@@ -1,8 +1,9 @@
 { inputs, ... }:
 {
   flake.modules.nixos.base =
-    { config, ... }:
+    { pkgs, config, ... }:
     {
+      environment.systemPackages = [ pkgs.attic-client ];
       age.secrets = {
         "attic".file = "${inputs.secrets}/attic.age";
         "nix" = {
