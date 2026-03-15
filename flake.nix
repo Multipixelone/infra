@@ -122,6 +122,13 @@
     zjstatus.url = "github:dj95/zjstatus";
     # helix fork with support for copilot-language-server
     helix.url = "github:devmanuelli/helix/textDocument/inlineCompletion";
+    # helix color
+    catppuccin-helix = {
+      url = "github:catppuccin/helix";
+      flake = false;
+    };
+    wrappers.url = "github:BirdeeHub/nix-wrapper-modules";
+    wrappers.inputs.nixpkgs.follows = "nixpkgs";
     # helix.url = "github:helix-editor/helix";
     yazi.url = "github:sxyazi/yazi";
     nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
