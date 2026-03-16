@@ -127,6 +127,10 @@
       url = "github:catppuccin/helix";
       flake = false;
     };
+    mcp-servers-nix = {
+      url = "github:natsukium/mcp-servers-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     wrappers.url = "github:BirdeeHub/nix-wrapper-modules";
     wrappers.inputs.nixpkgs.follows = "nixpkgs";
     # helix.url = "github:helix-editor/helix";

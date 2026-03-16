@@ -1889,6 +1889,26 @@
         "type": "github"
       }
     },
+    "mcp-servers-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1773624209,
+        "narHash": "sha256-KbmCjRujYcfLlgu2TK+OnPoEJl0NkSOM8h8plkVccIw=",
+        "owner": "natsukium",
+        "repo": "mcp-servers-nix",
+        "rev": "bfb4a5b6565dc07de81121f09231e963d4349b56",
+        "type": "github"
+      },
+      "original": {
+        "owner": "natsukium",
+        "repo": "mcp-servers-nix",
+        "type": "github"
+      }
+    },
     "monocle": {
       "inputs": {
         "crane": "crane_2",
@@ -2716,6 +2736,7 @@
         "khinsider": "khinsider",
         "lanzaboote": "lanzaboote",
         "make-shell": "make-shell",
+        "mcp-servers-nix": "mcp-servers-nix",
         "monocle": "monocle",
         "musnix": "musnix",
         "nextmeeting": "nextmeeting",
