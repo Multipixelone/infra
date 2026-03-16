@@ -1,6 +1,7 @@
 {
   flake.modules.homeManager.base = {
     programs = {
+      mergiraf.enableGitIntegration = true;
       git = {
         settings = {
           merge.conflictstyle = "zdiff3";
