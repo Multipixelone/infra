@@ -25,6 +25,9 @@ minishb:
   attic push system result -j 3
   unlink result
 
+fastb:
+  nix-fast-build --attic-cache system --no-link
+
 iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
 
