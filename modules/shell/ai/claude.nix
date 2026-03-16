@@ -213,6 +213,7 @@
           | `web-debug` | Chrome DevTools + Playwright MCP | Before browser debugging |
           | `hx` | Helix config, plugins, LSP patterns | Before editing hx config |
           | `zellij` | zellij sessions, panes, windows, orchestration | Before zellij interaction |
+          | `using-flake-parts` | Information on flake-parts layout and structure | whenever interacting with a flake-parts repository |
 
           ## Available Agents
 
