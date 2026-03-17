@@ -19,11 +19,11 @@
           let
             # wrap secret into gh cli
             gh-wrapped = pkgs.writeShellScriptBin "gh" ''
-              export GITHUB_TOKEN=$(cat ${hmArgs.config.age.secrets."gh".path})
+              set -a; source ${hmArgs.config.age.secrets."gh".path}; set +a
               ${lib.getExe pkgs.gh} "$@"
             '';
             gh-dash-wrapped = pkgs.writeShellScriptBin "gh-dash" ''
-              export GITHUB_TOKEN=$(cat ${hmArgs.config.age.secrets."gh".path})
+              set -a; source ${hmArgs.config.age.secrets."gh".path}; set +a
               ${lib.getExe pkgs.gh-dash} "$@"
             '';
           in
