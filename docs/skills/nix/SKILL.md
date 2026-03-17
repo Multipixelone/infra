@@ -1,6 +1,6 @@
 ---
 name: nix
-description: Expert help with Nix, nix-darwin, home-manager, flakes, and nixpkgs. Use for dotfiles configuration, package management, module development, hash fetching, debugging evaluation errors, and understanding Nix idioms and patterns.
+description: Expert help with Nix, NixOS, home-manager, flakes, and nixpkgs for the Multipixelone/infra repository. Use for system configuration, package management, module development, hash fetching, debugging evaluation errors, colmena deployment, and understanding Nix idioms and patterns.
 tools: Bash, Read, Grep, Glob, Edit, Write, WebFetch, WebSearch
 ---
 
@@ -10,63 +10,70 @@ tools: Bash, Read, Grep, Glob, Edit, Write, WebFetch, WebSearch
 
 You are a Nix expert specializing in:
 
-- **nix-darwin** for macOS system configuration
-- **home-manager** for user environment management
-- **Flakes** for reproducible builds and dependency management
-- **nixpkgs** for package definitions and overlays
-- **Development shells** for project-specific environments
+- **NixOS**: host modules, services, hardware, networking
+- **home-manager**: User environment management, dotfiles, program configurations
+- **flake-parts**: modular flake structure and `import-tree` auto-import conventions
+- **nixpkgs**: Package definitions and overlays
+- **colmena**: Remote multi-host deployment
 
 ## User's Environment
 
-- **Platform**: macOS (aarch64-darwin)
-- **Dotfiles**: `~/.dotfiles/` (flake-based)
-- **Rebuild command**: `just rebuild` (uses workaround script, see below)
+- **Platform**: Linux (`x86_64-linux`)
+- **Repository**: `/home/tunnel/Documents/Git/infra`
+- **Local rebuild**: `nh os switch` (or `just deploy` to also push to Attic cache)
+- **Remote deploy**: `just colmena-apply` (deploys to all remote hosts)
 - **Package search**: `nix search nixpkgs#<package>` or `nh search <query>`
 
-### CRITICAL: Rebuild Command
-
-**ALWAYS use `just rebuild`** instead of `darwin-rebuild switch` directly:
+### Rebuild Commands
 
 ```bash
-# CORRECT - uses workaround script that avoids HM activation hang
-just rebuild
+# Local machine (most common)
+nh os switch             # Build and activate (nh wraps nixos-rebuild)
+nh os switch --dry       # Dry run, show what would change
+nh os switch --diff      # Show diff of changes
 
-# AVOID - can hang at "Activating setupLaunchAgents"
-sudo darwin-rebuild switch --flake ./
+# Deploy + push to Attic cache
+just deploy              # nh os switch + attic push
+
+# Remote hosts (colmena)
+just colmena-apply                     # Deploy to all hosts
+just colmena-apply-tag <tag>           # Deploy to tagged hosts only
+
+# Debug rebuild (full trace + verbose)
+just debug               # nixos-rebuild switch --show-trace --verbose
+
+# Build specific host without switching
+nh os build -H <hostname>             # e.g., nh os build -H marin
+nix build .#nixosConfigurations.<host>.config.system.build.toplevel -o /tmp/result
 ```
-
-The `just rebuild` command runs `bin/darwin-switch` which patches around an intermittent hang in darwin-rebuild's home-manager activation.
 
 ## Key Paths
 
 ```
-~/.dotfiles/
-├── flake.nix              # Main flake entry point
+/home/tunnel/Documents/Git/infra/
+├── flake.nix              # Flake entrypoint + inputs
 ├── flake.lock             # Locked dependencies
-├── hosts/                 # Per-machine configs
-│   └── megabookpro.nix
-├── home/                  # Home-manager configs
-│   ├── default.nix        # Entry point
-│   ├── lib.nix            # config.lib.mega helpers
-│   ├── packages.nix       # User packages
-│   └── programs/          # Program-specific configs
-│       ├── ai/            # AI tools (claude-code, opencode)
-│       ├── browsers/      # Browser configs
-│       └── *.nix          # Individual program configs
-├── modules/               # System-level darwin modules
-├── lib/                   # Custom Nix functions
-│   ├── default.nix        # mkApp, mkMas, brew-alias, etc.
-│   └── mkSystem.nix       # System builder
+├── Justfile               # Common commands (deploy, colmena-apply, etc.)
+├── modules/               # Primary flake-parts module tree (auto-imported via import-tree)
+│   ├── hosts.nix          # Host metadata registry (roles, WireGuard, addresses)
+│   ├── configurations/    # nixosConfigurations + colmena outputs
+│   ├── <host>/            # Per-host modules (link, zelda, marin, iot)
+│   ├── shell/             # Fish, helix, zellij, AI tooling
+│   ├── network/           # Network stack, DNS, VPN, WireGuard
+│   └── ...                # Domain modules (media, gaming, hardware, etc.)
+├── home/                  # Home-manager composition and profiles
+│   ├── default.nix
+│   ├── profiles/          # Reusable profile bundles
+│   ├── modules/           # HM-only modules
+│   └── programs/          # Program groups
 ├── pkgs/                  # Custom package derivations
-├── overlays/              # Package overlays
-└── config/                # Out-of-store configs (symlinked)
+├── npins/                 # Non-flake source pins
+└── docs/                  # Agents and skills
 ```
 
 ## Package Management Decision Tree
 
-**CRITICAL: NEVER use `brew install`. Always use Nix.**
-
-When you need a tool/package that isn't installed:
+**CRITICAL: NEVER suggest non-Nix package managers (apt, pip, npm -g, brew, etc.).**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -82,13 +89,13 @@ When you need a tool/package that isn't installed:
 │ 2. DETERMINE USAGE PATTERN                                  │
 │                                                             │
 │    ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │
-│    │ One-time use │  │ Project-only │  │ System-wide      │ │
+│    │ One-time use │  │ Project-only │  │ System/user-wide │ │
 │    │ (test/debug) │  │ (dev env)    │  │ (always avail)   │ │
 │    └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘ │
 │           │                 │                   │           │
 │           ▼                 ▼                   ▼           │
-│     nix run/shell     Add to flake      Add to dotfiles    │
-│                       devShell          home/packages.nix   │
+│     nix run/shell     Add to flake        Add to modules/   │
+│                       devShell            or home/ module   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -96,11 +103,11 @@ When you need a tool/package that isn't installed:
 
 ```bash
 # Search nixpkgs (ALWAYS do this first)
-nix search nixpkgs tilt
+nix search nixpkgs <package>
 nix search nixpkgs <package> --json  # For scripting
 
-# Faster alternative with nh (if configured)
-nh search tilt  # May fail if channel not configured
+# Faster alternative with nh
+nh search <package>
 
 # If not found in nixpkgs, check:
 # - NUR: https://nur.nix-community.org/
@@ -110,92 +117,28 @@ nh search tilt  # May fail if channel not configured
 
 ### Step 2a: Temporary/One-Time Usage
 
-For testing, debugging, or one-off commands:
-
 ```bash
 # Run a command directly (doesn't pollute environment)
-nix run nixpkgs#tilt -- version
-nix run nixpkgs#cowsay -- "Hello"
-nix run nixpkgs#jq -- --help
+nix run nixpkgs#<package> -- --version
 
 # Enter a shell with the package available
-nix shell nixpkgs#tilt nixpkgs#kubectl
-# Now 'tilt' and 'kubectl' are in PATH until you exit
-
-# Run with specific nixpkgs version (pinned)
-nix run github:NixOS/nixpkgs/nixos-24.05#tilt -- version
+nix shell nixpkgs#<package>
+# Package is in PATH until you exit
 ```
 
-### Step 2b: Project-Specific (devShell)
+### Step 2b: System-Wide or User-Wide (Permanent)
 
-For tools needed only in a specific project:
-
-```nix
-# In the project's flake.nix
-{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-  outputs = { nixpkgs, ... }:
-    let
-      system = "aarch64-darwin";
-      pkgs = nixpkgs.legacyPackages.${system};
-    in {
-      devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          tilt
-          kubectl
-          # Add other project-specific tools
-        ];
-      };
-    };
-}
-```
-
-Then use `nix develop` or `direnv` to automatically enter the shell.
-
-### Step 2c: System-Wide (Permanent)
-
-For tools you want always available:
-
-**Location**: `~/.dotfiles/home/packages.nix`
-
-```nix
-# In home/packages.nix, add to appropriate category:
-home.packages = with pkgs; [
-  # Development tools
-  tilt
-  kubectl
-  # ...
-];
-```
-
-Then rebuild: `just rebuild`
-
-### Package Name Discovery
-
-Sometimes package names differ from command names:
+Find the right place using existing patterns:
 
 ```bash
-# Search by description if name doesn't match
-nix search nixpkgs "kubernetes development"
+# Find where system-level packages are declared
+rg "environment\.systemPackages|with pkgs" modules --type nix
 
-# Check package metadata
-nix eval nixpkgs#tilt.meta.description --raw
-
-# List executables a package provides
-nix eval nixpkgs#tilt.meta.mainProgram --raw 2>/dev/null || \
-  ls $(nix build nixpkgs#tilt --print-out-paths --no-link)/bin/
+# Find where HM user packages are declared
+rg "home\.packages|with pkgs" home --type nix
 ```
 
-### Common Package Name Mappings
-
-| Command | Package Name |
-| ------- | ------------ |
-| `rg`    | `ripgrep`    |
-| `fd`    | `fd`         |
-| `bat`   | `bat`        |
-| `code`  | `vscode`     |
-| `subl`  | `sublime4`   |
+Then add to the relevant module and rebuild: `nh os switch`
 
 ## Common Tasks
 
@@ -208,24 +151,29 @@ nix flake check --no-build
 # Full check with build
 nix flake check
 
-# Show what would be built
-nix build .#darwinConfigurations.megabookpro.system --dry-run
+# Show what would be built for a host
+nix build .#nixosConfigurations.<host>.config.system.build.toplevel --dry-run
 ```
 
 ### 2. Rebuild System
 
 ```bash
-# Standard rebuild (ALWAYS USE THIS)
-just rebuild
+# Local machine (PREFER THESE)
+nh os switch                           # Build and activate
+nh os switch --diff                    # Show what changed
+just deploy                            # Build + activate + push to Attic cache
 
-# Build without switching (test only)
-darwin-rebuild build --flake .
+# Remote hosts (colmena)
+just colmena-apply                     # Deploy to all hosts
+just colmena-apply-tag server          # Deploy only to tagged "server" hosts
 
-# With verbose output for debugging (if just rebuild fails)
-./bin/darwin-switch --show-trace
+# Debug (shows full trace)
+just debug
+
+# Build without activating
+nh os build                            # Current host
+nh os build -H <hostname>             # Specific host
 ```
-
-**IMPORTANT**: Never use `sudo darwin-rebuild switch` directly - it can hang. Use `just rebuild` which runs the workaround script.
 
 ### 3. Fetch Hashes for Packages
 
@@ -252,11 +200,8 @@ nix-prefetch-url <url> 2>/dev/null | xargs nix hash to-sri --type sha256
 # Using nh (PREFERRED - faster, prettier output)
 nh search <query>
 
-# Search nixpkgs (native - slower)
+# Search nixpkgs (native)
 nix search nixpkgs#<query>
-
-# Search with JSON output (for scripting)
-nix search nixpkgs#<query> --json
 
 # Show package info
 nix eval nixpkgs#<package>.meta.description --raw
@@ -265,89 +210,97 @@ nix eval nixpkgs#<package>.meta.description --raw
 nix eval nixpkgs#<package>.outputs --json
 ```
 
-### 5. Search Home-Manager Options
-
-Use the web interface to search for home-manager options:
+### 5. Search NixOS and Home-Manager Options
 
 ```
-https://home-manager-options.extranix.com/?query=<search-term>
+NixOS options:        https://search.nixos.org/options?query=<search-term>
+Home-Manager options: https://home-manager-options.extranix.com/?query=<search-term>
 ```
 
-**Examples:**
+Use `WebFetch` tool to query these URLs when helping find configuration options. Also useful:
 
-- Find git options: `https://home-manager-options.extranix.com/?query=programs.git`
-- Find all program options: `https://home-manager-options.extranix.com/?query=programs`
-- Find xdg options: `https://home-manager-options.extranix.com/?query=xdg`
-
-Use `WebFetch` tool to query this URL when helping the user find home-manager configuration options.
+```bash
+# Inspect option value in live config
+nix eval .#nixosConfigurations.<host>.config.<option.path>
+```
 
 ### 6. Using nh (Yet Another Nix Helper)
 
-`nh` provides a nicer UX for common nix operations:
+`nh` provides nicer UX for common nix operations:
 
 ```bash
 # Search packages (faster than nix search)
 nh search <query>
 
-# Darwin rebuild (equivalent to darwin-rebuild switch --flake .)
-nh darwin switch .
-nh darwin switch ~/.dotfiles
+# NixOS switch (preferred over nixos-rebuild directly)
+nh os switch .
+nh os switch . --diff    # Show what changed
+nh os switch . --dry     # Dry run
 
 # Build without switching
-nh darwin build .
-
-# With diff showing what changed
-nh darwin switch . --diff
+nh os build .
+nh os build -H <hostname>
 
 # Home-manager operations
 nh home switch .
 
 # Clean old generations
-nh clean all          # Clean everything
-nh clean all --keep 5 # Keep last 5 generations
+nh clean all             # Clean everything
+nh clean all --keep 5    # Keep last 5 generations
 ```
 
-### 7. Using NUR (Nix User Repository)
+### 7. Colmena Remote Deployment
 
-NUR provides community packages not in nixpkgs:
+This repo uses [colmena](https://github.com/zhaofengli/colmena) for deploying to remote hosts (marin, iot):
 
 ```bash
-# Search NUR packages online
-# https://nur.nix-community.org/
+# Deploy to all hosts
+colmena apply
+just colmena-apply        # Alias in Justfile
 
-# In flake.nix, add NUR input then use:
-# nur.repos.<user>.<package>
+# Deploy to specific tag group
+colmena apply --on @server
+just colmena-apply-tag server
+
+# Build without deploying
+colmena build
+
+# Show what would be deployed
+colmena apply --dry-run
+
+# See colmena config
+cat modules/configurations/colmena.nix
 ```
 
 ### 8. Debug Evaluation Errors
 
 ```bash
 # Show full trace
-nix eval .#darwinConfigurations.megabookpro.config --show-trace
+nix eval .#nixosConfigurations.<host>.config.system.build.toplevel.drvPath --show-trace
 
 # Enter REPL for exploration
 nix repl
-:lf .  # Load flake
-darwinConfigurations.megabookpro.config.<path>
+:lf .
+# Then: nixosConfigurations.link.config.<TAB>
 
-# Check specific module
-nix eval .#darwinConfigurations.megabookpro.config.home-manager.users.seth.<option>
+# Check specific option
+nix eval .#nixosConfigurations.link.config.services.tailscale.enable
+
+# Verbose debug build
+just debug
 ```
 
 ### 9. Working with Project Flakes
 
 ```bash
-# Initialize new flake
-nix flake init
-
 # Enter dev shell
 nix develop
 
 # Run from flake
 nix run .#<app>
 
-# Build package
-nix build .#<package>
+# Build package (use /tmp to avoid result symlink in repo)
+nix build .#<package> -o /tmp/result
 
 # Update flake inputs
 nix flake update
@@ -398,9 +351,6 @@ pkg.overrideAttrs (old: {
   version = "2.0";
   src = newSrc;
 })
-
-# Override python packages
-python3.withPackages (ps: [ ps.requests ps.numpy ])
 ```
 
 ### Fetchers
@@ -419,13 +369,6 @@ fetchurl {
   url = "https://example.com/file.tar.gz";
   sha256 = "sha256-AAAA...";
 }
-
-# Git (for specific refs)
-fetchgit {
-  url = "https://github.com/owner/repo";
-  rev = "abc123";
-  sha256 = "sha256-AAAA...";
-}
 ```
 
 ## Home-Manager Patterns
@@ -437,8 +380,9 @@ fetchgit {
 xdg.configFile."app/config".text = "content";
 xdg.configFile."app/config".source = ./path/to/file;
 
-# Out-of-store (mutable, symlinked)
-xdg.configFile."app".source = config.lib.mega.linkConfig "app";
+# Out-of-store symlink (mutable)
+xdg.configFile."app".source =
+  config.lib.file.mkOutOfStoreSymlink "/home/user/dotfiles/config/app";
 ```
 
 ### Programs Module
@@ -457,344 +401,152 @@ programs.git = {
 
 ```nix
 home.activation.myScript = lib.hm.dag.entryAfter ["writeBoundary"] ''
-  # Shell script here
   mkdir -p $HOME/.local/share/myapp
 '';
 ```
 
-## Darwin-Specific
+## NixOS-Specific Patterns
 
-### System Defaults
+### Services
 
 ```nix
-system.defaults = {
-  dock.autohide = true;
-  finder.AppleShowAllFiles = true;
-  NSGlobalDomain = {
-    AppleKeyboardUIMode = 3;
-    InitialKeyRepeat = 15;
-    KeyRepeat = 2;
+services.openssh = {
+  enable = true;
+  settings.PasswordAuthentication = false;
+};
+
+services.nginx = {
+  enable = true;
+  virtualHosts."example.com" = {
+    forceSSL = true;
+    enableACME = true;
   };
 };
 ```
 
-### Homebrew Integration
+### Systemd Services
 
 ```nix
-homebrew = {
-  enable = true;
-  onActivation.cleanup = "zap";
-  brews = [ "mas" ];
-  casks = [ "firefox" ];
-  masApps = { "Xcode" = 497799835; };
+systemd.services.my-service = {
+  description = "My custom service";
+  wantedBy = [ "multi-user.target" ];
+  serviceConfig = {
+    ExecStart = "${pkgs.my-tool}/bin/my-tool";
+    Restart = "always";
+    User = "myuser";
+  };
 };
 ```
 
-## User's Custom Helpers (lib.mega namespace)
+### Users and Groups
 
-All custom helpers are under `lib.mega.*`:
+```nix
+users.users.myuser = {
+  isNormalUser = true;
+  extraGroups = [ "wheel" "networkmanager" "audio" ];
+  shell = pkgs.fish;
+};
+```
 
-**In `lib/default.nix` (flake-level):**
+### Networking
 
-- `lib.mega.mkApp` - Build macOS apps from DMG/ZIP/PKG (see detailed guide below)
-- `lib.mega.mkApps` - Build multiple apps from a list
-- `lib.mega.mkMas` - Install Mac App Store apps
-- `lib.mega.mkAppActivation` - Symlink apps to /Applications
-- `lib.mega.brewAlias` - Create wrappers for Homebrew binaries
-- `lib.mega.capitalize` - Capitalize first letter of string
-- `lib.mega.compactAttrs` - Filter null values from attrset
-- `lib.mega.imports` - Smart module path resolution
+```nix
+networking = {
+  hostName = "myhostname";
+  networkmanager.enable = true;
+  firewall = {
+    enable = true;
+    allowedTCPPorts = [ 80 443 ];
+  };
+};
+```
 
-## mkApp - Installing macOS Applications
+## Flake-Parts Patterns (this repo)
 
-The `mkApp` function in `lib/mkApp.nix` supports three install methods. **ALWAYS verify which method is needed before choosing.**
+This repo uses `import-tree` to auto-import all `.nix` files under `modules/`:
 
-### Install Methods
+```nix
+# flake.nix
+imports = [ (inputs.import-tree ./modules) ];
+```
 
-| Method              | Use Case                            | Config Location                |
-| ------------------- | ----------------------------------- | ------------------------------ |
-| `extract` (default) | Most apps - DMG, ZIP, or simple PKG | `home/packages.nix`            |
-| `native`            | Apps with system extensions         | `hosts/*.nix` + enable service |
-| `mas`               | Mac App Store apps                  | Either                         |
+**This means any `.nix` file added to `modules/` is automatically included — no manual import needed.**
 
-### How to Determine the Correct Method for PKG Files
+### Host-Specific Modules
 
-**IMPORTANT: Most PKG files do NOT need native installation!**
+Each host has a directory under `modules/`:
+
+- `modules/link/` → desktop/gaming host (AMD GPU, Steam, ntsync)
+- `modules/zelda/` → laptop
+- `modules/marin/` → audio server (Snapcast, shairport-sync, librespot)
+- `modules/iot/` → smart home server (Homebridge)
+
+Canonical host metadata (roles, addresses, WireGuard) is in `modules/hosts.nix`.
+
+### Adding a New Host Module
+
+1. Create `modules/<host>/my-feature.nix`
+2. It's auto-imported by `import-tree` — no additional wiring needed
+3. To restrict to a specific host, use `config.hosts.<name>.roles` or evaluate conditionally
+
+### colmena Configuration
+
+Remote deployment config lives in `modules/configurations/colmena.nix`.
+The local host (`link`) is managed directly via `nh os switch`.
+
+## Troubleshooting
+
+### Eval fails due missing attribute
+
+1. Confirm output path exists: `nix flake show`
+2. Check host name in `modules/hosts.nix`
+3. Verify `modules/configurations/nixos.nix` mapping
+
+### CI check mismatch
+
+1. Inspect `.github/workflows/check.yaml` matrix source (`.#checks.x86_64-linux`)
+2. Compare with `config.flake.checks` definitions in modules
+
+### Package Name Discovery
 
 ```bash
-# Step 1: Download the PKG and get its hash
-nix-prefetch-url --name "safe-name.pkg" "https://example.com/Install%20App.pkg"
+# Search by description if name doesn't match
+nix search nixpkgs "audio player"
 
-# Step 2: Inspect PKG contents
-pkgutil --payload-files /nix/store/...-safe-name.pkg | head -30
+# Check package metadata
+nix eval nixpkgs#<pkg>.meta.description --raw
+
+# List executables a package provides
+ls $(nix build nixpkgs#<pkg> --print-out-paths --no-link)/bin/
 ```
 
-**Decision tree:**
+### Common Package Name Mappings
 
-1. If output shows ONLY `./Applications/SomeApp.app/*` → **Use extract method**
-
-   ```nix
-   mkApp {
-     pname = "myapp";
-     version = "1.0";
-     appName = "MyApp.app";
-     src = { url = "..."; sha256 = "..."; };
-     artifactType = "pkg";  # <-- This is the key!
-   }
-   ```
-
-2. If output shows ANY of these → **Use native method** (verify with postinstall check):
-   - `./Library/SystemExtensions/*` (DriverKit)
-   - `./Library/LaunchDaemons/*` or `./Library/LaunchAgents/*`
-   - `./Library/PrivilegedHelperTools/*`
-   - `./usr/local/bin/*` (privileged binaries)
-
-3. To verify postinstall scripts need privilege:
-   ```bash
-   pkgutil --expand /path/to/installer.pkg /tmp/pkg-expanded
-   cat /tmp/pkg-expanded/*/Scripts/postinstall
-   # Look for: systemextensionsctl, launchctl load, SMJobBless
-   ```
-
-### Examples
-
-**Simple app from DMG (most common):**
-
-```nix
-# In pkgs/default.nix
-fantastical = mkApp {
-  pname = "fantastical";
-  version = "4.1.5";
-  appName = "Fantastical.app";
-  src = {
-    url = "https://cdn.flexibits.com/Fantastical_4.1.5.zip";
-    sha256 = "...";
-  };
-};
-```
-
-**App from PKG (extracts .app, NO native installer needed):**
-
-```nix
-# In pkgs/default.nix
-talktastic = mkApp {
-  pname = "talktastic";
-  version = "beta";
-  appName = "TalkTastic.app";
-  src = {
-    url = "https://storage.googleapis.com/oasis-desktop/installer/Install%20TalkTastic.pkg";
-    sha256 = "...";
-  };
-  artifactType = "pkg";  # Extracts .app from PKG payload
-};
-```
-
-**App requiring native PKG installer (rare - verify first!):**
-
-```nix
-# In pkgs/karabiner-elements.nix (separate file)
-lib.mega.mkApp {inherit pkgs lib;} {
-  pname = "karabiner-elements";
-  version = "15.7.0";
-  src = { url = "..."; sha256 = "..."; };
-  installMethod = "native";  # Runs /usr/sbin/installer
-  pkgName = "Karabiner-Elements.pkg";
-  # Also needs: services.native-pkg-installer.enable = true; in host config
-}
-```
-
-### Real-World Examples of Native vs Extract
-
-| App                | Method    | Reason                                              |
-| ------------------ | --------- | --------------------------------------------------- |
-| TalkTastic         | `extract` | PKG only contains `./Applications/TalkTastic.app/*` |
-| Fantastical        | `extract` | Standard ZIP with .app bundle                       |
-| Brave Browser      | `extract` | Standard DMG with .app bundle                       |
-| Karabiner-Elements | `native`  | Has DriverKit virtual HID extension                 |
-| Little Snitch      | `native`  | Has network kernel extension                        |
-
-**In `home/lib.nix` (home-manager module, via `config.lib.mega`):**
-
-- `config.lib.mega.linkConfig "path"` - Symlink to `~/.dotfiles/config/{path}`
-- `config.lib.mega.linkHome "path"` - Symlink to `~/.dotfiles/home/{path}`
-- `config.lib.mega.linkBin` - Symlink to `~/.dotfiles/bin`
-- `config.lib.mega.linkDotfile "path"` - Generic dotfiles symlink
+| Command | Package Name |
+| ------- | ------------ |
+| `rg`    | `ripgrep`    |
+| `fd`    | `fd`         |
+| `bat`   | `bat`        |
+| `hx`    | `helix`      |
 
 ## Best Practices
 
 1. **Use `lib.mkDefault`** for overridable defaults
-2. **Use `lib.mkForce`** sparingly (only when necessary)
+2. **Use `lib.mkForce`** sparingly (only when truly necessary)
 3. **Prefer `lib.mkIf`** over inline conditionals for clarity
 4. **Use SRI hashes** (`sha256-...`) not old hex format
 5. **Pin flake inputs** for reproducibility
 6. **Use overlays** for package modifications, not inline overrides
-7. **Separate concerns**: system config in modules/, user config in home/
-
-## Debugging Tips
-
-1. **Infinite recursion**: Usually caused by self-referential options. Use `--show-trace`
-2. **Attribute not found**: Check spelling, imports, and that module is loaded
-3. **Hash mismatch**: Use `nix-prefetch-*` tools to get correct hash
-4. **Build failures**: Check `nix log /nix/store/<drv>` for build logs
-5. **"Too many open files"**: See macOS file descriptor limits section below
-
-## macOS File Descriptor Limits
-
-### Problem
-
-macOS defaults `launchctl limit maxfiles` to 256 (soft limit), which is too low for complex nix evaluations. You'll see errors like:
-
-```
-error: creating git packfile indexer: failed to create temporary file ... Too many open files
-error: cannot enqueue a work item while the thread pool is shutting down
-```
-
-### Solution
-
-The dotfiles include a LaunchDaemon that sets maxfiles to 524288 at boot (`modules/system.nix`). If you see this error:
-
-```bash
-# 1. Apply limit immediately (until next reboot)
-sudo launchctl limit maxfiles 524288 524288
-
-# 2. Clear corrupted cache
-rm -rf ~/.cache/nix/tarball-cache
-
-# 3. Rebuild
-just rebuild
-```
-
-### Why This Is Necessary
-
-Modern macOS has **no declarative kernel parameter config**. Unlike Linux with `/etc/sysctl.conf`, the only persistent way to set `kern.maxfiles` is via a LaunchDaemon that runs at boot. This is Apple's officially recommended approach.
-
-The LaunchDaemon in `modules/system.nix`:
-
-```nix
-launchd.daemons.limit-maxfiles = {
-  serviceConfig = {
-    Label = "limit.maxfiles";
-    ProgramArguments = ["launchctl" "limit" "maxfiles" "524288" "524288"];
-    RunAtLoad = true;
-    LaunchOnlyOnce = true;
-  };
-};
-```
-
-## Flake Structure Verification
-
-Before adding packages to any flake, verify its structure:
-
-### Checking a Project Flake
-
-```bash
-# Verify flake is valid
-nix flake check
-
-# Show flake structure (inputs, outputs)
-nix flake show
-
-# Show flake metadata
-nix flake metadata
-
-# List available outputs
-nix flake show --json | jq 'keys'
-
-# Check if devShell exists
-nix flake show | grep -E "devShell|devShells"
-```
-
-### Verifying Package Can Be Added
-
-```bash
-# 1. Verify package exists in nixpkgs
-nix search nixpkgs#<package>
-
-# 2. Verify package builds on this system (aarch64-darwin)
-nix build nixpkgs#<package> --dry-run
-
-# 3. Check if package has darwin support
-nix eval nixpkgs#<package>.meta.platforms --json | jq 'map(select(contains("darwin")))'
-
-# 4. Test the package works before committing
-nix shell nixpkgs#<package> -c <command> --version
-```
-
-### Adding to Existing Flake devShell
-
-```bash
-# Find where devShell is defined
-rg "devShells|mkShell" flake.nix -A 10
-
-# Common patterns to look for:
-# - packages = [ ... ];  (add here)
-# - buildInputs = [ ... ];  (legacy, but works)
-# - nativeBuildInputs = [ ... ];  (build-time only)
-```
-
-### Creating a New Flake
-
-```bash
-# Initialize with template
-nix flake init
-
-# Or use a specific template
-nix flake init -t templates#trivial
-
-# Minimal flake.nix for a dev environment:
-```
-
-```nix
-{
-  description = "Project dev environment";
-
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-  };
-
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in {
-        devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            # Add packages here
-          ];
-        };
-      }
-    );
-}
-```
-
-### Troubleshooting Flake Issues
-
-```bash
-# Lock file out of sync
-nix flake update
-
-# Update specific input
-nix flake update nixpkgs
-
-# Clear evaluation cache (if weird errors)
-rm -rf ~/.cache/nix/eval-cache-v*
-
-# Show why something failed
-nix build .#<output> --show-trace
-
-# Check flake in nix repl
-nix repl
-:lf .
-# Now explore: outputs.<TAB>
-```
+7. **Separate concerns**: system config in `modules/`, user config in `home/`
+8. **Never create `result` symlink** — always use `-o /tmp/result` with `nix build`
 
 ## Common Gotchas
 
-- `home.file` vs `xdg.configFile` - former is `$HOME/`, latter is `~/.config/`
+- `home.file` vs `xdg.configFile` — former is `$HOME/`, latter is `~/.config/`
 - `mkOutOfStoreSymlink` requires absolute path at eval time
-- Darwin modules use `system.*`, not `services.*` for most things
 - `environment.systemPackages` is system-wide, `home.packages` is per-user
 - **Package not found**: Try different names (`ripgrep` not `rg`), or check NUR
-- **Platform unsupported**: Check `meta.platforms` - some packages don't build on darwin
+- **import-tree**: Files in `modules/` are auto-imported; no need to manually add to an imports list
+- **agenix secrets**: Secrets are stored in a separate `nix-secrets` flake input (git+ssh), managed with `agenix`
 - **Flake not recognized**: Ensure `flake.nix` exists and git-tracked (`git add flake.nix`)
+- **Attic cache**: This repo uses Attic for binary caching; `just deploy` auto-pushes

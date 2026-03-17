@@ -100,31 +100,48 @@ Primary flake-parts module tree:
 
 All hosts use `role = ["server"]` or desktop roles defined in `modules/hosts.nix`. Kernel is `linuxPackages_zen` fleet-wide (set in `modules/boot/loader.nix`).
 
+## Deployment
+
+- **Local machine** (`link`): `nh os switch` or `just deploy` (also pushes to Attic cache)
+- **Remote machines** (`marin`, `iot`): `just colmena-apply` (colmena config in `modules/configurations/colmena.nix`)
+- **Secrets**: Managed via `agenix` from a private `nix-secrets` flake input (git+ssh)
+
+## Auto-Import Pattern (import-tree)
+
+**CRITICAL**: `modules/` uses `import-tree` for auto-importing. Every `.nix` file dropped into `modules/` is automatically included — **no manual imports list to update**. This is the key structural difference from typical NixOS configs.
+
 ## Quick Reference: "Where is X configured?"
 
-| Thing                       | Location                                |
-| --------------------------- | --------------------------------------- |
-| Host inventory / metadata   | `modules/hosts.nix`                     |
-| Host-specific system config | `modules/link/`, `modules/zelda/`, etc. |
-| NixOS configuration outputs | `modules/configurations/nixos.nix`      |
-| Colmena deployment outputs  | `modules/configurations/colmena.nix`    |
-| Home Manager base           | `home/default.nix`                      |
-| Home profiles               | `home/profiles/*`                       |
-| Fish shell config           | `modules/shell/fish/fish.nix`           |
-| Zellij config               | `modules/shell/zellij.nix`              |
-| Helix editor config         | `modules/shell/helix.nix`               |
-| Custom package definitions  | `pkgs/*`                                |
-| Flake-parts patterns        | `docs/skills/using-flake-parts/*`       |
-| Agent/skill docs            | `docs/agents/*.md`, `docs/skills/*.md`  |
+| Thing                          | Location                                |
+| ------------------------------ | --------------------------------------- |
+| Host inventory / metadata      | `modules/hosts.nix`                     |
+| Host-specific system config    | `modules/link/`, `modules/zelda/`, etc. |
+| NixOS configuration outputs    | `modules/configurations/nixos.nix`      |
+| Colmena deployment outputs     | `modules/configurations/colmena.nix`    |
+| Home Manager base              | `home/default.nix`                      |
+| Home profiles                  | `home/profiles/*`                       |
+| Fish shell config              | `modules/shell/fish/fish.nix`           |
+| Zellij config                  | `modules/shell/zellij.nix`              |
+| Helix editor config            | `modules/shell/helix.nix`               |
+| Network / DNS / VPN            | `modules/network/`                      |
+| Boot / kernel config           | `modules/boot/`                         |
+| Gaming (Steam/Wine/ntsync)     | `modules/gaming/`                       |
+| Media / audio services         | `modules/media/`                        |
+| Custom package definitions     | `pkgs/*`                                |
+| Pinned non-flake sources       | `npins/`                                |
+| Common rebuild/deploy commands | `Justfile`                              |
+| Flake-parts patterns           | `docs/skills/using-flake-parts/*`       |
+| Agent/skill docs               | `docs/agents/*.md`, `docs/skills/*.md`  |
 
 ## Conventions
 
 ### Additions Pattern
 
 1. Add or extend modules in `modules/` or `home/` (domain-appropriate folder).
-2. Wire host-specific changes in `modules/<host>/imports.nix` (or relevant host module).
+2. New `.nix` files in `modules/` are **automatically imported** by `import-tree` — no explicit import needed.
 3. Reuse shared stacks from `home/profiles/*` when possible.
 4. Keep machine metadata in `modules/hosts.nix` (addresses, roles, WireGuard data).
+5. Host-specific overrides go in `modules/<host>/` (e.g., `modules/link/gaming.nix`).
 
 ## Related Resources
 

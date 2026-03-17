@@ -420,6 +420,24 @@ The module system only passes arguments you explicitly name:
 args: { }  # Won't receive special arguments
 ```
 
+## This Repository's Pattern (import-tree)
+
+This repo uses `import-tree` instead of explicit `imports = [ ./module1.nix ./module2.nix ]`:
+
+```nix
+# flake.nix
+imports = [ (inputs.import-tree ./modules) ];
+```
+
+`import-tree` recursively discovers and imports every `.nix` file under `modules/`. This means:
+
+- **No imports list to update** when adding a new module file
+- **Files are automatically included** as long as they're git-tracked
+- New files must be `git add`-ed before the flake sees them
+- Module conflicts (duplicate `config` values) surface at eval time, not at file add time
+
+This is different from standard flake-parts where you explicitly list imports.
+
 ## Beyond the Basics
 
 For specialized flake-parts features, load these guides:

@@ -158,6 +158,33 @@ rg "callPackage|packages\\.|perSystem" modules pkgs flake.nix --type nix
 nix eval .#checks.x86_64-linux --apply builtins.attrNames --json
 ```
 
+### 6. Colmena Deployment Investigation
+
+```bash
+# See what hosts colmena knows about
+rg "deployment\." modules/configurations/colmena.nix -A 5
+
+# Check which tags a host has
+rg "tags\s*=" modules --type nix
+
+# Understand host composition
+cat modules/configurations/colmena.nix
+cat modules/configurations/nixos.nix
+```
+
+### 7. Auto-Import (import-tree)
+
+This repo uses `import-tree` — ALL `.nix` files under `modules/` are auto-imported. No explicit `imports = [ ]` lists to hunt for:
+
+```bash
+# Find all modules for a host
+fd -e nix modules/link/
+fd -e nix modules/zelda/
+
+# Find all domain modules
+fd -e nix modules/ --max-depth 2
+```
+
 ## Research Methodology
 
 When exploring, follow this process:
