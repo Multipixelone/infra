@@ -77,7 +77,6 @@ infra/
 │   ├── profiles/
 │   ├── modules/
 │   └── programs/
-├── system/                # Shared role bundles (server/desktop/laptop)
 ├── pkgs/                  # Custom package derivations
 ├── npins/                 # Non-flake source pins
 └── docs/                  # Agents and skills
@@ -105,7 +104,7 @@ infra/
 rg "programs\\.git|services\\.|networking\\." . --type nix
 
 # Find option DEFINITION (the mkOption)
-rg "mkOption|mkEnableOption" modules home system --type nix
+rg "mkOption|mkEnableOption" modules home --type nix
 
 # Check what a specific config evaluates to
 nix eval .#nixosConfigurations.zelda.config.programs.fish.enable --json
@@ -115,7 +114,7 @@ nix eval .#nixosConfigurations.zelda.config.programs.fish.enable --json
 
 ```bash
 # Find all imports in a file
-rg "imports\\s*=" modules home system --type nix -A 10
+rg "imports\\s*=" modules home --type nix -A 10
 
 # Trace module loading
 nix eval .#nixosConfigurations.link.config._module.args --show-trace
@@ -140,10 +139,10 @@ nix eval .#nixosConfigurations.zelda.config.services.tailscale.enable
 
 ```bash
 # All services defined
-rg "services\\." modules system --type nix | sort -u
+rg "services\\." modules --type nix | sort -u
 
 # All enabled programs
-rg "\\.enable\\s*=\\s*true" modules home system --type nix
+rg "\\.enable\\s*=\\s*true" modules home --type nix
 
 # Package references
 rg "pkgs\\." modules home pkgs --type nix | grep -v "^#"
@@ -188,7 +187,7 @@ Always provide:
 - Host metadata → `modules/hosts.nix`
 - Host configuration entry points → `modules/<host>/imports.nix`
 - User programs and shell/editor behavior → `home/` and `modules/shell/`
-- Shared OS role composition → `system/default.nix`
+- Shared OS role composition → `modules/` (domain modules and host-specific dirs)
 
 ## Common Investigation Patterns
 
@@ -202,7 +201,7 @@ Always provide:
 
 1. Find config: `rg` for the behavior
 2. Trace imports/composition via `imports = [ ... ]`
-3. Check whether behavior is host-specific (`modules/<host>/`) or shared (`system/`, `home/profiles/`)
+3. Check whether behavior is host-specific (`modules/<host>/`) or shared (`modules/`, `home/profiles/`)
 
 ### "How do I add X?"
 

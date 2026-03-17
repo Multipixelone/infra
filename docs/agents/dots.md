@@ -45,7 +45,6 @@ This is a **NixOS + Home Manager flake-parts configuration** managing:
 - Shared module sets under `modules/`
 - Home Manager profiles under `home/`
 - Custom packages under `pkgs/`
-- Reusable system bundles under `system/`
 
 **Flake root**: repository root (`flake.nix`)
 **Primary checks**: `.github/workflows/check.yaml` evaluates `.#checks.x86_64-linux`
@@ -59,7 +58,6 @@ This is a **NixOS + Home Manager flake-parts configuration** managing:
 | `flake.nix` | Flake entrypoint + inputs     | Global architecture and external deps      |
 | `modules/`  | Main flake-parts module tree  | Most NixOS options, host modules, services |
 | `home/`     | Home Manager modules/profiles | User-level apps, shell/editor preferences  |
-| `system/`   | Reusable host role bundles    | Shared server/desktop/laptop composition   |
 | `pkgs/`     | Local package derivations     | Custom packaged software                   |
 | `npins/`    | Pinned non-flake sources      | Source pinning and updates                 |
 | `docs/`     | Agent/skill docs              | Assistant behavior and reference material  |
@@ -121,7 +119,7 @@ Primary flake-parts module tree:
 
 1. Add or extend modules in `modules/` or `home/` (domain-appropriate folder).
 2. Wire host-specific changes in `modules/<host>/imports.nix` (or relevant host module).
-3. Reuse shared stacks from `system/default.nix` and `home/profiles/*` when possible.
+3. Reuse shared stacks from `home/profiles/*` when possible.
 4. Keep machine metadata in `modules/hosts.nix` (addresses, roles, WireGuard data).
 
 ## Related Resources
