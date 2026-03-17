@@ -239,6 +239,13 @@
           | `/next` | - | Complete current work, find next task - ensures clean handoff |
           | `/preview` | - | Smart preview - opens content in tmux pane (context-aware) |
         '';
+        agents = {
+          # Dotfiles navigator - central guide for finding things in this repo
+          dots = builtins.readFile "${self}/docs/agents/dots.md";
+
+          # Nix exploration agent for autonomous investigation of nix configs
+          nix = builtins.readFile "${self}/docs/agents/nix.md";
+        };
         settings = {
           theme = "dark";
           autoUpdates = false;
@@ -246,7 +253,7 @@
           autoCompactEnabled = false;
           enableAllProjectMcpServers = true;
           outputStyle = "Explanatory";
-          model = "claude-opus-4-6";
+          model = "claude-sonnet-4-6";
         };
       };
     };
