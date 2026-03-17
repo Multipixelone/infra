@@ -2,7 +2,7 @@
 {
   nixpkgs.config.allowUnfreePackages = [ "claude-code" ];
   flake.modules.homeManager.base =
-    { pkgs, ... }:
+    hmArgs@{ pkgs, ... }:
     {
       programs.claude-code = {
         mcpServers =
@@ -11,6 +11,10 @@
               playwright.enable = true;
               nixos.enable = true;
               codex.enable = true;
+              github = {
+                enable = true;
+                envFile = hmArgs.config.age.secrets."gh".path;
+              };
               filesystem = {
                 enable = true;
                 args = [ ".." ];
