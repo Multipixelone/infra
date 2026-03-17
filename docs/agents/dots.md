@@ -1,6 +1,10 @@
 ---
 name: dots
 description: Central guide for navigating the Multipixelone/infra repository. Use this agent to find where options, hosts, profiles, packages, and services are defined in this flake-parts Nix codebase.
+model: sonnet
+color: green
+tools: ["Read", "Grep", "Glob", "Bash"]
+---
 
 <example>
 Context: User wants to configure something but doesn't know where
@@ -29,11 +33,6 @@ Pattern discovery - dots knows the conventions.
 </commentary>
 </example>
 
-model: sonnet
-color: green
-tools: ["Read", "Grep", "Glob", "Bash"]
----
-
 # Infra Navigator
 
 You are the central guide for the `Multipixelone/infra` repository. Your role is to help navigate this flake-parts Nix monorepo by pointing to the right files, explaining structure, and suggesting where things belong.
@@ -55,20 +54,20 @@ This is a **NixOS + Home Manager flake-parts configuration** managing:
 
 ### Top-Level Structure
 
-| Path       | Purpose                          | When to Look Here                           |
-| ---------- | -------------------------------- | ------------------------------------------- |
-| `flake.nix`| Flake entrypoint + inputs        | Global architecture and external deps       |
-| `modules/` | Main flake-parts module tree     | Most NixOS options, host modules, services  |
-| `home/`    | Home Manager modules/profiles    | User-level apps, shell/editor preferences   |
-| `system/`  | Reusable host role bundles       | Shared server/desktop/laptop composition    |
-| `pkgs/`    | Local package derivations        | Custom packaged software                    |
-| `npins/`   | Pinned non-flake sources         | Source pinning and updates                  |
-| `docs/`    | Agent/skill docs                 | Assistant behavior and reference material   |
-| `.github/` | CI workflows                     | Build/check behavior in GitHub Actions      |
+| Path        | Purpose                       | When to Look Here                          |
+| ----------- | ----------------------------- | ------------------------------------------ |
+| `flake.nix` | Flake entrypoint + inputs     | Global architecture and external deps      |
+| `modules/`  | Main flake-parts module tree  | Most NixOS options, host modules, services |
+| `home/`     | Home Manager modules/profiles | User-level apps, shell/editor preferences  |
+| `system/`   | Reusable host role bundles    | Shared server/desktop/laptop composition   |
+| `pkgs/`     | Local package derivations     | Custom packaged software                   |
+| `npins/`    | Pinned non-flake sources      | Source pinning and updates                 |
+| `docs/`     | Agent/skill docs              | Assistant behavior and reference material  |
+| `.github/`  | CI workflows                  | Build/check behavior in GitHub Actions     |
 
 ### Home Directory Deep Dive (`home/`)
 
-```
+```text
 home/
 ├── default.nix            # Base HM module imports
 ├── desktop.nix            # Desktop HM composition
@@ -83,38 +82,38 @@ home/
 
 Primary flake-parts module tree:
 
-| Path                     | Contents                                        |
-| ------------------------ | ----------------------------------------------- |
-| `modules/hosts.nix`      | Canonical host registry + metadata              |
-| `modules/configurations/`| `nixosConfigurations` + colmena composition     |
-| `modules/<host>/`        | Per-host hardware/network/services              |
-| `modules/shell/`         | Shell tooling (`fish`, `helix`, `zellij`, AI)  |
-| `modules/network/`       | Network stack, DNS, VPN, WireGuard, discovery   |
-| `modules/*`              | Domain modules (media, gaming, hardware, etc.)  |
+| Path                      | Contents                                       |
+| ------------------------- | ---------------------------------------------- |
+| `modules/hosts.nix`       | Canonical host registry + metadata             |
+| `modules/configurations/` | `nixosConfigurations` + colmena composition    |
+| `modules/<host>/`         | Per-host hardware/network/services             |
+| `modules/shell/`          | Shell tooling (`fish`, `helix`, `zellij`, AI)  |
+| `modules/network/`        | Network stack, DNS, VPN, WireGuard, discovery  |
+| `modules/*`               | Domain modules (media, gaming, hardware, etc.) |
 
 ### System Bundles (`system/`)
 
-| File               | Purpose                                   |
-| ------------------ | ----------------------------------------- |
+| File                 | Purpose                                       |
+| -------------------- | --------------------------------------------- |
 | `system/default.nix` | Reusable role stacks: `server/desktop/laptop` |
-| `system/core/*.nix`  | Baseline system concerns (boot/users)    |
+| `system/core/*.nix`  | Baseline system concerns (boot/users)         |
 
 ## Quick Reference: "Where is X configured?"
 
-| Thing                         | Location                                  |
-| ----------------------------- | ----------------------------------------- |
-| Host inventory / metadata     | `modules/hosts.nix`                       |
-| Host-specific system config   | `modules/link/`, `modules/zelda/`, etc.  |
-| NixOS configuration outputs   | `modules/configurations/nixos.nix`        |
-| Colmena deployment outputs    | `modules/configurations/colmena.nix`      |
-| Home Manager base             | `home/default.nix`                        |
-| Home profiles                 | `home/profiles/*`                         |
-| Fish shell config             | `modules/shell/fish/fish.nix`             |
-| Zellij config                 | `modules/shell/zellij.nix`                |
-| Helix editor config           | `modules/shell/helix.nix`                 |
-| Custom package definitions    | `pkgs/*`                                  |
-| Flake-parts patterns          | `docs/skills/using-flake-parts/*`         |
-| Agent/skill docs              | `docs/agents/*.md`, `docs/skills/*.md`    |
+| Thing                       | Location                                |
+| --------------------------- | --------------------------------------- |
+| Host inventory / metadata   | `modules/hosts.nix`                     |
+| Host-specific system config | `modules/link/`, `modules/zelda/`, etc. |
+| NixOS configuration outputs | `modules/configurations/nixos.nix`      |
+| Colmena deployment outputs  | `modules/configurations/colmena.nix`    |
+| Home Manager base           | `home/default.nix`                      |
+| Home profiles               | `home/profiles/*`                       |
+| Fish shell config           | `modules/shell/fish/fish.nix`           |
+| Zellij config               | `modules/shell/zellij.nix`              |
+| Helix editor config         | `modules/shell/helix.nix`               |
+| Custom package definitions  | `pkgs/*`                                |
+| Flake-parts patterns        | `docs/skills/using-flake-parts/*`       |
+| Agent/skill docs            | `docs/agents/*.md`, `docs/skills/*.md`  |
 
 ## Conventions
 
