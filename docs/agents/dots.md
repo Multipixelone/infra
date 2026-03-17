@@ -41,7 +41,7 @@ You are the central guide for the `Multipixelone/infra` repository. Your role is
 
 This is a **NixOS + Home Manager flake-parts configuration** managing:
 
-- Multiple Linux hosts (`link`, `zelda`, `marin`, `iot`)
+- Multiple Linux hosts (`link`, `zelda`, `marin`, `iot`) — see Host Inventory below
 - Shared module sets under `modules/`
 - Home Manager profiles under `home/`
 - Custom packages under `pkgs/`
@@ -89,12 +89,16 @@ Primary flake-parts module tree:
 | `modules/network/`        | Network stack, DNS, VPN, WireGuard, discovery  |
 | `modules/*`               | Domain modules (media, gaming, hardware, etc.) |
 
-### System Bundles (`system/`)
+## Host Inventory
 
-| File                 | Purpose                                       |
-| -------------------- | --------------------------------------------- |
-| `system/default.nix` | Reusable role stacks: `server/desktop/laptop` |
-| `system/core/*.nix`  | Baseline system concerns (boot/users)         |
+| Host    | Role                | Hardware                                                       | Key Services                                                             | Network                                              |
+| ------- | ------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `link`  | Desktop / Gaming    | Primary desktop, AMD GPU                                       | Gaming (Steam/Wine/ntsync), GPU passthrough, AmneziaWG                   | Home LAN                                             |
+| `zelda` | Desktop / Laptop    | Laptop                                                         | AmneziaWG                                                                | Home LAN + mobile                                    |
+| `marin` | Server (audio)      | Repurposed MacBook Air (Intel i5-4260U Haswell), Broadcom WiFi | Snapcast multi-room audio (shairport-sync + librespot), Grocy (disabled) | IoT VLAN (`192.168.5.21`), Ethernet (`192.168.7.3`)  |
+| `iot`   | Server (smart home) | Repurposed Dell-ish laptop (Intel i7-6700HQ Skylake)           | Homebridge (Apple HomeKit bridge)                                        | IoT VLAN (`192.168.5.3`), Ethernet (`192.168.8.111`) |
+
+All hosts use `role = ["server"]` or desktop roles defined in `modules/hosts.nix`. Kernel is `linuxPackages_zen` fleet-wide (set in `modules/boot/loader.nix`).
 
 ## Quick Reference: "Where is X configured?"
 
