@@ -26,7 +26,7 @@
     #   };
     # })
     (final: prev: {
-      linuxPackages_xanmod_latest = prev.linuxPackages_xanmod_latest.extend (
+      linuxPackages_zen = prev.linuxPackages_zen.extend (
         lpself: lpsuper: {
           amneziawg = lpsuper.amneziawg.overrideAttrs {
             patches = lpsuper.amneziawg.patches ++ [ ./amnezia.patch ];
