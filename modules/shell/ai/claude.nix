@@ -11,6 +11,7 @@
               playwright.enable = true;
               nixos.enable = true;
               codex.enable = true;
+              context7.enable = true;
               github = {
                 enable = true;
                 envFile = hmArgs.config.age.secrets."gh".path;
