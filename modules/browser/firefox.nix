@@ -14,6 +14,9 @@
       hmArgs@{ lib, pkgs, ... }:
       let
         inherit (inputs) better-fox;
+        customAddons = pkgs.callPackage ../../pkgs/firefox-addons/generated.nix {
+          buildMozillaXpiAddon = pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon;
+        };
         extensions = with pkgs.nur.repos.rycee.firefox-addons; [
           # blockers
           sponsorblock
@@ -41,31 +44,10 @@
           reddit-enhancement-suite
           betterttv
           return-youtube-dislikes
-          # custom extensions TODO figure out some way to auto pull these
-          (buildFirefoxXpiAddon rec {
-            pname = "lastfm-unscrobbler";
-            version = "1.6.3";
-            addonId = "lastfm@unscrobbler.com";
-            url = "https://addons.mozilla.org/firefox/downloads/file/4231311/last_fm_unscrobbler-${version}.xpi";
-            sha256 = "sha256-K9TrTEnuAEwHTtMRr/VBzsk+s1rnaD0ZMr9akdi6jUs=";
-            meta = { };
-          })
-          (buildFirefoxXpiAddon rec {
-            pname = "readwise-kindle-sync";
-            version = "2.8.0";
-            addonId = "{f7619bc3-ed22-44a3-83ad-e79a78416737}";
-            url = "https://addons.mozilla.org/firefox/downloads/file/3732256/readwise-${version}.xpi";
-            sha256 = "sha256-obuJTjrx7Q2AyAr2va/Kkw7ND7yV5AnSD3SUO3B20QY=";
-            meta = { };
-          })
-          (buildFirefoxXpiAddon rec {
-            pname = "youtube-popout-player";
-            version = "4.4.1";
-            addonId = "{85b42b8f-49cd-4935-aeca-a6b32dd6ac9f}";
-            url = "https://addons.mozilla.org/firefox/downloads/file/4128380/youtube_popout_player-${version}.xpi";
-            sha256 = "sha256-H9r4BgOweFlVsJltm/iZiQ0Sz2o+5x2zSQN3fdORSoA=";
-            meta = { };
-          })
+          # custom extensions (managed via pkgs/firefox-addons/addons.json + just update-addons)
+          customAddons."last-fm-unscrobbler"
+          customAddons."readwise"
+          customAddons."youtube-popout-player"
         ];
         settings = {
           "app.update.channel" = "default";

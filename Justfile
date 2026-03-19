@@ -38,13 +38,18 @@ debug:
 	nh os switch -v -- --show-trace
 
 [parallel]
-update: update-flake update-npins
+update: update-flake update-npins update-addons
 
 update-flake:
 	nix flake update
 
 update-npins:
 	npins update
+
+update-addons:
+	nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
+	  --option allow-import-from-derivation true \
+	  -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
 
 history:
 	nix profile history --profile /nix/var/nix/profiles/system
