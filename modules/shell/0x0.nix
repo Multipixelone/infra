@@ -1,8 +1,9 @@
+{ withSystem, ... }:
 {
-  flake.modules.homeManager.base =
+  perSystem =
     { pkgs, ... }:
-    let
-      upload-script = pkgs.writeShellApplication {
+    {
+      packages.upload-script = pkgs.writeShellApplication {
         name = "0x0";
         runtimeInputs = with pkgs; [
           curl
@@ -13,27 +14,36 @@
         text = ''
           file_upload() {
             local file="$1"
-            printf "uploading \"%s\"...\n" "''${file}" >&2
-            url=$(curl -s -F "file=@''${file}" "https://0x0.st")
-            printf "%s" "''${url}"
-            # TODO negate this? I don't like having to have an else here
-            if [ -z "''${WAYLAND_DISPLAY+x}" ]; then
-              return;
-            else
-              wl-copy "''${url}";
+            printf 'uploading "%s"...\n' "''${file}" >&2
+            local url
+            if ! url=$(curl -s -f -F "reqtype=fileupload" -F "fileToUpload=@''${file}" "https://catbox.moe/user/api.php"); then
+              printf 'upload failed for "%s"\n' "''${file}" >&2
+              return 1
+            fi
+            printf '%s\n' "''${url}"
+            if [ -n "''${WAYLAND_DISPLAY+x}" ]; then
+              wl-copy "''${url}"
               notify-send "''${file} uploaded" "''${url}"
             fi
-            # TODO rewrite this to not fail shellcheck. see: https://www.shellcheck.net/wiki/SC2059
-            # shellcheck disable=SC2059
-            printf "\n$(date)\n\t''${file}\n\t\t''${url}" >> ~/.config/0x0.history
+            printf '\n%s\n\t%s\n\t\t%s\n' "$(date)" "''${file}" "''${url}" >> ~/.config/0x0.history
           }
-          file_upload "''${@}"
+          for file in "''${@}"; do
+            file_upload "''${file}"
+          done
         '';
       };
+    };
+  flake.modules.homeManager.base =
+    { pkgs, ... }:
+    let
+      upload-script = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.upload-script
+      );
     in
     {
       home.packages = [
         upload-script
       ];
     };
+
 }
