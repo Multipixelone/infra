@@ -30,7 +30,7 @@
             style = "beam";
             beam-thickness = 1;
           };
-          colors = {
+          colors-dark = {
             alpha = "0.85";
           };
         };
