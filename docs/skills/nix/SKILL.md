@@ -26,9 +26,11 @@ You are a Nix expert specializing in:
 
 ### Rebuild Commands
 
+**CRITICAL: ALWAYS use `nh os` for local builds and switches. NEVER use raw `nixos-rebuild` or `nix build .#nixosConfigurations...` unless explicitly asked.**
+
 ```bash
 # Local machine (most common)
-nh os switch             # Build and activate (nh wraps nixos-rebuild)
+nh os switch             # Build and activate (PREFERRED — always use this)
 nh os switch --dry       # Dry run, show what would change
 nh os switch --diff      # Show diff of changes
 
@@ -40,11 +42,11 @@ just colmena-apply                     # Deploy to all hosts
 just colmena-apply-tag <tag>           # Deploy to tagged hosts only
 
 # Debug rebuild (full trace + verbose)
-just debug               # nixos-rebuild switch --show-trace --verbose
+just debug               # nh os switch with --show-trace --verbose
 
 # Build specific host without switching
 nh os build -H <hostname>             # e.g., nh os build -H marin
-nix build .#nixosConfigurations.<host>.config.system.build.toplevel -o /tmp/result
+nh os build                           # Current host, no activation
 ```
 
 ## Key Paths
@@ -151,14 +153,17 @@ nix flake check --no-build
 # Full check with build
 nix flake check
 
-# Show what would be built for a host
-nix build .#nixosConfigurations.<host>.config.system.build.toplevel --dry-run
+# Show what would be built for a host (dry run)
+nh os build --dry                     # Current host
+nh os build -H <hostname> --dry       # Specific host
 ```
 
 ### 2. Rebuild System
 
+**ALWAYS use `nh os` for local builds. Never use raw `nixos-rebuild` or `nix build .#nixosConfigurations...`.**
+
 ```bash
-# Local machine (PREFER THESE)
+# Local machine (ALWAYS use nh os)
 nh os switch                           # Build and activate
 nh os switch --diff                    # Show what changed
 just deploy                            # Build + activate + push to Attic cache
@@ -226,23 +231,23 @@ nix eval .#nixosConfigurations.<host>.config.<option.path>
 
 ### 6. Using nh (Yet Another Nix Helper)
 
-`nh` provides nicer UX for common nix operations:
+**`nh` is the MANDATORY tool for all local NixOS builds.** Never use `nixos-rebuild` directly.
 
 ```bash
 # Search packages (faster than nix search)
 nh search <query>
 
-# NixOS switch (preferred over nixos-rebuild directly)
-nh os switch .
-nh os switch . --diff    # Show what changed
-nh os switch . --dry     # Dry run
+# NixOS switch (ALWAYS use this, never nixos-rebuild)
+nh os switch             # Build and activate
+nh os switch --diff      # Show what changed
+nh os switch --dry       # Dry run
 
 # Build without switching
-nh os build .
+nh os build
 nh os build -H <hostname>
 
 # Home-manager operations
-nh home switch .
+nh home switch
 
 # Clean old generations
 nh clean all             # Clean everything
@@ -275,7 +280,10 @@ cat modules/configurations/colmena.nix
 ### 8. Debug Evaluation Errors
 
 ```bash
-# Show full trace
+# Verbose debug build (PREFERRED — uses nh os under the hood)
+just debug
+
+# Show full trace (only if just debug is insufficient)
 nix eval .#nixosConfigurations.<host>.config.system.build.toplevel.drvPath --show-trace
 
 # Enter REPL for exploration
@@ -285,9 +293,6 @@ nix repl
 
 # Check specific option
 nix eval .#nixosConfigurations.link.config.services.tailscale.enable
-
-# Verbose debug build
-just debug
 ```
 
 ### 9. Working with Project Flakes

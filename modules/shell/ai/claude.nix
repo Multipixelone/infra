@@ -36,7 +36,7 @@
           |------|-----------|----------|-----------------|
           | File search | `find`, `ls -R` | `fd` | Load `cli-tools` skill if uncertain |
           | Content search | `grep`, `ack` | `rg` | Load `cli-tools` skill if uncertain |
-          | Nix builds | `nix build` (bare) | `nix build -o /tmp/...` or `just rebuild` | <50% confidence → load `nix` skill |
+          | Nix builds | `nix build` (bare), `nixos-rebuild` | `nh os switch`, `just rebuild`, or `nix build -o /tmp/...` | <50% confidence → load `nix` skill |
           | File operations | `cat`, `sed`, `awk`, `echo >` | Read/Edit/Write tools | Use specialized tools |
           | System config | Manual edits, `defaults write` | Edit Nix configs in `/home/tunnel/Documents/Git/infra` | Everything is Nix-managed |
           | GitHub push | Auto-push, assume consent | Ask explicit permission EVERY time | NEVER push without consent |

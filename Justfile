@@ -4,6 +4,9 @@
 #
 ############################################################################
 
+rebuild:
+  nh os switch
+
 deploy:
   nh os switch
   attic push system /run/current-system -j 2
@@ -32,7 +35,7 @@ iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
 
 debug:
-	nixos-rebuild switch --flake . --use-remote-sudo --show-trace --verbose
+	nh os switch -v -- --show-trace
 
 [parallel]
 update: update-flake update-npins
