@@ -2023,7 +2023,6 @@
         serviceConfig = {
           Type = "oneshot";
           ExecStart = lib.getExe audioFix;
-          RemainAfterExit = true;
         };
       };
       hardware = {
