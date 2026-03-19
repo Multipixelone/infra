@@ -1,11 +1,11 @@
 {
   lib,
-  config,
+  # config,
   ...
 }:
-let
-  inherit (config.flake.modules.nixos) gaming;
-in
+# let
+#   inherit (config.flake.modules.nixos) gaming;
+# in
 {
   nixpkgs.config.allowUnfreePackages = [
     "nvidia-x11"
@@ -16,7 +16,7 @@ in
     { pkgs, config, ... }:
     {
       specialisation.nvidia.configuration = {
-        imports = [ gaming ];
+        # imports = [ gaming ];
         system.nixos.tags = [ "nvidia" ];
 
         # Remove VFIO passthrough and VM-related boot config

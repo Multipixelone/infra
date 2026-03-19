@@ -5,6 +5,7 @@
       efi
       wifi
       laptop
+      gaming
     ];
   };
 }
