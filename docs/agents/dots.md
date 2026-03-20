@@ -42,8 +42,7 @@ You are the central guide for the `Multipixelone/infra` repository. Your role is
 This is a **NixOS + Home Manager flake-parts configuration** managing:
 
 - Multiple Linux hosts (`link`, `zelda`, `marin`, `iot`) — see Host Inventory below
-- Shared module sets under `modules/`
-- Home Manager profiles under `home/`
+- Shared module sets under `modules/` (including Home Manager composition)
 - Custom packages under `pkgs/`
 
 **Flake root**: repository root (`flake.nix`)
@@ -53,41 +52,28 @@ This is a **NixOS + Home Manager flake-parts configuration** managing:
 
 ### Top-Level Structure
 
-| Path        | Purpose                       | When to Look Here                          |
-| ----------- | ----------------------------- | ------------------------------------------ |
-| `flake.nix` | Flake entrypoint + inputs     | Global architecture and external deps      |
-| `modules/`  | Main flake-parts module tree  | Most NixOS options, host modules, services |
-| `home/`     | Home Manager modules/profiles | User-level apps, shell/editor preferences  |
-| `pkgs/`     | Local package derivations     | Custom packaged software                   |
-| `npins/`    | Pinned non-flake sources      | Source pinning and updates                 |
-| `docs/`     | Agent/skill docs              | Assistant behavior and reference material  |
-| `.github/`  | CI workflows                  | Build/check behavior in GitHub Actions     |
-
-### Home Directory Deep Dive (`home/`)
-
-```text
-home/
-├── default.nix            # Base HM module imports
-├── desktop.nix            # Desktop HM composition
-├── server.nix             # Server HM composition
-├── link.nix / zelda.nix   # Host-scoped HM entry modules
-├── profiles/              # Reusable profile bundles
-├── modules/               # HM-only modules (theme/media/etc.)
-└── programs/              # Program groups (terminal/media/theming/...)
-```
+| Path        | Purpose                      | When to Look Here                                    |
+| ----------- | ---------------------------- | ---------------------------------------------------- |
+| `flake.nix` | Flake entrypoint + inputs    | Global architecture and external deps                |
+| `modules/`  | Main flake-parts module tree | NixOS + Home Manager options, host modules, services |
+| `pkgs/`     | Local package derivations    | Custom packaged software                             |
+| `npins/`    | Pinned non-flake sources     | Source pinning and updates                           |
+| `docs/`     | Agent/skill docs             | Assistant behavior and reference material            |
+| `.github/`  | CI workflows                 | Build/check behavior in GitHub Actions               |
 
 ### Modules Directory (`modules/`)
 
 Primary flake-parts module tree:
 
-| Path                      | Contents                                       |
-| ------------------------- | ---------------------------------------------- |
-| `modules/hosts.nix`       | Canonical host registry + metadata             |
-| `modules/configurations/` | `nixosConfigurations` + colmena composition    |
-| `modules/<host>/`         | Per-host hardware/network/services             |
-| `modules/shell/`          | Shell tooling (`fish`, `helix`, `zellij`, AI)  |
-| `modules/network/`        | Network stack, DNS, VPN, WireGuard, discovery  |
-| `modules/*`               | Domain modules (media, gaming, hardware, etc.) |
+| Path                      | Contents                                                   |
+| ------------------------- | ---------------------------------------------------------- |
+| `modules/hosts.nix`       | Canonical host registry + metadata                         |
+| `modules/configurations/` | `nixosConfigurations` + colmena composition                |
+| `modules/<host>/`         | Per-host hardware/network/services                         |
+| `modules/home-manager/`   | Home Manager composition (base, checks, nixos integration) |
+| `modules/shell/`          | Shell tooling (`fish`, `helix`, `zellij`, AI)              |
+| `modules/network/`        | Network stack, DNS, VPN, WireGuard, discovery              |
+| `modules/*`               | Domain modules (media, gaming, hardware, etc.)             |
 
 ## Host Inventory
 
@@ -118,8 +104,7 @@ All hosts use `role = ["server"]` or desktop roles defined in `modules/hosts.nix
 | Host-specific system config    | `modules/link/`, `modules/zelda/`, etc. |
 | NixOS configuration outputs    | `modules/configurations/nixos.nix`      |
 | Colmena deployment outputs     | `modules/configurations/colmena.nix`    |
-| Home Manager base              | `home/default.nix`                      |
-| Home profiles                  | `home/profiles/*`                       |
+| Home Manager composition       | `modules/home-manager/`                 |
 | Fish shell config              | `modules/shell/fish/fish.nix`           |
 | Zellij config                  | `modules/shell/zellij.nix`              |
 | Helix editor config            | `modules/shell/helix.nix`               |
@@ -137,11 +122,10 @@ All hosts use `role = ["server"]` or desktop roles defined in `modules/hosts.nix
 
 ### Additions Pattern
 
-1. Add or extend modules in `modules/` or `home/` (domain-appropriate folder).
+1. Add or extend modules in `modules/` (domain-appropriate subfolder).
 2. New `.nix` files in `modules/` are **automatically imported** by `import-tree` — no explicit import needed.
-3. Reuse shared stacks from `home/profiles/*` when possible.
-4. Keep machine metadata in `modules/hosts.nix` (addresses, roles, WireGuard data).
-5. Host-specific overrides go in `modules/<host>/` (e.g., `modules/link/gaming.nix`).
+3. Keep machine metadata in `modules/hosts.nix` (addresses, roles, WireGuard data).
+4. Host-specific overrides go in `modules/<host>/` (e.g., `modules/link/gaming.nix`).
 
 ## Related Resources
 

@@ -66,17 +66,13 @@ You are an expert Nix explorer specializing in understanding and navigating this
 infra/
 ├── flake.nix              # Flake entrypoint + inputs
 ├── flake.lock             # Locked dependencies
-├── modules/               # Primary flake-parts module tree
+├── modules/               # Primary flake-parts module tree (NixOS + Home Manager)
 │   ├── hosts.nix          # Canonical host metadata registry
 │   ├── configurations/    # nixosConfigurations + colmena outputs
+│   ├── home-manager/      # Home Manager composition (base, checks, nixos integration)
 │   ├── <host>/            # host modules (link, zelda, marin, iot)
 │   ├── shell/             # fish, helix, zellij, AI tooling
 │   └── ...                # domain modules (network, media, gaming, etc.)
-├── home/                  # Home-manager composition and profiles
-│   ├── default.nix
-│   ├── profiles/
-│   ├── modules/
-│   └── programs/
 ├── pkgs/                  # Custom package derivations
 ├── npins/                 # Non-flake source pins
 └── docs/                  # Agents and skills
@@ -104,7 +100,7 @@ infra/
 rg "programs\\.git|services\\.|networking\\." . --type nix
 
 # Find option DEFINITION (the mkOption)
-rg "mkOption|mkEnableOption" modules home --type nix
+rg "mkOption|mkEnableOption" modules --type nix
 
 # Check what a specific config evaluates to
 nix eval .#nixosConfigurations.zelda.config.programs.fish.enable --json
@@ -114,7 +110,7 @@ nix eval .#nixosConfigurations.zelda.config.programs.fish.enable --json
 
 ```bash
 # Find all imports in a file
-rg "imports\\s*=" modules home --type nix -A 10
+rg "imports\\s*=" modules --type nix -A 10
 
 # Trace module loading
 nix eval .#nixosConfigurations.link.config._module.args --show-trace
@@ -142,10 +138,10 @@ nix eval .#nixosConfigurations.zelda.config.services.tailscale.enable
 rg "services\\." modules --type nix | sort -u
 
 # All enabled programs
-rg "\\.enable\\s*=\\s*true" modules home --type nix
+rg "\\.enable\\s*=\\s*true" modules --type nix
 
 # Package references
-rg "pkgs\\." modules home pkgs --type nix | grep -v "^#"
+rg "pkgs\\." modules pkgs --type nix | grep -v "^#"
 ```
 
 ### 5. Overlay Investigation
@@ -201,7 +197,7 @@ When exploring, follow this process:
 Always provide:
 
 1. **Direct answer** to the question
-2. **File locations** with line numbers (e.g., `home/programs/git.nix:42`)
+2. **File locations** with line numbers (e.g., `modules/git/default.nix:42`)
 3. **Code snippets** showing relevant configuration
 4. **Explanation** of how things connect
 5. **Suggestions** for modifications if applicable
@@ -213,7 +209,8 @@ Always provide:
 - Check nix configs FIRST before assuming manual configuration
 - Host metadata → `modules/hosts.nix`
 - Host configuration entry points → `modules/<host>/imports.nix`
-- User programs and shell/editor behavior → `home/` and `modules/shell/`
+- User programs and shell/editor behavior → `modules/shell/` and domain modules
+- Home Manager composition → `modules/home-manager/`
 - Shared OS role composition → `modules/` (domain modules and host-specific dirs)
 
 ## Common Investigation Patterns
@@ -221,20 +218,20 @@ Always provide:
 ### "Where is X configured?"
 
 1. `rg "X" . --type nix`
-2. Check both `modules/` (system/host) and `home/` (user)
+2. Check `modules/` — all NixOS and Home Manager config lives here
 3. Verify with `nix eval`
 
 ### "Why is X happening?"
 
 1. Find config: `rg` for the behavior
 2. Trace imports/composition via `imports = [ ... ]`
-3. Check whether behavior is host-specific (`modules/<host>/`) or shared (`modules/`, `home/profiles/`)
+3. Check whether behavior is host-specific (`modules/<host>/`) or shared (`modules/` domain modules)
 
 ### "How do I add X?"
 
 1. Find similar patterns: `rg "similar-thing" --type nix`
 2. Check if option exists in NixOS/Home Manager options
-3. Follow existing patterns in adjacent modules (`modules/<domain>/`, `home/programs/`)
+3. Follow existing patterns in adjacent modules (`modules/<domain>/`)
 
 ### "I need to use tool X" (Package Installation)
 
@@ -269,18 +266,18 @@ nix shell nixpkgs#<pkg> -c <command> --version
 
 **Step 3: Determine installation scope**
 
-| Need                | Solution                        | Location              |
-| ------------------- | ------------------------------- | --------------------- |
-| One-time test       | `nix run nixpkgs#<pkg> -- args` | No changes            |
-| Interactive session | `nix shell nixpkgs#<pkg>`       | No changes            |
-| Project-specific    | Add to flake/module composition | `modules/` / `home/`  |
-| Always available    | Add to home/system modules      | `home/` or `modules/` |
+| Need                | Solution                        | Location   |
+| ------------------- | ------------------------------- | ---------- |
+| One-time test       | `nix run nixpkgs#<pkg> -- args` | No changes |
+| Interactive session | `nix shell nixpkgs#<pkg>`       | No changes |
+| Project-specific    | Add to flake/module composition | `modules/` |
+| Always available    | Add to system/HM modules        | `modules/` |
 
 **Step 4: For project-specific (most common)**
 
 ```bash
 # Find module where package should live
-rg "environment\\.systemPackages|home\\.packages|with pkgs" modules home --type nix
+rg "environment\\.systemPackages|home\\.packages|with pkgs" modules --type nix
 
 # Add package to the closest existing list and verify with flake eval/checks
 ```
@@ -289,7 +286,7 @@ rg "environment\\.systemPackages|home\\.packages|with pkgs" modules home --type 
 
 ```bash
 # Check existing package organization
-rg "home\\.packages|environment\\.systemPackages" home modules --type nix
+rg "home\\.packages|environment\\.systemPackages" modules --type nix
 ```
 
 **If package isn't in nixpkgs:**
