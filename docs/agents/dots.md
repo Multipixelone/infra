@@ -57,7 +57,6 @@ This is a **NixOS + Home Manager flake-parts configuration** managing:
 | `flake.nix` | Flake entrypoint + inputs    | Global architecture and external deps                |
 | `modules/`  | Main flake-parts module tree | NixOS + Home Manager options, host modules, services |
 | `pkgs/`     | Local package derivations    | Custom packaged software                             |
-| `npins/`    | Pinned non-flake sources     | Source pinning and updates                           |
 | `docs/`     | Agent/skill docs             | Assistant behavior and reference material            |
 | `.github/`  | CI workflows                 | Build/check behavior in GitHub Actions               |
 
@@ -113,7 +112,6 @@ All hosts use `role = ["server"]` or desktop roles defined in `modules/hosts.nix
 | Gaming (Steam/Wine/ntsync)     | `modules/gaming/`                       |
 | Media / audio services         | `modules/media/`                        |
 | Custom package definitions     | `pkgs/*`                                |
-| Pinned non-flake sources       | `npins/`                                |
 | Common rebuild/deploy commands | `Justfile`                              |
 | Flake-parts patterns           | `docs/skills/using-flake-parts/*`       |
 | Agent/skill docs               | `docs/agents/*.md`, `docs/skills/*.md`  |

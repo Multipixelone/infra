@@ -1,7 +1,7 @@
 {
   lib,
   buildPythonApplication,
-  pins,
+  fetchFromGitHub,
   unicode-slugify,
   beautifulsoup4,
   mutagen,
@@ -13,8 +13,13 @@
 }:
 buildPythonApplication {
   pname = "bandcamp-dl";
-  inherit (pins.bandcamp-dl) version;
-  src = pins.bandcamp-dl;
+  version = "0.0.17";
+  src = fetchFromGitHub {
+    owner = "iheanyi";
+    repo = "bandcamp-dl";
+    rev = "d7b4c4d6e7bfe365ee36514d6c608caf883e4476";
+    hash = "sha256-PNyVEzwRMXE0AtTTg+JyWw6+FSuxobi3orXuxkG0kxw=";
+  };
   pyproject = true;
 
   propagatedBuildInputs = [

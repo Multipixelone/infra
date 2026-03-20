@@ -69,7 +69,6 @@ nh os build                           # Current host, no activation
 │   ├── modules/           # HM-only modules
 │   └── programs/          # Program groups
 ├── pkgs/                  # Custom package derivations
-├── npins/                 # Non-flake source pins
 └── docs/                  # Agents and skills
 ```
 

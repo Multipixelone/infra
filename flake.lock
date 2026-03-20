@@ -360,6 +360,22 @@
         "type": "github"
       }
     },
+    "bgutil-ytdlp-pot-provider": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773346709,
+        "narHash": "sha256-w9QRqc1Ewp75b7OTkD/nRu+gUAIP7Hx6XKc6G7f9eCs=",
+        "owner": "Brainicism",
+        "repo": "bgutil-ytdlp-pot-provider",
+        "rev": "6b497de5a6cbaf106bd94a934c5d2794c3fdf8bb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Brainicism",
+        "repo": "bgutil-ytdlp-pot-provider",
+        "type": "github"
+      }
+    },
     "blocklist": {
       "flake": false,
       "locked": {
@@ -2715,6 +2731,7 @@
         "base16": "base16",
         "beets-plugins": "beets-plugins",
         "better-fox": "better-fox",
+        "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
         "blocklist": "blocklist",
         "catppuccin": "catppuccin",
         "catppuccin-helix": "catppuccin-helix",
@@ -2769,6 +2786,7 @@
         "waybar-mediaplayer": "waybar-mediaplayer",
         "wrappers": "wrappers",
         "yazi": "yazi",
+        "yt-dlp-YTNSigDeno": "yt-dlp-YTNSigDeno",
         "zjstatus": "zjstatus",
         "zjstatus-hints": "zjstatus-hints"
       }
@@ -3587,6 +3605,22 @@
       "original": {
         "owner": "sxyazi",
         "repo": "yazi",
+        "type": "github"
+      }
+    },
+    "yt-dlp-YTNSigDeno": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1762907946,
+        "narHash": "sha256-lx1U1ZVl0ZTrkZYSkO0pOf8INM1qv3PXMof2eydQXCc=",
+        "owner": "bashonly",
+        "repo": "yt-dlp-YTNSigDeno",
+        "rev": "15ebf644ee0d10b6406a90d9fb54b46210855193",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bashonly",
+        "repo": "yt-dlp-YTNSigDeno",
         "type": "github"
       }
     },

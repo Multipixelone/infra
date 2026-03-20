@@ -39,7 +39,7 @@
       #         pkgs.nixfmt
       #         pkgs.just
       #         pkgs.attic-client
-      #         pkgs.npins
+
       #         inputs.agenix.packages.${pkgs.stdenv.hostPlatform.system}.default
       #       ];
       #       name = "dots";
@@ -60,7 +60,7 @@
       #       hooks =
       #         let
       #           # probably a better way to do this
-      #           excludes = [ "npins" ];
+      #           excludes = [ ];
       #         in
       #         {
       #           nixfmt = {
@@ -161,6 +161,14 @@
     };
     better-fox = {
       url = "github:yokoffing/Betterfox";
+      flake = false;
+    };
+    bgutil-ytdlp-pot-provider = {
+      url = "github:Brainicism/bgutil-ytdlp-pot-provider";
+      flake = false;
+    };
+    yt-dlp-YTNSigDeno = {
+      url = "github:bashonly/yt-dlp-YTNSigDeno";
       flake = false;
     };
     secrets = {

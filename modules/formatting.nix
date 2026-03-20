@@ -16,7 +16,6 @@
           "*.png"
           "Justfile"
           "LICENSE"
-          "npins/**"
           "*.fish"
         ];
       };

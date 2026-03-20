@@ -4,47 +4,6 @@ on:
   schedule:
     - cron: "0 0 1-31/3 * *" # runs every third day
 jobs:
-  update-npins-deps:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: cachix/install-nix-action@v27
-        with:
-          extra_nix_config: |
-            auto-optimise-store = true
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - name: Install SSH Key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - id: npins
-        name: npins
-        run: |
-          MESSAGE="
-            $(nix run nixpkgs#npins -- -d ./npins update -f 2>&1 | { grep -e '.*Changes:$\|.*url:.*' -e '.*Changes:$\|.*revision:.*' -e '.*Changes:$\|.*version:.*'|| true; })"
-
-          if [ -n "$(git diff-files 2>&1)" ]; then
-            git add -A
-            {
-              echo "message<<EOF"
-              echo "$MESSAGE"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          fi
-      - name: Create a pull request
-        uses: peter-evans/create-pull-request@v7
-        id: pull-request
-        with:
-          title: "chore: bump npins dependencies"
-          branch: update_npins_lock_action
-          commit-message: "⚙️ bump npins"
-          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
-          assignees: Multipixelone
-          labels: automated
-          body: |
-            ${{ steps.npins.outputs.message }}
   update-flake-lock:
     runs-on: ubuntu-latest
     steps:

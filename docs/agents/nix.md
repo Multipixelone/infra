@@ -74,7 +74,6 @@ infra/
 │   ├── shell/             # fish, helix, zellij, AI tooling
 │   └── ...                # domain modules (network, media, gaming, etc.)
 ├── pkgs/                  # Custom package derivations
-├── npins/                 # Non-flake source pins
 └── docs/                  # Agents and skills
 ```
 

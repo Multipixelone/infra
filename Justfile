@@ -38,13 +38,10 @@ debug:
 	nh os switch -v -- --show-trace
 
 [parallel]
-update: update-flake update-npins update-addons
+update: update-flake update-addons
 
 update-flake:
 	nix flake update
-
-update-npins:
-	npins update
 
 update-addons:
 	nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \

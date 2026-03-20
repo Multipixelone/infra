@@ -2,14 +2,15 @@
   lib,
   config,
   inputs,
-  rootPath,
   ...
 }:
 {
   flake.modules.homeManager.gui =
     hmArgs@{ pkgs, ... }:
     let
-      pins = import "${rootPath}/npins";
+      bgutil-version =
+        (builtins.fromJSON (builtins.readFile "${inputs.bgutil-ytdlp-pot-provider}/server/package.json"))
+        .version;
     in
     {
       age.secrets."yt-dlp" = {
@@ -19,7 +20,7 @@
       };
       xdg.configFile = {
         # plugin to connect to docker container
-        "yt-dlp/plugins/bgutil-ytdlp-pot-provider".source = pins.bgutil-ytdlp-pot-provider + "/plugin";
+        "yt-dlp/plugins/bgutil-ytdlp-pot-provider".source = inputs.bgutil-ytdlp-pot-provider + "/plugin";
         # plugin to allow yt-dlp to get pot token
         # "yt-dlp/plugins/yt-dlp-get-pot".source = pkgs.fetchFromGitHub rec {
         #   version = "0.3.0";
@@ -29,7 +30,7 @@
         #   hash = "sha256-MtQFXWJByo/gyftMtywCCfpf8JtldA2vQP8dnpLEl7U=";
         # };
         # plugin to allow yt-dlp to solve with deno
-        "yt-dlp/plugins/yt-dlp-deno".source = pins.yt-dlp-YTNSigDeno;
+        "yt-dlp/plugins/yt-dlp-deno".source = inputs.yt-dlp-YTNSigDeno;
       };
       virtualisation.quadlet.containers.bgutil-provider = {
         autoStart = true;
@@ -38,7 +39,7 @@
           Restart = "always";
         };
         containerConfig = {
-          image = "brainicism/bgutil-ytdlp-pot-provider:${pins.bgutil-ytdlp-pot-provider.version}";
+          image = "brainicism/bgutil-ytdlp-pot-provider:${bgutil-version}";
           publishPorts = [ "127.0.0.1:4416:4416" ];
         };
       };
