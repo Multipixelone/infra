@@ -18,12 +18,12 @@ Repository-specific implementation lives in:
 
 ## Core Concepts
 
-| Concept      | Description                                              |
-| ------------ | -------------------------------------------------------- |
-| Session      | Top-level zellij workspace, attachable/detachable        |
-| Tab          | Workspace inside a session                               |
-| Pane         | Split terminal in a tab                                  |
-| Mode         | zellij input mode (`normal`, `locked`, etc.)             |
+| Concept      | Description                                               |
+| ------------ | --------------------------------------------------------- |
+| Session      | Top-level zellij workspace, attachable/detachable         |
+| Tab          | Workspace inside a session                                |
+| Pane         | Split terminal in a tab                                   |
+| Mode         | zellij input mode (`normal`, `locked`, etc.)              |
 | Plugin panel | Embedded panel (eg `zjstatus`, `zjstatus-hints`, monocle) |
 
 ## Environment Detection
@@ -55,18 +55,18 @@ zellij -s <session-name>
 
 ### Shared bindings
 
-| Binding           | Action            |
-| ----------------- | ----------------- |
-| `Ctrl-Tab`        | Next tab          |
-| `Ctrl-Shift-Tab`  | Previous tab      |
-| `Alt-Enter`       | New pane to right |
-| `Alt-Shift-Enter` | New pane below    |
-| `Alt-Shift-Q`     | Close focused pane|
+| Binding           | Action             |
+| ----------------- | ------------------ |
+| `Ctrl-Tab`        | Next tab           |
+| `Ctrl-Shift-Tab`  | Previous tab       |
+| `Alt-Enter`       | New pane to right  |
+| `Alt-Shift-Enter` | New pane below     |
+| `Alt-Shift-Q`     | Close focused pane |
 
 ### Extra shared-except-locked binding
 
-| Binding | Action |
-| ------- | ------ |
+| Binding | Action                                                   |
+| ------- | -------------------------------------------------------- |
 | `Alt-m` | Launch monocle plugin in-place and return to normal mode |
 
 ## AI Workflow Commands
@@ -106,13 +106,13 @@ This means tab names and mode behavior are intentionally dynamic during interact
 
 ## Where to Edit Zellij Behavior
 
-| Need | File |
-| ---- | ---- |
-| Enable/disable zellij | `modules/shell/zellij.nix` |
-| Keybindings and plugin config | `modules/shell/zellij.nix` |
-| Status line plugin wiring | `modules/shell/zellij.nix` |
-| Fish tab-name automation | `modules/shell/fish/fish.nix` |
-| Helix popup terminal behavior | `modules/shell/helix.nix` |
+| Need                          | File                          |
+| ----------------------------- | ----------------------------- |
+| Enable/disable zellij         | `modules/shell/zellij.nix`    |
+| Keybindings and plugin config | `modules/shell/zellij.nix`    |
+| Status line plugin wiring     | `modules/shell/zellij.nix`    |
+| Fish tab-name automation      | `modules/shell/fish/fish.nix` |
+| Helix popup terminal behavior | `modules/shell/helix.nix`     |
 
 ## Investigation Checklist
 
