@@ -21,6 +21,7 @@
         binPath = lib.mkForce "/run/current-system/sw/bin/start-hyprland";
         prettyName = "Hyprland";
       };
+      services.desktopManager.plasma6.enable = true;
       services = {
         # seatd.enable = true;
         # kmscon = {
@@ -49,7 +50,7 @@
               })
               (lib.mkIf (config.networking.hostName == "zelda") {
                 default_session = {
-                  command = "${tuigreet} --greeting \"hi finn :)\" --time --remember --remember-session --cmd '${hypr-cmd}'";
+                  command = "${tuigreet} --greeting \"hi finn :)\" --time --remember --remember-session --sessions /run/current-system/sw/share/wayland-sessions";
                   user = "greeter";
                 };
               })
