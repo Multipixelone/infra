@@ -19,7 +19,7 @@
       keep-outputs = true;
       warn-dirty = false;
       abort-on-warn = true;
-      allow-import-from-derivation = false;
+      allow-import-from-derivation = true;
       experimental-features = [
         "nix-command"
         "flakes"
