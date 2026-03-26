@@ -19,9 +19,15 @@
         sync_frequency = "5m";
         sync_address = "https://api.atuin.sh";
 
+        history_filter = [
+          "^z(i)? .*"
+          "^cd .*"
+        ];
+
         ctrl_n_shortcuts = true;
         enter_accept = true;
 
+        workspaces = true;
         search_mode = "fuzzy";
         filter_mode = "global";
         filter_mode_shell_up_key_binding = "session-preload";
