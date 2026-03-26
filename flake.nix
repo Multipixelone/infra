@@ -144,6 +144,13 @@
       url = "github:tinted-theming/schemes";
     };
     nixpkgs-xr.url = "github:nix-community/nixpkgs-xr";
+    direnv-instant = {
+      url = "github:Mic92/direnv-instant";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-parts.follows = "flake-parts";
+      };
+    };
     # prismlauncher.url = "github:PrismLauncher/PrismLauncher";
     nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
     # FIX: bump when https://github.com/samuelngs/apple-emoji-ttf/issues/101 fixed

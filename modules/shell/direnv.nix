@@ -1,15 +1,41 @@
+{ inputs, ... }:
 {
   flake.modules.homeManager.base = {
+    imports = [
+      inputs.direnv-instant.homeModules.direnv-instant
+    ];
     programs = {
+      direnv-instant.enable = true;
       direnv = {
         enable = true;
-        nix-direnv.enable = true;
-        config.global.warn_timeout = 0;
+        # config = { };
+        stdlib = ''
+          : "''${XDG_CACHE_HOME:="''${HOME}/.cache"}"
+          declare -A direnv_layout_dirs
+          direnv_layout_dir() {
+              local hash path
+              echo "''${direnv_layout_dirs[$PWD]:=$(
+                  hash="$(sha1sum - <<< "$PWD" | head -c40)"
+                  path="''${PWD//[^a-zA-Z0-9]/-}"
+                  echo "''${XDG_CACHE_HOME}/direnv/layouts/''${hash}''${path}"
+              )}"
+          }
+        '';
       };
       git.ignores = [
-        # ".envrc"
         ".direnv"
       ];
+    };
+  };
+  flake.modules.nixos.base = {
+    programs.direnv = {
+      enable = true;
+      nix-direnv = {
+        enable = true;
+      };
+      settings = {
+      };
+      direnvrcExtra = "";
     };
   };
 }
