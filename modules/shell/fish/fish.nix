@@ -60,7 +60,6 @@
         };
         # allow apps like uwsm to read HM vars
         programs.bash.enable = true;
-        programs.carapace.enable = true;
         programs.fish = {
           enable = true;
           shellAbbrs =
