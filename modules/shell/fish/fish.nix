@@ -23,8 +23,9 @@
         ...
       }:
       let
-        cliphist = lib.getExe pkgs.cliphist;
-        wl-copy = lib.getExe' pkgs.wl-clipboard "wl-copy";
+        inherit (lib) getExe getExe';
+        cliphist = getExe pkgs.cliphist;
+        wl-copy = getExe' pkgs.wl-clipboard "wl-copy";
         fzf-config = ''
           set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'" \n
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
@@ -89,8 +90,14 @@
             mkdir = "mkdir -pv";
             tree = "eza -s type -a -T -I '.git|node_modules|.next'";
             clip = "${cliphist} list | fzf | ${cliphist} decode | ${wl-copy}";
-            ping = lib.getExe pkgs.prettyping;
-            public-ip = lib.getExe' pkgs.dnsutils "dig" + " +short myip.opendns.com @resolver1.opendns.com";
+            ping = getExe pkgs.prettyping;
+            public-ip = getExe' pkgs.dnsutils "dig" + " +short myip.opendns.com @resolver1.opendns.com";
+
+            # Confirm before overwriting something.
+            cp = "${getExe pkgs.xcp} --interactive";
+            mv = "mv --interactive";
+            rm = getExe pkgs.gomi;
+            ln = "ln --interactive";
           };
           shellInit = fish-config;
           interactiveShellInit = ''
@@ -101,7 +108,7 @@
             set -gx NIXPKGS_ALLOW_INSECURE 1
 
             if test "$TERM" != "dumb"
-              ${lib.getExe pkgs.zellij} setup --generate-completion fish | source
+              ${getExe pkgs.zellij} setup --generate-completion fish | source
             end
             if status is-interactive
                   if type -q zellij
@@ -138,7 +145,7 @@
               onVariable = "PWD";
               body = ''
                 if test -d ./.git
-                  ${lib.getExe pkgs.onefetch} --no-art
+                  ${getExe pkgs.onefetch} --no-art
                 end
               '';
             };
@@ -146,14 +153,14 @@
               # If you run the command with comma, running the same command
               # will not prompt for confirmation for the rest of the session
               if contains $argv[1] $__command_not_found_confirmed_commands
-                or ${lib.getExe pkgs.gum} confirm --no-show-help --selected.background=2 "Run using comma?"
+                or ${getExe pkgs.gum} confirm --no-show-help --selected.background=2 "Run using comma?"
 
                 # Not bothering with capturing the status of the command, just run it again
                 if not contains $argv[1] $__command_not_found_confirmed_commands
                   set -ga __command_not_found_confirmed_commands $argv[1]
                 end
 
-                ${lib.getExe pkgs.comma} -- $argv
+                ${getExe pkgs.comma} -- $argv
                 return 0
               else
                 __fish_default_command_not_found_handler $argv
