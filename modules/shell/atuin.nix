@@ -9,7 +9,10 @@
     programs.atuin = {
       enable = true;
       enableFishIntegration = true;
+      daemon.enable = true;
       settings = {
+        update_check = false;
+
         key_path = hmArgs.config.age.secrets."atuin".path;
 
         auto_sync = true;
@@ -25,6 +28,14 @@
 
         style = "compact";
         inline_height = 20;
+
+        daemon = {
+          enabled = true;
+          autostart = true;
+
+          sync_frequency = 3600;
+          systemd_socket = true;
+        };
       };
     };
   };
