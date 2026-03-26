@@ -1,10 +1,12 @@
 <h1 align="center">finns ❄️ dots</h1>
 
-[![built with nix](https://img.shields.io/static/v1?logo=nixos&logoColor=white&label=&message=Built%20with%20Nix&color=41439a)](https://builtwithnix.org)
-[![CI](https://github.com/Multipixelone/infra/actions/workflows/check.yaml/badge.svg)](https://github.com/Multipixelone/infra/actions/workflows/ci.yml)
-![GitHub Language](https://img.shields.io/github/languages/top/Multipixelone/infra?color=c6a0f6)
-![GitHub Code Size](https://img.shields.io/github/languages/code-size/Multipixelone/infra?color=fab387)
-[![License](https://img.shields.io/github/license/Multipixelone/infra?color=a6e3a1)](https://github.com/Multipixelone/infra/blob/master/LICENSE)
+<p align="center">
+  <a href="https://builtwithnix.org"><img src="https://img.shields.io/static/v1?logo=nixos&logoColor=white&label=&message=Built%20with%20Nix&color=41439a" alt="built with nix"></a>
+  <a href="https://github.com/Multipixelone/infra/actions/workflows/ci.yml"><img src="https://github.com/Multipixelone/infra/actions/workflows/check.yaml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/github/languages/top/Multipixelone/infra?color=c6a0f6" alt="GitHub Language">
+  <img src="https://img.shields.io/github/languages/code-size/Multipixelone/infra?color=fab387" alt="GitHub Code Size">
+  <a href="https://github.com/Multipixelone/infra/blob/master/LICENSE"><img src="https://img.shields.io/github/license/Multipixelone/infra?color=a6e3a1" alt="License"></a>
+</p>
 
 ## About
 
