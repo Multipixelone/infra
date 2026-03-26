@@ -121,7 +121,7 @@
     nix-hardware.url = "github:NixOS/nixos-hardware/master";
     zjstatus.url = "github:dj95/zjstatus";
     # helix fork with support for copilot-language-server
-    helix.url = "github:devmanuelli/helix/textDocument/inlineCompletion";
+    helix.url = "github:spion/helix/textDocument/inlineCompletion";
     # helix color
     catppuccin-helix = {
       url = "github:catppuccin/helix";
