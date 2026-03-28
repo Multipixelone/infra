@@ -46,6 +46,9 @@
 
         addons = with pkgs.ankiAddons; [
           review-heatmap
+          image-occlusion-enhanced
+          fsrs4anki-helper
+          anki-quizlet-importer-extended
           anki-connect
         ];
       };
