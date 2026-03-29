@@ -19,6 +19,10 @@
         };
 
         nix.settings.trusted-users = [ config.flake.meta.owner.username ];
+
+        systemd.tmpfiles.rules = [
+          "L /var/lib/AccountsService/icons/${config.flake.meta.owner.username} - - - - ${./Finn.jpg}"
+        ];
       };
     };
   };
