@@ -1,8 +1,26 @@
-{ inputs, self, ... }:
 {
+  rootPath,
+  withSystem,
+  inputs,
+  self,
+  ...
+}:
+{
+  perSystem =
+    { pkgs, ... }:
+    {
+      packages.ralph-wiggum-plugin = pkgs.callPackage "${rootPath}/pkgs/ralph-wiggum-plugin" {
+        src = inputs.claude-code-src;
+      };
+    };
   nixpkgs.config.allowUnfreePackages = [ "claude-code" ];
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
+    let
+      ralph-wiggum-plugin = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.ralph-wiggum-plugin
+      );
+    in
     {
       programs.claude-code = {
         mcpServers =
@@ -24,6 +42,13 @@
           }).config.settings.servers;
         skillsDir = self + /docs/skills;
         agentsDir = self + /docs/agents;
+        plugins = [
+          "${ralph-wiggum-plugin}"
+          "${inputs.claude-code-src}/plugins/commit-commands"
+          "${inputs.claude-code-src}/plugins/feature-dev"
+          "${inputs.claude-code-src}/plugins/pr-review-toolkit"
+          "${inputs.claude-code-src}/plugins/security-guidance"
+        ];
         enable = true;
         memory.text = ''
           ## MANDATORY PRE-FLIGHT PROTOCOL

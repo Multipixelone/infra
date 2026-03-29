@@ -170,6 +170,10 @@
       url = "github:yokoffing/Betterfox";
       flake = false;
     };
+    claude-code-src = {
+      url = "github:anthropics/claude-code";
+      flake = false;
+    };
     bgutil-ytdlp-pot-provider = {
       url = "github:Brainicism/bgutil-ytdlp-pot-provider";
       flake = false;
