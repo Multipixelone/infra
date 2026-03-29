@@ -94,9 +94,9 @@
             public-ip = getExe' pkgs.dnsutils "dig" + " +short myip.opendns.com @resolver1.opendns.com";
 
             # Confirm before overwriting something.
-            cp = "${getExe pkgs.xcp} --interactive";
-            mv = "mv --interactive";
+            cp = getExe pkgs.xcp;
             rm = getExe pkgs.gomi;
+            mv = "mv --interactive";
             ln = "ln --interactive";
           };
           shellInit = fish-config;
