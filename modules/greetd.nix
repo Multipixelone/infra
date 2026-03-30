@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, withSystem, ... }:
 {
   flake.modules.nixos.pc =
     {
@@ -7,8 +7,10 @@
       ...
     }:
     let
-      # TODO run tuigreet inside of kmscon
-      # kmscon = "${pkgs.kmscon}/libexec/kmscon/kmscon";
+      cage = lib.getExe pkgs.cage;
+      foot = lib.getExe (
+        withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.foot)
+      );
       tuigreet = lib.getExe pkgs.tuigreet;
       uwsm = lib.getExe config.programs.uwsm.package;
       hypr-cmd = "${uwsm} start -e -D Hyprland hyprland-uwsm.desktop"; # hyprland = lib.getExe' config.programs.hyprland.package "Hyprland";
@@ -22,17 +24,6 @@
         prettyName = "Hyprland";
       };
       services = {
-        # seatd.enable = true;
-        # kmscon = {
-        #   enable = true;
-        #   extraConfig = "font-size=24";
-        #   fonts = [
-        #     {
-        #       name = "PragmataPro Liga";
-        #       package = pkgs.callPackage ../../pkgs/pragmata {};
-        #     }
-        #   ];
-        # };
         greetd =
           let
             session = {
@@ -49,26 +40,28 @@
               })
               (lib.mkIf (config.networking.hostName == "zelda") {
                 default_session = {
-                  command = "${tuigreet} --greeting \"hi finn :)\" --time --remember --remember-session --cmd '${hypr-cmd}'";
+                  command = "${cage} -s -- ${foot} -o 'font=PragmataPro Mono Liga:size=16' -e ${tuigreet} --greeting \"hi finn :)\" --time --remember --remember-session --cmd '${hypr-cmd}'";
                   user = "greeter";
                 };
               })
             ];
           };
       };
-      # this is a life saver.
-      # literally no documentation about this anywhere.
-      # might be good to write about this...
       # https://www.reddit.com/r/NixOS/comments/u0cdpi/tuigreet_with_xmonad_how/
-      systemd.services.greetd.serviceConfig = {
-        Type = "idle";
-        StandardInput = "tty";
-        StandardOutput = "tty";
-        StandardError = "journal"; # Without this errors will spam on screen
-        # Without these bootlogs will spam on screen
-        TTYReset = true;
-        TTYVHangup = true;
-        TTYVTDisallocate = true;
-      };
+      systemd.services.greetd.serviceConfig = lib.mkMerge [
+        {
+          Type = "idle";
+          StandardError = "journal";
+        }
+        # TTY settings are only needed for direct VT greeters (link autologin).
+        # cage manages its own display, so these interfere with VT handoff to Hyprland.
+        (lib.mkIf (config.networking.hostName == "link") {
+          StandardInput = "tty";
+          StandardOutput = "tty";
+          TTYReset = true;
+          TTYVHangup = true;
+          TTYVTDisallocate = true;
+        })
+      ];
     };
 }
