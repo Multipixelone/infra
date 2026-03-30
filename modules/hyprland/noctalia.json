@@ -16,8 +16,8 @@
       "enableExclusionZoneInset": true,
       "backgroundOpacity": 0.93,
       "useSeparateOpacity": false,
-      "marginVertical": 7,
-      "marginHorizontal": 150,
+      "marginVertical": 5,
+      "marginHorizontal": 0,
       "frameThickness": 8,
       "frameRadius": 12,
       "outerCorners": false,
@@ -51,7 +51,7 @@
           },
           {
             "compactMode": false,
-            "hideMode": "hidden",
+            "hideMode": "idle",
             "hideWhenIdle": false,
             "id": "MediaMini",
             "maxWidth": 145,
@@ -66,7 +66,17 @@
             "visualizerType": "linear"
           }
         ],
-        "center": [],
+        "center": [
+          {
+            "clockColor": "none",
+            "customFont": "",
+            "formatHorizontal": "HH:mm ddd, MMM dd",
+            "formatVertical": "HH mm - dd MM",
+            "id": "Clock",
+            "tooltipFormat": "HH:mm ddd, MMM dd",
+            "useCustomFont": false
+          }
+        ],
         "right": [
           {
             "blacklist": ["nm-applet", "bluetooth"],
@@ -76,24 +86,6 @@
             "hidePassive": false,
             "id": "Tray",
             "pinned": []
-          },
-          {
-            "clockColor": "none",
-            "customFont": "",
-            "formatHorizontal": "HH:mm ddd, MMM dd",
-            "formatVertical": "HH mm - dd MM",
-            "id": "Clock",
-            "tooltipFormat": "HH:mm ddd, MMM dd",
-            "useCustomFont": false
-          },
-          {
-            "deviceNativePath": "__default__",
-            "displayMode": "graphic-clean",
-            "hideIfIdle": false,
-            "hideIfNotDetected": false,
-            "id": "Battery",
-            "showNoctaliaPerformance": false,
-            "showPowerProfiles": false
           },
           {
             "displayMode": "onhover",
@@ -110,25 +102,35 @@
             "textColor": "none"
           },
           {
-            "colorizeDistroLogo": false,
-            "colorizeSystemIcon": "none",
-            "customIconPath": "",
-            "enableColorization": false,
-            "icon": "noctalia",
-            "id": "ControlCenter",
-            "useDistroLogo": false
+            "deviceNativePath": "__default__",
+            "displayMode": "graphic-clean",
+            "hideIfIdle": false,
+            "hideIfNotDetected": false,
+            "id": "Battery",
+            "showNoctaliaPerformance": false,
+            "showPowerProfiles": false
           },
           {
-            "defaultSettings": {
-              "apiKey": "",
-              "apiUrl": "",
-              "configPath": "",
-              "enabled": true,
-              "folderIds": [],
-              "pollIntervalMs": 10000,
-              "verifyTls": false
-            },
-            "id": "plugin:syncthing-status"
+            "compactMode": false,
+            "diskPath": "/",
+            "iconColor": "none",
+            "id": "SystemMonitor",
+            "showCpuCores": false,
+            "showCpuFreq": false,
+            "showCpuTemp": true,
+            "showCpuUsage": true,
+            "showDiskAvailable": false,
+            "showDiskUsage": false,
+            "showDiskUsageAsPercent": false,
+            "showGpuTemp": false,
+            "showLoadAverage": false,
+            "showMemoryAsPercent": false,
+            "showMemoryUsage": true,
+            "showNetworkStats": false,
+            "showSwapUsage": false,
+            "textColor": "none",
+            "useMonospaceFont": true,
+            "usePadding": false
           }
         ]
       },
@@ -203,9 +205,9 @@
       "fontDefaultScale": 1,
       "fontFixedScale": 1,
       "tooltipsEnabled": true,
-      "scrollbarAlwaysVisible": true,
-      "boxBorderEnabled": false,
-      "panelBackgroundOpacity": 0.88,
+      "scrollbarAlwaysVisible": false,
+      "boxBorderEnabled": true,
+      "panelBackgroundOpacity": 0,
       "translucentWidgets": false,
       "panelsAttachedToBar": true,
       "settingsPanelMode": "centered",
