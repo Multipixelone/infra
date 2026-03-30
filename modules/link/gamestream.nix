@@ -47,17 +47,14 @@
         set -x STEAM_GAMESCOPE_CLIENT 1
         set -x STEAM_GAMESCOPE_HDR_SUPPORTED 1
       '';
+      gamescope-default-width = "3840";
+      gamescope-default-height = "2160";
+      gamescope-default-refresh = "240";
       gamescope-base-opts = [
         "--fade-out-duration"
         "200"
         "--xwayland-count"
         "2"
-        "-w"
-        "${toString "3840"}"
-        "-h"
-        "${toString "2160"}"
-        "-r"
-        "${toString "240"}"
         "-f"
         "--expose-wayland"
         "--backend"
@@ -96,8 +93,22 @@
           exit 1
         end
 
-        # Combine base args, extra args from CLI, and extra args from env (for legacy)
-        set -l final_args ${lib.escapeShellArgs gamescope-base-opts}
+        # Resolution: prefer Sunshine client env vars, fall back to defaults
+        set -l gs_width ${gamescope-default-width}
+        set -l gs_height ${gamescope-default-height}
+        set -l gs_refresh ${gamescope-default-refresh}
+        if set -q SUNSHINE_CLIENT_WIDTH
+          set gs_width $SUNSHINE_CLIENT_WIDTH
+        end
+        if set -q SUNSHINE_CLIENT_HEIGHT
+          set gs_height $SUNSHINE_CLIENT_HEIGHT
+        end
+        if set -q SUNSHINE_CLIENT_FPS
+          set gs_refresh $SUNSHINE_CLIENT_FPS
+        end
+
+        # Combine base args with dynamic resolution
+        set -l final_args ${lib.escapeShellArgs gamescope-base-opts} -w $gs_width -h $gs_height -r $gs_refresh
 
         # Add args from -x/--extra-args flag, splitting the string into a list
         if set -q _flag_extra_args
