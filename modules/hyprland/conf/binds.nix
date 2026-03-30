@@ -14,7 +14,7 @@
         ...
       }:
       let
-        terminal = lib.getExe pkgs.foot;
+
         brightness = lib.getExe pkgs.brillo;
         playerctl = lib.getExe pkgs.playerctl;
         swayosd-client = lib.getExe' pkgs.swayosd "swayosd-client";
@@ -79,7 +79,7 @@
               [
                 "ALT_SHIFT, Q, killactive"
                 # app keybinds
-                "$mod, RETURN, exec, uwsm app -- ${terminal}"
+                "$mod, RETURN, exec, uwsm app -- foot"
                 "SUPER, E, exec, foot -a foot-files -- fish -c yazi"
                 "ALT_SHIFT, W, exec, uwsm app -- firefox"
                 "ALT_SHIFT, D, exec, ${runOnce "discord"}"

@@ -410,6 +410,22 @@
         "type": "github"
       }
     },
+    "catppuccin-foot": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1752980058,
+        "narHash": "sha256-bpGVDESE6Pr7kaFgfAWJ/5KC9mRPlv2ciYwRr6jcIKs=",
+        "owner": "catppuccin",
+        "repo": "foot",
+        "rev": "8d263e0e6b58a6b9ea507f71e4dbf6870aaf8507",
+        "type": "github"
+      },
+      "original": {
+        "owner": "catppuccin",
+        "repo": "foot",
+        "type": "github"
+      }
+    },
     "catppuccin-helix": {
       "flake": false,
       "locked": {
@@ -2819,6 +2835,7 @@
         "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
         "blocklist": "blocklist",
         "catppuccin": "catppuccin",
+        "catppuccin-foot": "catppuccin-foot",
         "catppuccin-helix": "catppuccin-helix",
         "claude-code-src": "claude-code-src",
         "colmena": "colmena",

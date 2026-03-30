@@ -127,6 +127,11 @@
       url = "github:catppuccin/helix";
       flake = false;
     };
+    # foot color
+    catppuccin-foot = {
+      url = "github:catppuccin/foot";
+      flake = false;
+    };
     mcp-servers-nix = {
       url = "github:natsukium/mcp-servers-nix";
       inputs.nixpkgs.follows = "nixpkgs";
