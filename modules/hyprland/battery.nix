@@ -1,3 +1,4 @@
+{ withSystem, ... }:
 {
   flake.modules = {
     homeManager.laptop =
@@ -8,11 +9,14 @@
         ...
       }:
       let
+        hyprctl-instance = withSystem pkgs.stdenv.hostPlatform.system (
+          psArgs: psArgs.config.packages.hyprctl-instance
+        );
         script = pkgs.writeShellApplication {
           name = "watch-battery";
           runtimeInputs = with pkgs; [
             coreutils
-            findutils
+            hyprctl-instance
             inotify-tools
             osConfig.programs.hyprland.package
           ];
@@ -20,7 +24,7 @@
             BAT=$(echo /sys/class/power_supply/BAT*)
             BAT_STATUS="$BAT/status"
             BAT_CAP="$BAT/capacity"
-            HYPRLAND_INSTANCE_SIGNATURE=$(find /run/user/1000/hypr/ -mindepth 1 -printf '%P\n' -prune)
+            HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
             export HYPRLAND_INSTANCE_SIGNATURE
 
             hypr() {

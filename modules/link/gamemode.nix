@@ -1,6 +1,7 @@
 # https://github.com/fufexan/dotfiles/blob/483680e121b73db8ed24173ac9adbcc718cbbc6e/system/programs/gamemode.nix
 {
   lib,
+  withSystem,
   inputs,
   config,
   ...
@@ -16,9 +17,12 @@ in
       ...
     }:
     let
+      hyprctl-instance = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.hyprctl-instance
+      );
       programs = [
+        hyprctl-instance
         config.programs.hyprland.package
-        pkgs.findutils
         pkgs.systemd
         pkgs.gawk
         pkgs.coreutils
@@ -31,7 +35,7 @@ in
         runtimeInputs = programs;
         text = ''
           SECRET=$(cat "${config.age.secrets."syncthing".path}")
-          HYPRLAND_INSTANCE_SIGNATURE=$(find /run/user/1000/hypr/ -mindepth 1 -printf '%P\n' -prune)
+          HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
           systemctl stop podman-nicotine
           export HYPRLAND_INSTANCE_SIGNATURE
           # ledfx change scene (disabled temporarily)
@@ -48,7 +52,7 @@ in
         runtimeInputs = programs;
         text = ''
           SECRET=$(cat "${config.age.secrets."syncthing".path}")
-          HYPRLAND_INSTANCE_SIGNATURE=$(find /run/user/1000/hypr/ -mindepth 1 -printf '%P\n' -prune)
+          HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
           export HYPRLAND_INSTANCE_SIGNATURE
           systemctl start podman-nicotine
           curl -X POST -H "X-API-Key: $SECRET" http://localhost:8384/rest/system/resume

@@ -9,6 +9,9 @@
     { pkgs, config, ... }:
     let
       moondeck = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.moondeck);
+      hyprctl-instance = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.hyprctl-instance
+      );
       sh = lib.getExe pkgs.bash;
       hypr-dispatch =
         lib.getExe' config.programs.hyprland.package "hyprctl" + " dispatch exec [workspace 7]";
@@ -113,7 +116,7 @@
       prep =
         let
           packages = [
-            pkgs.findutils
+            hyprctl-instance
             pkgs.gawk
             pkgs.coreutils
             pkgs.procps
@@ -125,7 +128,7 @@
             runtimeInputs = packages;
 
             text = ''
-              HYPRLAND_INSTANCE_SIGNATURE=$(find /run/user/1000/hypr/ -mindepth 1 -printf '%P\n' -prune)
+              HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
               export HYPRLAND_INSTANCE_SIGNATURE
               width=''${1:-3840}
               height=''${2:-2160}
@@ -148,7 +151,7 @@
             runtimeInputs = packages;
 
             text = ''
-              HYPRLAND_INSTANCE_SIGNATURE=$(find /run/user/1000/hypr/ -mindepth 1 -printf '%P\n' -prune)
+              HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
               export HYPRLAND_INSTANCE_SIGNATURE
               hyprctl dispatch moveworkspacetomonitor 7 0
               hyprctl output remove SUNSHINE
