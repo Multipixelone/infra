@@ -13,6 +13,7 @@
       };
     };
   nixpkgs.config.allowUnfreePackages = [
+    "pragmata-pro"
     "vista-fonts"
     "corefonts"
     "apple-emoji"

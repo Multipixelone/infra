@@ -23,15 +23,9 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = with lib; {
-    homepage = "https://github.com/tonsky/FiraCode";
-    description = "Monospace font with programming ligatures";
-    longDescription = ''
-      Fira Code is a monospace font extending the Fira Mono font with
-      a set of ligatures for common programming multi-character
-      combinations.
-    '';
-    license = licenses.ofl;
-    maintainers = [ maintainers.rycee ];
+    homepage = "https://fsd.it/shop/fonts/pragmatapro/";
+    description = "Condensed monospace font with programming ligatures";
+    license = licenses.unfree;
     platforms = platforms.all;
   };
 }
