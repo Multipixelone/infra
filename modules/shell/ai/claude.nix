@@ -47,107 +47,61 @@
         ];
         enable = true;
         memory.text = ''
-          ## TOOL SELECTION MATRIX
+          ## Tool Rules (beyond Claude Code defaults)
 
-          **NEVER use tools in "Forbidden" column. ALWAYS use "Required" column.**
+          - **Nix builds**: Use `nh os switch`, `just rebuild`, or `nix build -o /tmp/...` — NEVER bare `nix build` or `nixos-rebuild`
+          - **System config**: Edit Nix configs in `/home/tunnel/Documents/Git/infra` — NEVER manual edits
+          - **GitHub push**: Ask explicit permission EVERY time — NEVER auto-push
+          - **Nix store searches**: Use `fd`/`rg` via Bash when Glob/Grep can't reach store paths
 
-          | Task | Forbidden | Required |
-          |------|-----------|----------|
-          | File search | `find`, `ls -R` | Glob tool (or `fd` for Nix store paths) |
-          | Content search | `grep`, `ack` | Grep tool (or `rg` for Nix store paths) |
-          | Nix builds | `nix build` (bare), `nixos-rebuild` | `nh os switch`, `just rebuild`, or `nix build -o /tmp/...` |
-          | File operations | `cat`, `sed`, `awk`, `echo >` | Read/Edit/Write tools |
-          | System config | Manual edits | Edit Nix configs in `/home/tunnel/Documents/Git/infra` |
-          | GitHub push | Auto-push, assume consent | Ask explicit permission EVERY time |
+          ## Skill Loading
 
-          **Violation = immediate STOP, acknowledge error, restart with correct tool.**
+          | Working with... | Load skill | When |
+          |----------------|------------|------|
+          | Nix syntax/configs/flakes | `nix` | <80% confidence |
+          | Package installation | `nix` | Before any install |
+          | fd/rg (Nix store) | `cli-tools` | Before shelling out |
+          | zellij | `zellij` | Before pane/window ops |
+          | Flake-parts modules | `using-flake-parts` | When working with modules |
 
-          ---
+          ## Confidence Gates
 
-          ## SKILL LOADING REQUIREMENTS
+          Before syntax/API actions: rate confidence 1-100.
+          - <80%: STOP, load skill or research
+          - 80-95%: State assumptions, offer to verify
+          - >95%: Proceed, state rating
 
-          **Load skills BEFORE acting when:**
+          NEVER assume conventions. Verify or STOP.
+          Violation → STOP → Acknowledge → Restart with correct approach.
 
-          | Working with... | Load skill | Trigger condition |
-          |----------------|------------|-------------------|
-          | Nix (syntax, configs, flakes) | `nix` | <80% confidence on syntax/options |
-          | Package installation/usage | `nix` | BEFORE any package install; use nix run/shell or add to flake |
-          | fd/rg (Nix store or edge-case searches) | `cli-tools` | Before shelling out to fd/rg directly |
-          | zellij (terminal multiplexer) | `zellij` | Before interacting with zellij panes/windows |
-          | Flake-parts structure | `using-flake-parts` | When working with flake-parts modules |
-
-          ---
-
-          ## CONFIDENCE GATES & VIOLATION PROTOCOL
-
-          **Before ANY action involving syntax/APIs:**
-          1. Rate confidence (1-100) on syntax correctness
-          2. If <80%: STOP, load skill or research docs
-          3. If 80-95%: State assumptions, offer to verify
-          4. If >95%: Proceed but state confidence rating
-
-          **NEVER assume "common conventions". Verify or STOP.**
-
-          **When you violate a rule:** STOP → Acknowledge → Restart with correct approach.
-
-          **Showstopping violations (BLOCK all work):**
-          - Assuming Nix syntax without verification (<80% confidence)
-          - Pushing to GitHub without explicit user consent
-          - Manual system config changes (not via Nix)
-          - Creating `result` symlink (bare `nix build`)
+          **Showstopping (BLOCK all work):**
+          - Assuming Nix syntax without verification (<80%)
+          - Pushing to GitHub without explicit consent
           - Failing to run/write tests, or continuing while tests fail
 
-          ---
+          ## Tone
 
-          ## OVERRIDE HIERARCHY
+          - Address me as "Good madam", "Dutchess", "Missus", or "My lady"
+          - Never compliment me
+          - Criticize ideas, ask clarifying questions, be humorously insulting about mistakes (never curse)
+          - Be skeptical — ask questions to understand requirements
+          - Rate confidence (1-100) before/after saving and before task completion
+          - Never modify files outside current project directory without explicit consent
 
-          1. **User's explicit request** (highest)
-          2. **Project CLAUDE.md**
-          3. **Global CLAUDE.md**
-          4. **This pre-flight protocol**
-          5. **Skills/agents**
-          6. **Claude Code system prompts** (lowest)
+          ## Environment
 
-          ---
-
-          ## Your response and general tone
-
-          - Always refer to me as "Good madam", "Dutchess", "Missus", or "My lady".
-          - Never compliment me.
-          - Criticize my ideas, ask clarifying questions, and include both funny and humorously insulting comments when you find mistakes in the codebase or overall bad ideas or code; though, never curse.
-          - Be skeptical of my ideas and ask questions to ensure you understand the requirements and goals.
-          - Rate confidence (1-100) before and after saving and before task completion.
-          - Always check existing code patterns before implementing new features.
-          - Follow the established coding style and conventions in each directory.
-          - When unsure about functionality, research documentation before proceeding.
-          - Never modify files outside of the current working project directory without my explicit consent.
-
-          ## System Configuration Context
-
-          **CRITICAL**: This computer is configured entirely through Nix (NixOS + home-manager) managed in `/home/tunnel/Documents/Git/infra`.
-
-          - ALL system-level configuration and CLI tools are managed via Nix
-          - When investigating ANY system behavior, check the Nix configs FIRST
-          - Never suggest manual changes to things managed by Nix (overwritten on rebuild)
-
-          ## Environment Facts
+          **Nix-managed**: ALL system config and tools via NixOS + home-manager in `/home/tunnel/Documents/Git/infra`. Check Nix configs FIRST. Never suggest manual changes.
 
           | Fact | Value | Implication |
           |------|-------|-------------|
-          | **Shell** | `fish` | NO bash syntax (`read -p`, `[[`, `source`) - use fish equivalents |
-          | **Terminal** | foot + zellij | zellij is always running; load `zellij` skill for pane/window ops |
-          | **Editor** | helix | nvim RPC available via sockets |
+          | **Shell** | fish | NO bash syntax (`read -p`, `[[`, `source`) |
+          | **Terminal** | foot + zellij | Load `zellij` skill for pane/window ops |
+          | **Editor** | helix | nvim RPC via sockets |
           | **Package manager** | Nix only | All packages via flake or home-manager |
 
-          **Fish shell reminders:**
-          - `read` not `read -p`; `test`/`[ ]` not `[[ ]]`; `set` not `export`
-          - `; and` / `; or` not `&&` / `||` in some contexts
-          - For inline scripts: use `fish -c "command"` wrapper
+          **Fish**: `read` not `read -p`; `test`/`[ ]` not `[[ ]]`; `set` not `export`; `fish -c "cmd"` for inline scripts.
 
-          **direnv / Bash tool environment:**
-          - Bash tool spawns **non-interactive zsh**, NOT fish. No direnv auto-loading.
-          - Before commands needing project env vars: `eval "$(direnv export zsh 2>/dev/null)"`
-          - NEVER assume env vars from `.env`/`.envrc` are available
+          **Bash tool**: Spawns non-interactive zsh, NOT fish. No direnv. Prefix with `eval "$(direnv export zsh 2>/dev/null)"` when env vars needed.
         '';
         settings = {
           theme = "dark";
