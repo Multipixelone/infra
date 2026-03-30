@@ -81,6 +81,7 @@
       };
       xdg.configFile = {
         "zellij/config.kdl".text = ''
+          theme "default"
           pane_frames false
           show_startup_tips false
           plugins {
