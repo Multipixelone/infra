@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asl-anki"
+version = "0.1.0"
+description = "Generate Anki flashcards for ASL vocabulary"
+requires-python = ">=3.11"
+dependencies = ["requests", "beautifulsoup4", "yt-dlp", "genanki"]
+
+[project.scripts]
+asl-anki = "asl_anki.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
