@@ -136,7 +136,7 @@ Quick reference skills:
 
 - **Nix syntax** → Load `nix` skill
 - **CLI tools (fd, rg)** → Load `cli-tools` skill
-- **Terminal multiplexing** → Load `zellij` guidance (`docs/skills/tmux-claude/SKILL.md`)
+- **Terminal multiplexing** → Load `zellij` skill (`docs/skills/zellij/SKILL.md`)
 
 ## How to Use Me
 

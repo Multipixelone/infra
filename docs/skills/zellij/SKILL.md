@@ -1,6 +1,6 @@
 ---
 name: zellij
-description: zellij terminal multiplexer configuration, key bindings, pane/tab/session management, and command orchestration in this infra repository.
+description: Zellij terminal multiplexer — pane/tab/session management, keybindings, plugin config, and command orchestration.
 tools: Bash, Read, Grep, Glob
 ---
 
