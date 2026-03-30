@@ -1,12 +1,8 @@
 {
-  inputs,
-  ...
-}:
-{
   perSystem =
-    { pkgs, ... }:
+    { pkgs, inputs', ... }:
     let
-      hyprlandPkg = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+      hyprlandPkg = inputs'.hyprland.packages.hyprland;
       grimblast = pkgs.grimblast.override { hyprland = hyprlandPkg; };
       screenshot-pkgs = [
         hyprlandPkg
