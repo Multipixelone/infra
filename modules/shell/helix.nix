@@ -269,25 +269,27 @@
               ];
             };
           };
-          texlab.config.texlab = {
+          texlab = {
             command = "texlab";
-            chktex = {
-              onOpenAndSave = true;
-              onEdit = true;
-            };
-            build = {
-              onSave = true;
-              forwardSearchAfter = true;
-              executable = "latexrun";
-              args = [ "%f" ];
-            };
-            forwardSearch = {
-              executable = "zathura";
-              args = [
-                "%p"
-                "--synctex-forward"
-                "%l:1:%f"
-              ];
+            config.texlab = {
+              chktex = {
+                onOpenAndSave = true;
+                onEdit = true;
+              };
+              build = {
+                onSave = true;
+                forwardSearchAfter = true;
+                executable = "latexrun";
+                args = [ "%f" ];
+              };
+              forwardSearch = {
+                executable = "zathura";
+                args = [
+                  "%p"
+                  "--synctex-forward"
+                  "%l:1:%f"
+                ];
+              };
             };
           };
         };
