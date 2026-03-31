@@ -306,14 +306,6 @@
           [
             {
               name = "nix";
-              scope = "source.nix";
-              file-types = [ "nix" ];
-              comment-token = "#";
-              indent = {
-                tab-width = 2;
-                unit = "  ";
-              };
-              injection-regex = "nix";
               language-servers = [
                 "nixd"
                 "gpt"
@@ -324,10 +316,6 @@
             {
               name = "yaml";
               auto-format = true;
-              file-types = [
-                "yaml"
-                "yml"
-              ];
               language-servers = [ "yaml-language-server" ];
             }
             {
@@ -373,7 +361,6 @@
               name = "typst";
               formatter.command = lib.getExe pkgs.typstyle;
               auto-format = true;
-              file-types = [ "typ" ];
               language-servers = [ "tinymist" ];
             }
             {
