@@ -37,6 +37,9 @@
             enable = true;
             wrap-indicator = "↩ ";
           };
+          auto-save = {
+            focus-lost = true;
+          };
           lsp = {
             display-inlay-hints = true;
             display-progress-messages = true;
