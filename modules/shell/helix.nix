@@ -149,9 +149,7 @@
           };
           gpt = {
             command = "copilot-language-server";
-            args = [
-              "--stdio"
-            ];
+            args = [ "--stdio" ];
             config = {
               editorInfo = {
                 name = "Helix";
@@ -222,7 +220,6 @@
           uwu-colors = {
             command = "${inputs.uwu-colors.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/uwu_colors";
           };
-
           vscode-css-language-server = {
             command = "${pkgs.nodePackages.vscode-langservers-extracted}/bin/vscode-css-language-server";
             args = [ "--stdio" ];
@@ -304,7 +301,7 @@
                 "nixd"
                 "gpt"
               ];
-              formatter.command = "${lib.getExe pkgs.nixfmt}";
+              formatter.command = lib.getExe pkgs.nixfmt;
               auto-format = true;
             }
             {
@@ -330,7 +327,7 @@
                 "markdown-oxide"
               ];
               formatter = {
-                command = "prettier";
+                command = lib.getExe pkgs.nodePackages.prettier;
                 args = [
                   "--stdin-filepath"
                   "file.md"
@@ -357,7 +354,7 @@
             }
             {
               name = "typst";
-              formatter.command = "${lib.getExe pkgs.typstyle}";
+              formatter.command = lib.getExe pkgs.typstyle;
               auto-format = true;
               file-types = [ "typ" ];
               language-servers = [ "tinymist" ];
@@ -365,11 +362,13 @@
             {
               name = "toml";
               auto-format = true;
-              formatter.command = lib.getExe pkgs.taplo;
-              formatter.args = [
-                "fmt"
-                "-"
-              ];
+              formatter = {
+                command = lib.getExe pkgs.taplo;
+                args = [
+                  "fmt"
+                  "-"
+                ];
+              };
               language-servers = [ "taplo" ];
             }
             {
@@ -384,9 +383,7 @@
             {
               name = "html";
               formatter = prettier "html";
-              language-servers = [
-                "vscode-html-language-server"
-              ];
+              language-servers = [ "vscode-html-language-server" ];
             }
             {
               name = "javascript";
@@ -401,7 +398,7 @@
                 "typescript-language-server"
               ];
               formatter = {
-                command = "${pkgs.dprint}/bin/dprint";
+                command = lib.getExe pkgs.dprint;
                 args = [
                   "fmt"
                   "--config"
@@ -443,7 +440,6 @@
         ];
       in
       {
-        # also install packages to main environment
         home.packages = packages;
         age.secrets = {
           "copilot" = {
@@ -453,19 +449,14 @@
         home.file.".dprint.json".source = builtins.toFile "dprint.json" (
           builtins.toJSON {
             lineWidth = 80;
-
-            # This applies to both JavaScript & TypeScript
             typescript = {
               quoteStyle = "preferSingle";
               binaryExpression.operatorPosition = "sameLine";
             };
-
             json.indentWidth = 2;
-
             excludes = [
               "**/*-lock.json"
             ];
-
             plugins = [
               "https://plugins.dprint.dev/typescript-0.93.0.wasm"
               "https://plugins.dprint.dev/json-0.19.3.wasm"
