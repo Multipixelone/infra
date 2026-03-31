@@ -255,26 +255,18 @@
           yaml-language-server = {
             command = "${pkgs.nodePackages.yaml-language-server}/bin/yaml-language-server";
             args = [ "--stdio" ];
-            config = {
-              yaml = {
-                schemaStore = {
-                  enable = true;
-                };
-                format = {
-                  enable = true;
-                };
-                validate = true;
-                completion = true;
-                hover = true;
-                schemas = {
-                  kubernetes = [
-                    "*.k8s.yaml"
-                    "kustomization.yaml"
-                    "**/values.yaml"
-                    "helm/*.yaml"
-                  ];
-                };
-              };
+            config.yaml = {
+              schemaStore.enable = true;
+              format.enable = true;
+              validate = true;
+              completion = true;
+              hover = true;
+              schemas.kubernetes = [
+                "*.k8s.yaml"
+                "kustomization.yaml"
+                "**/values.yaml"
+                "helm/*.yaml"
+              ];
             };
           };
           texlab.config.texlab = {
