@@ -97,7 +97,7 @@
               "paste_clipboard_after"
               "collapse_selection"
             ];
-            # new helix commands
+            # tree-sitter selection
             C-h = "select_prev_sibling";
             C-j = "shrink_selection";
             C-k = "expand_selection";
