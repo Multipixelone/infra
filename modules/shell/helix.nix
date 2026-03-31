@@ -30,6 +30,7 @@
           true-color = true; # fix colors over ssh
           cursorline = true;
           popup-border = "all";
+          trim-trailing-whitespace = true;
           indent-guides.render = true;
           indent-heuristic = "tree-sitter";
           soft-wrap = {
