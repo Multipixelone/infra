@@ -152,7 +152,7 @@
                 name = "Helix";
                 version = "25.01";
               };
-              editorPluginIngo = {
+              editorPluginInfo = {
                 name = "helix-copilot";
                 version = "0.1.0";
               };
