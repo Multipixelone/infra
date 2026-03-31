@@ -338,7 +338,10 @@
               auto-format = true;
               language-servers = [
                 "basedpyright"
-                "ruff"
+                {
+                  name = "ruff";
+                  except-features = [ "hover" ];
+                }
               ];
             }
             {
