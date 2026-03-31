@@ -428,10 +428,9 @@
         ...
       }:
       let
-        # wrap secret into helix-gpt
         gpt-wrapped = pkgs.writeShellScriptBin "copilot-language-server" ''
           export GITHUB_COPILOT_TOKEN=$(cat ${hmArgs.config.age.secrets."copilot".path})
-          ${lib.getExe pkgs.copilot-language-server} $@
+          ${lib.getExe pkgs.copilot-language-server} "$@"
         '';
         packages = with pkgs; [
           gpt-wrapped
