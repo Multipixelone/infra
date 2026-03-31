@@ -35,7 +35,11 @@
             enable = true;
             wrap-indicator = "↩ ";
           };
-          lsp.display-inlay-hints = true;
+          lsp = {
+            display-inlay-hints = true;
+            display-progress-messages = true;
+            auto-document-highlight = true;
+          };
           end-of-line-diagnostics = "hint";
           inline-diagnostics = {
             cursor-line = "error";
