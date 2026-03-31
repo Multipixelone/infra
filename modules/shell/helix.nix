@@ -58,13 +58,13 @@
               "mode"
               "separator"
               "file-name"
-              "diagnostics"
               "file-modification-indicator"
               "read-only-indicator"
               "spinner"
             ];
             right = [
               "diagnostics"
+              "workspace-diagnostics"
               "version-control"
               "register"
               "file-encoding"
