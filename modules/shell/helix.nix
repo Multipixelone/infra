@@ -189,10 +189,33 @@
             command = lib.getExe pkgs.fish-lsp;
             args = [ "start" ];
           };
-          dprint = {
-            command = lib.getExe pkgs.dprint;
-            args = [ "lsp" ];
-          };
+          dprint =
+            let
+              dprintConfig = builtins.toFile "dprint.json" (
+                builtins.toJSON {
+                  lineWidth = 80;
+                  typescript = {
+                    quoteStyle = "preferSingle";
+                    binaryExpression.operatorPosition = "sameLine";
+                  };
+                  json.indentWidth = 2;
+                  excludes = [ "**/*-lock.json" ];
+                  plugins = [
+                    "https://plugins.dprint.dev/typescript-0.93.0.wasm"
+                    "https://plugins.dprint.dev/json-0.19.3.wasm"
+                    "https://plugins.dprint.dev/markdown-0.17.8.wasm"
+                  ];
+                }
+              );
+            in
+            {
+              command = lib.getExe pkgs.dprint;
+              args = [
+                "lsp"
+                "--config"
+                dprintConfig
+              ];
+            };
           astro-ls = {
             command = "${pkgs.astro-language-server}/bin/astro-ls";
             args = [ "--stdio" ];
@@ -401,8 +424,6 @@
                 command = lib.getExe pkgs.dprint;
                 args = [
                   "fmt"
-                  "--config"
-                  # "${hmArgs.config.xdg.configHome}/dprint/dprint.json"
                   "--stdin"
                   "javascript"
                 ];
@@ -446,24 +467,6 @@
             file = "${inputs.secrets}/github/copilot.age";
           };
         };
-        home.file.".dprint.json".source = builtins.toFile "dprint.json" (
-          builtins.toJSON {
-            lineWidth = 80;
-            typescript = {
-              quoteStyle = "preferSingle";
-              binaryExpression.operatorPosition = "sameLine";
-            };
-            json.indentWidth = 2;
-            excludes = [
-              "**/*-lock.json"
-            ];
-            plugins = [
-              "https://plugins.dprint.dev/typescript-0.93.0.wasm"
-              "https://plugins.dprint.dev/json-0.19.3.wasm"
-              "https://plugins.dprint.dev/markdown-0.17.8.wasm"
-            ];
-          }
-        );
         programs.helix = {
           enable = true;
           package = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.helix);
