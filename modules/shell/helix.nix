@@ -335,7 +335,7 @@
                 command = lib.getExe pkgs.nodePackages.prettier;
                 args = [
                   "--stdin-filepath"
-                  "file.md"
+                  "%{buffer_name}"
                 ];
               };
               auto-format = true;
