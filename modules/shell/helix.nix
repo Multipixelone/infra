@@ -43,6 +43,8 @@
           end-of-line-diagnostics = "hint";
           inline-diagnostics = {
             cursor-line = "error";
+            prefix-len = 1;
+            max-wrap = 20;
           };
           gutters = [
             "diagnostics"
