@@ -254,6 +254,7 @@
       # inputs.rust-overlay.follows = "zjstatus";
       # inputs.nixpkgs.follows = "zjstatus";
     };
+    millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
     # humble-key = {
     #   url = "github:Multipixelone/humble-steam-key-redeemer/nix-build";
     #   inputs.nixpkgs.follows = "nixpkgs";
