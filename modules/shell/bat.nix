@@ -25,6 +25,13 @@
           config = {
             pager = "${lib.getExe pkgs.ov} --quit-if-one-screen --header 3";
           };
+          extraPackages = with pkgs.bat-extras; [
+            prettybat
+            batwatch
+            batpipe
+            batman
+            batdiff
+          ];
         };
       };
     };
