@@ -94,7 +94,7 @@
                         [FLAC_PROG, '-ds', '--stdout', '--force-raw-format', '--endian=little', '--sign=signed', flac_path],
                         stdout=sp.PIPE,
                         stderr=sp.DEVNULL) as decoding:
-                    for chunk in iter(lambda: decoding.stdout.read(CHUNK_SIZE), b'''):
+                    for chunk in iter(lambda: decoding.stdout.read(CHUNK_SIZE), b""):
                         md_five.update(chunk)
 
                 return md_five.hexdigest()
@@ -234,11 +234,14 @@
         failure_max_retries = 2
         failure_delay_seconds = 2
       '';
-      euphony-wrapped = pkgs.writeShellScriptBin "euphony" ''
-        ${
-          lib.getExe' inputs.euphony.packages.${pkgs.stdenv.hostPlatform.system}.default "euphony"
-        } -c ${configFile} $@
-      '';
+      euphony-wrapped = pkgs.writeShellApplication {
+        name = "euphony";
+        text = ''
+          ${
+            lib.getExe' inputs.euphony.packages.${pkgs.stdenv.hostPlatform.system}.default "euphony"
+          } -c ${configFile} "$@"
+        '';
+      };
     in
     {
       # Plex API token for playlist-downloader
@@ -300,7 +303,7 @@
             Service = {
               Type = "oneshot";
               Environment = [
-                "PLEXAPI_CONFIG_PATH=\"${hmArgs.config.age.secrets."plexapi".path}\""
+                "PLEXAPI_CONFIG_PATH=${hmArgs.config.age.secrets."plexapi".path}"
               ];
               ExecStart = lib.getExe inputs.playlist-download.packages.${pkgs.stdenv.hostPlatform.system}.default;
             };
@@ -377,6 +380,7 @@
               "inline"
               "lastgenre"
               "lastimport"
+              "lyrics"
               "mbsubmit"
               "mbsync"
               "missing"
@@ -392,6 +396,7 @@
               "savedformats"
               "titlecase"
               "the"
+              "types"
               "importsource"
             ];
             clutter = [
@@ -404,14 +409,10 @@
               "*.nfo"
               "*.xml"
               "*.docx"
-              "*.jpg"
-              "*.jpeg"
-              "*.png"
             ];
             # get rid of reserved characters instead of replacing with underscore
             replace = {
               "[\\\\/]" = "";
-              "[\/]" = "";
               "^\\." = "";
               "[\\x00-\\x1f]" = "";
               "[<>:\"\\?\\*\\|]" = "";
@@ -484,6 +485,10 @@
               count = 3;
               cleanup_existing = true;
             };
+            lyrics = {
+              auto = true;
+              synced = true;
+            };
             duplicates = {
               # checksum = "${lib.getExe' pkgs.chromaprint "fpcalc"} -plain {file}";
               checksum = "${ffmpeg} -i {file} -f crc -";
@@ -530,9 +535,7 @@
               let
                 log-timestamp = pkgs.writeShellApplication {
                   name = "log-timestamp";
-                  runtimeInputs = with pkgs; [
-                    dateutils
-                  ];
+                  runtimeInputs = [ ];
                   text = ''
                     export LOGDIR="${beets-dir}/logs"
                     export LOG="''${LOGDIR}/import_times.log"
@@ -735,14 +738,14 @@
                 try:
                   custom_artist
                 except NameError:
-                  return albumartists_sort[0]
+                  return albumartists_sort[0] if albumartists_sort else albumartist
                 else:
                   return custom_artist
               '';
               source = ''
                 format = set([i.format for i in items])
                 tbr = sum([i.bitrate for i in items])
-                abr = tbr / len(items) / 1000
+                abr = int(tbr / len(items) / 1000)
                 # brm = set([i.bitrate_mode for i in items])
                 samplerate = set([i.samplerate for i in items])
                 bitdepth = sum([i.bitdepth for i in items]) // len(items)
@@ -759,15 +762,17 @@
                     #   for p in brm:
                     #       o.append(p)
 
-                if abr < 480 and abr >= 320:
+                if abr >= 480:
+                    o.append(str(abr))
+                elif abr >= 320:
                     o.append('320')
-                elif abr < 320 and abr >= 220:
+                elif abr >= 220:
                     o.append('V0')
-                elif abr < 215 and abr >= 170 and abr != 192:
-                    o.append('V2')
                 elif abr == 192:
                     o.append('192')
-                elif abr < 170:
+                elif abr >= 170:
+                    o.append('V2')
+                elif abr > 0:
                     o.append(str(abr))
 
                 return ", ".join(o)
@@ -787,19 +792,21 @@
                  'DVD':           'DVDA',
                 }
                 media_types_to_omit = ['Blu-spec CD']
-                if items[0].media in media_list:
-                  return str(media_list[items[0].media]) + ', '
-                elif items[0].media in media_types_to_omit:
+                all_media = [i.media for i in items]
+                media = max(set(all_media), key=all_media.count)
+                if media in media_list:
+                  return str(media_list[media]) + ', '
+                elif media in media_types_to_omit:
                   return None
-                elif items[0].media == ''':
+                elif media == "":
                   return None
                 else:
-                  return str(items[0].media) + ', '
+                  return str(media) + ', '
               '';
             };
             item_fields.disc_and_track = ''
               if not track or (tracktotal and tracktotal == 1):
-                return '''
+                return ""
               elif disctotal > 1:
                 return f"{disc:02}-{track:02}. "
               else:
@@ -809,16 +816,11 @@
               # "artist Ye" = "Kanye West";
             };
             aunique = {
-              keys = "albumartist
-            albumtype
-            year
-            album";
-              disambiguators = "format
-            mastering
-            media
-            label
-            albumdisambig
-            releasegroupdisambig";
+              keys = "albumartist albumtype year album";
+              disambiguators = "format mastering media label albumdisambig releasegroupdisambig";
+            };
+            types = {
+              plex_userrating = "int";
             };
             ui.colors = {
               # Field colors for use in the item and album formats.
@@ -883,7 +885,7 @@
               auto = true;
               cautious = false;
               cover_names = "cover front art album folder";
-              maxwidth = 300;
+              maxwidth = 1200;
               high_resolution = true;
               store_source = true;
               sources = [
