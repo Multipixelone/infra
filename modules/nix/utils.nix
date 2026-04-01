@@ -21,7 +21,7 @@
         ];
     };
   flake.modules.nixos.base =
-    { pkgs, lib, ... }:
+    { lib, ... }:
     {
       environment.variables.NH_FLAKE = lib.mkDefault "/home/${config.flake.meta.owner.username}/Documents/Git/${config.flake.meta.repo.name}";
       programs.nh = {
