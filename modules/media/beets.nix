@@ -471,7 +471,6 @@
                 discogs = true;
                 spotify = true;
                 bandcamp = true;
-                beatport = true;
                 deezer = true;
                 tidal = true;
               };
