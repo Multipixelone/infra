@@ -37,7 +37,7 @@
             mode_tab           "#[fg=#${colors.base07}]#[bg=#${colors.base07},fg=#${colors.base02},bold]TAB#[fg=#${colors.base07}] "
             mode_scroll        "#[fg=#${colors.base0A}]#[bg=#${colors.base0A},fg=#${colors.base02},bold]SCROLL#[fg=#${colors.base0A}] "
             mode_enter_search  "#[fg=#${colors.base0D}]#[bg=#${colors.base0D},fg=#${colors.base02},bold]ENT-SEARCH#[fg=#${colors.base0D}] "
-            mode_search        "#[fg=#${colors.base0D}]#[bg=#${colors.base0D},fg=#${colors.base02},bold]SEARCHARCH#[fg=#${colors.base0D}] "
+            mode_search        "#[fg=#${colors.base0D}]#[bg=#${colors.base0D},fg=#${colors.base02},bold]SEARCH#[fg=#${colors.base0D}] "
             mode_rename_tab    "#[fg=#${colors.base07}]#[bg=#${colors.base07},fg=#${colors.base02},bold]RENAME-TAB#[fg=#${colors.base07}] "
             mode_rename_pane   "#[fg=#${colors.base0D}]#[bg=#${colors.base0D},fg=#${colors.base02},bold]RENAME-PANE#[fg=#${colors.base0D}] "
             mode_session       "#[fg=#${colors.base0E}]#[bg=#${colors.base0E},fg=#${colors.base02},bold]SESSION#[fg=#${colors.base0E}] "
