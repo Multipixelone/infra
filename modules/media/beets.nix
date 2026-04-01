@@ -459,12 +459,14 @@
             musicbrainz = {
               # truthfully i'm not sure at all why i'd ever want to penalize tracks in this manner.
               data_source_mismatch_penalty = 0;
+              genres = true;
               extra_tags = [
                 "year"
                 "catalognum"
                 "country"
                 "media"
                 "label"
+                "barcode"
               ];
               # fetch and embed external_ids from musicbrainz
               external_ids = {
