@@ -104,8 +104,6 @@
               bind "Alt Enter" { NewPane "Right"; SwitchToMode "Normal"; }
               bind "Alt Shift Q" { CloseFocus; SwitchToMode "Normal"; }
               bind "Alt Shift Enter" { NewPane "Down"; SwitchToMode "Normal"; }
-            }
-            shared_except "locked" {
               bind "Alt m" {
                 LaunchPlugin "file://${monocle}/bin/monocle.wasm" {
                   in_place true
@@ -121,6 +119,8 @@
                 };
                 SwitchToMode "Normal"
               }
+            }
+            shared_except "locked" {
               bind "Alt f" { ToggleFloatingPanes; SwitchToMode "Normal"; }
               bind "Alt Shift F" { TogglePaneEmbedOrFloating; SwitchToMode "Normal"; }
               bind "Alt e" { EditScrollback; SwitchToMode "Normal"; }
