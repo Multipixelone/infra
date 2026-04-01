@@ -146,7 +146,7 @@
         let
           # this lovely snippet pulls the first artist from the albumartists_sort field :-)
           # first_artist = "%the{%tcp{%ifdef{albumartists_sort,%first{$albumartists_sort,1,0,\␀},$first_artist}}}";
-          first_artist = "%the{%tcp{%ifdef{albumartists_sort,$first_artist,$albumartist}}}";
+          first_artist = "%the{%titlecase{%ifdef{albumartists_sort,$first_artist,$albumartist}}}";
           # if no month and day just display year, otherwise display all three
           date = "%if{$original_year,($original_year%if{$original_month,.$original_month.$original_day}) ,) }";
           # ex. 01-01. Tyler, the Creator ft. Frank Ocean - Slater.wav
@@ -156,11 +156,11 @@
         in
         [
           {
-            category = "genre:mt, genre:broadway, genre:Musical";
+            category = "genres:mt, genres:broadway, genres:Musical";
             path = "0. Musicals/%the{$album} ${disambig_rerelease}${date}[$media_type$source]/$disc_and_track$title";
           }
           {
-            category = "albumtype:soundtrack, genre:Soundtrack";
+            category = "albumtype:soundtrack, genres:Soundtrack";
             path = "OST/$album ${disambig_rerelease}${date}[$media_type$source]/${track_path}";
           }
           {
@@ -390,8 +390,9 @@
               "smartplaylist"
               # "stylize"
               "savedformats"
-              "tcp"
+              "titlecase"
               "the"
+              "importsource"
             ];
             clutter = [
               "Thumbs.DB"
@@ -459,19 +460,20 @@
             musicbrainz = {
               # truthfully i'm not sure at all why i'd ever want to penalize tracks in this manner.
               data_source_mismatch_penalty = 0;
+              genres = true;
               extra_tags = [
                 "year"
                 "catalognum"
                 "country"
                 "media"
                 "label"
+                "barcode"
               ];
               # fetch and embed external_ids from musicbrainz
               external_ids = {
                 discogs = true;
                 spotify = true;
                 bandcamp = true;
-                beatport = true;
                 deezer = true;
                 tidal = true;
               };
@@ -479,6 +481,8 @@
             lastgenre = {
               force = false;
               keep_existing = true;
+              count = 3;
+              cleanup_existing = true;
             };
             duplicates = {
               # checksum = "${lib.getExe' pkgs.chromaprint "fpcalc"} -plain {file}";
@@ -609,6 +613,7 @@
               auto = true;
               overwrite = true;
               albumgain = true;
+              per_disc = true;
               backend = "ffmpeg";
               command = ffmpeg;
               threads = 6;
@@ -668,39 +673,41 @@
                   opus = lib.getExe opus-test;
                 };
             };
-            tcp.asis = [
-              "EP"
-              "LP"
-              "feat. "
-              "PhD"
-              "DJ"
-              "TCP"
-              "SOS"
-              "DMC"
-              "A$AP"
-              "MF"
-              "OST"
-              "PAL"
-              "NTSC"
-              "T.I"
-              "II"
-              "III"
-              "IV"
-              "VI"
-              "VII"
-              "VIII"
-              "IX"
-              "XI"
-              "XII"
-              "XIII"
-              "XIV"
-              "XV"
-              "XVI"
-              "XVII"
-              "XVIII"
-              "XIX"
-              "XX"
-            ];
+            titlecase = {
+              auto = false;
+              preserve = [
+                "EP"
+                "LP"
+                "feat. "
+                "PhD"
+                "DJ"
+                "SOS"
+                "DMC"
+                "A$AP"
+                "MF"
+                "OST"
+                "PAL"
+                "NTSC"
+                "T.I"
+                "II"
+                "III"
+                "IV"
+                "VI"
+                "VII"
+                "VIII"
+                "IX"
+                "XI"
+                "XII"
+                "XIII"
+                "XIV"
+                "XV"
+                "XVI"
+                "XVII"
+                "XVIII"
+                "XIX"
+                "XX"
+              ];
+            };
             smartplaylist = {
               relative_to = hmArgs.config.programs.beets.settings.directory;
               playlist_dir = hmArgs.config.home.sessionVariables.PLAYLIST_DIR;
@@ -877,8 +884,17 @@
               cautious = false;
               cover_names = "cover front art album folder";
               maxwidth = 300;
-              sources = "coverart albumart itunes amazon google";
+              high_resolution = true;
+              store_source = true;
+              sources = [
+                "filesystem"
+                "coverart"
+                "albumart"
+                "itunes"
+                "amazon"
+              ];
             };
+            importsource.suggest_removal = false;
           };
         };
       };
