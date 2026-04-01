@@ -884,7 +884,15 @@
               cautious = false;
               cover_names = "cover front art album folder";
               maxwidth = 300;
-              sources = "coverart albumart itunes amazon google";
+              high_resolution = true;
+              store_source = true;
+              sources = [
+                "filesystem"
+                "coverart"
+                "albumart"
+                "itunes"
+                "amazon"
+              ];
             };
             importsource.suggest_removal = false;
           };
