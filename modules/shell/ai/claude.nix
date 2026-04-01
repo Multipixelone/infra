@@ -47,13 +47,13 @@
           if [ -n "$project_dir" ] && [ "$current_dir" != "$project_dir" ]; then
               display_dir=''${current_dir#"$project_dir"/}
               if [ "$display_dir" = "$current_dir" ]; then
-                  display_dir=$(echo "$current_dir" | sed "s|^$HOME|~|")
+                  display_dir=''${current_dir/#"$HOME"/~}
               fi
           else
-              display_dir=$(echo "$current_dir" | sed "s|^$HOME|~|")
+              display_dir=''${current_dir/#"$HOME"/~}
           fi
           # Replace leading ~ with  icon
-          display_dir=$(echo "$display_dir" | sed 's|^~| |')
+          display_dir=''${display_dir/#~/}
 
           # Git branch + dirty indicator
           git_info=""
