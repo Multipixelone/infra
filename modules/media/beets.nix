@@ -156,11 +156,11 @@
         in
         [
           {
-            category = "genre:mt, genre:broadway, genre:Musical";
+            category = "genres:mt, genres:broadway, genres:Musical";
             path = "0. Musicals/%the{$album} ${disambig_rerelease}${date}[$media_type$source]/$disc_and_track$title";
           }
           {
-            category = "albumtype:soundtrack, genre:Soundtrack";
+            category = "albumtype:soundtrack, genres:Soundtrack";
             path = "OST/$album ${disambig_rerelease}${date}[$media_type$source]/${track_path}";
           }
           {
