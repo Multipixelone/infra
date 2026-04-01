@@ -10,6 +10,8 @@
     ];
     programs.nixcord = {
       enable = true;
+      discord.vencord.enable = false;
+      discord.equicord.enable = true;
       config = {
         frameless = true;
         themeLinks = [
@@ -22,6 +24,12 @@
           whoReacted.enable = true;
           youtubeAdblock.enable = true;
           webScreenShareFixes.enable = true;
+          questify = {
+            enable = true;
+            # completeAchievementQuestsInBackground = true;
+            # completeGameQuestsInBackground = true;
+            # completeVideoQuestsInBackground = true;
+          };
         };
       };
     };
