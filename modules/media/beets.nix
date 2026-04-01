@@ -610,6 +610,7 @@
               auto = true;
               overwrite = true;
               albumgain = true;
+              per_disc = true;
               backend = "ffmpeg";
               command = ffmpeg;
               threads = 6;
