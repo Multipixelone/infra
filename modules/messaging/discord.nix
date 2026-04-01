@@ -23,6 +23,12 @@
           whoReacted.enable = true;
           youtubeAdblock.enable = true;
           webScreenShareFixes.enable = true;
+          questify = {
+            enable = true;
+            completeAchievementQuestsInBackground = true;
+            completeGameQuestsInBackground = true;
+            completeVideoQuestsInBackground = true;
+          };
         };
       };
     };
