@@ -10,6 +10,7 @@
     ];
     programs.nixcord = {
       enable = true;
+      discord.equicord.enable = true;
       config = {
         frameless = true;
         themeLinks = [
