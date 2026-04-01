@@ -118,6 +118,13 @@
                 };
                 SwitchToMode "Normal"
               }
+              bind "Alt f" { ToggleFloatingPanes; SwitchToMode "Normal"; }
+              bind "Alt Shift F" { TogglePaneEmbedOrFloating; SwitchToMode "Normal"; }
+              bind "Alt e" { EditScrollback; SwitchToMode "Normal"; }
+              bind "Alt h" { MoveFocus "Left"; }
+              bind "Alt l" { MoveFocus "Right"; }
+              bind "Alt j" { MoveFocus "Down"; }
+              bind "Alt k" { MoveFocus "Up"; }
             }
           }
         '';
