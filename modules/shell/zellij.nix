@@ -110,6 +110,9 @@
                 LaunchPlugin "file://${monocle}/bin/monocle.wasm" {
                   in_place true
                   kiosk true
+                };
+                SwitchToMode "Normal"
+              }
               bind "Alt r" {
                 LaunchOrFocusPlugin "file://${room}/lib/zellij/plugins/room.wasm" {
                   floating true
