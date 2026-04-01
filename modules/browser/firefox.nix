@@ -11,7 +11,7 @@
   };
   flake.modules.homeManager = {
     gui =
-      hmArgs@{ lib, pkgs, ... }:
+      { pkgs, ... }:
       let
         inherit (inputs) better-fox;
         customAddons = pkgs.callPackage ../../pkgs/firefox-addons/generated.nix {
