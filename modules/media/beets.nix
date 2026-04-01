@@ -506,10 +506,10 @@
               embed = true;
               delete_originals = true;
               copy_album_art = true;
-              max_bitrate = 1500;
+              max_bitrate = 4000;
               formats = {
-                # DEFAULT flac 16-44.1khz with highest compression level (unsure if this matters, but whatever LOL)
-                flac.command = "${ffmpeg} -i $source -compression_level 12 -sample_fmt s16 -ar 44100 -y -acodec flac $dest";
+                # bring anything higher then 96000Hz down to that.
+                flac.command = "${ffmpeg} -i $source -af aformat=sample_rates=8000|11025|16000|22050|32000|44100|48000|88200|96000 -compression_level 5 -y -acodec flac $dest";
                 mp3.command = "${ffmpeg} -i $source -ab 320k -ac 2 -ar 44100 -joint_stereo 0 $dest";
                 lossyflac = {
                   command = "convert-lossyflac $source $dest";
