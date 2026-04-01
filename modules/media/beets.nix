@@ -392,6 +392,7 @@
               "savedformats"
               "titlecase"
               "the"
+              "importsource"
             ];
             clutter = [
               "Thumbs.DB"
@@ -885,6 +886,7 @@
               maxwidth = 300;
               sources = "coverart albumart itunes amazon google";
             };
+            importsource.suggest_removal = false;
           };
         };
       };
