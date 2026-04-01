@@ -53,6 +53,7 @@ in
         };
         colors-dark = catppuccinColors // {
           alpha = "0.85";
+          alpha-mode = "matching";
         };
       };
     };
