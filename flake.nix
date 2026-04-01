@@ -242,6 +242,12 @@
       # inputs.crane.follows = "zjstatus";
       # inputs.rust-overlay.follows = "zjstatus";
     };
+    zsm = {
+      url = "github:Multipixelone/zsm/nix-build";
+      # inputs.nixpkgs.follows = "monocle";
+      # inputs.crane.follows = "monocle";
+      # inputs.rust-overlay.follows = "monocle";
+    };
     # TODO switch to upstream if PR accepted
     room = {
       url = "github:Multipixelone/room/reduce-binary-size";

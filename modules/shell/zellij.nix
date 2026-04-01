@@ -8,6 +8,7 @@
     let
       zjstatus = inputs.zjstatus.packages.${pkgs.stdenv.hostPlatform.system}.default;
       monocle = inputs.monocle.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      zsm = inputs.zsm.packages.${pkgs.stdenv.hostPlatform.system}.default;
       zjstatus-hints = inputs.zjstatus-hints.packages.${pkgs.stdenv.hostPlatform.system}.default;
       room = inputs.room.packages.${pkgs.stdenv.hostPlatform.system}.default;
       inherit (hmArgs.config.lib.stylix) colors;
@@ -83,6 +84,7 @@
       xdg.configFile = {
         "zellij/config.kdl".text = ''
           theme "default"
+          default_layout "zjstatus"
           pane_frames false
           show_startup_tips false
           plugins {
@@ -119,6 +121,16 @@
                 };
                 SwitchToMode "Normal"
               }
+              bind "Alt z" {
+                LaunchOrFocusPlugin "file://${zsm}/bin/zsm.wasm" {
+                  floating true
+                  move_to_focused_tab true
+                  show_resurrectable_sessions true
+                  session_seperator "-"
+                  base_paths "/home/tunnel/Documents/Git|/volume1/Media"
+                  default_layout "zjstatus"
+                }
+              }
             }
             shared_except "locked" {
               bind "Alt f" { ToggleFloatingPanes; SwitchToMode "Normal"; }
@@ -131,7 +143,7 @@
             }
           }
         '';
-        "zellij/layouts/default.kdl".text = ''
+        "zellij/layouts/zjstatus.kdl".text = ''
           layout {
               default_tab_template {
                   pane size=2 borderless=true {
