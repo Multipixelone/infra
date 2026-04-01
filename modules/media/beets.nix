@@ -146,7 +146,7 @@
         let
           # this lovely snippet pulls the first artist from the albumartists_sort field :-)
           # first_artist = "%the{%tcp{%ifdef{albumartists_sort,%first{$albumartists_sort,1,0,\␀},$first_artist}}}";
-          first_artist = "%the{%tcp{%ifdef{albumartists_sort,$first_artist,$albumartist}}}";
+          first_artist = "%the{%titlecase{%ifdef{albumartists_sort,$first_artist,$albumartist}}}";
           # if no month and day just display year, otherwise display all three
           date = "%if{$original_year,($original_year%if{$original_month,.$original_month.$original_day}) ,) }";
           # ex. 01-01. Tyler, the Creator ft. Frank Ocean - Slater.wav
@@ -390,7 +390,7 @@
               "smartplaylist"
               # "stylize"
               "savedformats"
-              "tcp"
+              "titlecase"
               "the"
             ];
             clutter = [
@@ -668,39 +668,41 @@
                   opus = lib.getExe opus-test;
                 };
             };
-            tcp.asis = [
-              "EP"
-              "LP"
-              "feat. "
-              "PhD"
-              "DJ"
-              "TCP"
-              "SOS"
-              "DMC"
-              "A$AP"
-              "MF"
-              "OST"
-              "PAL"
-              "NTSC"
-              "T.I"
-              "II"
-              "III"
-              "IV"
-              "VI"
-              "VII"
-              "VIII"
-              "IX"
-              "XI"
-              "XII"
-              "XIII"
-              "XIV"
-              "XV"
-              "XVI"
-              "XVII"
-              "XVIII"
-              "XIX"
-              "XX"
-            ];
+            titlecase = {
+              auto = false;
+              preserve = [
+                "EP"
+                "LP"
+                "feat. "
+                "PhD"
+                "DJ"
+                "SOS"
+                "DMC"
+                "A$AP"
+                "MF"
+                "OST"
+                "PAL"
+                "NTSC"
+                "T.I"
+                "II"
+                "III"
+                "IV"
+                "VI"
+                "VII"
+                "VIII"
+                "IX"
+                "XI"
+                "XII"
+                "XIII"
+                "XIV"
+                "XV"
+                "XVI"
+                "XVII"
+                "XVIII"
+                "XIX"
+                "XX"
+              ];
+            };
             smartplaylist = {
               relative_to = hmArgs.config.programs.beets.settings.directory;
               playlist_dir = hmArgs.config.home.sessionVariables.PLAYLIST_DIR;
