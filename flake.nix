@@ -242,7 +242,12 @@
       # inputs.crane.follows = "zjstatus";
       # inputs.rust-overlay.follows = "zjstatus";
     };
-    room.url = "github:Multipixelone/room";
+    # TODO switch to upstream if PR accepted
+    room = {
+      url = "github:Multipixelone/room/reduce-binary-size";
+      # inputs.rust-overlay.follows = "zjstatus";
+      # inputs.nixpkgs.follows = "zjstatus";
+    };
     # humble-key = {
     #   url = "github:Multipixelone/humble-steam-key-redeemer/nix-build";
     #   inputs.nixpkgs.follows = "nixpkgs";
