@@ -242,6 +242,7 @@
       # inputs.crane.follows = "zjstatus";
       # inputs.rust-overlay.follows = "zjstatus";
     };
+    room.url = "github:Multipixelone/room";
     # humble-key = {
     #   url = "github:Multipixelone/humble-steam-key-redeemer/nix-build";
     #   inputs.nixpkgs.follows = "nixpkgs";

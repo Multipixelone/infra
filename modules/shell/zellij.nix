@@ -9,6 +9,7 @@
       zjstatus = inputs.zjstatus.packages.${pkgs.stdenv.hostPlatform.system}.default;
       monocle = inputs.monocle.packages.${pkgs.stdenv.hostPlatform.system}.default;
       zjstatus-hints = inputs.zjstatus-hints.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      room = inputs.room.packages.${pkgs.stdenv.hostPlatform.system}.default;
       inherit (hmArgs.config.lib.stylix) colors;
       zjstatus-conf = ''
         plugin location="zjstatus" {
@@ -109,6 +110,11 @@
                 LaunchPlugin "file://${monocle}/bin/monocle.wasm" {
                   in_place true
                   kiosk true
+              bind "Alt r" {
+                LaunchOrFocusPlugin "file://${room}/lib/zellij/plugins/room.wasm" {
+                  floating true
+                  ignore_case true
+                  quick_jump true
                 };
                 SwitchToMode "Normal"
               }
