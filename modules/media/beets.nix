@@ -478,6 +478,8 @@
             lastgenre = {
               force = false;
               keep_existing = true;
+              count = 3;
+              cleanup_existing = true;
             };
             duplicates = {
               # checksum = "${lib.getExe' pkgs.chromaprint "fpcalc"} -plain {file}";
