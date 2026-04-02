@@ -819,9 +819,6 @@
               keys = "albumartist albumtype year album";
               disambiguators = "format mastering media label albumdisambig releasegroupdisambig";
             };
-            types = {
-              plex_userrating = "int";
-            };
             ui.colors = {
               # Field colors for use in the item and album formats.
               album = [
