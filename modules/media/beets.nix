@@ -726,7 +726,7 @@
             album_fields = {
               disambig = ''
                 o = []
-                if year > original_year:
+                if year > original_year and str(year) not in (albumdisambig or ""):
                   o.append(f"RE-{year}")
                 if albumdisambig:
                   o.append(albumdisambig)
