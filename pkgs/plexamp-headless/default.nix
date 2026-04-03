@@ -4,6 +4,7 @@
   makeWrapper,
   # treble.node is compiled for Node.js ABI v115 (node_register_module_v115)
   nodejs_20,
+  python3,
   squashfsTools,
   nodePackages,
   plexamp,
@@ -17,10 +18,26 @@ let
     pname = "plexamp-appimage-contents";
     inherit version src;
 
-    nativeBuildInputs = [ squashfsTools nodePackages.asar ];
+    nativeBuildInputs = [
+      python3
+      squashfsTools
+      nodePackages.asar
+    ];
 
     unpackPhase = ''
-      unsquashfs "$src"
+      # AppImage = ELF stub + squashfs; calculate where the squashfs starts
+      offset=$(python3 -c '
+      import os, struct
+      elfHeader = os.read(0, 64)
+      (bitness, endianness) = struct.unpack("4x B B 58x", elfHeader)
+      (shoff, shentsize, shnum) = struct.unpack(
+          (">" if endianness == 2 else "<") +
+          ("40x Q 10x H H 2x" if bitness == 2 else "32x L 10x H H 14x"),
+          elfHeader
+      )
+      print(shoff + shentsize * shnum)
+      ' < "$src")
+      unsquashfs -o "$offset" -d squashfs-root "$src"
     '';
 
     installPhase = ''
