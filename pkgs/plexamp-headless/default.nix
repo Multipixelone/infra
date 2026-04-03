@@ -49,13 +49,11 @@ let
       # extract only the packed files and handle unpacked files separately.
       if [ -f app.asar ]; then
         ${nodejs_20}/bin/node -e '
-          const asar = require("${nodePackages.asar}/lib/node_modules/@electron/asar");
+          const asar = require("${nodejs_20.pkgs.asar}/lib/node_modules/@electron/asar");
           const fs = require("fs");
           const path = require("path");
           const archive = process.argv[1];
           const dest = process.argv[2];
-          const header = asar.createPackageFromFiles;  // ensure module loads
-          const disk = require("${nodePackages.asar}/lib/node_modules/@electron/asar/lib/disk");
           const filenames = asar.listPackage(archive);
           for (const name of filenames) {
             const destPath = path.join(dest, name);
