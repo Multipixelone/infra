@@ -1,31 +1,24 @@
 {
   lib,
   stdenvNoCC,
-  fetchurl,
-  makeWrapper,
   nodejs,
 }:
-stdenvNoCC.mkDerivation (finalAttrs: {
+stdenvNoCC.mkDerivation {
   pname = "plexamp-headless";
   version = "4.13.0";
 
-  src = fetchurl {
-    url = "https://plexamp.plex.tv/headless/Plexamp-Linux-headless-v${finalAttrs.version}.tar.bz2";
-    hash = lib.fakeHash;
-  };
-
-  nativeBuildInputs = [ makeWrapper ];
+  src = null;
+  dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
 
-    mkdir -p "$out/lib/plexamp-headless"
-    cp -r . "$out/lib/plexamp-headless/"
-
     mkdir -p "$out/bin"
-    makeWrapper "${lib.getExe nodejs}" "$out/bin/plexamp-headless" \
-      --chdir "$out/lib/plexamp-headless/plexamp" \
-      --add-flags "$out/lib/plexamp-headless/plexamp/js/index.js"
+    cat > "$out/bin/plexamp-headless" <<'EOF'
+    #!/usr/bin/env sh
+    exec ${lib.getExe nodejs} /var/lib/plexamp-headless/plexamp/js/index.js "$@"
+    EOF
+    chmod +x "$out/bin/plexamp-headless"
 
     runHook postInstall
   '';
@@ -38,4 +31,4 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     platforms = [ "x86_64-linux" ];
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
   };
-})
+}
