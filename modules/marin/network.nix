@@ -15,6 +15,12 @@ in
       networking = {
         # broken on broadcom-sta
         wireless.iwd.enable = false;
+        # prefer ipv4 (plexamp fix)
+        getaddrinfo = {
+          precedence = {
+            "::ffff:0:0/96" = 100;
+          };
+        };
         networkmanager = {
           enable = true;
           wifi.backend = "wpa_supplicant";
