@@ -79,6 +79,12 @@ let
         # Remove dangling symlinks
         find "$out/app" -xtype l -delete 2>/dev/null || true
       fi
+
+      # Debug: show extracted structure to find the headless entry point
+      echo "=== Extracted app contents ==="
+      find "$out/app" -maxdepth 3 -type f | head -80
+      echo "=== Looking for index.js ==="
+      find "$out/app" -name "index.js" -type f
     '';
   };
 in
