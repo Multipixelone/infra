@@ -32,6 +32,7 @@
         exec systemd-run --pty --collect \
           -p User=plexamp-headless \
           -p 'Environment=HOME=${stateDir}' \
+          -p 'Environment="NODE_OPTIONS=--dns-result-order=ipv4first"' \
           -p 'Environment=XDG_CONFIG_HOME=${stateDir}/.config' \
           -p 'Environment=XDG_DATA_HOME=${stateDir}/.local/share' \
           ${lib.getExe plexamp-headless}
@@ -60,6 +61,7 @@
           Group = "plexamp-headless";
           StateDirectory = "plexamp-headless";
           Environment = [
+            "NODE_OPTIONS=--dns-result-order=ipv4first"
             "HOME=${stateDir}"
             "XDG_CONFIG_HOME=${stateDir}/.config"
             "XDG_DATA_HOME=${stateDir}/.local/share"
