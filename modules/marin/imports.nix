@@ -5,7 +5,6 @@
       efi
       wifi
       base
-      plexamp-headless
     ];
   };
 }
