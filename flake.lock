@@ -3345,6 +3345,7 @@
         "secrets": "secrets",
         "spicetify-nix": "spicetify-nix",
         "statix": "statix",
+        "steam-easygrid": "steam-easygrid",
         "stylix": "stylix",
         "systems": "systems_10",
         "tinted-schemes": "tinted-schemes",
@@ -3702,6 +3703,22 @@
       "original": {
         "owner": "molybdenumsoftware",
         "repo": "statix",
+        "type": "github"
+      }
+    },
+    "steam-easygrid": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1774202696,
+        "narHash": "sha256-BnNpwOU3ZEk0m+W3wQ68/QpEFPG+jv1ARzrDe/9hF0I=",
+        "owner": "luthor112",
+        "repo": "steam-easygrid",
+        "rev": "6d571fc40c90005f020963e2924dad134b405fd7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "luthor112",
+        "repo": "steam-easygrid",
         "type": "github"
       }
     },

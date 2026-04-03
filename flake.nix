@@ -255,6 +255,11 @@
       # inputs.nixpkgs.follows = "zjstatus";
     };
     millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+    # steam plugins
+    steam-easygrid = {
+      url = "github:luthor112/steam-easygrid";
+      flake = false;
+    };
     # humble-key = {
     #   url = "github:Multipixelone/humble-steam-key-redeemer/nix-build";
     #   inputs.nixpkgs.follows = "nixpkgs";
