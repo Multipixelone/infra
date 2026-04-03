@@ -6,7 +6,6 @@
   nodejs_20,
   python3,
   squashfsTools,
-  nodePackages,
   plexamp,
 }:
 let
@@ -21,7 +20,7 @@ let
     nativeBuildInputs = [
       python3
       squashfsTools
-      nodePackages.asar
+      nodejs_20.pkgs.asar
     ];
 
     unpackPhase = ''
