@@ -1,19 +1,17 @@
 {
   lib,
   stdenvNoCC,
-  fetchurl,
   makeWrapper,
   # treble.node is compiled for Node.js ABI v115 (node_register_module_v115)
   nodejs_20,
   squashfsTools,
   nodePackages,
+  plexamp,
 }:
 let
-  version = "4.13.0";
-  src = fetchurl {
-    url = "https://plexamp.plex.tv/plexamp.plex.tv/desktop/Plexamp-${version}.AppImage";
-    hash = lib.fakeHash;
-  };
+  # Reuse the source and version from the nixpkgs plexamp desktop package
+  inherit (plexamp) version src;
+
   # Extract the squashfs filesystem from the AppImage
   appimageContents = stdenvNoCC.mkDerivation {
     pname = "plexamp-appimage-contents";
