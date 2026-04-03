@@ -743,37 +743,36 @@
                   return custom_artist
               '';
               source = ''
-                format = set([i.format for i in items])
+                all_formats   = [i.format     for i in items]
+                all_rates     = [i.samplerate for i in items]
+                all_depths    = [i.bitdepth   for i in items]
                 tbr = sum([i.bitrate for i in items])
                 abr = int(tbr / len(items) / 1000)
-                # brm = set([i.bitrate_mode for i in items])
-                samplerate = set([i.samplerate for i in items])
-                bitdepth = sum([i.bitdepth for i in items]) // len(items)
 
-                # Init output
-                o = [f for f in format] if format else []
+                # Dominant values across tracks (same pattern as media_type)
+                fmt   = max(set(all_formats), key=all_formats.count) if all_formats else None
+                rate  = max(set(all_rates),   key=all_rates.count)   if all_rates   else None
+                depth = max(set(all_depths),  key=all_depths.count)  if all_depths  else None
 
-                # Handle bitrate categories
-                for f in format:
-                    if f == 'FLAC':
-                      for p in samplerate:
-                          o.append(str(p // 1000) + '-' + str(bitdepth))
-                    # if f == 'MP3' and brm:
-                    #   for p in brm:
-                    #       o.append(p)
+                lossless = {'FLAC', 'ALAC', 'APE', 'WAV', 'AIFF', 'WavPack'}
+                o = [fmt] if fmt else []
 
-                if abr >= 480:
-                    o.append(str(abr))
-                elif abr >= 320:
-                    o.append('320')
-                elif abr >= 220:
-                    o.append('V0')
-                elif abr == 192:
-                    o.append('192')
-                elif abr >= 170:
-                    o.append('V2')
-                elif abr > 0:
-                    o.append(str(abr))
+                if fmt in lossless:
+                    # Lossless: sample rate + bit depth is the full quality story
+                    if rate and depth:
+                        o.append(f"{rate / 1000:g}\u2044{depth}")
+                else:
+                    # Lossy: bitrate category
+                    if abr >= 320:
+                        o.append('320')
+                    elif abr >= 220:
+                        o.append('V0')
+                    elif abr == 192:
+                        o.append('192')
+                    elif abr >= 170:
+                        o.append('V2')
+                    elif abr > 0:
+                        o.append(str(abr))
 
                 return ", ".join(o)
               '';
