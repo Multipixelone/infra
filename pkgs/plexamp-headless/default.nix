@@ -40,19 +40,45 @@ let
     '';
 
     installPhase = ''
-      mkdir -p "$out"
+      mkdir -p "$out/app"
       cd squashfs-root/resources
 
-      # Extract JS source from the asar archive
+      # Extract JS source from the asar archive.
+      # asar extract fails on dangling symlinks in app.asar.unpacked (build
+      # artifacts like node_gyp_bins/python3), so use Node.js directly to
+      # extract only the packed files and handle unpacked files separately.
       if [ -f app.asar ]; then
-        asar extract app.asar "$out/app"
+        ${nodejs_20}/bin/node -e '
+          const asar = require("${nodePackages.asar}/lib/node_modules/@electron/asar");
+          const fs = require("fs");
+          const path = require("path");
+          const archive = process.argv[1];
+          const dest = process.argv[2];
+          const header = asar.createPackageFromFiles;  // ensure module loads
+          const disk = require("${nodePackages.asar}/lib/node_modules/@electron/asar/lib/disk");
+          const filenames = asar.listPackage(archive);
+          for (const name of filenames) {
+            const destPath = path.join(dest, name);
+            const stat = asar.statFile(archive, name);
+            if (!stat) continue;
+            if ("files" in stat) {
+              fs.mkdirSync(destPath, { recursive: true });
+            } else if (!stat.unpacked) {
+              fs.mkdirSync(path.dirname(destPath), { recursive: true });
+              fs.writeFileSync(destPath, asar.extractFile(archive, name));
+            }
+          }
+        ' app.asar "$out/app"
       elif [ -d app ]; then
-        cp -r app "$out/app"
+        cp -r app/* "$out/app/"
       fi
 
-      # Copy native modules (e.g. treble.node) that live outside the asar
+      # Copy native modules (e.g. treble.node) that live outside the asar,
+      # skipping dangling symlinks (build artifacts like node_gyp_bins/python3)
       if [ -d app.asar.unpacked ]; then
-        cp -rn app.asar.unpacked/* "$out/app/" || true
+        cp -rn --no-dereference app.asar.unpacked/* "$out/app/" 2>/dev/null || true
+        # Remove dangling symlinks
+        find "$out/app" -xtype l -delete 2>/dev/null || true
       fi
     '';
   };
