@@ -57,7 +57,8 @@ let
           const filenames = asar.listPackage(archive);
           for (const name of filenames) {
             const destPath = path.join(dest, name);
-            const stat = asar.statFile(archive, name);
+            let stat;
+            try { stat = asar.statFile(archive, name); } catch { continue; }
             if (!stat) continue;
             if ("files" in stat) {
               fs.mkdirSync(destPath, { recursive: true });
