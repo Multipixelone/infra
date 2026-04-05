@@ -221,7 +221,7 @@
             args = [ "--stdio" ];
           };
           typescript-language-server = {
-            command = lib.getExe pkgs.nodePackages.typescript-language-server;
+            command = lib.getExe pkgs.typescript-language-server;
             args = [ "--stdio" ];
             config = {
               typescript-language-server.source = {
@@ -244,7 +244,7 @@
             command = "${inputs.uwu-colors.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/uwu_colors";
           };
           vscode-css-language-server = {
-            command = "${pkgs.nodePackages.vscode-langservers-extracted}/bin/vscode-css-language-server";
+            command = "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server";
             args = [ "--stdio" ];
             config = {
               provideFormatter = true;
@@ -253,7 +253,7 @@
             };
           };
           yaml-language-server = {
-            command = "${pkgs.nodePackages.yaml-language-server}/bin/yaml-language-server";
+            command = "${pkgs.yaml-language-server}/bin/yaml-language-server";
             args = [ "--stdio" ];
             config.yaml = {
               schemaStore.enable = true;
@@ -296,7 +296,7 @@
         language =
           let
             prettier = lang: {
-              command = lib.getExe pkgs.nodePackages.prettier;
+              command = lib.getExe pkgs.prettier;
               args = [
                 "--parser"
                 lang
@@ -332,7 +332,7 @@
                 "markdown-oxide"
               ];
               formatter = {
-                command = lib.getExe pkgs.nodePackages.prettier;
+                command = lib.getExe pkgs.prettier;
                 args = [
                   "--stdin-filepath"
                   "%{buffer_name}"
@@ -435,7 +435,7 @@
         packages = with pkgs; [
           gpt-wrapped
           marksman
-          nodePackages.prettier
+          prettier
           wl-clipboard
           markdown-oxide
         ];
