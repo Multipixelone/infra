@@ -29,10 +29,9 @@
         fzf-config = ''
           set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'" \n
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
-          set -U __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
-          set -U __done_allow_nongraphical 1
-          set -U --append __done_exclude '^lazygit'
-          set -U --append __done_exclude '^hx'
+          set -gx __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
+          set -gx __done_allow_nongraphical 1
+          set -g __done_exclude '^lazygit' '^hx'
         '';
         # pure-config = ''
         #   set pure_enable_single_line_prompt true
