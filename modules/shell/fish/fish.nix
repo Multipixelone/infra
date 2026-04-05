@@ -27,7 +27,7 @@
         cliphist = getExe pkgs.cliphist;
         wl-copy = getExe' pkgs.wl-clipboard "wl-copy";
         fzf-config = ''
-          set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'" \n
+          set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'"
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
           set -gx __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
           set -gx __done_allow_nongraphical 1
