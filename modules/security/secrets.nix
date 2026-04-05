@@ -16,18 +16,23 @@ in
       # agenix.homeManagerIntegration.autoImport = false;
     };
 
-    homeManager.base = {
-      imports = [
-        inputs.agenix.homeManagerModules.default
-        polyModule
-      ];
-      age = {
-        identityPaths = [
-          "/home/tunnel/.ssh/agenix"
+    homeManager.base =
+      { pkgs, ... }:
+      {
+        imports = [
+          inputs.agenix.homeManagerModules.default
+          polyModule
         ];
-        secretsDir = "/home/tunnel/.secrets";
+        home.packages = [
+          inputs.agenix.packages.${pkgs.stdenv.hostPlatform.system}.default
+        ];
+        age = {
+          identityPaths = [
+            "/home/tunnel/.ssh/agenix"
+          ];
+          secretsDir = "/home/tunnel/.secrets";
+        };
       };
-    };
 
     # nixOnDroid.base = {
     #   imports = [
