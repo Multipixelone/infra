@@ -27,12 +27,11 @@
         cliphist = getExe pkgs.cliphist;
         wl-copy = getExe' pkgs.wl-clipboard "wl-copy";
         fzf-config = ''
-          set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'" \n
+          set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'"
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
-          set -U __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
-          set -U __done_allow_nongraphical 1
-          set -U --append __done_exclude '^lazygit'
-          set -U --append __done_exclude '^hx'
+          set -gx __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
+          set -gx __done_allow_nongraphical 1
+          set -g __done_exclude '^lazygit' '^hx'
         '';
         # pure-config = ''
         #   set pure_enable_single_line_prompt true
@@ -104,7 +103,7 @@
             # set $EDITOR in fish
             set -gx EDITOR hx
             set -gx VISUAL hx
-            set -gx NIXPKGS_ALLLOW_UNFREE 1
+            set -gx NIXPKGS_ALLOW_UNFREE 1
             set -gx NIXPKGS_ALLOW_INSECURE 1
 
             if test "$TERM" != "dumb"
@@ -118,9 +117,9 @@
                               set -l cmd_line (string split " " -- $argv)
                               set -l process_name $cmd_line[1]
                               if test -n "$process_name" -a "$process_name" != "z"
-                                  command nohup zellij action rename-tab $process_name >/dev/null 2>&1
+                                  command zellij action rename-tab $process_name >/dev/null 2>&1 &
                                   if test "$process_name" = "hx"
-                                    command nohup zellij action switch-mode locked >/dev/null 2>&1
+                                    command zellij action switch-mode locked >/dev/null 2>&1 &
                                   end
                               end
                           end
@@ -130,9 +129,9 @@
                           if set -q ZELLIJ
                               set -l cmd_line (string split " " -- $argv)
                               set -l process_name $cmd_line[1]
-                              command nohup zellij action switch-mode normal >/dev/null 2>&1
+                              command zellij action switch-mode normal >/dev/null 2>&1 &
                               if test "$process_name" = "z"
-                                  command nohup zellij action rename-tab (prompt_pwd) >/dev/null 2>&1
+                                  command zellij action rename-tab (prompt_pwd) >/dev/null 2>&1 &
                               end
                           end
                       end

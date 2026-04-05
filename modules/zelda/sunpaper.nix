@@ -9,10 +9,11 @@
             --replace-fail "sunwait" "${lib.getExe pkgs.sunwait}" \
             --replace-fail "setwallpaper" "${lib.getExe' pkgs.wallutils "setwallpaper"}" \
             --replace-fail '$HOME/sunpaper/images/Corporate-Synergy' "$out/share/sunpaper/images/Lakeside" \
-            --replace-fail '/usr/share' '/etc'
+            --replace-fail '/usr/share' '/etc' \
+            --replace-fail "swww" "awww"
         '';
         buildInputs = oldAttrs.buildInputs ++ [
-          pkgs.swww
+          pkgs.awww
           pkgs.bc
         ];
       });
@@ -33,9 +34,9 @@
             latitude="40.680271N"
             longitude="73.944893W"
 
-            swww_enable="true"
-            swww_fps="240"
-            swww_step="30"
+            awww_enable="true"
+            awww_fps="240"
+            awww_step="30"
           '';
           systemd.user = {
             timers.sunpaper = {

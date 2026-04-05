@@ -18,18 +18,18 @@ in
       set-wallpaper = pkgs.writeShellApplication {
         name = "set-wallpaper";
         runtimeInputs = [
-          pkgs.swww
+          pkgs.awww
           pkgs.socat
           pkgs.jq
           config.programs.hyprland.package
         ];
         text = ''
-          # Wait for swww daemon to be ready
-          until swww query &>/dev/null; do sleep 0.5; done
+          # Wait for awww daemon to be ready
+          until awww query &>/dev/null; do sleep 0.5; done
 
           # Set wallpapers on known monitors (|| true so a missing output doesn't abort)
-          swww img --outputs DP-1 "${main}" || true
-          swww img --outputs DP-3 "${side}" || true
+          awww img --outputs DP-1 "${main}" || true
+          awww img --outputs DP-3 "${side}" || true
 
           # Resolve the active Hyprland socket
           XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -41,7 +41,7 @@ in
             case "$line" in
               monitoradded*)
                 monitor="''${line#monitoradded>>}"
-                swww img --outputs "$monitor" "${main}"
+                awww img --outputs "$monitor" "${main}"
                 ;;
             esac
           done
@@ -56,7 +56,7 @@ in
             Unit = {
               Description = "Set wallpaper on all monitors and watch for new ones";
               After = [
-                "swww.service"
+                "awww.service"
                 "graphical-session.target"
               ];
               PartOf = [ "graphical-session.target" ];

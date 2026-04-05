@@ -9,7 +9,7 @@
     programs.atuin = {
       enable = true;
       enableFishIntegration = true;
-      daemon.enable = true;
+      daemon.enable = false;
       settings = {
         update_check = false;
 
@@ -36,11 +36,7 @@
         inline_height = 20;
 
         daemon = {
-          enabled = true;
-          autostart = true;
-
-          sync_frequency = 3600;
-          systemd_socket = true;
+          enabled = false;
         };
       };
     };
