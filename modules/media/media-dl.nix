@@ -5,6 +5,14 @@
   ...
 }:
 {
+  nixpkgs.overlays = [
+    (final: prev: {
+      streamrip = prev.streamrip.overrideAttrs {
+        src = inputs.streamrip;
+        version = inputs.streamrip.rev;
+      };
+    })
+  ];
   flake.modules.homeManager.gui =
     hmArgs@{ pkgs, ... }:
     let

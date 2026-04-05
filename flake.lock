@@ -3344,6 +3344,7 @@
         "spicetify-nix": "spicetify-nix",
         "statix": "statix",
         "steam-easygrid": "steam-easygrid",
+        "streamrip": "streamrip",
         "stylix": "stylix",
         "systems": "systems_10",
         "tinted-schemes": "tinted-schemes",
@@ -3717,6 +3718,22 @@
       "original": {
         "owner": "luthor112",
         "repo": "steam-easygrid",
+        "type": "github"
+      }
+    },
+    "streamrip": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773346720,
+        "narHash": "sha256-OeU1KBGcmpryOlDmW1aFNAgSP484ZAcc4CVsgfrsKVI=",
+        "owner": "nathom",
+        "repo": "streamrip",
+        "rev": "095ec9fe0c1662b32b42e202d86dbc0159a94abf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nathom",
+        "repo": "streamrip",
         "type": "github"
       }
     },

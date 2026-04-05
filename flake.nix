@@ -120,6 +120,10 @@
     catppuccin.url = "github:catppuccin/nix";
     nix-hardware.url = "github:NixOS/nixos-hardware/master";
     zjstatus.url = "github:dj95/zjstatus";
+    streamrip = {
+      url = "github:nathom/streamrip";
+      flake = false;
+    };
     # helix fork with support for copilot-language-server
     helix.url = "github:spion/helix/textDocument/inlineCompletion";
     # helix color
