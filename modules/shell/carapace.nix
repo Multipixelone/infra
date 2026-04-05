@@ -1,3 +1,4 @@
+{ inputs, ... }:
 {
   flake.modules.homeManager.base =
     { lib, pkgs, ... }:
@@ -31,6 +32,10 @@
           ExecStart = pkgs.writeShellScript "update-programs-sqlite" ''
             export PATH="${pkgs.gnutar}/bin:${pkgs.xz}/bin:$PATH"
             mkdir -p ~/.nix-defexpr/channels/nixpkgs
+
+            # Shim so <nixpkgs> resolves through ~/.nix-defexpr/channels
+            # without this, comma/nix-shell fail on missing default.nix
+            ln -sfn ${inputs.nixpkgs}/default.nix ~/.nix-defexpr/channels/nixpkgs/default.nix
 
             ${pkgs.curl}/bin/curl -sfL "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz" \
               | tar -xJ -O --wildcards '*/programs.sqlite' > ~/.nix-defexpr/channels/nixpkgs/programs.sqlite.tmp
