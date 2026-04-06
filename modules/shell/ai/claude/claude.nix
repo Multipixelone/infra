@@ -99,153 +99,23 @@
           | Nix syntax/configs/flakes | `nix` | <80% confidence |
           | Package installation | `nix` | Before any install |
           | Flake-parts modules | `using-flake-parts` | When working with modules |
+          | CLI tools (qmd/ast-grep/semgrep/fastmod/rtk) | `cli-tools` | Before first use |
 
-          # Command Substitutes
+          ## CLI Tools (load `cli-tools` skill for full syntax)
 
-          ## qmd
-
-          **Usage**: Retrieve an exact passage from a source file by line range (99.2% token reduction).
-
-          ```bash
-          qmd get <file>:<line> -l <count>   # read N lines starting at line
-          qmd get src/main/App.java:120 -l 30
-          ```
-
-          **When Claude should use this automatically:**
-          - Any time you know the file and approximate line number
-          - Before asking Claude to read a function — find the line with `rg -n` first, then `qmd get`
-          - Never read a whole file when you only need one function
-
-          **Expected output**: The exact source lines requested, nothing else. No surrounding context, no file header.
-
-          ---
-
-          ## ripgrep
-
-          **Usage**: Find files containing a pattern before reading them (95.4% token reduction).
-
-          ```bash
-          rg -l <pattern> .              # list files containing pattern
-          rg -n <pattern> <file>         # find exact line number in a file
-          rg --type java <pattern> .     # restrict to file type
-          ```
-
-          **When Claude should use this automatically:**
-          - Before reading any directory to find a file — always run ripgrep first
-          - Before using `qmd get` — use `rg -n` to find the exact line number
-          - Never use `find . -name` or directory listings to locate a file by content
-
-          **Expected output**: For `-l`: one file path per line. For `-n`: `<file>:<line>:<match>` per line.
-
-          ---
-
-          ## ast-grep
-
-          **Usage**: AST-aware search and structural rewrite (93.3% token reduction).
-
-          ```bash
-          ast-grep run --pattern '<pattern>' --lang <lang> .          # search
-          ast-grep run --pattern '<old>' --rewrite '<new>' --lang <lang> -U .  # rewrite
-          ```
-
-          **When Claude should use this automatically:**
-          - Renaming a method, function call, or expression across a codebase
-          - When fastmod would match inside comments or strings (wrong)
-          - Supported languages: Java, TypeScript, JavaScript, Python, Go, Rust, C, C++
-
-          **Expected output**: Matched file paths with line numbers (search), or diff of rewrites (with `-U`).
-
-          **When NOT to use ast-grep:**
-          - Renaming a bare identifier across config files, YAML, or plain strings → use fastmod
-          - The pattern is not a valid syntax fragment in the target language
-
-          ---
-
-          ## semgrep
-
-          **Usage**: Lightweight static analysis and structural rewriting for many languages.
-
-          ```bash
-          semgrep scan --pattern '<pattern>' --lang <lang> .              # search
-          semgrep scan --pattern '<pattern>' --lang <lang> --json .       # machine-readable output
-          semgrep scan --config <rule.yaml> .                             # run a rule file
-          ```
-
-          **When Claude should use this automatically:**
-          - The rewrite involves a structural pattern where arguments or expressions vary
-          - Need to enforce or detect code patterns across a codebase
-          - The target is too complex for fastmod but ast-grep's exact AST is too rigid
-          - Use metavariables (`$X`, `$FUNC`, `$...ARGS`) to match arbitrary expressions
-
-          **Expected output**: Matched findings with file, line, and matched code snippet.
-
-          **When NOT to use semgrep:**
-          - Simple literal string rename → use fastmod
-          - Rename a specific method call with no argument variation → use ast-grep
-          - Languages not supported by semgrep → use fastmod
-
-          ---
-
-          ## fastmod
-
-          **Usage**: Fast literal string replacement across a codebase (65.1% token reduction).
-
-          ```bash
-          fastmod --accept-all --fixed-strings <old> <new> -e <ext> .
-          fastmod --accept-all --fixed-strings old_name new_name -e java,yaml .
-          ```
-
-          **When Claude should use this automatically:**
-          - Renaming a config key, underscore identifier, or any literal string across many files
-          - When the text to replace is not a syntax expression (no method calls, no parentheses)
-          - Use `--fixed-strings` to disable regex interpretation; use `-e` to restrict by extension
-
-          **Expected output**: Number of replacements made, list of modified files.
-
-          **When NOT to use fastmod:**
-          - Renaming a method call or expression → use ast-grep
-          - The pattern has structural variation (different argument shapes) → use semgrep
-
-          ## RTK - Rust Token Killer
-
-          **Usage**: Token-optimized CLI proxy (60-90% savings on dev operations)
-
-          ### Meta Commands (always use rtk directly)
-
-          ```bash
-          rtk gain              # Show token savings analytics
-          rtk gain --history    # Show command usage history with savings
-          rtk discover          # Analyze Claude Code history for missed opportunities
-          rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
-          ```
-
-          ### Installation Verification
-
-          ```bash
-          rtk --version         # Should show: rtk X.Y.Z
-          rtk gain              # Should work (not "command not found")
-          which rtk             # Verify correct binary
-          ```
-
-          ### Hook-Based Usage
-
-          All other commands are automatically rewritten by the Claude Code hook.
-          Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
+          | Task | Tool | Quick syntax |
+          |------|------|-------------|
+          | Read specific lines | `qmd get <file>:<line> -l <N>` | Find line first: `rg -n <pattern> <file>` |
+          | AST-aware code rewrite | `ast-grep` | Expressions, method calls |
+          | Structural pattern match | `semgrep` | Metavariables `$X`, `$FUNC` |
+          | Literal string replace | `fastmod --accept-all --fixed-strings` | Config keys, identifiers |
+          | Token savings analytics | `rtk gain` / `rtk discover` | Meta commands only |
 
           ## Confidence Gates
 
-          Before syntax/API actions: rate confidence 1-100.
-          - <80%: STOP, load skill or research
-          - 80-95%: State assumptions, offer to verify
-          - >95%: Proceed, state rating
+          Rate 1-100 before syntax/API actions. <80%: STOP, load skill. 80-95%: state assumptions. >95%: proceed.
 
-          NEVER assume conventions. Verify or STOP.
-          Violation → STOP → Acknowledge → Restart with correct approach.
-
-          **Showstopping (BLOCK all work):**
-          - Assuming Nix syntax without verification (<80%)
-          - Pushing to GitHub without explicit consent
-          - Failing to run/write tests, or continuing while tests fail
+          **Showstopping (BLOCK all work):** Guessing Nix syntax (<80%), auto-pushing to GitHub, continuing with failing tests.
 
           ## Tone
 
@@ -268,16 +138,15 @@
           | **Package manager** | Nix only | All packages via flake or home-manager |
 
           **Fish**: `read` not `read -p`; `test`/`[ ]` not `[[ ]]`; `set` not `export`; `fish -c "cmd"` for inline scripts.
-
-          **Bash tool**: Spawns non-interactive zsh, NOT fish. No direnv. Prefix with `eval "$(direnv export zsh 2>/dev/null)"` when env vars needed.
+          **Bash tool**: Spawns non-interactive zsh, NOT fish. No direnv. Prefix `eval "$(direnv export zsh 2>/dev/null)"` when needed.
         '';
         settings = {
           theme = "dark";
           autoUpdates = false;
           includeCoAuthoredBy = false;
           autoCompactEnabled = true;
-          enableAllProjectMcpServers = true;
-          outputStyle = "Explanatory";
+          enableAllProjectMcpServers = false;
+          outputStyle = "Concise";
           hooks = {
             PreToolUse = [
               {
