@@ -43,9 +43,9 @@
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
     let
-      ralph-wiggum-plugin = withSystem pkgs.stdenv.hostPlatform.system (
-        psArgs: psArgs.config.packages.ralph-wiggum-plugin
-      );
+      # ralph-wiggum-plugin = withSystem pkgs.stdenv.hostPlatform.system (
+      #   psArgs: psArgs.config.packages.ralph-wiggum-plugin
+      # );
       claude-status-line = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.claude-status-line
       );
@@ -77,7 +77,7 @@
         skillsDir = self + /docs/skills;
         agentsDir = self + /docs/agents;
         plugins = [
-          "${ralph-wiggum-plugin}"
+          # "${ralph-wiggum-plugin}"
           "${inputs.claude-code-src}/plugins/commit-commands"
           # "${inputs.claude-code-src}/plugins/feature-dev"
           # "${inputs.claude-code-src}/plugins/pr-review-toolkit"
