@@ -125,10 +125,10 @@
         mcpServers =
           (inputs.mcp-servers-nix.lib.evalModule pkgs {
             programs = {
-              playwright.enable = true;
+              # playwright.enable = true;
               nixos.enable = true;
-              codex.enable = true;
-              context7.enable = true;
+              # codex.enable = true;
+              # context7.enable = true;
               github = {
                 enable = true;
                 envFile = hmArgs.config.age.secrets."gh".path;
@@ -140,8 +140,8 @@
         plugins = [
           "${ralph-wiggum-plugin}"
           "${inputs.claude-code-src}/plugins/commit-commands"
-          "${inputs.claude-code-src}/plugins/feature-dev"
-          "${inputs.claude-code-src}/plugins/pr-review-toolkit"
+          # "${inputs.claude-code-src}/plugins/feature-dev"
+          # "${inputs.claude-code-src}/plugins/pr-review-toolkit"
           "${inputs.claude-code-src}/plugins/security-guidance"
         ];
         enable = true;
