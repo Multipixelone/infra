@@ -179,6 +179,7 @@
       url = "github:yokoffing/Betterfox";
       flake = false;
     };
+    qmd.url = "github:tobi/qmd";
     claude-code-src = {
       url = "github:anthropics/claude-code";
       flake = false;
