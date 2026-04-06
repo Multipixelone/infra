@@ -3724,15 +3724,16 @@
     "streamrip": {
       "flake": false,
       "locked": {
-        "lastModified": 1773346720,
-        "narHash": "sha256-OeU1KBGcmpryOlDmW1aFNAgSP484ZAcc4CVsgfrsKVI=",
-        "owner": "nathom",
+        "lastModified": 1775282254,
+        "narHash": "sha256-wdMnwNKA0NHSMQFtRzDvqty/KCuxov0/i19jJw/5rlg=",
+        "owner": "mikelandzelo173",
         "repo": "streamrip",
-        "rev": "095ec9fe0c1662b32b42e202d86dbc0159a94abf",
+        "rev": "81a803e64ef9ff34751d6eedf82471c22e1cf4c6",
         "type": "github"
       },
       "original": {
-        "owner": "nathom",
+        "owner": "mikelandzelo173",
+        "ref": "feat/qobuz-login-fix",
         "repo": "streamrip",
         "type": "github"
       }

@@ -10,6 +10,10 @@
       streamrip = prev.streamrip.overrideAttrs {
         src = inputs.streamrip;
         version = inputs.streamrip.rev;
+
+        propagatedBuildInputs = prev.streamrip.propagatedBuildInputs ++ [
+          prev.python3Packages.playwright
+        ];
       };
     })
   ];

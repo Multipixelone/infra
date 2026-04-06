@@ -121,7 +121,7 @@
     nix-hardware.url = "github:NixOS/nixos-hardware/master";
     zjstatus.url = "github:dj95/zjstatus";
     streamrip = {
-      url = "github:nathom/streamrip";
+      url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
       flake = false;
     };
     # helix fork with support for copilot-language-server
