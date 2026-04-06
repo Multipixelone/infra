@@ -3,6 +3,7 @@
   withSystem,
   inputs,
   self,
+  lib,
   ...
 }:
 {
@@ -48,6 +49,9 @@
       claude-status-line = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.claude-status-line
       );
+      rtk-rewrite = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.rtk-rewrite
+      );
     in
     {
       programs.claude-code = {
@@ -90,6 +94,32 @@
           | Package installation | `nix` | Before any install |
           | fd/rg (Nix store) | `cli-tools` | Before shelling out |
           | Flake-parts modules | `using-flake-parts` | When working with modules |
+
+          # RTK - Rust Token Killer
+
+          **Usage**: Token-optimized CLI proxy (60-90% savings on dev operations)
+
+          ## Meta Commands (always use rtk directly)
+
+          ```bash
+          rtk gain              # Show token savings analytics
+          rtk gain --history    # Show command usage history with savings
+          rtk discover          # Analyze Claude Code history for missed opportunities
+          rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
+          ```
+
+          ## Installation Verification
+
+          ```bash
+          rtk --version         # Should show: rtk X.Y.Z
+          rtk gain              # Should work (not "command not found")
+          which rtk             # Verify correct binary
+          ```
+
+          ## Hook-Based Usage
+
+          All other commands are automatically rewritten by the Claude Code hook.
+          Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
 
           ## Confidence Gates
 
@@ -137,6 +167,19 @@
           autoCompactEnabled = true;
           enableAllProjectMcpServers = true;
           outputStyle = "Explanatory";
+          hooks = {
+            PreToolUse = [
+              {
+                matcher = "Bash";
+                hooks = [
+                  {
+                    type = "command";
+                    command = lib.getExe rtk-rewrite;
+                  }
+                ];
+              }
+            ];
+          };
           statusLine = {
             type = "command";
             command = "${claude-status-line}/bin/claude-status-line";
