@@ -89,7 +89,6 @@
           | Nix syntax/configs/flakes | `nix` | <80% confidence |
           | Package installation | `nix` | Before any install |
           | fd/rg (Nix store) | `cli-tools` | Before shelling out |
-          | zellij | `zellij` | Before pane/window ops |
           | Flake-parts modules | `using-flake-parts` | When working with modules |
 
           ## Confidence Gates
