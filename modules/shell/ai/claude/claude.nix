@@ -95,11 +95,18 @@
 
           ## Skill Loading
 
+          All skills run on **haiku** for speed/cost. Complex work auto-escalates to the **nix agent** (sonnet).
+
           | Working with... | Load skill | When |
           |----------------|------------|------|
           | Nix syntax/configs/flakes | `nix` | <80% confidence |
-          | Package installation | `nix` | Before any install |
+          | Package installation | `package-add-flow` | Before any install |
           | Flake-parts modules | `using-flake-parts` | When working with modules |
+          | Adding/configuring services | `service-add-flow` | Before adding services |
+          | Secret management (agenix) | `secrets-flow` | Before touching secrets |
+          | "Where is X configured?" | `infra-locate` | Navigation questions |
+          | Check/CI failures | `check-triage` | After failed checks |
+          | Option tracing | `option-trace-lite` | "Where is option X set?" |
           | CLI tools (qmd/ast-grep/semgrep/fastmod/rtk) | `cli-tools` | Before first use |
 
           ## CLI Tools (load `cli-tools` skill for full syntax)

@@ -1,7 +1,7 @@
 ---
 name: dots
 description: Central guide for navigating the Multipixelone/infra repository. Use this agent to find where options, hosts, profiles, packages, and services are defined in this flake-parts Nix codebase.
-model: sonnet
+model: haiku
 color: green
 tools: ["Read", "Grep", "Glob", "Bash"]
 ---

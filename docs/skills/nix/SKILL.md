@@ -1,6 +1,6 @@
 ---
 name: nix
-model: sonnet
+model: haiku
 description: Expert help with Nix, NixOS, home-manager, flakes, and nixpkgs for the Multipixelone/infra repository. Use for system configuration, package management, module development, hash fetching, debugging evaluation errors, colmena deployment, and understanding Nix idioms and patterns.
 tools: Bash, Read, Grep, Glob, Edit, Write, WebFetch, WebSearch
 ---
@@ -544,6 +544,18 @@ ls $(nix build nixpkgs#<pkg> --print-out-paths --no-link)/bin/
 6. **Use overlays** for package modifications, not inline overrides
 7. **Separate concerns**: system config in `modules/`, user config in `home/`
 8. **Never create `result` symlink** — always use `-o /tmp/result` with `nix build`
+
+## Escalation
+
+This skill provides reference patterns for routine Nix work. Escalate to the `nix` **agent** (sonnet) when:
+
+- Infinite recursion or complex evaluation errors that `--show-trace` doesn't clarify
+- Multi-file module interaction debugging (option set in one module, overridden in another)
+- Overlay conflicts or cross-host dependency resolution
+- Hash mismatches requiring iterative `nix-prefetch` debugging
+- Architecture decisions spanning multiple hosts or domains
+
+For simple "where is X?" questions, use the `infra-locate` skill instead.
 
 ## Common Gotchas
 

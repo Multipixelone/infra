@@ -1,6 +1,6 @@
 ---
 name: using-flake-parts
-model: sonnet
+model: haiku
 description: Expert guidance for using flake-parts framework in Nix flakes. Use when converting flakes to flake-parts, organizing modular flake configurations, working with perSystem, creating reusable flake modules, handling overlays, or debugging flake-parts issues.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -438,6 +438,18 @@ imports = [ (inputs.import-tree ./modules) ];
 - Module conflicts (duplicate `config` values) surface at eval time, not at file add time
 
 This is different from standard flake-parts where you explicitly list imports.
+
+## Escalation
+
+This skill provides reference patterns for flake-parts usage. Escalate to the `nix` **agent** (sonnet) when:
+
+- Circular dependency or infinite recursion across modules
+- Complex `withSystem` / `moduleWithSystem` composition issues
+- Debugging why a perSystem option isn't visible in a top-level context
+- Architecture decisions about module boundaries or refactoring
+- Import-tree conflicts where multiple modules define the same option
+
+For simple "where is X configured?" questions, use the `infra-locate` skill instead.
 
 ## Beyond the Basics
 
