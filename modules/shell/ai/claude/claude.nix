@@ -82,7 +82,7 @@
           "${inputs.claude-code-src}/plugins/commit-commands"
           # "${inputs.claude-code-src}/plugins/feature-dev"
           # "${inputs.claude-code-src}/plugins/pr-review-toolkit"
-          "${inputs.claude-code-src}/plugins/security-guidance"
+          # "${inputs.claude-code-src}/plugins/security-guidance"
         ];
         enable = true;
         memory.text = ''
