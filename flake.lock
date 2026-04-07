@@ -476,6 +476,22 @@
         "type": "github"
       }
     },
+    "caveman": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1775499540,
+        "narHash": "sha256-asJsuZEaWjDEML/u7L7icX1pP36K83hB3EKGZV6wfiE=",
+        "owner": "JuliusBrussee",
+        "repo": "caveman",
+        "rev": "af581f6314f490ff9a434d4ea06bba7df658f0f4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "JuliusBrussee",
+        "repo": "caveman",
+        "type": "github"
+      }
+    },
     "claude-code-src": {
       "flake": false,
       "locked": {
@@ -3348,6 +3364,7 @@
         "catppuccin": "catppuccin",
         "catppuccin-foot": "catppuccin-foot",
         "catppuccin-helix": "catppuccin-helix",
+        "caveman": "caveman",
         "claude-code-src": "claude-code-src",
         "colmena": "colmena",
         "direnv-instant": "direnv-instant",

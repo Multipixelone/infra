@@ -78,6 +78,7 @@
         agentsDir = self + /docs/agents;
         plugins = [
           # "${ralph-wiggum-plugin}"
+          "${inputs.caveman}/plugins/caveman"
           "${inputs.claude-code-src}/plugins/commit-commands"
           # "${inputs.claude-code-src}/plugins/feature-dev"
           # "${inputs.claude-code-src}/plugins/pr-review-toolkit"
