@@ -1,6 +1,5 @@
 ---
 name: using-flake-parts
-model: haiku
 description: Expert guidance for using flake-parts framework in Nix flakes. Use when converting flakes to flake-parts, organizing modular flake configurations, working with perSystem, creating reusable flake modules, handling overlays, or debugging flake-parts issues.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---

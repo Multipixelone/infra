@@ -1,6 +1,5 @@
 ---
 name: nix
-model: haiku
 description: Expert help with Nix, NixOS, home-manager, flakes, and nixpkgs for the Multipixelone/infra repository. Use for system configuration, package management, module development, hash fetching, debugging evaluation errors, colmena deployment, and understanding Nix idioms and patterns.
 tools: Bash, Read, Grep, Glob, Edit, Write, WebFetch, WebSearch
 ---
