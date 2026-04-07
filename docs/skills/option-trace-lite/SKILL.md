@@ -1,5 +1,6 @@
 ---
 name: option-trace-lite
+model: haiku
 description: Lightweight single-option trace for this flake-parts repo. Finds where an option is set, where it comes from, and how to verify it.
 tools: Read, Grep, Glob, Bash
 ---

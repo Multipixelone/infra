@@ -1,5 +1,6 @@
 ---
 name: package-add-flow
+model: haiku
 description: Deterministic workflow for adding packages in Multipixelone/infra with correct scope and safe validation.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---

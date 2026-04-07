@@ -1,5 +1,6 @@
 ---
 name: check-triage
+model: haiku
 description: Fast first-pass triage for `nix flake check` failures in Multipixelone/infra, with clear routing to fix owners.
 tools: Bash, Read, Grep
 ---

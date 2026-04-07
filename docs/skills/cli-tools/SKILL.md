@@ -1,5 +1,6 @@
 ---
 name: cli-tools
+model: haiku
 description: Reference docs for token-optimized CLI tools - qmd, ast-grep, semgrep, fastmod, and RTK. Load before first use of any code search/rewrite tool or RTK meta commands.
 tools: Bash
 ---

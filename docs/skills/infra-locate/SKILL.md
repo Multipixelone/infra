@@ -1,5 +1,6 @@
 ---
 name: infra-locate
+model: haiku
 description: Fast path finder for Multipixelone/infra. Use for "where is X configured?" questions and file targeting without deep architectural analysis.
 tools: Read, Grep, Glob
 ---
