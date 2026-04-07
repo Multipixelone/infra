@@ -1,19 +1,32 @@
 ---
 name: check-triage
-model: haiku
 description: Fast first-pass triage for `nix flake check` failures in Multipixelone/infra, with clear routing to fix owners.
-tools: Bash, Read, Grep
+model: haiku
+color: red
+tools: ["Bash", "Read", "Grep"]
 ---
+
+<example>
+Context: CI failed or local checks broke
+user: "nix flake check is failing"
+assistant: "I'll spawn the check-triage agent to classify the failure and find the owning files."
+<commentary>
+Triage task - agent runs checks, classifies output, routes to fix path.
+</commentary>
+</example>
+
+<example>
+Context: Something broke after a config change
+user: "I changed something and now builds are broken"
+assistant: "I'll use the check-triage agent to identify what broke and where."
+<commentary>
+Post-change failure - agent will run checks and pinpoint the issue.
+</commentary>
+</example>
 
 # Check Triage
 
 Purpose: classify `nix flake check` failures quickly and route to the correct fix path.
-
-## When to Use
-
-- CI/check failures
-- Local `nix flake check` failures
-- "What broke?" after config changes
 
 ## Procedure
 

@@ -1,11 +1,30 @@
 ---
-name: secrets-flow
+name: secrets
+description: Manage agenix secrets in Multipixelone/infra. Add secret references, find existing patterns, and validate configuration.
 model: haiku
-description: Deterministic workflow for managing agenix secrets in Multipixelone/infra. Use for adding, referencing, or rotating encrypted secrets.
-tools: Read, Grep, Glob, Bash
+color: magenta
+tools: ["Read", "Grep", "Glob", "Bash"]
 ---
 
-# Secrets Flow
+<example>
+Context: User needs to add a secret for a service
+user: "I need to add an API key for the new service"
+assistant: "I'll spawn the secrets agent to find the right agenix pattern and add the reference."
+<commentary>
+Secret management - agent finds existing patterns, adds reference, validates.
+</commentary>
+</example>
+
+<example>
+Context: User wants to know how secrets work
+user: "How are secrets handled in this repo?"
+assistant: "I'll use the secrets agent to show the agenix setup and existing secret references."
+<commentary>
+Secret investigation - agent traces the agenix configuration.
+</commentary>
+</example>
+
+# Secrets
 
 Purpose: make agenix secret management a repeatable, low-ambiguity flow.
 

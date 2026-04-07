@@ -93,21 +93,25 @@
           - **GitHub push**: Ask explicit permission EVERY time — NEVER auto-push
           - **Nix store searches**: Use `fd`/`rg` via Bash when Glob/Grep can't reach store paths
 
-          ## Skill Loading
+          ## Skills & Agents
 
-          All skills run on **haiku** for speed/cost. Complex work auto-escalates to the **nix agent** (sonnet).
+          **Skills** (haiku, loaded as reference into context):
+          - `nix` — Nix syntax, commands, patterns (<80% confidence)
+          - `using-flake-parts` — flake-parts framework patterns
+          - `cli-tools` — qmd/ast-grep/semgrep/fastmod/rtk syntax
 
-          | Working with... | Load skill | When |
-          |----------------|------------|------|
-          | Nix syntax/configs/flakes | `nix` | <80% confidence |
-          | Package installation | `package-add-flow` | Before any install |
-          | Flake-parts modules | `using-flake-parts` | When working with modules |
-          | Adding/configuring services | `service-add-flow` | Before adding services |
-          | Secret management (agenix) | `secrets-flow` | Before touching secrets |
-          | "Where is X configured?" | `infra-locate` | Navigation questions |
+          **Agents** (haiku, spawned as autonomous subprocesses):
+
+          | Task | Spawn agent | When |
+          |------|-------------|------|
+          | "Where is X configured?" | `dots` | Navigation questions |
+          | Package installation | `package-add` | Before any install |
+          | Adding/configuring services | `service-add` | Before adding services |
+          | Secret management (agenix) | `secrets` | Before touching secrets |
           | Check/CI failures | `check-triage` | After failed checks |
-          | Option tracing | `option-trace-lite` | "Where is option X set?" |
-          | CLI tools (qmd/ast-grep/semgrep/fastmod/rtk) | `cli-tools` | Before first use |
+          | Option tracing | `option-trace` | "Where is option X set?" |
+
+          Complex work auto-escalates to the `nix` agent (sonnet).
 
           ## CLI Tools (load `cli-tools` skill for full syntax)
 

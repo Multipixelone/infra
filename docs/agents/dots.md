@@ -138,6 +138,38 @@ Quick reference skills:
 - **CLI tools (fd, rg)** → Load `cli-tools` skill
 - **Terminal multiplexing** → Load `zellij` skill (`docs/skills/zellij/SKILL.md`)
 
+## Search Workflow
+
+1. Normalize the query to likely Nix option stems (`programs.<x>`, `services.<x>`, `networking.<x>`, package/tool name).
+2. Run a narrow content search first:
+
+```bash
+rg -n "<term>|programs\\.<term>|services\\.<term>|networking\\.<term>" modules pkgs --type nix
+```
+
+3. If no hits, use filename discovery:
+
+```bash
+glob "**/*<term>*.nix" modules pkgs
+```
+
+4. If host-specific, inspect host entrypoint:
+
+```bash
+read modules/<host>/imports.nix
+```
+
+5. Return only high-confidence paths with a short reason.
+
+## Output Contract
+
+Always return:
+
+1. Direct answer in one sentence.
+2. 1-3 file paths with line numbers when available.
+3. Why each file is relevant.
+4. The next best file to open/edit first.
+
 ## How to Use Me
 
 Ask me:

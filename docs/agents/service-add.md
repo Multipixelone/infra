@@ -1,11 +1,30 @@
 ---
-name: service-add-flow
+name: service-add
+description: Add NixOS services or systemd units to Multipixelone/infra. Creates modules, configures services, and validates.
 model: haiku
-description: Deterministic workflow for adding NixOS services or systemd units in Multipixelone/infra. Use for enabling existing NixOS services or creating custom systemd units.
-tools: Read, Grep, Glob, Bash, Edit, Write
+color: cyan
+tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
-# Service Add Flow
+<example>
+Context: User wants to enable an existing NixOS service
+user: "Enable tailscale on marin"
+assistant: "I'll spawn the service-add agent to set it up in the right host module."
+<commentary>
+Service enable - agent finds existing patterns, creates/edits module, validates.
+</commentary>
+</example>
+
+<example>
+Context: User wants a custom systemd service
+user: "I need a systemd service that runs my backup script nightly"
+assistant: "I'll use the service-add agent to create the systemd unit in the right module."
+<commentary>
+Custom service - agent creates module with systemd.services block, validates.
+</commentary>
+</example>
+
+# Service Add
 
 Purpose: make service addition a repeatable, low-ambiguity flow.
 
@@ -107,7 +126,7 @@ Return:
 Escalate to `nix` agent when:
 
 - Service requires complex networking (WireGuard, firewall, DNS).
-- Service needs secret management (→ also load `secrets-flow` skill).
+- Service needs secret management (→ also use `secrets` agent).
 - Service conflicts with existing module configuration.
 - Custom package derivation is needed for the service binary.
 
