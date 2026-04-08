@@ -12,4 +12,8 @@
         ];
       };
   };
+
+  flake.modules.homeManager.base = {
+    nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+  };
 }

@@ -15,31 +15,6 @@
       };
     };
   nixpkgs.config.allowUnfreePackages = [ "claude-code" ];
-  # FIXME get rid of this as soon as claude is updated upstream nixpkgs
-  nixpkgs.overlays = [
-    (final: prev: {
-      claude-code = prev.claude-code.overrideAttrs (oldAttrs: rec {
-        version = "2.1.92";
-        src = final.fetchzip {
-          url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
-          hash = "sha256-CLLCtVK3TeXFZ8wBnRRHNc2MoUt7lTdMJwz8sZHpkFM=";
-        };
-        npmDepsHash = "sha256-PbTxKWooUILBLNnOCk96FkKr2MfnNi56V7Tdd5F+keE=";
-        postPatch = ''
-          cp ${./claude-code-package-lock.json} package-lock.json
-          substituteInPlace cli.js \
-            --replace-fail '#!/bin/sh' '#!/usr/bin/env sh'
-        '';
-        # Must explicitly override npmDeps — overrideAttrs doesn't re-derive
-        # it from the new src/postPatch/npmDepsHash
-        npmDeps = final.fetchNpmDeps {
-          inherit src postPatch;
-          name = "claude-code-${version}-npm-deps";
-          hash = npmDepsHash;
-        };
-      });
-    })
-  ];
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
     let
