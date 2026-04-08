@@ -7,7 +7,7 @@
         moonlight-qt
         waypipe
         filezilla
-        bluebubbles
+        # bluebubbles
       ];
     };
 }
