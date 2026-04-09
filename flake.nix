@@ -301,7 +301,6 @@
       url = "github:BirdeeHub/nix-wrapper-modules";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    yazi.url = "github:sxyazi/yazi";
     yt-dlp-YTNSigDeno = {
       url = "github:bashonly/yt-dlp-YTNSigDeno";
       flake = false;
