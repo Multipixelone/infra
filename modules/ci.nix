@@ -1,54 +1,12 @@
 { config, lib, ... }:
 let
   inherit (config.flake.meta) repo;
-
-  caches = [
-    {
-      url = "https://nix-community.cachix.org/";
-      key = "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=";
-    }
-    {
-      url = "https://cache.nixos.org/";
-      key = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-    }
-    {
-      url = "https://helix.cachix.org";
-      key = "helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs=";
-    }
-    {
-      url = "https://yazi.cachix.org";
-      key = "yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k=";
-    }
-    {
-      url = "https://anyrun.cachix.org";
-      key = "anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s=";
-    }
-    {
-      url = "https://hyprland.cachix.org";
-      key = "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=";
-    }
-    {
-      url = "https://nix-gaming.cachix.org";
-      key = "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=";
-    }
-    {
-      url = "https://prismlauncher.cachix.org";
-      key = "prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c=";
-    }
-  ];
-
-  atticCache = {
-    url = "https://attic-cache.fly.dev/system?priority=50";
-    key = "system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk=";
-  };
+  inherit (config) caches;
 
   mkNixConf =
-    {
-      extraSubstituters ? [ ],
-    }:
     let
-      substituters = lib.concatStringsSep " " ((map (c: c.url) caches) ++ extraSubstituters);
-      trustedKeys = lib.concatStringsSep " " (map (c: c.key) (caches ++ [ atticCache ]));
+      substituters = lib.concatStringsSep " " (map (c: c.url) caches);
+      trustedKeys = lib.concatStringsSep " " (map (c: c.key) caches);
     in
     ''
       fallback = true
@@ -117,7 +75,7 @@ let
       uses = "nixbuild/nix-quick-install-action@v34";
       "with" = {
         nix_version = "2.31.2";
-        nix_conf = mkNixConf { extraSubstituters = [ atticCache.url ]; };
+        nix_conf = mkNixConf;
       };
     };
     createAtticNetrc = {

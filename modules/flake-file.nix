@@ -73,13 +73,6 @@
         flake = false;
       };
 
-      helix.url = "github:spion/helix/textDocument/inlineCompletion";
-
-      catppuccin-helix = {
-        url = "github:catppuccin/helix";
-        flake = false;
-      };
-
       catppuccin-foot = {
         url = "github:catppuccin/foot";
         flake = false;

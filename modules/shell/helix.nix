@@ -5,6 +5,20 @@
   ...
 }:
 {
+  caches = [
+    {
+      url = "https://helix.cachix.org";
+      key = "helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs=";
+    }
+  ];
+  flake-file.inputs = {
+    helix.url = "github:spion/helix/textDocument/inlineCompletion";
+    catppuccin-helix = {
+      url = "github:catppuccin/helix";
+      flake = false;
+    };
+
+  };
   perSystem.wrappers.packages.helix = true;
   flake.wrappers.helix =
     { pkgs, wlib, ... }:

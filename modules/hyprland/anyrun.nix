@@ -1,5 +1,11 @@
 { inputs, lib, ... }:
 {
+  caches = [
+    {
+      url = "https://anyrun.cachix.org";
+      key = "anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s=";
+    }
+  ];
   flake.modules = {
     homeManager.gui =
       {
