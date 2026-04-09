@@ -25,6 +25,11 @@
       }
     ];
 
+    flake-file.nixConfig = {
+      extra-substituters = map (c: c.url) config.caches;
+      extra-trusted-public-keys = map (c: c.key) config.caches;
+    };
+
     flake.modules.nixos.base = {
       nix.settings = {
         substituters = map (c: c.url) config.caches;

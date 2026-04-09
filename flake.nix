@@ -9,6 +9,26 @@
     abort-on-warn = true;
     allow-import-from-derivation = false;
     extra-experimental-features = [ "pipe-operators" ];
+    extra-substituters = [
+      "https://yazi.cachix.org"
+      "https://helix.cachix.org"
+      "https://attic-cache.fly.dev/system?priority=50"
+      "https://nix-community.cachix.org"
+      "https://hyprland.cachix.org"
+      "https://anyrun.cachix.org"
+      "https://nix-gaming.cachix.org"
+      "https://prismlauncher.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k="
+      "helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs="
+      "system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk="
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
+      "anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s="
+      "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4="
+      "prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c="
+    ];
   };
 
   inputs = {
