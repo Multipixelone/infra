@@ -1,0 +1,359 @@
+{ lib, ... }:
+{
+  flake-file = {
+    description = "Multipixelone (Finn)'s nix + HomeManager config";
+
+    nixConfig = {
+      abort-on-warn = true;
+      extra-experimental-features = [
+        "pipe-operators"
+      ];
+      allow-import-from-derivation = false;
+    };
+
+    inputs = {
+      nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+      nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
+      nixpkgs-cloudflared.url = "github:wrbbz/nixpkgs/cloudflared-2025.4.0";
+      nixpkgs-mine.url = "github:Multipixelone/nixpkgs/init-soundshow";
+
+      systems.url = "github:nix-systems/default-linux";
+
+      flake-compat.url = "github:edolstra/flake-compat";
+
+      flake-utils = {
+        url = "github:numtide/flake-utils";
+        inputs.systems.follows = "systems";
+      };
+
+      flake-parts = {
+        url = "github:hercules-ci/flake-parts";
+        inputs.nixpkgs-lib.follows = "nixpkgs";
+      };
+
+      flake-file.url = "github:vic/flake-file";
+      import-tree.url = lib.mkDefault "github:vic/import-tree";
+
+      nixos-wsl = {
+        url = "github:nix-community/NixOS-WSL/main";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-compat.follows = "flake-compat";
+        };
+      };
+
+      git-hooks = {
+        url = "github:cachix/git-hooks.nix";
+        inputs = {
+          flake-compat.follows = "flake-compat";
+          nixpkgs.follows = "nixpkgs";
+        };
+      };
+
+      treefmt-nix = {
+        url = "github:numtide/treefmt-nix";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      files.url = "github:mightyiam/files";
+      nur.url = "github:nix-community/NUR";
+      musnix.url = "github:musnix/musnix";
+      catppuccin.url = "github:catppuccin/nix";
+      nix-hardware.url = "github:NixOS/nixos-hardware/master";
+      zjstatus.url = "github:dj95/zjstatus";
+
+      streamrip = {
+        url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
+        flake = false;
+      };
+
+      helix.url = "github:spion/helix/textDocument/inlineCompletion";
+
+      catppuccin-helix = {
+        url = "github:catppuccin/helix";
+        flake = false;
+      };
+
+      catppuccin-foot = {
+        url = "github:catppuccin/foot";
+        flake = false;
+      };
+
+      mcp-servers-nix = {
+        url = "github:natsukium/mcp-servers-nix";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      wrappers = {
+        url = "github:BirdeeHub/nix-wrapper-modules";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      yazi.url = "github:sxyazi/yazi";
+      nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
+      apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
+      ucodenix.url = "github:e-tho/ucodenix";
+      base16.url = "github:SenchoPens/base16.nix";
+
+      tinted-schemes = {
+        url = "github:tinted-theming/schemes";
+        flake = false;
+      };
+
+      nixpkgs-xr.url = "github:nix-community/nixpkgs-xr";
+
+      direnv-instant = {
+        url = "github:Mic92/direnv-instant";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-parts.follows = "flake-parts";
+        };
+      };
+
+      nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
+
+      apple-emoji = {
+        url = "github:samuelngs/apple-emoji-linux/b22ae7f";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      make-shell = {
+        url = "github:nicknovitski/make-shell";
+        inputs.flake-compat.follows = "flake-compat";
+      };
+
+      blocklist = {
+        url = "github:StevenBlack/hosts";
+        flake = false;
+      };
+
+      better-fox = {
+        url = "github:yokoffing/Betterfox";
+        flake = false;
+      };
+
+      qmd.url = "github:tobi/qmd";
+
+      caveman = {
+        url = "github:JuliusBrussee/caveman";
+        flake = false;
+      };
+
+      claude-code-src = {
+        url = "github:anthropics/claude-code";
+        flake = false;
+      };
+
+      bgutil-ytdlp-pot-provider = {
+        url = "github:Brainicism/bgutil-ytdlp-pot-provider";
+        flake = false;
+      };
+
+      yt-dlp-YTNSigDeno = {
+        url = "github:bashonly/yt-dlp-YTNSigDeno";
+        flake = false;
+      };
+
+      secrets = {
+        url = "git+ssh://git@github.com/Multipixelone/nix-secrets.git";
+        flake = false;
+      };
+
+      nextmeeting = {
+        url = "github:Multipixelone/nextmeeting/reformat?dir=packaging";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-utils.follows = "flake-utils";
+      };
+
+      playlist-download = {
+        url = "github:Multipixelone/playlist-downloader";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-utils.follows = "flake-utils";
+      };
+
+      rb-scrobbler = {
+        url = "github:Multipixelone/rb-scrobbler/nix-build";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      beets-plugins.url = "github:Multipixelone/beets-plugins";
+
+      waybar-mediaplayer = {
+        url = "github:Multipixelone/waybar-mediaplayer/artist";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-utils.follows = "flake-utils";
+      };
+
+      khinsider = {
+        url = "github:Multipixelone/khinsider/nix-build";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-utils.follows = "flake-utils";
+      };
+
+      euphony = {
+        url = "github:Multipixelone/euphony/nix-build";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      zjstatus-hints.url = "github:b0o/zjstatus-hints";
+
+      uwu-colors = {
+        url = "github:q60/uwu_colors";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          utils.follows = "flake-utils";
+        };
+      };
+
+      monocle.url = "github:Multipixelone/monocle/nix-build";
+
+      zsm.url = "github:Multipixelone/zsm/nix-build";
+
+      room.url = "github:Multipixelone/room/reduce-binary-size";
+
+      millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+
+      steam-easygrid = {
+        url = "github:luthor112/steam-easygrid";
+        flake = false;
+      };
+
+      qtscrob = {
+        url = "github:Multipixelone/QtScrobbler/nix-build";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-utils.follows = "flake-utils";
+      };
+
+      statix = {
+        url = "github:molybdenumsoftware/statix";
+        inputs = {
+          flake-parts.follows = "flake-parts";
+          nixpkgs.follows = "nixpkgs";
+        };
+      };
+
+      stylix = {
+        url = "github:danth/stylix";
+        inputs = {
+          flake-parts.follows = "flake-parts";
+          nixpkgs.follows = "nixpkgs";
+          nur.follows = "nur";
+          systems.follows = "systems";
+          tinted-schemes.follows = "tinted-schemes";
+        };
+      };
+
+      auto-cpufreq = {
+        url = "github:AdnanHodzic/auto-cpufreq";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      nix-gaming = {
+        url = "github:fufexan/nix-gaming";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-parts.follows = "flake-parts";
+        };
+      };
+
+      home-manager = {
+        url = "github:nix-community/home-manager/master";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      agenix = {
+        url = "github:ryantm/agenix";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          home-manager.follows = "home-manager";
+          systems.follows = "systems";
+        };
+      };
+
+      nixos-generators = {
+        url = "github:nix-community/nixos-generators";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      colmena = {
+        url = "github:zhaofengli/colmena";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
+
+      nix-index-database = {
+        url = "github:nix-community/nix-index-database";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      spicetify-nix = {
+        url = "github:Gerg-L/spicetify-nix";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      anyrun.url = "github:fufexan/anyrun/launch-prefix";
+
+      anyrun-nixos-options = {
+        url = "github:n3oney/anyrun-nixos-options";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-parts.follows = "flake-parts";
+      };
+
+      lanzaboote = {
+        url = "github:nix-community/lanzaboote/v1.0.0";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      noctalia = {
+        url = "github:noctalia-dev/noctalia-shell";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.noctalia-qs.follows = "noctalia-qs";
+      };
+
+      noctalia-qs = {
+        url = "github:noctalia-dev/noctalia-qs";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      hyprland.url = "github:hyprwm/hyprland";
+
+      hyprland-plugins = {
+        url = "github:hyprwm/hyprland-plugins";
+        inputs.hyprland.follows = "hyprland";
+      };
+
+      hyprlock = {
+        url = "github:hyprwm/hyprlock";
+        inputs = {
+          hyprgraphics.follows = "hyprland/hyprgraphics";
+          hyprlang.follows = "hyprland/hyprlang";
+          hyprutils.follows = "hyprland/hyprutils";
+          nixpkgs.follows = "hyprland/nixpkgs";
+          systems.follows = "hyprland/systems";
+        };
+      };
+
+      hyprpaper = {
+        url = "github:hyprwm/hyprpaper";
+        inputs = {
+          hyprgraphics.follows = "hyprland/hyprgraphics";
+          hyprlang.follows = "hyprland/hyprlang";
+          hyprutils.follows = "hyprland/hyprutils";
+          nixpkgs.follows = "hyprland/nixpkgs";
+          systems.follows = "hyprland/systems";
+        };
+      };
+
+      hypridle = {
+        url = "github:hyprwm/hypridle";
+        inputs = {
+          hyprlang.follows = "hyprland/hyprlang";
+          hyprutils.follows = "hyprland/hyprutils";
+          nixpkgs.follows = "hyprland/nixpkgs";
+          systems.follows = "hyprland/systems";
+        };
+      };
+    };
+  };
+}
