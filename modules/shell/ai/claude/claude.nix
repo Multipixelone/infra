@@ -2,7 +2,6 @@
   rootPath,
   withSystem,
   inputs,
-  self,
   lib,
   config,
   ...
