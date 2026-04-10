@@ -54,11 +54,6 @@
       catppuccin.url = "github:catppuccin/nix";
       nix-hardware.url = "github:NixOS/nixos-hardware/master";
 
-      streamrip = {
-        url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
-        flake = false;
-      };
-
       catppuccin-foot = {
         url = "github:catppuccin/foot";
         flake = false;
@@ -116,16 +111,6 @@
         flake = false;
       };
 
-      bgutil-ytdlp-pot-provider = {
-        url = "github:Brainicism/bgutil-ytdlp-pot-provider";
-        flake = false;
-      };
-
-      yt-dlp-YTNSigDeno = {
-        url = "github:bashonly/yt-dlp-YTNSigDeno";
-        flake = false;
-      };
-
       secrets = {
         url = "git+ssh://git@github.com/Multipixelone/nix-secrets.git";
         flake = false;
@@ -152,12 +137,6 @@
 
       waybar-mediaplayer = {
         url = "github:Multipixelone/waybar-mediaplayer/artist";
-        inputs.nixpkgs.follows = "nixpkgs";
-        inputs.flake-utils.follows = "flake-utils";
-      };
-
-      khinsider = {
-        url = "github:Multipixelone/khinsider/nix-build";
         inputs.nixpkgs.follows = "nixpkgs";
         inputs.flake-utils.follows = "flake-utils";
       };
