@@ -102,11 +102,6 @@
         inputs.nixpkgs.follows = "nixpkgs";
       };
 
-      make-shell = {
-        url = "github:nicknovitski/make-shell";
-        inputs.flake-compat.follows = "flake-compat";
-      };
-
       blocklist = {
         url = "github:StevenBlack/hosts";
         flake = false;
