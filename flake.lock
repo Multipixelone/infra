@@ -2662,22 +2662,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-cloudflared": {
-      "locked": {
-        "lastModified": 1743673149,
-        "narHash": "sha256-jGucaQTPNN+j901QEALk1lRs73zAFuSCPnZJMY3YfXs=",
-        "owner": "wrbbz",
-        "repo": "nixpkgs",
-        "rev": "cf1af042a660fe1311403eddf5ed01e50037f44f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "wrbbz",
-        "ref": "cloudflared-2025.4.0",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nixpkgs-lib": {
       "locked": {
         "lastModified": 1774748309,
@@ -3409,7 +3393,6 @@
         "nixos-generators": "nixos-generators",
         "nixos-wsl": "nixos-wsl",
         "nixpkgs": "nixpkgs_12",
-        "nixpkgs-cloudflared": "nixpkgs-cloudflared",
         "nixpkgs-mine": "nixpkgs-mine",
         "nixpkgs-stable": "nixpkgs-stable",
         "nixpkgs-xr": "nixpkgs-xr",
