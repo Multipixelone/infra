@@ -128,6 +128,10 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+    github-gitignore = {
+      url = "github:github/gitignore";
+      flake = false;
+    };
     helix.url = "github:spion/helix/textDocument/inlineCompletion";
     home-manager = {
       url = "github:nix-community/home-manager/master";
@@ -166,6 +170,10 @@
         nixpkgs.follows = "hyprland/nixpkgs";
         systems.follows = "hyprland/systems";
       };
+    };
+    ignoreBoy = {
+      url = "github:Ookiiboy/ignoreBoy";
+      inputs.gitignore-repo.follows = "github-gitignore";
     };
     import-tree.url = "github:vic/import-tree";
     khinsider = {

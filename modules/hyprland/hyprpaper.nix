@@ -1,6 +1,4 @@
 {
-  pkgs,
-  config,
   inputs,
   # lib,
   ...
@@ -47,7 +45,6 @@
   flake.modules = {
     homeManager.gui =
       {
-        osConfig,
         pkgs,
         config,
         ...

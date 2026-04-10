@@ -10,7 +10,6 @@
       {
         osConfig,
         pkgs,
-        config,
         ...
       }:
       let

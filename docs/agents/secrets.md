@@ -39,12 +39,12 @@ Purpose: make agenix secret management a repeatable, low-ambiguity flow.
 
 ## Step 1: Identify Secret Type and Scope
 
-| Type | Scope | Pattern |
-|------|-------|---------|
+| Type                     | Scope       | Pattern                                                   |
+| ------------------------ | ----------- | --------------------------------------------------------- |
 | NixOS service credential | System-wide | `age.secrets."name".file = "${inputs.secrets}/path.age";` |
-| HM program credential | User-level | `age.secrets."name".file = "${inputs.secrets}/path.age";` |
-| Environment file | Service | `environmentFiles = [ config.age.secrets."name".path ];` |
-| Config file | Service | `rcloneConfigFile = config.age.secrets."name".path;` |
+| HM program credential    | User-level  | `age.secrets."name".file = "${inputs.secrets}/path.age";` |
+| Environment file         | Service     | `environmentFiles = [ config.age.secrets."name".path ];`  |
+| Config file              | Service     | `rcloneConfigFile = config.age.secrets."name".path;`      |
 
 ## Step 2: Find Existing Patterns
 

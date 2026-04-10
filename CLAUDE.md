@@ -18,7 +18,7 @@ NixOS + home-manager infra via flake-parts. Single system: `x86_64-linux`.
 
 ## Key Files
 
-- `flake.nix` — **auto-generated**, NEVER edit. Regenerate: `nix run .#write-flake`
+- `flake.nix` — **auto-generated**, NEVER edit. Regenerate: `nix run .#write-flake` (or `nix run .#generate-files` to regenerate everything)
 - `outputs.nix` — 12-line flake entry point; imports `flake-file`, `allfollow`, `import-tree ./modules`
 - `modules/flake-file.nix` — core/shared flake inputs
 - `modules/` — all `.nix` files auto-discovered via import-tree. **New files must be `git add`ed.**
@@ -38,7 +38,7 @@ flake-file.inputs.beets-plugins.url = "github:Multipixelone/beets-plugins";
 
 Binary caches: set `caches` per-module; aggregated into `flake-file.nixConfig` by `modules/nixpkgs/substituters.nix`.
 `allfollow` (in `outputs.nix`) auto-adds `.follows` for common transitive inputs (nixpkgs, flake-parts, etc.).
-After any `flake-file` change: **`nix run .#write-flake`**.
+After any `flake-file` change: **`nix run .#write-flake`**. To regenerate all auto-generated files at once (flake.nix + files from `mightyiam/files`), use **`nix run .#generate-files`**.
 
 ## Wrappers (Portable Apps)
 

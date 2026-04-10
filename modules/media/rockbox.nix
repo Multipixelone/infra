@@ -1,7 +1,6 @@
 {
   lib,
   withSystem,
-  rootPath,
   ...
 }:
 {
@@ -87,7 +86,7 @@
     };
 
   flake.modules.homeManager.base =
-    hmArgs@{ pkgs, ... }:
+    { pkgs, ... }:
     let
       rb-albumart = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.rb-albumart

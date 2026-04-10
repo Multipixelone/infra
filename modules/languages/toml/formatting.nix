@@ -1,3 +1,6 @@
 {
-  perSystem.treefmt.programs.taplo.enable = true;
+  perSystem.treefmt.programs = {
+    taplo.enable = true;
+    toml-sort.enable = true;
+  };
 }

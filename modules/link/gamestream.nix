@@ -1,7 +1,6 @@
 {
   lib,
   withSystem,
-  inputs,
   ...
 }:
 {

@@ -1,8 +1,6 @@
 {
   buildMozillaXpiAddon,
-  fetchurl,
   lib,
-  stdenv,
 }:
 {
   "last-fm-unscrobbler" = buildMozillaXpiAddon {

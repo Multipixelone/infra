@@ -3,6 +3,8 @@
     { inputs', ... }:
     {
       treefmt.programs = {
+        deadnix.enable = true;
+
         nixf-diagnose = {
           enable = true;
           ignore = [

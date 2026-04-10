@@ -1,7 +1,7 @@
 {
   nixpkgs.config.allowUnfreePackages = [ "objectbox-linux" ];
   flake.modules.homeManager.gui =
-    { pkgs, lib, ... }:
+    { pkgs, ... }:
     {
       home.packages = with pkgs; [
         moonlight-qt

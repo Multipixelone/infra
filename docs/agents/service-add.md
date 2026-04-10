@@ -38,11 +38,11 @@ Purpose: make service addition a repeatable, low-ambiguity flow.
 
 ## Step 1: Determine Service Type
 
-| Type | Example | Approach |
-|------|---------|----------|
-| Existing NixOS service | `services.tailscale.enable` | Enable + configure in module |
-| Custom systemd service | One-off daemon or script | `systemd.services.<name>` block |
-| Existing HM service | `services.easyeffects.enable` | Enable in HM module |
+| Type                   | Example                       | Approach                        |
+| ---------------------- | ----------------------------- | ------------------------------- |
+| Existing NixOS service | `services.tailscale.enable`   | Enable + configure in module    |
+| Custom systemd service | One-off daemon or script      | `systemd.services.<name>` block |
+| Existing HM service    | `services.easyeffects.enable` | Enable in HM module             |
 
 ## Step 2: Find Similar Patterns
 

@@ -1,4 +1,4 @@
-{ inputs, config, ... }:
+{ inputs, ... }:
 {
   flake.modules.homeManager.base = {
     imports = [

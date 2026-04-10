@@ -26,7 +26,7 @@
       ]
     );
     apply = lib.mapAttrs (
-      name: text:
+      _name: text:
       if lib.isAttrs text then
         lib.pipe text.order [
           (map (lib.flip lib.getAttr text.parts))
@@ -54,8 +54,54 @@
       |> lib.concatLines
       |> (s: s + "\n");
 
-    perSystem = psArgs: {
-      make-shells.default.packages = [ psArgs.config.files.writer.drv ];
-    };
+    perSystem =
+      {
+        pkgs,
+        config,
+        self',
+        ...
+      }:
+      {
+        make-shells.default.packages = [
+          config.files.writer.drv
+          config.packages.generate-files
+        ];
+
+        packages.generate-files = pkgs.writeShellApplication {
+          name = "generate-files";
+          meta.description = "Generate all automatically generated files for this repository";
+          text = ''
+            # github:mightyiam/files.
+            ${self'.apps.write-files.program}
+
+            lock_bck=$(mktemp)
+            cp -p flake.lock "$lock_bck"
+
+            ${self'.apps.write-flake.program}
+
+            # If flake.lock remains unchanged, restore mtime.
+            if cmp -s flake.lock "$lock_bck"; then
+              touch -r "$lock_bck" flake.lock
+            fi
+          '';
+        };
+
+        apps.write-files = {
+          program = config.files.writer.drv;
+          meta.description = "Generate files using github:mightyiam/files.";
+        };
+
+        apps.generate-files = {
+          program = config.packages.generate-files;
+          meta.description = "Generate all automatically generated files for this repository";
+        };
+
+        pre-commit.settings.hooks.generate-files = {
+          enable = true;
+          package = config.packages.generate-files;
+          entry = self'.apps.generate-files.program;
+          pass_filenames = false;
+        };
+      };
   };
 }

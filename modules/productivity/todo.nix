@@ -26,10 +26,8 @@
             todoist-wrapped
           ];
         };
-      gui =
-        { pkgs, ... }:
-        {
-        };
+      gui = _: {
+      };
     };
   };
 }

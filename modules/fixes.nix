@@ -3,7 +3,7 @@
     # https://github.com/NixOS/nixpkgs/pull/503253
     (
 
-      final: prev: {
+      _final: prev: {
         python3Packages = prev.python3Packages.overrideScope (
           pyFinal: pyPrev: {
             wand = pyPrev.wand.overridePythonAttrs (_: rec {

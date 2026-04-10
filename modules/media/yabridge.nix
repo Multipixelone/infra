@@ -1,5 +1,4 @@
 {
-  inputs,
   rootPath,
   withSystem,
   ...

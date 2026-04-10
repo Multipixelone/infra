@@ -1,5 +1,4 @@
-{ config, ... }:
-{
+_: {
   flake.modules = {
     homeManager.laptop =
       { pkgs, lib, ... }:

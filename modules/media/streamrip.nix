@@ -9,7 +9,7 @@
     flake = false;
   };
   nixpkgs.overlays = [
-    (final: prev: {
+    (_final: prev: {
       streamrip = prev.streamrip.overrideAttrs {
         src = inputs.streamrip;
         version = inputs.streamrip.rev;

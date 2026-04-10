@@ -10,8 +10,10 @@
   perSystem = {
     treefmt = {
       projectRootFile = "flake.nix";
+      enableDefaultExcludes = true;
       programs = {
         prettier.enable = true;
+        shellcheck.enable = true;
         shfmt.enable = true;
       };
       settings = {
@@ -22,6 +24,14 @@
           "Justfile"
           "LICENSE"
           "*.fish"
+          "**/.gitkeep"
+          "**/*.key"
+          "**/*.crt"
+          "**/*.gitmodules"
+          "**/.direnv"
+          "**/node_modules/*"
+          "**/*.code-workspace"
+          "pkgs/firefox-addons/generated.nix"
         ];
       };
     };

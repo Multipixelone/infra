@@ -23,12 +23,14 @@ HEADERS = {
     )
 }
 
+
 # Stable IDs derived from fixed strings so re-importing updates existing notes
 # rather than creating duplicates. genanki requires IDs in range [1<<30, 1<<31).
 def _stable_id(seed: str) -> int:
     h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
     lo, hi = 1 << 30, 1 << 31
     return lo + (h % (hi - lo))
+
 
 ASL_MODEL = genanki.Model(
     model_id=_stable_id("asl-anki-model-v1"),
@@ -38,11 +40,7 @@ ASL_MODEL = genanki.Model(
         {
             "name": "ASL → Sign",
             "qfmt": "<div style='font-size:2em;font-weight:bold'>{{ASL}}</div>",
-            "afmt": (
-                "{{FrontSide}}"
-                "<hr>"
-                "<div style='text-align:center'>{{Sign}}</div>"
-            ),
+            "afmt": ("{{FrontSide}}<hr><div style='text-align:center'>{{Sign}}</div>"),
         },
         {
             "name": "Sign → ASL",
@@ -170,10 +168,15 @@ def download_youtube(url: str, dest_dir: Path) -> Path | None:
 def get_video_dimensions(path: Path) -> tuple[int, int] | None:
     """Return (width, height) of the first video stream, or None on failure."""
     cmd = [
-        "ffprobe", "-v", "error",
-        "-select_streams", "v:0",
-        "-show_entries", "stream=width,height",
-        "-of", "csv=s=x:p=0",
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=s=x:p=0",
         str(path),
     ]
     try:
@@ -202,10 +205,16 @@ def detect_motion_crop(input_path: Path, pad_fraction: float = 0.08) -> dict | N
     vid_w, vid_h = dims
 
     cmd = [
-        "ffmpeg", "-loglevel", "error",
-        "-i", str(input_path),
-        "-vf", "tblend=all_mode=difference,cropdetect=limit=16:round=2:reset=0",
-        "-f", "null", "-",
+        "ffmpeg",
+        "-loglevel",
+        "error",
+        "-i",
+        str(input_path),
+        "-vf",
+        "tblend=all_mode=difference,cropdetect=limit=16:round=2:reset=0",
+        "-f",
+        "null",
+        "-",
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -293,20 +302,28 @@ def process_video(
 
     ffmpeg_cmd = [
         "ffmpeg",
-        "-loglevel", loglevel,
-        "-i", str(input_path),
+        "-loglevel",
+        loglevel,
+        "-i",
+        str(input_path),
         "-an",
-        "-filter:v", filter_str,
-        "-f", "yuv4mpegpipe",
+        "-filter:v",
+        filter_str,
+        "-f",
+        "yuv4mpegpipe",
         "-",
     ]
 
     gifski_cmd = [
         "gifski",
-        "-o", str(output_path),
-        "--fps", str(fps),
-        "--quality", "85",
-        "--lossy-quality", "30",
+        "-o",
+        str(output_path),
+        "--fps",
+        str(fps),
+        "--quality",
+        "85",
+        "--lossy-quality",
+        "30",
         "-",
     ]
 
@@ -403,7 +420,8 @@ def main() -> None:
         help="Also crop vertically to the region of motion (opt-in).",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable debug logging.",
     )
@@ -472,9 +490,12 @@ def main() -> None:
 
                 crop = detect_motion_crop(video_path) if do_crop else None
                 if do_crop and crop is None:
-                    logger.debug("  Motion detection yielded no crop; encoding full frame.")
+                    logger.debug(
+                        "  Motion detection yielded no crop; encoding full frame."
+                    )
                 ok = process_video(
-                    video_path, gif_path,
+                    video_path,
+                    gif_path,
                     crop=crop,
                     crop_vertical=args.crop_vertical,
                 )

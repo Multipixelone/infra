@@ -31,10 +31,8 @@
             gcalcli-wrapped
           ];
         };
-      gui =
-        { pkgs, ... }:
-        {
-        };
+      gui = _: {
+      };
     };
   };
 }

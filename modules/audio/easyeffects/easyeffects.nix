@@ -1,5 +1,4 @@
-{ lib, ... }:
-{
+_: {
   flake.modules.nixos.pc.programs.dconf.enable = true;
   flake.modules.homeManager.gui = {
     services.easyeffects.enable = true;

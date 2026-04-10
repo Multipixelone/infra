@@ -1,4 +1,3 @@
-{ inputs, ... }:
-{
+_: {
   perSystem.treefmt.programs.nixfmt.enable = true;
 }

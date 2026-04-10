@@ -6,7 +6,7 @@
 {
 
   configurations.nixos.iot.module =
-    { pkgs, config, ... }:
+    { config, ... }:
     {
       boot.initrd.availableKernelModules = [
         "xhci_pci"
