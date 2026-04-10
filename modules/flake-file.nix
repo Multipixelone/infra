@@ -64,11 +64,6 @@
         inputs.nixpkgs.follows = "nixpkgs";
       };
 
-      wrappers = {
-        url = "github:BirdeeHub/nix-wrapper-modules";
-        inputs.nixpkgs.follows = "nixpkgs";
-      };
-
       nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
       apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
       ucodenix.url = "github:e-tho/ucodenix";
