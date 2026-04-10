@@ -17,7 +17,13 @@
       url = "github:catppuccin/helix";
       flake = false;
     };
-
+    uwu-colors = {
+      url = "github:q60/uwu_colors";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        utils.follows = "flake-utils";
+      };
+    };
   };
   perSystem.wrappers.packages.helix = true;
   flake.wrappers.helix =

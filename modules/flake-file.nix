@@ -144,14 +144,6 @@
         inputs.nixpkgs.follows = "nixpkgs";
       };
 
-      uwu-colors = {
-        url = "github:q60/uwu_colors";
-        inputs = {
-          nixpkgs.follows = "nixpkgs";
-          utils.follows = "flake-utils";
-        };
-      };
-
       qtscrob = {
         url = "github:Multipixelone/QtScrobbler/nix-build";
         inputs.nixpkgs.follows = "nixpkgs";
