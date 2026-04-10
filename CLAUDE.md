@@ -1,58 +1,65 @@
 # Multipixelone/infra
 
-NixOS + home-manager infrastructure managed with flake-parts.
+NixOS + home-manager infra via flake-parts. Single system: `x86_64-linux`.
 
 ## Build Commands
 
-| Command              | Purpose                              |
-| -------------------- | ------------------------------------ |
-| `just rebuild`       | Local rebuild via `nh os switch`     |
-| `just deploy`        | Rebuild + push to attic cache        |
-| `just colmena-apply` | Deploy to remote hosts               |
-| `just debug`         | Rebuild with verbose trace           |
-| `just update`        | Update flake lock + firefox addons   |
-| `just gc`            | Garbage collection + history cleanup |
-| `nix flake check`    | Run all checks (CI does this too)    |
+- `just rebuild` — local rebuild (`nh os switch`)
+- `just deploy` — rebuild + push to attic
+- `just colmena-apply` / `just colmena-apply-tag <t>` — deploy remote hosts
+- `just debug` — rebuild with `--show-trace`
+- `just update` — update flake lock + firefox addons
+- `just fastb` — `nix-fast-build` + attic push
+- `just iso` — build installer ISO
+- `just gc` — garbage collect + wipe old generations
+- `nix flake check` — run all checks (CI does this too)
 
-**NEVER use bare `nix build` or `nixos-rebuild` directly.**
+**NEVER use bare `nix build` or `nixos-rebuild`.**
 
-## Repository Structure
+## Key Files
 
+- `flake.nix` — **auto-generated**, NEVER edit. Regenerate: `nix run .#write-flake`
+- `outputs.nix` — 12-line flake entry point; imports `flake-file`, `allfollow`, `import-tree ./modules`
+- `modules/flake-file.nix` — core/shared flake inputs
+- `modules/` — all `.nix` files auto-discovered via import-tree. **New files must be `git add`ed.**
+- `pkgs/` — custom packages, referenced via `pkgs.callPackage "${rootPath}/pkgs/..." { }`
+- `docs/` — skills, agents, documentation
+
+Module style: each returns `{ flake = { ... }; }` and/or `{ perSystem = { ... }; }`.
+NixOS configs: `configurations.nixos.<host>.module` with `imports = with config.flake.modules.nixos; [ ... ];`
+
+## flake-file (Inputs)
+
+Modules declare their own inputs inline — no need to touch `flake-file.nix` for feature-specific deps:
+
+```nix
+flake-file.inputs.beets-plugins.url = "github:Multipixelone/beets-plugins";
 ```
-modules/           # Flake-parts modules (auto-imported via import-tree)
-├── <host>/        # Host-specific configs (link, zelda, marin, iot)
-├── shell/         # Shell tools, AI config, terminal setup
-├── hyprland/      # Window manager
-├── theme/         # Styling (Stylix)
-├── hardware/      # CPU, GPU, RAID
-├── network/       # DNS, WireGuard, firewall
-├── home-manager/  # HM base, GUI, gaming, checks
-├── boot/          # EFI, boot options
-└── *.nix          # Feature modules (backup, ci, locale, etc.)
-pkgs/              # Custom package definitions
-docs/              # Skills, agents, documentation
+
+Binary caches: set `caches` per-module; aggregated into `flake-file.nixConfig` by `modules/nixpkgs/substituters.nix`.
+`allfollow` (in `outputs.nix`) auto-adds `.follows` for common transitive inputs (nixpkgs, flake-parts, etc.).
+After any `flake-file` change: **`nix run .#write-flake`**.
+
+## Wrappers (Portable Apps)
+
+`nix-wrapper-modules` (`inputs.wrappers`) produces self-contained packages runnable on **any Nix device** via `nix run`:
+
+```nix
+perSystem.wrappers.packages.helix = true;
+flake.wrappers.helix = { pkgs, wlib, ... }: {
+  imports = [ wlib.wrapperModules.helix ];
+  package = inputs.helix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  settings = { /* app config */ };
+};
 ```
 
-## Flake-Parts Patterns
+Consume in home-manager: `withSystem pkgs.stdenv.hostPlatform.system (ps: ps.config.packages.helix)`
 
-- **import-tree**: All `.nix` files in `modules/` are auto-discovered. New files MUST be `git add`ed to be visible.
-- **Module style**: Each module returns `{ flake = { ... }; }` and/or `{ perSystem = { ... }; }`.
-- **NixOS configs**: Defined via `configurations.nixos.<host>.module` with imports from `config.flake.modules.nixos`.
-- **Single system**: `systems = [ "x86_64-linux" ]` — no Darwin.
+## Hosts
 
-## Host Conventions
-
-- Hosts named after Zelda characters: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server)
-- Each host has: `imports.nix`, `facter.nix`, `hardware-configuration.nix`, `hostname.nix`, `state-version.nix`
-- Host imports compose feature modules: `imports = with config.flake.modules.nixos; [ efi pc gaming ];`
+Zelda characters: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server).
+Each has: `imports.nix`, `facter.nix`, `hardware-configuration.nix`, `hostname.nix`, `state-version.nix`.
 
 ## Secrets
 
-- Managed via `agenix` — encrypted in private `inputs.secrets` repo
-- Access pattern: `config.age.secrets."path/to/secret".path`
-- NEVER commit unencrypted secrets
-
-## Custom Packages
-
-- Defined in `pkgs/` directory
-- Referenced via `pkgs.callPackage "${rootPath}/pkgs/..." { }`
+agenix — encrypted in private `inputs.secrets` repo. Access: `config.age.secrets."path/to/secret".path`. NEVER commit unencrypted.
