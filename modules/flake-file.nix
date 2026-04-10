@@ -48,14 +48,6 @@
         };
       };
 
-      git-hooks = {
-        url = "github:cachix/git-hooks.nix";
-        inputs = {
-          flake-compat.follows = "flake-compat";
-          nixpkgs.follows = "nixpkgs";
-        };
-      };
-
       treefmt-nix = {
         url = "github:numtide/treefmt-nix";
         inputs.nixpkgs.follows = "nixpkgs";
