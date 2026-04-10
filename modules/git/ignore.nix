@@ -9,6 +9,10 @@
     type = lib.types.listOf lib.types.str;
   };
 
+  config.gitignore = [
+    "/.claude/settings.local.json"
+  ];
+
   config.flake-file.inputs = {
     github-gitignore = {
       url = "github:github/gitignore";

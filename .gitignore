@@ -86,6 +86,7 @@ result-*
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
 # User Provided
+/.claude/settings.local.json
 /.pre-commit-config.yaml
 /result
 /result.*
