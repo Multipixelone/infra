@@ -1,22 +1,20 @@
 {
   lib,
-  config,
   inputs,
   ...
 }:
 {
-  nixpkgs.overlays = [
-    (final: prev: {
-      streamrip = prev.streamrip.overrideAttrs {
-        src = inputs.streamrip;
-        version = inputs.streamrip.rev;
+  flake-file.inputs = {
+    bgutil-ytdlp-pot-provider = {
+      url = "github:Brainicism/bgutil-ytdlp-pot-provider";
+      flake = false;
+    };
 
-        propagatedBuildInputs = prev.streamrip.propagatedBuildInputs ++ [
-          prev.python3Packages.playwright
-        ];
-      };
-    })
-  ];
+    yt-dlp-YTNSigDeno = {
+      url = "github:bashonly/yt-dlp-YTNSigDeno";
+      flake = false;
+    };
+  };
   flake.modules.homeManager.gui =
     hmArgs@{ pkgs, ... }:
     let
@@ -33,14 +31,6 @@
       xdg.configFile = {
         # plugin to connect to docker container
         "yt-dlp/plugins/bgutil-ytdlp-pot-provider".source = inputs.bgutil-ytdlp-pot-provider + "/plugin";
-        # plugin to allow yt-dlp to get pot token
-        # "yt-dlp/plugins/yt-dlp-get-pot".source = pkgs.fetchFromGitHub rec {
-        #   version = "0.3.0";
-        #   owner = "coletdjnz";
-        #   repo = "yt-dlp-get-pot";
-        #   tag = "v${version}";
-        #   hash = "sha256-MtQFXWJByo/gyftMtywCCfpf8JtldA2vQP8dnpLEl7U=";
-        # };
         # plugin to allow yt-dlp to solve with deno
         "yt-dlp/plugins/yt-dlp-deno".source = inputs.yt-dlp-YTNSigDeno;
       };
@@ -55,17 +45,8 @@
           publishPorts = [ "127.0.0.1:4416:4416" ];
         };
       };
-      home.packages = [
-        inputs.khinsider.packages.${pkgs.stdenv.hostPlatform.system}.default
-        pkgs.streamrip
-        # spotdl-wrapped
-      ];
       programs = {
         aria2.enable = true;
-        fish.functions.rs = ''
-          #!/bin/fish
-          ${lib.getExe pkgs.streamrip} search qobuz album "$argv"
-        '';
         yt-dlp = {
           enable = true;
           package = pkgs.yt-dlp.overrideAttrs (prev: {
