@@ -48,11 +48,6 @@
         };
       };
 
-      treefmt-nix = {
-        url = "github:numtide/treefmt-nix";
-        inputs.nixpkgs.follows = "nixpkgs";
-      };
-
       files.url = "github:mightyiam/files";
       nur.url = "github:nix-community/NUR";
       musnix.url = "github:musnix/musnix";
