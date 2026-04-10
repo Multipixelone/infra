@@ -53,7 +53,6 @@
       musnix.url = "github:musnix/musnix";
       catppuccin.url = "github:catppuccin/nix";
       nix-hardware.url = "github:NixOS/nixos-hardware/master";
-      zjstatus.url = "github:dj95/zjstatus";
 
       streamrip = {
         url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
@@ -174,8 +173,6 @@
         url = "github:Multipixelone/euphony/nix-build";
         inputs.nixpkgs.follows = "nixpkgs";
       };
-
-      zjstatus-hints.url = "github:b0o/zjstatus-hints";
 
       uwu-colors = {
         url = "github:q60/uwu_colors";

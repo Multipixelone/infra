@@ -326,7 +326,10 @@
       flake = false;
     };
     zjstatus.url = "github:dj95/zjstatus";
-    zjstatus-hints.url = "github:b0o/zjstatus-hints";
+    zjstatus-hints = {
+      url = "github:b0o/zjstatus-hints";
+      inputs.rust-overlay.follows = "monocle/rust-overlay";
+    };
     zsm.url = "github:Multipixelone/zsm/nix-build";
   };
 }

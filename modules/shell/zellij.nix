@@ -1,6 +1,11 @@
 { inputs, ... }:
 {
   flake-file.inputs = {
+    zjstatus.url = "github:dj95/zjstatus";
+    zjstatus-hints = {
+      url = "github:b0o/zjstatus-hints";
+      inputs.rust-overlay.follows = "monocle/rust-overlay";
+    };
     monocle.url = "github:Multipixelone/monocle/nix-build";
     zsm.url = "github:Multipixelone/zsm/nix-build";
     room.url = "github:Multipixelone/room/reduce-binary-size";
