@@ -19,7 +19,7 @@ NixOS + home-manager infra via flake-parts. Single system: `x86_64-linux`.
 ## Key Files
 
 - `flake.nix` — **auto-generated**, NEVER edit. Regenerate: `nix run .#write-flake` (or `nix run .#generate-files` to regenerate everything)
-- `outputs.nix` — 12-line flake entry point; imports `flake-file`, `allfollow`, `import-tree ./modules`
+- `outputs.nix` — flake entry point; imports `flake-file` and `import-tree ./modules`
 - `modules/flake-file.nix` — core/shared flake inputs
 - `modules/` — all `.nix` files auto-discovered via import-tree. **New files must be `git add`ed.**
 - `pkgs/` — custom packages, referenced via `pkgs.callPackage "${rootPath}/pkgs/..." { }`
@@ -37,7 +37,7 @@ flake-file.inputs.beets-plugins.url = "github:Multipixelone/beets-plugins";
 ```
 
 Binary caches: set `caches` per-module; aggregated into `flake-file.nixConfig` by `modules/nixpkgs/substituters.nix`.
-`allfollow` (in `outputs.nix`) auto-adds `.follows` for common transitive inputs (nixpkgs, flake-parts, etc.).
+Transitive input follows must be declared explicitly on each input in `modules/flake-file.nix` (no auto-pruning — `allfollow`/`nix-auto-follow` both caused lock churn because nix's dedup disagrees with theirs).
 After any `flake-file` change: **`nix run .#write-flake`**. To regenerate all auto-generated files at once (flake.nix + files from `mightyiam/files`), use **`nix run .#generate-files`**.
 
 ## Wrappers (Portable Apps)

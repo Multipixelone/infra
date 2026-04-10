@@ -33,12 +33,6 @@
       flake-file.url = "github:vic/flake-file";
       import-tree.url = lib.mkDefault "github:vic/import-tree";
 
-      allfollow = {
-        url = lib.mkDefault "github:spikespaz/allfollow";
-        inputs.rust-overlay.follows = "monocle/rust-overlay";
-        inputs.nixpkgs.follows = "nixpkgs";
-      };
-
       nixos-wsl = {
         url = "github:nix-community/NixOS-WSL/main";
         inputs = {

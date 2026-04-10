@@ -40,13 +40,6 @@
         systems.follows = "systems";
       };
     };
-    allfollow = {
-      url = "github:spikespaz/allfollow";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "monocle/rust-overlay";
-      };
-    };
     anyrun.url = "github:fufexan/anyrun/launch-prefix";
     anyrun-nixos-options = {
       url = "github:n3oney/anyrun-nixos-options";

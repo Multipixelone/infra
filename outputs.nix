@@ -4,7 +4,6 @@ inputs.flake-parts.lib.mkFlake { inherit inputs; } {
 
   imports = [
     inputs.flake-file.flakeModules.default
-    inputs.flake-file.flakeModules.allfollow
     (inputs.import-tree ./modules)
   ];
 
