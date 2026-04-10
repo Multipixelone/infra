@@ -84,8 +84,6 @@
         };
       };
 
-      nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
-
       apple-emoji = {
         url = "github:samuelngs/apple-emoji-linux/b22ae7f";
         inputs.nixpkgs.follows = "nixpkgs";
