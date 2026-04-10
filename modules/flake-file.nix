@@ -33,29 +33,19 @@
       flake-file.url = "github:vic/flake-file";
       import-tree.url = lib.mkDefault "github:vic/import-tree";
 
-      nixos-wsl = {
-        url = "github:nix-community/NixOS-WSL/main";
-        inputs = {
-          nixpkgs.follows = "nixpkgs";
-          flake-compat.follows = "flake-compat";
-        };
-      };
+      # nixos-wsl = {
+      #   url = "github:nix-community/NixOS-WSL/main";
+      #   inputs = {
+      #     nixpkgs.follows = "nixpkgs";
+      #     flake-compat.follows = "flake-compat";
+      #   };
+      # };
 
       files.url = "github:mightyiam/files";
       nur.url = "github:nix-community/NUR";
       musnix.url = "github:musnix/musnix";
       catppuccin.url = "github:catppuccin/nix";
       nix-hardware.url = "github:NixOS/nixos-hardware/master";
-
-      catppuccin-foot = {
-        url = "github:catppuccin/foot";
-        flake = false;
-      };
-
-      mcp-servers-nix = {
-        url = "github:natsukium/mcp-servers-nix";
-        inputs.nixpkgs.follows = "nixpkgs";
-      };
 
       nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
       apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
@@ -148,14 +138,6 @@
       auto-cpufreq = {
         url = "github:AdnanHodzic/auto-cpufreq";
         inputs.nixpkgs.follows = "nixpkgs";
-      };
-
-      nix-gaming = {
-        url = "github:fufexan/nix-gaming";
-        inputs = {
-          nixpkgs.follows = "nixpkgs";
-          flake-parts.follows = "flake-parts";
-        };
       };
 
       home-manager = {

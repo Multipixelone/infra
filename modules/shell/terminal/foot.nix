@@ -23,6 +23,10 @@ let
     builtins.listToAttrs (map parseKV lines);
 in
 {
+  flake-file.inputs.catppuccin-foot = {
+    url = "github:catppuccin/foot";
+    flake = false;
+  };
   perSystem.wrappers.packages.foot = true;
   flake.wrappers.foot =
     { pkgs, wlib, ... }:

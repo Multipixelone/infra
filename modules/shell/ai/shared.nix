@@ -5,6 +5,12 @@
   ...
 }:
 {
+  config.flake-file.inputs = {
+    mcp-servers-nix = {
+      url = "github:natsukium/mcp-servers-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
   options.flake.aiConfig = lib.mkOption {
     type = lib.types.attrsOf lib.types.anything;
     default = { };

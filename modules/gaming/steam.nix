@@ -1,11 +1,5 @@
 { inputs, ... }:
 {
-  caches = [
-    {
-      url = "https://nix-gaming.cachix.org";
-      key = "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=";
-    }
-  ];
   flake-file.inputs = {
     millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
 
