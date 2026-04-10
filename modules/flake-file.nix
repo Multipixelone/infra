@@ -203,19 +203,6 @@
         };
       };
 
-      monocle.url = "github:Multipixelone/monocle/nix-build";
-
-      zsm.url = "github:Multipixelone/zsm/nix-build";
-
-      room.url = "github:Multipixelone/room/reduce-binary-size";
-
-      millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
-
-      steam-easygrid = {
-        url = "github:luthor112/steam-easygrid";
-        flake = false;
-      };
-
       qtscrob = {
         url = "github:Multipixelone/QtScrobbler/nix-build";
         inputs.nixpkgs.follows = "nixpkgs";
@@ -288,14 +275,6 @@
       spicetify-nix = {
         url = "github:Gerg-L/spicetify-nix";
         inputs.nixpkgs.follows = "nixpkgs";
-      };
-
-      anyrun.url = "github:fufexan/anyrun/launch-prefix";
-
-      anyrun-nixos-options = {
-        url = "github:n3oney/anyrun-nixos-options";
-        inputs.nixpkgs.follows = "nixpkgs";
-        inputs.flake-parts.follows = "flake-parts";
       };
 
       lanzaboote = {

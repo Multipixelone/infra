@@ -1,5 +1,14 @@
 { inputs, lib, ... }:
 {
+  flake-file.inputs = {
+    anyrun.url = "github:fufexan/anyrun/launch-prefix";
+
+    anyrun-nixos-options = {
+      url = "github:n3oney/anyrun-nixos-options";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+    };
+  };
   caches = [
     {
       url = "https://anyrun.cachix.org";

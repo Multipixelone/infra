@@ -6,6 +6,14 @@
       key = "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=";
     }
   ];
+  flake-file.inputs = {
+    millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+
+    steam-easygrid = {
+      url = "github:luthor112/steam-easygrid";
+      flake = false;
+    };
+  };
   nixpkgs = {
     config = {
       allowUnfreePackages = [

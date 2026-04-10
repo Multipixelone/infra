@@ -1,5 +1,10 @@
 { inputs, ... }:
 {
+  flake-file.inputs = {
+    monocle.url = "github:Multipixelone/monocle/nix-build";
+    zsm.url = "github:Multipixelone/zsm/nix-build";
+    room.url = "github:Multipixelone/room/reduce-binary-size";
+  };
   flake.modules.homeManager.base =
     hmArgs@{
       pkgs,
