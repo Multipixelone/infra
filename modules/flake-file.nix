@@ -106,13 +106,6 @@
         flake = false;
       };
 
-      better-fox = {
-        url = "github:yokoffing/Betterfox";
-        flake = false;
-      };
-
-      qmd.url = "github:tobi/qmd";
-
       caveman = {
         url = "github:JuliusBrussee/caveman";
         flake = false;

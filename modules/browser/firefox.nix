@@ -3,6 +3,10 @@
   ...
 }:
 {
+  flake-file.inputs.better-fox = {
+    url = "github:yokoffing/Betterfox";
+    flake = false;
+  };
   nixpkgs = {
     config.allowUnfreePackages = [ "betterttv" ];
     overlays = [
