@@ -101,16 +101,6 @@
         flake = false;
       };
 
-      caveman = {
-        url = "github:JuliusBrussee/caveman";
-        flake = false;
-      };
-
-      claude-code-src = {
-        url = "github:anthropics/claude-code";
-        flake = false;
-      };
-
       secrets = {
         url = "git+ssh://git@github.com/Multipixelone/nix-secrets.git";
         flake = false;

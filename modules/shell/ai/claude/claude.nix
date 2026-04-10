@@ -7,6 +7,16 @@
   ...
 }:
 {
+  flake-file.inputs = {
+    caveman = {
+      url = "github:JuliusBrussee/caveman";
+      flake = false;
+    };
+    claude-code-src = {
+      url = "github:anthropics/claude-code";
+      flake = false;
+    };
+  };
   perSystem =
     { pkgs, ... }:
     {
