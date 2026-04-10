@@ -133,8 +133,6 @@
         inputs.nixpkgs.follows = "nixpkgs";
       };
 
-      beets-plugins.url = "github:Multipixelone/beets-plugins";
-
       waybar-mediaplayer = {
         url = "github:Multipixelone/waybar-mediaplayer/artist";
         inputs.nixpkgs.follows = "nixpkgs";

@@ -6,6 +6,7 @@
   ...
 }:
 {
+  flake-file.inputs.beets-plugins.url = "github:Multipixelone/beets-plugins";
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
     let
