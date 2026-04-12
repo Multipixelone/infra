@@ -32,6 +32,7 @@
     fileSystems = {
       "/boot/efi" = {
         device = "/dev/disk/by-uuid/9433-A195";
+        fsType = "vfat";
       };
       "/swap" = {
         device = "/dev/disk/by-label/Linux";
