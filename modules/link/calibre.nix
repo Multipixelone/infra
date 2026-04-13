@@ -1,4 +1,9 @@
-{ config, inputs, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 {
   flake-file.inputs.calibre-plugins.url = "github:nydragon/calibre-plugins";
   flake.modules.homeManager.gui =
@@ -20,17 +25,27 @@
       '';
     };
 
-  configurations.nixos.link.module = {
-    services.calibre-web = {
-      enable = true;
-      user = config.flake.meta.owner.username;
-      group = "users";
-      listen.ip = "0.0.0.0";
-      openFirewall = true;
-      options = {
-        calibreLibrary = "/home/${config.flake.meta.owner.username}/Calibre Library";
-        enableBookUploading = true;
+  configurations.nixos.link.module =
+    let
+      username = config.flake.meta.owner.username;
+      libraryLink = "/home/${username}/calibre-library";
+    in
+    {
+      # Symlink avoids spaces-in-path issues with systemd ReadWritePaths
+      systemd.tmpfiles.rules = [
+        "L+ ${libraryLink} - - - - /home/${username}/Calibre Library"
+      ];
+      services.calibre-web = {
+        enable = true;
+        user = username;
+        group = "users";
+        listen.ip = "0.0.0.0";
+        openFirewall = true;
+        options = {
+          calibreLibrary = libraryLink;
+          enableBookUploading = true;
+        };
       };
+      systemd.services.calibre-web.serviceConfig.ProtectHome = lib.mkForce "read-only";
     };
-  };
 }
