@@ -19,7 +19,7 @@ _: {
           };
         };
         home.packages = [
-          (pkgs.writeFishBin "win" ''
+          (pkgs.writers.writeFishBin "win" ''
             set VM_NAME "win11"
             set STATE (virsh --connect qemu:///system domstate $VM_NAME 2>/dev/null)
             if string match -q "running*" $STATE

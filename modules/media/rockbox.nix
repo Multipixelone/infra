@@ -11,7 +11,7 @@
         let
           hr = "${lib.getExe pkgs.hr} ━";
         in
-        pkgs.writeFishBin "rb-albumart" ''
+        pkgs.writers.writeFishBin "rb-albumart" ''
           function rockbox_art_converter
               set -l art_size "250x250"
 

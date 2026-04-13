@@ -18,7 +18,7 @@
           # i don't know why I have to build this with nixpkgs-stable, but I will neex to fix it eventually
           musepack = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.musepack);
         in
-        pkgs.writeFishBin "convert-mpc" ''
+        pkgs.writers.writeFishBin "convert-mpc" ''
           # Check for correct number of arguments
           if test (count $argv) -ne 2
               echo "Usage: convert-mpc <input_file> <output_file.mpc>" >&2
