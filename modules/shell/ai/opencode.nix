@@ -16,9 +16,9 @@
         programs.opencode = {
           enable = true;
           enableMcpIntegration = true;
+          inherit (aiConfig) context;
           agents = aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
-          rules = aiConfig.rulesText;
           settings = {
             model = "anthropic/claude-sonnet-4-5";
             autoupdate = false;

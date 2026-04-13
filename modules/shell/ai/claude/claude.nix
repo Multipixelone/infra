@@ -47,8 +47,8 @@
         pkgs.fastmod
       ];
       programs.claude-code = {
-        inherit (aiConfig) skillsDir agentsDir;
-        memory.text = aiConfig.rulesText;
+        inherit (aiConfig) agentsDir context;
+        skills = aiConfig.skillsDir;
         enableMcpIntegration = true;
         plugins = [
           # "${ralph-wiggum-plugin}"
