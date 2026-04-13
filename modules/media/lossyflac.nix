@@ -10,8 +10,7 @@
     {
       packages = {
         lossywav = pkgs.callPackage "${rootPath}/pkgs/lossywav" { };
-        beets-lossyflac = pkgs.writeScriptBin "beets-lossyflac" ''
-          #!${lib.getExe pkgs.fish}
+        beets-lossyflac = pkgs.writeFishBin "beets-lossyflac" ''
           set query $argv[1]
 
           beet modify -awm $query format=lossyFLAC
@@ -25,9 +24,7 @@
             ffmpeg = lib.getExe pkgs.ffmpeg-full;
             lossywav = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.lossywav);
           in
-          pkgs.writeScriptBin "convert-lossyflac" ''
-            #!${lib.getExe pkgs.fish}
-
+          pkgs.writeFishBin "convert-lossyflac" ''
             set input_file $argv[1]
             set output_file $argv[2]
 

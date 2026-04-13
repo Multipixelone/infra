@@ -50,10 +50,7 @@
         "--checkers"
         "2"
       ];
-      ipod-sync = pkgs.writeScriptBin "ipod-sync" ''
-        #!${lib.getExe pkgs.fish}
-        #!/usr/bin/env fish
-
+      ipod-sync = pkgs.writeFishBin "ipod-sync" ''
         set -l rclone_args ${lib.concatStringsSep " " rclone-base-opts}
 
         if test -d "$IPOD_DIR"

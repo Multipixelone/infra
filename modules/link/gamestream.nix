@@ -69,9 +69,7 @@
         "3000"
       ];
       # exec ${config.security.wrappers.gamescope.program} $final_args -- $argv
-      gamescope-run = pkgs.writeScriptBin "gamescope-run" ''
-        #!${lib.getExe pkgs.fish}
-
+      gamescope-run = pkgs.writeFishBin "gamescope-run" ''
         # Session Environment
         ${gamescope-env}
 

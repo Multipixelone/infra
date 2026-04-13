@@ -1,7 +1,7 @@
 _: {
   flake.modules = {
     homeManager.laptop =
-      { pkgs, lib, ... }:
+      { pkgs, ... }:
       {
         programs.looking-glass-client = {
           enable = true;
@@ -19,9 +19,7 @@ _: {
           };
         };
         home.packages = [
-          (pkgs.writeScriptBin "win" ''
-            #!${lib.getExe pkgs.fish}
-            #!/usr/bin/env fish
+          (pkgs.writeFishBin "win" ''
             set VM_NAME "win11"
             set STATE (virsh --connect qemu:///system domstate $VM_NAME 2>/dev/null)
             if string match -q "running*" $STATE
