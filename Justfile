@@ -5,10 +5,10 @@
 ############################################################################
 
 rebuild:
-  nh os switch
+  genswitch
 
 deploy:
-  nh os switch
+  genswitch
   attic push system /run/current-system -j 2
 
 colmena-apply:
@@ -35,7 +35,7 @@ iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
 
 debug:
-	nh os switch -v -- --show-trace
+	genswitch -v -- --show-trace
 
 [parallel]
 update: update-flake update-addons
