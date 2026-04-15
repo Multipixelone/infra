@@ -14,7 +14,6 @@
         group = "snapserver";
       };
       networking.firewall.enable = false;
-      security.rtkit.enable = true;
       # user to run snapserver as
       users.users.snapserver = {
         group = "snapserver";
@@ -23,9 +22,6 @@
       users.groups.snapserver = { };
       services = {
         pipewire = {
-          enable = true;
-          alsa.enable = true;
-          alsa.support32Bit = true;
           socketActivation = false;
           pulse.enable = true;
         };
@@ -50,7 +46,7 @@
             };
             stream = {
               source = [
-                "airplay://${pkgs.shairport-sync}/bin/shairport-sync?name=Airplay&devicename=Speakers"
+                "airplay://${pkgs.shairport-sync-airplay2}/bin/shairport-sync?name=Airplay&devicename=Speakers"
                 # "pipe://${rain-pipe}?name=Rain"
                 "librespot://${lib.getExe pkgs.librespot}?name=Spotify&devicename=Speakers"
                 "meta:///Airplay/Spotify?name=Combined"
@@ -73,35 +69,6 @@
           #     };
           #   };
         };
-      };
-      networking.firewall = {
-        allowedUDPPorts = [
-          319
-          320
-          5353
-        ];
-        allowedUDPPortRanges = [
-          {
-            from = 32768;
-            to = 60999;
-          }
-          {
-            from = 6000;
-            to = 6009;
-          }
-        ];
-        allowedTCPPorts = [
-          3689
-          5000
-          5353
-          7000
-        ];
-        allowedTCPPortRanges = [
-          {
-            from = 32768;
-            to = 60999;
-          }
-        ];
       };
       systemd = {
         # tmpfiles.rules = [
@@ -133,16 +100,16 @@
             User = "snapserver";
             Group = "snapserver";
           };
-          # nqptp = {
-          #   description = "Network Precision Time Protocol for Shairport Sync";
-          #   wantedBy = [ "multi-user.target" ];
-          #   after = [ "network.target" ];
-          #   serviceConfig = {
-          #     ExecStart = "${pkgs.nqptp}/bin/nqptp";
-          #     Restart = "always";
-          #     RestartSec = "5s";
-          #   };
-          # };
+          nqptp = {
+            description = "Network Precision Time Protocol for Shairport Sync";
+            wantedBy = [ "multi-user.target" ];
+            after = [ "network.target" ];
+            serviceConfig = {
+              ExecStart = "${pkgs.nqptp}/bin/nqptp";
+              Restart = "always";
+              RestartSec = "5s";
+            };
+          };
           # ambience-rain =
           #   let
           #     rain-sound = pkgs.fetchurl {
