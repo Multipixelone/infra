@@ -409,6 +409,7 @@
               "*.nfo"
               "*.xml"
               "*.docx"
+              "*.euphony"
             ];
             # use fraction slash instead of underscore for path separators in metadata
             path_sep_replace = "⁄"; # U+2044 FRACTION SLASH
