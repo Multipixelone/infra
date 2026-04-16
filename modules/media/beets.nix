@@ -410,12 +410,19 @@
               "*.xml"
               "*.docx"
             ];
-            # get rid of reserved characters instead of replacing with underscore
+            # replace reserved characters with unicode lookalikes
             replace = {
-              "[\\\\/]" = "";
+              "/" = "⁄"; # U+2044 FRACTION SLASH
+              "\\\\" = "＼"; # U+FF3C FULLWIDTH REVERSE SOLIDUS
               "^\\." = "";
               "[\\x00-\\x1f]" = "";
-              "[<>:\"\\?\\*\\|]" = "";
+              "<" = "＜"; # U+FF1C FULLWIDTH LESS-THAN SIGN
+              ">" = "＞"; # U+FF1E FULLWIDTH GREATER-THAN SIGN
+              ":" = "꞉"; # U+A789 MODIFIER LETTER COLON
+              "\"" = "″"; # U+2033 DOUBLE PRIME
+              "\\?" = "？"; # U+FF1F FULLWIDTH QUESTION MARK
+              "\\*" = "＊"; # U+FF0A FULLWIDTH ASTERISK
+              "\\|" = "│"; # U+2502 BOX DRAWINGS LIGHT VERTICAL
               "\\.$" = "";
               "\\s+$" = "";
               "^\\s+" = "";
