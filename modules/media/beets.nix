@@ -410,9 +410,11 @@
               "*.xml"
               "*.docx"
             ];
+            # use fraction slash instead of underscore for path separators in metadata
+            path_sep_replace = "⁄"; # U+2044 FRACTION SLASH
             # replace reserved characters with unicode lookalikes
             replace = {
-              "/" = "⁄"; # U+2044 FRACTION SLASH
+              # backslash (path sep on Windows, handled separately from path_sep_replace)
               "\\\\" = "＼"; # U+FF3C FULLWIDTH REVERSE SOLIDUS
               "^\\." = "";
               "[\\x00-\\x1f]" = "";
