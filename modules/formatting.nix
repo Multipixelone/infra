@@ -7,34 +7,41 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  perSystem = {
-    treefmt = {
-      projectRootFile = "flake.nix";
-      enableDefaultExcludes = true;
-      programs = {
-        prettier.enable = true;
-        shellcheck.enable = true;
-        shfmt.enable = true;
-      };
-      settings = {
-        on-unmatched = "fatal";
-        global.excludes = [
-          "*.jpg"
-          "*.png"
-          "Justfile"
-          "LICENSE"
-          "*.fish"
-          "**/.gitkeep"
-          "**/*.key"
-          "**/*.crt"
-          "**/*.gitmodules"
-          "**/.direnv"
-          "**/node_modules/*"
-          "**/*.code-workspace"
-          "pkgs/firefox-addons/generated.nix"
+  perSystem =
+    { config, ... }:
+    {
+      make-shells.default = {
+        inputsFrom = [
+          config.treefmt.build.devShell
         ];
       };
+      treefmt = {
+        inherit (config.flake-root) projectRootFile;
+        enableDefaultExcludes = true;
+        programs = {
+          prettier.enable = true;
+          shellcheck.enable = true;
+          shfmt.enable = true;
+        };
+        settings = {
+          on-unmatched = "fatal";
+          global.excludes = [
+            "*.jpg"
+            "*.png"
+            "Justfile"
+            "LICENSE"
+            "*.fish"
+            "**/.gitkeep"
+            "**/*.key"
+            "**/*.crt"
+            "**/*.gitmodules"
+            "**/.direnv"
+            "**/node_modules/*"
+            "**/*.code-workspace"
+            "pkgs/firefox-addons/generated.nix"
+          ];
+        };
+      };
+      pre-commit.settings.hooks.treefmt.enable = true;
     };
-    pre-commit.settings.hooks.treefmt.enable = true;
-  };
 }
