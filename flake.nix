@@ -111,6 +111,7 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
+    flake-root.url = "github:srid/flake-root";
     flake-utils = {
       url = "github:numtide/flake-utils";
       inputs.systems.follows = "systems";

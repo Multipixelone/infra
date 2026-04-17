@@ -344,21 +344,39 @@
     "beets-plugins": {
       "inputs": {
         "beets-plexsync": "beets-plexsync",
+        "beets-src": "beets-src",
         "beets-stylize": "beets-stylize",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1775775708,
-        "narHash": "sha256-35gAWmSZaOkp78bwtjV5wDsR7ChZuwXsiftucQkPhIQ=",
+        "lastModified": 1776394412,
+        "narHash": "sha256-tjxExlvdZtseF0DbWC3+V7WjTY54kA2K6ekpciKleHA=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "e1633e20ffecd62c8ba395ad68a95f6aa73d53d3",
+        "rev": "5a1fa0cf282f930ec34ef3bf022a446221c06894",
         "type": "github"
       },
       "original": {
         "owner": "Multipixelone",
         "repo": "beets-plugins",
+        "type": "github"
+      }
+    },
+    "beets-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1776389376,
+        "narHash": "sha256-W7ox6dbrzBTiYY/aO1ftGAThXOs5lEA2AoITeiDjLTo=",
+        "owner": "Multipixelone",
+        "repo": "beets",
+        "rev": "ac8f5465377423c27a96ed796c7c099a90d7e993",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Multipixelone",
+        "ref": "prune-dirs",
+        "repo": "beets",
         "type": "github"
       }
     },
@@ -1029,6 +1047,21 @@
       "original": {
         "owner": "hercules-ci",
         "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "flake-root": {
+      "locked": {
+        "lastModified": 1723604017,
+        "narHash": "sha256-rBtQ8gg+Dn4Sx/s+pvjdq3CB2wQNzx9XGFq/JVGCB6k=",
+        "owner": "srid",
+        "repo": "flake-root",
+        "rev": "b759a56851e10cb13f6b8e5698af7b59c44be26e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "srid",
+        "repo": "flake-root",
         "type": "github"
       }
     },
@@ -3018,11 +3051,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1775423009,
-        "narHash": "sha256-vPKLpjhIVWdDrfiUM8atW6YkIggCEKdSAlJPzzhkQlw=",
+        "lastModified": 1776169885,
+        "narHash": "sha256-l/iNYDZ4bGOAFQY2q8y5OAfBBtrDAaPuRQqWaFHVRXM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "68d8aa3d661f0e6bd5862291b5bb263b2a6595c9",
+        "rev": "4bd9165a9165d7b5e33ae57f3eecbcb28fb231c9",
         "type": "github"
       },
       "original": {
@@ -3494,6 +3527,7 @@
         "flake-compat": "flake-compat_2",
         "flake-file": "flake-file",
         "flake-parts": "flake-parts_2",
+        "flake-root": "flake-root",
         "flake-utils": "flake-utils_3",
         "git-hooks": "git-hooks",
         "github-gitignore": "github-gitignore",
