@@ -20,8 +20,17 @@
           agents = aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
           settings = {
-            model = "anthropic/claude-sonnet-4-5";
+            plugin = [ "@ex-machina/opencode-anthropic-auth" ];
+            model = "github-copilot/gpt-5.3-codex";
+            agent.plan.model = "anthropic/claude-opus-4-7";
+            agent.plan.thinking = "high";
             autoupdate = false;
+            agent.build.permission.task = {
+              "*" = "allow";
+            };
+            agent.plan.permission.task = {
+              "*" = "allow";
+            };
           };
         };
       };
