@@ -745,12 +745,12 @@
             album_fields = {
               disambig = ''
                 o = []
-                if year > original_year and str(year) not in (albumdisambig or ""):
-                  o.append(f"RE-{year}")
                 if albumdisambig:
                   o.append(albumdisambig)
+                if year > original_year and str(year) not in (albumdisambig or ""):
+                  o.append(f"RE-{year}")
 
-                return ", ".join(o)
+                return " ".join(o)
               '';
               # use custom_artist field if defined, otherwise fall back to first artist in albumartists_sort
               first_artist = ''
