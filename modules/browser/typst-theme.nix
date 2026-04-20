@@ -55,11 +55,11 @@
               .tsel span::selection, .tsel::selection { background-color: #cba6f760 !important; }
 
               /* 7. Hover highlight color */
-              .hover .typst-text, .typst-text:hover { 
-                --glyph_fill: #fab387 !important; 
-                --glyph_stroke: #fab387 !important; 
+              .hover .typst-text, .typst-text:hover {
+                --glyph_fill: #fab387 !important;
+                --glyph_stroke: #fab387 !important;
                 /* Pre-invert the hover color so the parent filter transforms it into Peach! */
-                filter: invert(1) hue-rotate(180deg) !important; 
+                filter: invert(1) hue-rotate(180deg) !important;
               }
 
               /* 8. Hide Scrollbar */
