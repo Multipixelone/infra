@@ -93,8 +93,10 @@
           settings = {
             plugin = [
               "@ex-machina/opencode-anthropic-auth"
+              "@simonwjackson/opencode-direnv"
               "oh-my-opencode-slim"
               "true-mem"
+              "openrtk"
             ];
             model = "github-copilot/gpt-5.3-codex";
             autoupdate = false;
