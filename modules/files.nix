@@ -51,8 +51,7 @@
           using [the _files_ flake-parts module](https://github.com/mightyiam/files):
         ''
       ]
-      |> lib.concatLines
-      |> (s: s + "\n");
+      |> lib.concatLines;
 
     perSystem =
       {

@@ -1,7 +1,4 @@
 # infra ❄️
-
-One dotfile to rule them all. `dotfiles` on steroids, this repository contains my NixOS and Home Manager-based IaC for my personal devices and home servers.
-
 <p align="center">
   <a href="https://builtwithnix.org"><img src="https://img.shields.io/static/v1?logo=nixos&logoColor=white&label=&message=Built%20with%20Nix&color=41439a" alt="built with nix"></a>
   <a href="https://github.com/mightyiam/dendritic"> <img src="https://img.shields.io/badge/Dendritic--Pattern-Nix-informational?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAA5CAYAAAB0+HhyAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAbpJREFUaN7tWcGuwyAMW6L9/y/nXTZpr4PiJA6sqJwmrZQYjOOk8igcZmbv3yIilWvpY9L4BHVpINXjBnIDKRrP1arEUjZlgIiokr0GS9mo1GoFN0uKJUMBdkCt96J00wyt5DUYALLv0ch96O3kCgD0O+INqvdslK5ypApLJnsBjea25o1Ai4gIOvH4XARMdAOO81rPaEWOYCiXB8RpZkfoNtPuDwUnsusoOBa1kFg0ojozqYaqpLJywioAp5cdOZ2KU8kkXmEEiiY3RhLsvYObXQdSiUppZC312HAm3bL+7WuToi9F5rROpGotyfgi5qXP+jeJJi4mIM96PS8mTEsSzcrZ4s5V6s7KB+mafYsT2eaObKtal80jmeDOAjmjLHutbbzW3u63zNglTae7HkF2aGY7CFlbq0DM7rQoWov8WvPhGK9mi6mK5oKnf/CO/flr9Bm5jNb/ZmaK7soqkKhg6L/sCDbpop/XmL7sK+6M48wIAfMTRrdBN6MeiTar3Q06zy5lKTMyk8ipbPNVt6SsHXVnKvKWsncUokGBfCuD15HgWqAzAEsTG6OpsYRaK8cN5AZyRSAzXfIf7j4IjUJ5XtMAAAAASUVORK5CYII=&logoColor=white" alt="Dendritic Pattern"/></a>
@@ -13,16 +10,18 @@ One dotfile to rule them all. `dotfiles` on steroids, this repository contains m
   <a href="https://github.com/Multipixelone/infra/actions/workflows/ci.yml"><img src="https://github.com/Multipixelone/infra/actions/workflows/check.yaml/badge.svg" alt="CI"></a>
 </p>
 
+One dotfile to rule them all. `dotfiles` on steroids, this repository contains my NixOS and Home Manager-based IaC for my personal devices and home servers.
+
 ## Hosts
 
-| Hostname | Description                          | Manufacturer | Model       | Role    | Desktop/window manager | Notes                 |
-| -------- | ------------------------------------ | ------------ | ----------- | ------- | ---------------------- | --------------------- |
-| `link`   | My desktop                           | Custom       | Gaming PC   | Desktop | Hyprland               | -                     |
-| `zelda`  | My personal laptop                   | Razer        | Razer Blade | Laptop  | Hyprland               | -                     |
-| `iot`    | Old Dell laptop running IoT services | Dell         | Laptop      | Server  | None                   | IoT services          |
-| `marin`  | Mac Mini as Airport Express          | Apple        | Mac Mini    | Server  | None                   | Audio + home services |
-| `iphone` | Personal phone                       | Apple        | iPhone      | Mobile  | -                      | -                     |
-| `ipad`   | Personal tablet                      | Apple        | iPad        | Tablet  | -                      | -                     |
+| Hostname | Description | Manufacturer | Model | Role | Desktop/window manager | Notes |
+|----------|-------------|--------------|-------|------|------------------------|-------|
+| `link` | My desktop | Custom | Gaming PC | Desktop | Hyprland | - |
+| `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
+| `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
+| `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
+| `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |
+| `ipad` | Personal tablet | Apple | iPad | Tablet | - | - |
 
 ## Dendritic
 

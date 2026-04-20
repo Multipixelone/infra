@@ -14,9 +14,6 @@
         # markdown
         ''
           # ${config.flake.meta.repo.name} ❄️
-
-          One dotfile to rule them all. `dotfiles` on steroids, this repository contains my NixOS and Home Manager-based IaC for my personal devices and home servers.
-
         '';
 
       parts.badges =
@@ -32,6 +29,8 @@
             <a href="https://github.com/Multipixelone/infra/blob/master/LICENSE"><img src="https://img.shields.io/github/license/Multipixelone/infra?color=a6e3a1" alt="License"></a>
             <a href="https://github.com/Multipixelone/infra/actions/workflows/ci.yml"><img src="https://github.com/Multipixelone/infra/actions/workflows/check.yaml/badge.svg" alt="CI"></a>
           </p>
+
+          One dotfile to rule them all. `dotfiles` on steroids, this repository contains my NixOS and Home Manager-based IaC for my personal devices and home servers.
 
         '';
 
@@ -100,7 +99,7 @@
         files.files = [
           {
             path_ = "README.md";
-            drv = pkgs.writeText "README.md" config.text.readme;
+            drv = pkgs.writeText "README.md" (lib.removeSuffix "\n" config.text.readme + "\n");
           }
         ];
 
