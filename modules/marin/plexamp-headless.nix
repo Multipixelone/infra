@@ -42,6 +42,9 @@
       users.users.plexamp-headless = {
         isSystemUser = true;
         group = "plexamp-headless";
+        # Needs audio group to open /dev/snd/* (ALSA output); without it
+        # Plexamp accepts the session but playback hangs / the client bounces.
+        extraGroups = [ "audio" ];
         home = stateDir;
       };
       users.groups.plexamp-headless = { };
