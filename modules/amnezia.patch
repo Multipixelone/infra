@@ -30,7 +30,7 @@ diff -ruN amneziawg-1.0.0-orig/cookie.c amneziawg-1.0.0/cookie.c
  {
 -	struct blake2s_state blake;
 +	struct blake2s_ctx blake;
- 
+
  	blake2s_init(&blake, NOISE_SYMMETRIC_KEY_LEN);
  	blake2s_update(&blake, label, COOKIE_KEY_LABEL_LEN);
 @@ -77,7 +77,7 @@
@@ -40,7 +40,7 @@ diff -ruN amneziawg-1.0.0-orig/cookie.c amneziawg-1.0.0/cookie.c
 -	blake2s(mac1, message, key, COOKIE_LEN, len, NOISE_SYMMETRIC_KEY_LEN);
 +	blake2s(key, NOISE_SYMMETRIC_KEY_LEN, message, len, mac1, COOKIE_LEN);
  }
- 
+
  static void compute_mac2(u8 mac2[COOKIE_LEN], const void *message, size_t len,
 @@ -85,13 +85,13 @@
  {
@@ -49,13 +49,13 @@ diff -ruN amneziawg-1.0.0-orig/cookie.c amneziawg-1.0.0/cookie.c
 -	blake2s(mac2, message, cookie, COOKIE_LEN, len, COOKIE_LEN);
 +	blake2s(cookie, COOKIE_LEN, message, len, mac2, COOKIE_LEN);
  }
- 
+
  static void make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
  			struct cookie_checker *checker)
  {
 -	struct blake2s_state state;
 +	struct blake2s_ctx state;
- 
+
  	if (wg_birthdate_has_expired(checker->secret_birthdate,
  				     COOKIE_SECRET_MAX_AGE)) {
 diff -ruN amneziawg-1.0.0-orig/crypto/include/zinc/blake2s.h amneziawg-1.0.0/crypto/include/zinc/blake2s.h
@@ -64,7 +64,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/include/zinc/blake2s.h amneziawg-1.0.0/cry
 @@ -16,7 +16,7 @@
  	BLAKE2S_KEY_SIZE = 32
  };
- 
+
 -struct blake2s_state {
 +struct blake2s_ctx {
  	u32 h[8];
@@ -73,7 +73,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/include/zinc/blake2s.h amneziawg-1.0.0/cry
 @@ -25,17 +25,17 @@
  	unsigned int outlen;
  };
- 
+
 -void blake2s_init(struct blake2s_state *state, const size_t outlen);
 -void blake2s_init_key(struct blake2s_state *state, const size_t outlen,
 +void blake2s_init(struct blake2s_ctx *state, const size_t outlen);
@@ -83,7 +83,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/include/zinc/blake2s.h amneziawg-1.0.0/cry
 -void blake2s_final(struct blake2s_state *state, u8 *out);
 +void blake2s_update(struct blake2s_ctx *state, const u8 *in, size_t inlen);
 +void blake2s_final(struct blake2s_ctx *state, u8 *out);
- 
+
 -static inline void blake2s(u8 *out, const u8 *in, const u8 *key,
 -			   const size_t outlen, const size_t inlen,
 -			   const size_t keylen)
@@ -93,7 +93,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/include/zinc/blake2s.h amneziawg-1.0.0/cry
  {
 -	struct blake2s_state state;
 +	struct blake2s_ctx state;
- 
+
  	WARN_ON(IS_ENABLED(DEBUG) && ((!in && inlen > 0) || !out || !outlen ||
  		outlen > BLAKE2S_HASH_SIZE || keylen > BLAKE2S_KEY_SIZE ||
 diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/crypto/zinc/blake2s/blake2s.c
@@ -102,13 +102,13 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
 @@ -37,19 +37,19 @@
  	{ 10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0 },
  };
- 
+
 -static inline void blake2s_set_lastblock(struct blake2s_state *state)
 +static inline void blake2s_set_lastblock(struct blake2s_ctx *state)
  {
  	state->f[0] = -1;
  }
- 
+
 -static inline void blake2s_increment_counter(struct blake2s_state *state,
 +static inline void blake2s_increment_counter(struct blake2s_ctx *state,
  					     const u32 inc)
@@ -116,7 +116,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
  	state->t[0] += inc;
  	state->t[1] += (state->t[0] < inc);
  }
- 
+
 -static inline void blake2s_init_param(struct blake2s_state *state,
 +static inline void blake2s_init_param(struct blake2s_ctx *state,
  				      const u32 param)
@@ -125,7 +125,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
 @@ -60,14 +60,14 @@
  	state->h[0] ^= param;
  }
- 
+
 -void blake2s_init(struct blake2s_state *state, const size_t outlen)
 +void blake2s_init(struct blake2s_ctx *state, const size_t outlen)
  {
@@ -133,7 +133,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
  	blake2s_init_param(state, 0x01010000 | outlen);
  	state->outlen = outlen;
  }
- 
+
 -void blake2s_init_key(struct blake2s_state *state, const size_t outlen,
 +void blake2s_init_key(struct blake2s_ctx *state, const size_t outlen,
  		      const void *key, const size_t keylen)
@@ -151,7 +151,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
 @@ -96,7 +96,7 @@
  }
  #endif
- 
+
 -static inline void blake2s_compress(struct blake2s_state *state,
 +static inline void blake2s_compress(struct blake2s_ctx *state,
  				    const u8 *block, size_t nblocks,
@@ -160,16 +160,16 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s.c amneziawg-1.0.0/cry
 @@ -167,7 +167,7 @@
  	}
  }
- 
+
 -void blake2s_update(struct blake2s_state *state, const u8 *in, size_t inlen)
 +void blake2s_update(struct blake2s_ctx *state, const u8 *in, size_t inlen)
  {
  	const size_t fill = BLAKE2S_BLOCK_SIZE - state->buflen;
- 
+
 @@ -191,7 +191,7 @@
  	state->buflen += inlen;
  }
- 
+
 -void blake2s_final(struct blake2s_state *state, u8 *out)
 +void blake2s_final(struct blake2s_ctx *state, u8 *out)
  {
@@ -190,7 +190,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s-x86_64-glue.c amnezia
 @@ -8,10 +8,10 @@
  #include <asm/processor.h>
  #include <asm/fpu/api.h>
- 
+
 -asmlinkage void blake2s_compress_ssse3(struct blake2s_state *state,
 +asmlinkage void blake2s_compress_ssse3(struct blake2s_ctx *state,
  				       const u8 *block, const size_t nblocks,
@@ -199,11 +199,11 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/blake2s/blake2s-x86_64-glue.c amnezia
 +asmlinkage void blake2s_compress_avx512(struct blake2s_ctx *state,
  					const u8 *block, const size_t nblocks,
  					const u32 inc);
- 
+
 @@ -34,7 +34,7 @@
  #endif
  }
- 
+
 -static inline bool blake2s_compress_arch(struct blake2s_state *state,
 +static inline bool blake2s_compress_arch(struct blake2s_ctx *state,
  					 const u8 *block, size_t nblocks,
@@ -214,7 +214,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/selftest/blake2s.c amneziawg-1.0.0/cr
 +++ amneziawg-1.0.0/crypto/zinc/selftest/blake2s.c	2026-02-10 14:01:42.303009905 +0300
 @@ -2072,7 +2072,7 @@
  		buf[i] = (u8)i;
- 
+
  	for (i = 0; i < ARRAY_SIZE(blake2s_keyed_testvecs); ++i) {
 -		blake2s(hash, buf, key, BLAKE2S_HASH_SIZE, i, BLAKE2S_KEY_SIZE);
 +		blake2s(key, BLAKE2S_KEY_SIZE, buf, i, hash, BLAKE2S_HASH_SIZE);
@@ -223,7 +223,7 @@ diff -ruN amneziawg-1.0.0-orig/crypto/zinc/selftest/blake2s.c amneziawg-1.0.0/cr
  			success = false;
 @@ -2080,7 +2080,7 @@
  	}
- 
+
  	for (i = 0; i < ARRAY_SIZE(blake2s_testvecs); ++i) {
 -		blake2s(hash, buf, NULL, BLAKE2S_HASH_SIZE, i, 0);
 +		blake2s(NULL, 0, buf, i, hash, BLAKE2S_HASH_SIZE);
@@ -234,12 +234,12 @@ diff -ruN amneziawg-1.0.0-orig/noise.c amneziawg-1.0.0/noise.c
 --- amneziawg-1.0.0-orig/noise.c	2026-02-10 13:16:00.000000000 +0300
 +++ amneziawg-1.0.0/noise.c	2026-02-10 13:50:34.604973420 +0300
 @@ -36,10 +36,10 @@
- 
+
  void __init wg_noise_init(void)
  {
 -	struct blake2s_state blake;
 +	struct blake2s_ctx blake;
- 
+
 -	blake2s(handshake_init_chaining_key, handshake_name, NULL,
 -		NOISE_HASH_LEN, sizeof(handshake_name), 0);
 +	blake2s(NULL, 0,handshake_name, sizeof(handshake_name),
@@ -248,7 +248,7 @@ diff -ruN amneziawg-1.0.0-orig/noise.c amneziawg-1.0.0/noise.c
  	blake2s_update(&blake, handshake_init_chaining_key, NOISE_HASH_LEN);
  	blake2s_update(&blake, identifier_name, sizeof(identifier_name));
 @@ -307,7 +307,7 @@
- 
+
  static void hmac(u8 *out, const u8 *in, const u8 *key, const size_t inlen, const size_t keylen)
  {
 -	struct blake2s_state state;
@@ -257,12 +257,11 @@ diff -ruN amneziawg-1.0.0-orig/noise.c amneziawg-1.0.0/noise.c
  	u8 i_hash[BLAKE2S_HASH_SIZE] __aligned(__alignof__(u32));
  	int i;
 @@ -434,7 +434,7 @@
- 
+
  static void mix_hash(u8 hash[NOISE_HASH_LEN], const u8 *src, size_t src_len)
  {
 -	struct blake2s_state blake;
 +	struct blake2s_ctx blake;
- 
+
  	blake2s_init(&blake, NOISE_HASH_LEN);
  	blake2s_update(&blake, hash, NOISE_HASH_LEN);
-

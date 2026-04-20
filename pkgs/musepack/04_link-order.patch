@@ -33,7 +33,7 @@
 @@ -22,8 +22,9 @@ mpcenc_SOURCES = keyboard.c mpcenc.c pip
  	$(common_sources) \
  	mpcenc.h predict.h config.h
- 
+
 -mpcenc_LDADD = -lm \
 +mpcenc_LDADD = \
  	$(EXTRALIBS) \
@@ -41,4 +41,3 @@
 -	$(top_builddir)/libmpcenc/libmpcenc.a
 +	$(top_builddir)/libmpcenc/libmpcenc.a \
 +	-lm
- 

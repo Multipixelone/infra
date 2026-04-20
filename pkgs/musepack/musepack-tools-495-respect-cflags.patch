@@ -141,9 +141,9 @@ Subject: [PATCH] Respect environment CFLAGS
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -20,10 +20,6 @@ endif()
- 
+
  add_definitions(-DFAST_MATH -DCVD_FASTLOG)
- 
+
 -if(NOT MSVC)
 -  set(CMAKE_C_FLAGS "-O3 -Wall -fomit-frame-pointer -pipe")
 -endif(NOT MSVC)
@@ -151,7 +151,7 @@ Subject: [PATCH] Respect environment CFLAGS
  add_subdirectory(libmpcdec)
  add_subdirectory(libmpcpsy)
  add_subdirectory(libmpcenc)
--- 
+--
 2.43.2
 
 </code></pre></td></tr></table>

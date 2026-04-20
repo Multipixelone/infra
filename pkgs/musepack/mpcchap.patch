@@ -3,9 +3,9 @@ index 9a5bb6a..a92325b 100644
 --- a/common/fastmath.c
 +++ b/common/fastmath.c
 @@ -20,10 +20,10 @@
- 
+
  #ifdef FAST_MATH
- 
+
 -const float  tabatan2   [ 2*TABSTEP+1] [2];
 -const float  tabcos     [26*TABSTEP+1] [2];
 -const float  tabsqrt_ex [256];
@@ -14,8 +14,8 @@ index 9a5bb6a..a92325b 100644
 +float  tabcos     [26*TABSTEP+1] [2];
 +float  tabsqrt_ex [256];
 +float  tabsqrt_m  [   TABSTEP+1] [2];
- 
- 
+
+
  void   Init_FastMath ( void )
 diff --git a/configure.in b/configure.in
 index cda7d7f..c04307d 100644
@@ -23,7 +23,7 @@ index cda7d7f..c04307d 100644
 +++ b/configure.in
 @@ -27,6 +27,12 @@ esac
  AC_SUBST([EXTRALIBS])
- 
+
  AC_ARG_ENABLE([mpcchap], [AS_HELP_STRING([--enable-mpcchap], [enable building mpcchap])])
 +if test "x$enable_mpcchap" = xyes; then
 +  PKG_CHECK_MODULES(LIBCUE, libcue)
@@ -32,15 +32,15 @@ index cda7d7f..c04307d 100644
 +fi
 +
  AM_CONDITIONAL([MPC_CHAP], [test "x$enable_mpcchap" = xyes])
- 
- 
+
+
 diff --git a/include/mpc/mpcmath.h b/include/mpc/mpcmath.h
 index 9372d4b..e2588ad 100644
 --- a/include/mpc/mpcmath.h
 +++ b/include/mpc/mpcmath.h
 @@ -86,10 +86,10 @@ static mpc_inline mpc_int32_t mpc_lrintf(float fVal)
  # define IFLOORF(x)   my_ifloor ((float)(x))
- 
+
  void   Init_FastMath ( void );
 -extern const float  tabatan2   [] [2];
 -extern const float  tabcos     [] [2];
@@ -50,7 +50,7 @@ index 9372d4b..e2588ad 100644
 +extern float  tabcos     [] [2];
 +extern float  tabsqrt_ex [];
 +extern float  tabsqrt_m  [] [2];
- 
+
  static mpc_inline float my_atan2 ( float x, float y )
  {
 diff --git a/mpcchap/Makefile.am b/mpcchap/Makefile.am
@@ -58,17 +58,17 @@ index be99c49..0697f94 100644
 --- a/mpcchap/Makefile.am
 +++ b/mpcchap/Makefile.am
 @@ -4,7 +4,8 @@ bin_PROGRAMS = mpcchap
- 
+
  common_sources = ../common/tags.c ../common/crc32.c
- 
+
 -AM_CPPFLAGS = -I$(top_srcdir)/include
 +AM_CPPFLAGS = -I$(top_srcdir)/include \
 +	$(LIBCUE_CFLAGS)
- 
+
  if HAVE_VISIBILITY
    AM_CFLAGS = -fvisibility=hidden
 @@ -16,4 +17,4 @@ dictionary.h iniparser.h
- 
+
  mpcchap_LDADD = $(top_builddir)/libmpcdec/libmpcdec.la \
  	$(top_builddir)/libmpcenc/libmpcenc.a \
 -	-lm -lcuefile
@@ -80,10 +80,10 @@ index eee3dbd..f5546cc 100644
 @@ -25,7 +25,7 @@
  #include <inttypes.h>
  #include <sys/stat.h>
- 
+
 -#include <cuetools/cuefile.h>
 +#include <libcue/libcue.h>
- 
+
  // tags.c
  void    Init_Tags        ( void );
 @@ -161,18 +161,26 @@ error_read_in_file:
@@ -97,14 +97,14 @@ index eee3dbd..f5546cc 100644
  	int chap_pos, end_pos, chap_size, i;
  	char * tmp_buff;
      mpc_status ret = MPC_STATUS_OK;
- 
+
 -	if (0 == (cd = cf_parse(chap_file, &format))) {
 +	in_file = fopen(chap_file, "r");
 +	if (NULL == in_file) {
  		fprintf(stderr, "%s: input file error\n", chap_file);
  		return !MPC_STATUS_OK;
  	}
- 
+
 +  if (0 == (cd = cue_parse_file(in_file))) {
 +          fclose(in_file);
 +          fprintf(stderr, "%s: input file error\n", chap_file);

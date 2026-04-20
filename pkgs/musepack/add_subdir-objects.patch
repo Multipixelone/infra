@@ -12,5 +12,5 @@ Last-Update: 2013-10-23
 -AM_INIT_AUTOMAKE
 +AM_INIT_AUTOMAKE(subdir-objects)
  AM_MAINTAINER_MODE
- 
+
  AC_LANG_C

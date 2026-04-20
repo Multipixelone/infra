@@ -7,6 +7,6 @@ Index: libmpc-0.1~r459/configure.in
  AM_CONFIG_HEADER([include/config.h])
  AM_INIT_AUTOMAKE
 +AM_MAINTAINER_MODE
- 
+
  AC_LANG_C
  AC_PROG_CC
