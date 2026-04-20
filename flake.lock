@@ -344,17 +344,19 @@
     "beets-plugins": {
       "inputs": {
         "beets-plexsync": "beets-plexsync",
-        "beets-src": "beets-src",
+        "beets-src": [
+          "beets-src"
+        ],
         "beets-stylize": "beets-stylize",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1776394412,
-        "narHash": "sha256-tjxExlvdZtseF0DbWC3+V7WjTY54kA2K6ekpciKleHA=",
+        "lastModified": 1776432551,
+        "narHash": "sha256-WqhqPhDSaFB9v7os+X51eTCb5LAXOS413u+KKfyJKz4=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "5a1fa0cf282f930ec34ef3bf022a446221c06894",
+        "rev": "5b944cc79d231c8c17715b2cda266eab528e26d7",
         "type": "github"
       },
       "original": {
@@ -366,16 +368,15 @@
     "beets-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1776389376,
-        "narHash": "sha256-W7ox6dbrzBTiYY/aO1ftGAThXOs5lEA2AoITeiDjLTo=",
-        "owner": "Multipixelone",
+        "lastModified": 1776635946,
+        "narHash": "sha256-smaaWXOctsqP0zzEf6wrppkqev7p2DDyO+NrD2ovGCc=",
+        "owner": "beetbox",
         "repo": "beets",
-        "rev": "ac8f5465377423c27a96ed796c7c099a90d7e993",
+        "rev": "44ffbdf65080383430c06fa699b5bdf16a3cba98",
         "type": "github"
       },
       "original": {
-        "owner": "Multipixelone",
-        "ref": "prune-dirs",
+        "owner": "beetbox",
         "repo": "beets",
         "type": "github"
       }
@@ -3511,6 +3512,7 @@
         "auto-cpufreq": "auto-cpufreq",
         "base16": "base16",
         "beets-plugins": "beets-plugins",
+        "beets-src": "beets-src",
         "better-fox": "better-fox",
         "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
         "blocklist": "blocklist",

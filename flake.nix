@@ -58,7 +58,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     base16.url = "github:SenchoPens/base16.nix";
-    beets-plugins.url = "github:Multipixelone/beets-plugins";
+    beets-plugins = {
+      url = "github:Multipixelone/beets-plugins";
+      inputs.beets-src.follows = "beets-src";
+    };
+    beets-src = {
+      url = "github:beetbox/beets";
+      flake = false;
+    };
     better-fox = {
       url = "github:yokoffing/Betterfox";
       flake = false;

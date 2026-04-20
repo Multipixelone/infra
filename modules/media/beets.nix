@@ -5,7 +5,16 @@
   ...
 }:
 {
-  flake-file.inputs.beets-plugins.url = "github:Multipixelone/beets-plugins";
+  flake-file.inputs = {
+    beets-plugins = {
+      url = "github:Multipixelone/beets-plugins";
+      inputs.beets-src.follows = "beets-src";
+    };
+    beets-src = {
+      url = "github:beetbox/beets";
+      flake = false;
+    };
+  };
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
     let
