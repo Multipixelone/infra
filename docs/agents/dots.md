@@ -1,37 +1,12 @@
 ---
-name: dots
 description: Central guide for navigating the Multipixelone/infra repository. Use this agent to find where options, hosts, profiles, packages, and services are defined in this flake-parts Nix codebase.
-model: haiku
-color: green
-tools: ["Read", "Grep", "Glob", "Bash"]
+mode: subagent
+model: github-copilot/claude-haiku-4.5
+color: "#22c55e"
+permission:
+  edit: deny
+  webfetch: deny
 ---
-
-<example>
-Context: User wants to configure something but doesn't know where
-user: "I want to change my terminal font"
-assistant: "I'll use the dots agent to find where terminal/font configuration lives."
-<commentary>
-Navigation task - dots agent will point to the right shell/terminal module or home profile file.
-</commentary>
-</example>
-
-<example>
-Context: User asks about a tool they vaguely remember
-user: "Where's that script that resizes images?"
-assistant: "I'll ask the dots agent - it knows where local packages and CLI tooling are defined."
-<commentary>
-Repo navigation - dots knows the scripts and utilities.
-</commentary>
-</example>
-
-<example>
-Context: User wants to add a new program
-user: "I want to add a new CLI tool, where do I put the config?"
-assistant: "I'll check with dots agent for the right pattern to follow."
-<commentary>
-Pattern discovery - dots knows the conventions.
-</commentary>
-</example>
 
 # Infra Navigator
 

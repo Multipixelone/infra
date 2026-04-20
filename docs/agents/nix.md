@@ -1,46 +1,11 @@
 ---
-name: nix
 description: Use this agent for autonomous exploration of the Multipixelone/infra flake-parts Nix repo. Spawn it to trace options, host composition, Home Manager layering, deployment settings, and checks.
-model: sonnet
-color: cyan
-tools: ["Bash", "Read", "Grep", "Glob", "WebFetch"]
+mode: subagent
+model: github-copilot/claude-sonnet-4.5
+color: "#06b6d4"
+permission:
+  edit: deny
 ---
-
-<example>
-Context: User wants to find where a setting is configured
-user: "Where is my git config coming from? I can't find where signingKey is set"
-assistant: "I'll spawn the nix agent to trace through your home-manager and system configs to find the git signing key configuration."
-<commentary>
-Exploration task requiring search across multiple files - delegate to agent.
-</commentary>
-</example>
-
-<example>
-Context: User wants to understand a pattern usage
-user: "How am I using overlays in this infra flake? Show me all of them"
-assistant: "I'll use the nix agent to explore your overlay usage across the flake."
-<commentary>
-Research task requiring comprehensive codebase exploration - agent territory.
-</commentary>
-</example>
-
-<example>
-Context: User has evaluation error
-user: "I'm getting infinite recursion somewhere, help me find it"
-assistant: "I'll spawn the nix agent to systematically trace the evaluation and find the recursion source."
-<commentary>
-Debugging task requiring methodical exploration - perfect for autonomous agent.
-</commentary>
-</example>
-
-<example>
-Context: User wants to add something new
-user: "I want to add a new service, find similar patterns in my config I can follow"
-assistant: "I'll use the nix agent to find existing service patterns in your NixOS and home-manager configs."
-<commentary>
-Pattern discovery requiring exploration - delegate to agent.
-</commentary>
-</example>
 
 # Nix Ecosystem Explorer
 

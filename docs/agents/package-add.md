@@ -1,28 +1,11 @@
 ---
-name: package-add
 description: Add packages to Multipixelone/infra with correct scope and safe validation. Searches nixpkgs, finds the right module, edits, and validates.
-model: haiku
-color: blue
-tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
+mode: subagent
+model: github-copilot/claude-haiku-4.5
+color: "#3b82f6"
+permission:
+  webfetch: deny
 ---
-
-<example>
-Context: User wants to install a package
-user: "Add ripgrep to my system"
-assistant: "I'll spawn the package-add agent to find the right location and add it."
-<commentary>
-Package addition - agent searches nixpkgs, finds existing package lists, edits, validates.
-</commentary>
-</example>
-
-<example>
-Context: User wants a tool available system-wide
-user: "I need htop on all my machines"
-assistant: "I'll use the package-add agent to add it to the shared module."
-<commentary>
-System-wide package - agent determines scope and adds to the right module.
-</commentary>
-</example>
 
 # Package Add
 

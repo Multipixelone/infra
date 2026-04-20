@@ -1,28 +1,12 @@
 ---
-name: option-trace
 description: Trace where a NixOS or Home Manager option is set in this flake-parts repo. Finds assignments, precedence modifiers, and evaluated values.
-model: haiku
-color: yellow
-tools: ["Read", "Grep", "Glob", "Bash"]
+mode: subagent
+model: github-copilot/claude-haiku-4.5
+color: "#eab308"
+permission:
+  edit: deny
+  webfetch: deny
 ---
-
-<example>
-Context: User wants to know where an option comes from
-user: "Where is programs.git.signingKey set?"
-assistant: "I'll spawn the option-trace agent to find all assignments and precedence for that option."
-<commentary>
-Single-option trace - agent searches codebase and reports file:line locations.
-</commentary>
-</example>
-
-<example>
-Context: User is confused why a service is enabled
-user: "Why is services.tailscale.enable true? I didn't set it"
-assistant: "I'll use the option-trace agent to trace where that option is being set."
-<commentary>
-Option investigation - agent will find all assignment sites and precedence modifiers.
-</commentary>
-</example>
 
 # Option Trace
 
