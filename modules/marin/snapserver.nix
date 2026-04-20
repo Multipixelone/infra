@@ -22,12 +22,29 @@
       };
 
       # AirPlay 2 timing and control ports.
+      # Shairport-sync AirPlay 2 mode uses dynamic ports in the ephemeral range
+      # (32768-60999) for event/data/control channels - without these open the
+      # client sees the device via mDNS but fails with "unable to connect to
+      # speakers" when the actual RTSP SETUP tries to open those channels.
+      # See: https://github.com/mikebrady/shairport-sync/blob/master/TROUBLESHOOTING.md
       networking.firewall = {
         allowedUDPPorts = [
-          319
-          320
+          319 # NQPTP PTP event
+          320 # NQPTP PTP general
         ];
-        allowedTCPPorts = [ 7000 ];
+        allowedTCPPorts = [ 7000 ]; # AirPlay 2 RTSP control
+        allowedTCPPortRanges = [
+          {
+            from = 32768;
+            to = 60999;
+          }
+        ];
+        allowedUDPPortRanges = [
+          {
+            from = 32768;
+            to = 60999;
+          }
+        ];
       };
 
       users.users.snapserver = {
