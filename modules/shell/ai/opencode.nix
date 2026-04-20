@@ -9,6 +9,11 @@
       catppuccin.opencode.enable = false;
     };
     base =
+      {
+        pkgs,
+        lib,
+        ...
+      }:
       let
         aiConfig = config.flake.aiConfig;
         omoConfig = builtins.toJSON {
@@ -33,6 +38,133 @@
                   model = "github-copilot/grok-code-fast-1";
                 };
               };
+            };
+          };
+          lsp = {
+            nixd = {
+              command = [
+                (lib.getExe pkgs.nixd)
+                "--inlay-hints=true"
+              ];
+              extensions = [ ".nix" ];
+            };
+            basedpyright = {
+              command = [
+                "${pkgs.basedpyright}/bin/basedpyright-langserver"
+                "--stdio"
+              ];
+              extensions = [
+                ".py"
+                ".pyi"
+              ];
+            };
+            ruff = {
+              command = [
+                (lib.getExe pkgs.ruff)
+                "server"
+              ];
+              extensions = [
+                ".py"
+                ".pyi"
+              ];
+            };
+            "typescript-language-server" = {
+              command = [
+                (lib.getExe pkgs.typescript-language-server)
+                "--stdio"
+              ];
+              extensions = [
+                ".ts"
+                ".tsx"
+                ".js"
+                ".jsx"
+                ".mjs"
+                ".cjs"
+              ];
+            };
+            "vscode-css-language-server" = {
+              command = [
+                "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server"
+                "--stdio"
+              ];
+              extensions = [
+                ".css"
+                ".scss"
+                ".less"
+              ];
+            };
+            "vscode-html-language-server" = {
+              command = [
+                "${pkgs.vscode-langservers-extracted}/bin/vscode-html-language-server"
+                "--stdio"
+              ];
+              extensions = [
+                ".html"
+                ".htm"
+              ];
+            };
+            "vscode-json-language-server" = {
+              command = [
+                "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server"
+                "--stdio"
+              ];
+              extensions = [
+                ".json"
+                ".jsonc"
+              ];
+            };
+            yaml = {
+              command = [
+                "${pkgs.yaml-language-server}/bin/yaml-language-server"
+                "--stdio"
+              ];
+              extensions = [
+                ".yaml"
+                ".yml"
+              ];
+            };
+            taplo = {
+              command = [
+                (lib.getExe pkgs.taplo)
+                "lsp"
+                "stdio"
+              ];
+              extensions = [ ".toml" ];
+            };
+            marksman = {
+              command = [
+                (lib.getExe pkgs.marksman)
+                "server"
+              ];
+              extensions = [
+                ".md"
+                ".markdown"
+              ];
+            };
+            texlab = {
+              command = [ (lib.getExe pkgs.texlab) ];
+              extensions = [
+                ".tex"
+                ".bib"
+              ];
+            };
+            tinymist = {
+              command = [ (lib.getExe pkgs.tinymist) ];
+              extensions = [ ".typ" ];
+            };
+            "astro-ls" = {
+              command = [
+                "${pkgs.astro-language-server}/bin/astro-ls"
+                "--stdio"
+              ];
+              extensions = [ ".astro" ];
+            };
+            "fish-lsp" = {
+              command = [
+                (lib.getExe pkgs.fish-lsp)
+                "start"
+              ];
+              extensions = [ ".fish" ];
             };
           };
           presets = {
