@@ -255,7 +255,24 @@
           # config work (e.g. {file:./secrets/github-mcp-pat}).
           set -l root (git rev-parse --show-toplevel 2>/dev/null; or echo $PWD)
           cd $root; or return
-          opencode $argv
+
+          # Pick a free port so the oh-my-opencode-slim multiplexer (zellij)
+          # can reach opencode's HTTP API. Starting at 4096 and scanning
+          # upward lets multiple concurrent / forgotten opencode instances
+          # coexist without port conflicts.
+          set -l port
+          for candidate in (seq 4096 4196)
+            if test (ss -Htln "sport = :$candidate" 2>/dev/null | count) -eq 0
+              set port $candidate
+              break
+            end
+          end
+          if test -z "$port"
+            echo "ocd: no free port in 4096-4196" >&2
+            return 1
+          end
+
+          opencode --port $port $argv
         '';
 
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;
