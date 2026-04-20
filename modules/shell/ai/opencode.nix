@@ -41,30 +41,38 @@
                 model = "anthropic/claude-opus-4-7";
                 variant = "high";
                 skills = [ "*" ];
-                mcps = [ "*" ];
+                mcps = [
+                  "*"
+                  "websearch"
+                ];
               };
               oracle = {
                 model = "github-copilot/gemini-3.1-pro-preview";
                 variant = "high";
-                skills = [ "simplify" ];
+                skills = [ ];
                 mcps = [ ];
               };
               librarian = {
-                model = "github-copilot/claude-haiku-4-5";
-                variant = "low";
+                model = "github-copilot/claude-haiku-4.5";
+                # haiku doesn't support reasoning effort
+                # variant = "low";
                 skills = [ ];
-                mcps = [ "*" ];
+                mcps = [
+                  "websearch"
+                  "context7"
+                  "grep_app"
+                ];
               };
               explorer = {
                 model = "github-copilot/grok-code-fast-1";
                 variant = "low";
-                skills = [ "cartography" ];
+                skills = [ ];
                 mcps = [ ];
               };
               designer = {
                 model = "github-copilot/gemini-3.1-pro-preview";
                 variant = "medium";
-                skills = [ ];
+                skills = [ "agent-browser" ];
                 mcps = [ ];
               };
               fixer = {
