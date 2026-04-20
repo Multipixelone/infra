@@ -48,6 +48,19 @@
 
       environment.systemPackages = [ claimScript ];
 
+      networking.firewall = {
+        allowedTCPPorts = [
+          8324 # Control other plex devices
+          32500 # Plexamp dashboard port
+        ];
+        allowedUDPPortRanges = [
+          {
+            from = 32410;
+            to = 32414; # mDNS ports for device discovert
+          }
+        ];
+      };
+
       systemd.services.plexamp-headless = {
         description = "Plexamp Headless";
         after = [ "network-online.target" ];
