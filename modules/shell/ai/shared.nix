@@ -1,6 +1,6 @@
 {
   lib,
-  self,
+  rootPath,
   inputs,
   ...
 }:
@@ -19,8 +19,8 @@
 
   config = {
     flake.aiConfig = {
-      agentsDir = self + /docs/agents;
-      skillsDir = self + /docs/skills;
+      agentsDir = rootPath + /docs/agents;
+      skillsDir = rootPath + /docs/skills;
       context = ''
         ## Rules
         System config: Nix only in `/home/tunnel/Documents/Git/infra`.
