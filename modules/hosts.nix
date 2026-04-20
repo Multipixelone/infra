@@ -35,6 +35,36 @@ let
           default = [ ];
           description = "Roles or tags describing this host (e.g. desktop, laptop, server, mobile).";
         };
+        description = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional human-friendly host description for docs/readme.";
+        };
+        manufacturer = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional hardware manufacturer for docs/readme.";
+        };
+        model = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional hardware model for docs/readme.";
+        };
+        readmeRole = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional display role used in README host table (e.g. Server/Laptop/Desktop).";
+        };
+        desktopWindowManager = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional desktop/window manager name for README host table.";
+        };
+        notes = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Optional notes for README host table.";
+        };
         homeAddress = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
           default = null;
@@ -67,12 +97,22 @@ in
     link = {
       isNixOS = true;
       roles = [ "desktop" ];
+      description = "My desktop";
+      manufacturer = "Custom";
+      model = "Gaming PC";
+      readmeRole = "Desktop";
+      desktopWindowManager = "Hyprland";
       homeAddress = "192.168.6.6";
       wireguard.ipv4Address = "10.100.0.1";
     };
     zelda = {
       isNixOS = true;
       roles = [ "laptop" ];
+      description = "My personal laptop";
+      manufacturer = "Razer";
+      model = "Razer Blade";
+      readmeRole = "Laptop";
+      desktopWindowManager = "Hyprland";
       wireguard = {
         ipv4Address = "10.100.0.2";
         publicKey = "8mNNHB03ytgnnZMPv0AZOpgZVumEvy3tr+E7h3WBCUI=";
@@ -83,15 +123,31 @@ in
       homeAddress = "192.168.8.111";
       iotAddress = "192.168.5.3";
       roles = [ "server" ];
+      description = "Old Dell laptop running IoT services";
+      manufacturer = "Dell";
+      model = "Laptop";
+      readmeRole = "Server";
+      desktopWindowManager = "None";
+      notes = "IoT services";
     };
     marin = {
       isNixOS = true;
       homeAddress = "192.168.5.21";
       iotAddress = "192.168.7.3";
       roles = [ "server" ];
+      description = "Mac Mini as Airport Express";
+      manufacturer = "Apple";
+      model = "Mac Mini";
+      readmeRole = "Server";
+      desktopWindowManager = "None";
+      notes = "Audio + home services";
     };
     ipad = {
       roles = [ "tablet" ];
+      description = "Personal tablet";
+      manufacturer = "Apple";
+      model = "iPad";
+      readmeRole = "Tablet";
       wireguard = {
         ipv4Address = "10.100.0.50";
         publicKey = "YHW9LGJkWRaa5GtBCmqFd1IVS9fyVRUP3orDXeCC8l8=";
@@ -99,6 +155,10 @@ in
     };
     iphone = {
       roles = [ "mobile" ];
+      description = "Personal phone";
+      manufacturer = "Apple";
+      model = "iPhone";
+      readmeRole = "Mobile";
       wireguard = {
         ipv4Address = "10.100.0.100";
         publicKey = "ORnW9c/rVHqOdaawcHJlpeTtg7pPvPxICtN2kXTlc3I=";
