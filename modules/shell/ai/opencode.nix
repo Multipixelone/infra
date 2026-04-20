@@ -109,6 +109,15 @@
           };
         };
 
+        programs.fish.shellAliases.oc = "opencode";
+        programs.fish.functions.ocd = ''
+          # Always run opencode from the repo root so relative paths in
+          # config work (e.g. {file:./secrets/github-mcp-pat}).
+          set -l root (git rev-parse --show-toplevel 2>/dev/null; or echo $PWD)
+          cd $root; or return
+          opencode $argv
+        '';
+
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;
       };
   };
