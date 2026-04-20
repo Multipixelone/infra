@@ -16,210 +16,293 @@
       }:
       let
         aiConfig = config.flake.aiConfig;
+
+        # ── Composable building blocks ──────────────────────────────────
+        #
+        # Models: reusable model identifiers keyed by short name.
+        # Roles:  per-role skills/mcps (model-agnostic).
+        # mkPreset: merges a model assignment onto the matching role config.
+
+        models = {
+          claude-opus = "anthropic/claude-opus-4-6";
+          claude-opus-next = "anthropic/claude-opus-4-7";
+          gemini-pro = "github-copilot/gemini-3.1-pro-preview";
+          claude-haiku = "github-copilot/claude-haiku-4.5";
+          grok-fast = "github-copilot/grok-code-fast-1";
+          gpt-codex = "github-copilot/gpt-5.3-codex";
+          gpt-mini = "github-copilot/gpt-5.4-mini";
+          gpt-5-2 = "github-copilot/gpt-5.2";
+        };
+
+        # Role definitions: skills, mcps, and optional variant per role.
+        # These are model-agnostic — a preset just picks which model fills
+        # each role.
+        roles = {
+          orchestrator = {
+            variant = "medium";
+            skills = [ "*" ];
+            # Keep context7/grep_app off orchestrator so it delegates
+            # doc/code lookups to librarian instead of doing them itself.
+            mcps = [
+              "*"
+              "!context7"
+              "!grep_app"
+            ];
+          };
+          oracle = {
+            variant = "high";
+            skills = [ "simplify" ];
+            mcps = [ ];
+          };
+          librarian = {
+            # haiku doesn't support reasoning effort — omit variant
+            skills = [ ];
+            mcps = [
+              "websearch"
+              "context7"
+              "grep_app"
+            ];
+          };
+          explorer = {
+            variant = "low";
+            skills = [ "cartography" ];
+            mcps = [ ];
+          };
+          designer = {
+            variant = "high";
+            skills = [ "agent-browser" ];
+            mcps = [ ];
+          };
+          fixer = {
+            variant = "low";
+            skills = [ ];
+            mcps = [ ];
+          };
+          observer = {
+            variant = "low";
+            skills = [ ];
+            mcps = [ ];
+          };
+        };
+
+        # mkPreset :: { role = modelKey; ... } -> preset attrset
+        # Merges each role's config with `{ model = models.${modelKey}; }`.
+        mkPreset =
+          assignments:
+          builtins.mapAttrs (
+            role: modelKey: { model = models.${modelKey}; } // (roles.${role} or { })
+          ) assignments;
+
+        # ── Preset definitions ──────────────────────────────────────────
+
+        # Shared specialist assignment (everything except orchestrator).
+        specialists = {
+          oracle = "claude-opus-next";
+          librarian = "claude-haiku";
+          explorer = "grok-fast";
+          designer = "gemini-pro";
+          fixer = "gpt-codex";
+          observer = "gpt-mini";
+        };
+
+        presetCustom = mkPreset (specialists // { orchestrator = "claude-opus"; });
+        presetCopilot = mkPreset (specialists // { orchestrator = "gpt-codex"; });
+
+        # ── Shared config sections ──────────────────────────────────────
+
+        councilConfig = {
+          master.model = models.gpt-codex;
+          master_fallback = [
+            models.claude-opus-next
+            models.gemini-pro
+          ];
+          presets.default = {
+            alpha.model = models.claude-opus-next;
+            beta.model = models.gemini-pro;
+            gamma.model = models.grok-fast;
+          };
+        };
+
+        fallbackConfig = {
+          enabled = true;
+          timeoutMs = 15000;
+          chains = {
+            orchestrator = [
+              models.gpt-codex
+              models.gpt-5-2
+              models.claude-opus-next
+            ];
+            oracle = [
+              models.claude-opus-next
+              models.gemini-pro
+            ];
+            librarian = [
+              models.claude-haiku
+              models.gpt-mini
+            ];
+            explorer = [
+              models.grok-fast
+              models.gpt-mini
+            ];
+            designer = [
+              models.gemini-pro
+              models.claude-opus-next
+            ];
+            fixer = [
+              models.gpt-codex
+              models.grok-fast
+            ];
+          };
+        };
+
+        lspServers = {
+          nixd = {
+            command = [
+              (lib.getExe pkgs.nixd)
+              "--inlay-hints=true"
+            ];
+            extensions = [ ".nix" ];
+          };
+          basedpyright = {
+            command = [
+              "${pkgs.basedpyright}/bin/basedpyright-langserver"
+              "--stdio"
+            ];
+            extensions = [
+              ".py"
+              ".pyi"
+            ];
+          };
+          ruff = {
+            command = [
+              (lib.getExe pkgs.ruff)
+              "server"
+            ];
+            extensions = [
+              ".py"
+              ".pyi"
+            ];
+          };
+          "typescript-language-server" = {
+            command = [
+              (lib.getExe pkgs.typescript-language-server)
+              "--stdio"
+            ];
+            extensions = [
+              ".ts"
+              ".tsx"
+              ".js"
+              ".jsx"
+              ".mjs"
+              ".cjs"
+            ];
+          };
+          "vscode-css-language-server" = {
+            command = [
+              "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server"
+              "--stdio"
+            ];
+            extensions = [
+              ".css"
+              ".scss"
+              ".less"
+            ];
+          };
+          "vscode-html-language-server" = {
+            command = [
+              "${pkgs.vscode-langservers-extracted}/bin/vscode-html-language-server"
+              "--stdio"
+            ];
+            extensions = [
+              ".html"
+              ".htm"
+            ];
+          };
+          "vscode-json-language-server" = {
+            command = [
+              "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server"
+              "--stdio"
+            ];
+            extensions = [
+              ".json"
+              ".jsonc"
+            ];
+          };
+          yaml = {
+            command = [
+              "${pkgs.yaml-language-server}/bin/yaml-language-server"
+              "--stdio"
+            ];
+            extensions = [
+              ".yaml"
+              ".yml"
+            ];
+          };
+          taplo = {
+            command = [
+              (lib.getExe pkgs.taplo)
+              "lsp"
+              "stdio"
+            ];
+            extensions = [ ".toml" ];
+          };
+          marksman = {
+            command = [
+              (lib.getExe pkgs.marksman)
+              "server"
+            ];
+            extensions = [
+              ".md"
+              ".markdown"
+            ];
+          };
+          texlab = {
+            command = [ (lib.getExe pkgs.texlab) ];
+            extensions = [
+              ".tex"
+              ".bib"
+            ];
+          };
+          tinymist = {
+            command = [ (lib.getExe pkgs.tinymist) ];
+            extensions = [ ".typ" ];
+          };
+          "astro-ls" = {
+            command = [
+              "${pkgs.astro-language-server}/bin/astro-ls"
+              "--stdio"
+            ];
+            extensions = [ ".astro" ];
+          };
+          "fish-lsp" = {
+            command = [
+              (lib.getExe pkgs.fish-lsp)
+              "start"
+            ];
+            extensions = [ ".fish" ];
+          };
+        };
+
+        # ── Final assembled config ──────────────────────────────────────
+
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
-          multiplexer = {
-            type = "zellij";
+          multiplexer.type = "zellij";
+          preset = "copilot";
+          council = councilConfig;
+          fallback = fallbackConfig;
+          todoContinuation = {
+            autoEnable = true;
+            autoEnableThreshold = 4;
+            maxContinuations = 5;
           };
-          preset = "custom";
-          council = {
-            master = {
-              model = "github-copilot/gpt-5.3-codex";
-            };
-            presets = {
-              default = {
-                alpha = {
-                  model = "anthropic/claude-opus-4-7";
-                };
-                beta = {
-                  model = "github-copilot/gemini-3.1-pro-preview";
-                };
-                gamma = {
-                  model = "github-copilot/grok-code-fast-1";
-                };
-              };
-            };
-          };
-          lsp = {
-            nixd = {
-              command = [
-                (lib.getExe pkgs.nixd)
-                "--inlay-hints=true"
-              ];
-              extensions = [ ".nix" ];
-            };
-            basedpyright = {
-              command = [
-                "${pkgs.basedpyright}/bin/basedpyright-langserver"
-                "--stdio"
-              ];
-              extensions = [
-                ".py"
-                ".pyi"
-              ];
-            };
-            ruff = {
-              command = [
-                (lib.getExe pkgs.ruff)
-                "server"
-              ];
-              extensions = [
-                ".py"
-                ".pyi"
-              ];
-            };
-            "typescript-language-server" = {
-              command = [
-                (lib.getExe pkgs.typescript-language-server)
-                "--stdio"
-              ];
-              extensions = [
-                ".ts"
-                ".tsx"
-                ".js"
-                ".jsx"
-                ".mjs"
-                ".cjs"
-              ];
-            };
-            "vscode-css-language-server" = {
-              command = [
-                "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server"
-                "--stdio"
-              ];
-              extensions = [
-                ".css"
-                ".scss"
-                ".less"
-              ];
-            };
-            "vscode-html-language-server" = {
-              command = [
-                "${pkgs.vscode-langservers-extracted}/bin/vscode-html-language-server"
-                "--stdio"
-              ];
-              extensions = [
-                ".html"
-                ".htm"
-              ];
-            };
-            "vscode-json-language-server" = {
-              command = [
-                "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server"
-                "--stdio"
-              ];
-              extensions = [
-                ".json"
-                ".jsonc"
-              ];
-            };
-            yaml = {
-              command = [
-                "${pkgs.yaml-language-server}/bin/yaml-language-server"
-                "--stdio"
-              ];
-              extensions = [
-                ".yaml"
-                ".yml"
-              ];
-            };
-            taplo = {
-              command = [
-                (lib.getExe pkgs.taplo)
-                "lsp"
-                "stdio"
-              ];
-              extensions = [ ".toml" ];
-            };
-            marksman = {
-              command = [
-                (lib.getExe pkgs.marksman)
-                "server"
-              ];
-              extensions = [
-                ".md"
-                ".markdown"
-              ];
-            };
-            texlab = {
-              command = [ (lib.getExe pkgs.texlab) ];
-              extensions = [
-                ".tex"
-                ".bib"
-              ];
-            };
-            tinymist = {
-              command = [ (lib.getExe pkgs.tinymist) ];
-              extensions = [ ".typ" ];
-            };
-            "astro-ls" = {
-              command = [
-                "${pkgs.astro-language-server}/bin/astro-ls"
-                "--stdio"
-              ];
-              extensions = [ ".astro" ];
-            };
-            "fish-lsp" = {
-              command = [
-                (lib.getExe pkgs.fish-lsp)
-                "start"
-              ];
-              extensions = [ ".fish" ];
-            };
-          };
+          # Enable observer agent (disabled by default upstream).
+          # gpt-5.4-mini is vision-capable, so the block below activates.
+          disabled_agents = [ ];
+          lsp = lspServers;
           presets = {
-            custom = {
-              orchestrator = {
-                model = "anthropic/claude-opus-4-7";
-                variant = "high";
-                skills = [ "*" ];
-                mcps = [
-                  "*"
-                  "websearch"
-                ];
-              };
-              oracle = {
-                model = "github-copilot/gemini-3.1-pro-preview";
-                variant = "high";
-                skills = [ ];
-                mcps = [ ];
-              };
-              librarian = {
-                model = "github-copilot/claude-haiku-4.5";
-                # haiku doesn't support reasoning effort
-                # variant = "low";
-                skills = [ ];
-                mcps = [
-                  "websearch"
-                  "context7"
-                  "grep_app"
-                ];
-              };
-              explorer = {
-                model = "github-copilot/grok-code-fast-1";
-                variant = "low";
-                skills = [ ];
-                mcps = [ ];
-              };
-              designer = {
-                model = "github-copilot/gemini-3.1-pro-preview";
-                variant = "medium";
-                skills = [ "agent-browser" ];
-                mcps = [ ];
-              };
-              fixer = {
-                model = "github-copilot/gpt-5.3-codex";
-                variant = "low";
-                skills = [ ];
-                mcps = [ ];
-              };
-              observer = {
-                model = "github-copilot/gpt-5.4-mini";
-                variant = "low";
-                skills = [ ];
-                mcps = [ ];
-              };
-            };
+            custom = presetCustom;
+            copilot = presetCopilot;
           };
         };
       in
