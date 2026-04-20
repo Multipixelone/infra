@@ -77,7 +77,7 @@
             lock_bck=$(mktemp)
             cp -p flake.lock "$lock_bck"
 
-            ${self'.apps.write-flake.program}
+            ${lib.getExe self'.packages.write-flake}
 
             # If flake.lock remains unchanged, restore mtime.
             if cmp -s flake.lock "$lock_bck"; then

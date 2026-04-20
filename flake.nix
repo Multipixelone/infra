@@ -307,10 +307,7 @@
     ucodenix.url = "github:e-tho/ucodenix";
     uwu-colors = {
       url = "github:q60/uwu_colors";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        utils.follows = "flake-utils";
-      };
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     waybar-mediaplayer = {
       url = "github:Multipixelone/waybar-mediaplayer/artist";
