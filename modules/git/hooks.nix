@@ -26,8 +26,16 @@
       pre-commit.settings.hooks = {
         # General use pre-commit hooks
         trim-trailing-whitespace.enable = true;
-        mixed-line-endings.enable = true;
-        end-of-file-fixer.enable = true;
+        mixed-line-endings = {
+          enable = true;
+          # Generated .gitignore contains literal CR in macOS filenames
+          # (e.g. `Icon\r`, `.HFS+ Private Directory Data\r`)
+          excludes = [ "^\\.gitignore$" ];
+        };
+        end-of-file-fixer = {
+          enable = true;
+          excludes = [ "^\\.gitignore$" ];
+        };
         check-executables-have-shebangs.enable = true;
         check-added-large-files.enable = true;
         # git secret checking
