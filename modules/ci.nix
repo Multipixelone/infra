@@ -133,7 +133,7 @@ in
       <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${filename}?query=branch%3A${repo.defaultBranch}">
       <img
         alt="CI status"
-        src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${filename}?style=for-the-badge&branch=${repo.defaultBranch}&label=${workflowName}"
+        src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${filename}?style=flat-square&branch=${repo.defaultBranch}&label=${workflowName}"
       >
       </a>
 
@@ -161,7 +161,7 @@ in
       ''
     )
     + ''
-      See [`modules/meta/ci.nix`](modules/meta/ci.nix).
+      See [`modules/ci.nix`](modules/ci.nix).
 
     '';
   };
