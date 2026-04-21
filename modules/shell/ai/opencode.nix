@@ -26,6 +26,7 @@
         models = {
           claude-opus = "anthropic/claude-opus-4-6";
           claude-opus-next = "anthropic/claude-opus-4-7";
+          claude-sonnet = "anthropic/claude-sonnet-4-6";
           gemini-pro = "github-copilot/gemini-3.1-pro-preview";
           claude-haiku = "github-copilot/claude-haiku-4.5";
           grok-fast = "github-copilot/grok-code-fast-1";
@@ -134,6 +135,7 @@
             ];
             oracle = [
               models.claude-opus-next
+              models.claude-sonnet
               models.gemini-pro
             ];
             librarian = [
