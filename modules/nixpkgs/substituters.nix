@@ -17,7 +17,7 @@
     caches = [
       {
         url = "https://cache.nixos.org";
-        key = "cache.nixos.org-1:6NCHdD59X431o0gWypbY0EwA8p4P9YJf5vN2+6s8YfA=";
+        key = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
       }
       {
         url = "https://attic-cache.fly.dev/system?priority=50";
