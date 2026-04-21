@@ -1,5 +1,11 @@
 # infra
-[![CI](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/check.yaml?branch=main&style=flat-square)](https://github.com/Multipixelone/infra/actions/workflows/check.yaml)
+<a href="https://github.com/Multipixelone/infra/actions/workflows/check.yaml?query=branch%3Amain">
+<img
+  alt="CI status"
+  src="https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/check.yaml?style=flat-square&branch=main&label=Check"
+>
+</a>
+
 [![License](https://img.shields.io/github/license/Multipixelone/infra?style=flat-square)](https://github.com/Multipixelone/infra/blob/main/LICENSE)
 [![Built with Nix](https://img.shields.io/badge/Built%20with-Nix-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://builtwithnix.org)
 [![Dendritic Pattern](https://img.shields.io/badge/Dendritic--Pattern-Nix-informational?style=flat-square&color=c6a0f6&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAA5CAYAAAB0+HhyAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAbpJREFUaN7tWcGuwyAMW6L9/y/nXTZpr4PiJA6sqJwmrZQYjOOk8igcZmbv3yIilWvpY9L4BHVpINXjBnIDKRrP1arEUjZlgIiokr0GS9mo1GoFN0uKJUMBdkCt96J00wyt5DUYALLv0ch96O3kCgD0O+INqvdslK5ypApLJnsBjea25o1Ai4gIOvH4XARMdAOO81rPaEWOYCiXB8RpZkfoNtPuDwUnsusoOBa1kFg0ojozqYaqpLJywioAp5cdOZ2KU8kkXmEEiiY3RhLsvYObXQdSiUppZC312HAm3bL+7WuToi9F5rROpGotyfgi5qXP+jeJJi4mIM96PS8mTEsSzcrZ4s5V6s7KB+mafYsT2eaObKtal80jmeDOAjmjLHutbbzW3u63zNglTae7HkF2aGY7CFlbq0DM7rQoWov8WvPhGK9mi6mK5oKnf/CO/flr9Bm5jNb/ZmaK7soqkKhg6L/sCDbpop/XmL7sK+6M48wIAfMTRrdBN6MeiTar3Q06zy5lKTMyk8ipbPNVt6SsHXVnKvKWsncUokGBfCuD15HgWqAzAEsTG6OpsYRaK8cN5AZyRSAzXfIf7j4IjUJ5XtMAAAAASUVORK5CYII=&logoColor=white)](https://github.com/mightyiam/dendritic)
@@ -9,6 +15,18 @@
 `dotfiles` on steroids, this repository contains my declarative NixOS and Home Manager-based Infrastructure as Code (IaC) for personal devices and home servers.
 
 Built on top of [flake-parts](https://flake.parts/), this setup manages system configurations, dotfiles, user secrets (via `agenix`), custom packages, and portable applications runnable anywhere via `nix run`.
+
+## Hosts
+
+| Hostname | Description | Manufacturer | Model | Role | Desktop/WM | Notes |
+|----------|-------------|--------------|-------|------|------------|-------|
+| `link` | My desktop | Custom | Gaming PC | Desktop | Hyprland | - |
+| `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
+| `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
+| `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
+| `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |
+| `ipad` | Personal tablet | Apple | iPad | Tablet | - | - |
+
 
 ## Repository Structure
 
@@ -48,21 +66,26 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `helix` — `nix run github:Multipixelone/infra#helix`
 - `noctalia-shell` — `nix run github:Multipixelone/infra#noctalia-shell`
 
-## Hosts
-
-| Hostname | Description | Manufacturer | Model | Role | Desktop/WM | Notes |
-|----------|-------------|--------------|-------|------|------------|-------|
-| `link` | My desktop | Custom | Gaming PC | Desktop | Hyprland | - |
-| `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
-| `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
-| `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
-| `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |
-| `ipad` | Personal tablet | Apple | iPad | Tablet | - | - |
-
-
 ## Dendritic Pattern
 
 This repository follows the [dendritic](https://github.com/mightyiam/dendritic) pattern with flake-parts modules auto-discovered from `modules/`.
+
+## Running checks on GitHub Actions
+
+Running this repository's flake checks on GitHub Actions is merely a bonus
+and possibly more of a liability.
+
+Workflow files are generated using
+[the _files_ flake-parts module](https://github.com/mightyiam/files).
+
+For better visibility, a job is spawned for each flake check.
+This is done dynamically.
+
+To prevent runners from running out of space,
+The action [Nothing but Nix](https://github.com/marketplace/actions/nothing-but-nix)
+is used.
+
+See [`modules/ci.nix`](modules/ci.nix).
 
 ## Generated files
 
