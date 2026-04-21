@@ -21,6 +21,9 @@ let
 
   filename = "check.yaml";
   filePath = ".github/workflows/${filename}";
+  nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
+  nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
+  nixpkgsAgeBadgeJsonPath = ".github/badges/nixpkgs-age.json";
 
   workflowName = "Check";
 
@@ -129,14 +132,17 @@ let
 in
 {
   text.readme.parts = {
-    ci-badge = ''
+    ci-badges = ''
+      <div align="center">
+
       <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${filename}?query=branch%3A${repo.defaultBranch}">
-      <img
-        alt="CI status"
-        src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${filename}?style=flat-square&branch=${repo.defaultBranch}&label=${workflowName}"
-      >
+        <img alt="CI status" src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${filename}?style=for-the-badge&branch=${repo.defaultBranch}&label=${workflowName}">
+      </a>
+      <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${nixpkgsAgeFilename}?query=branch%3A${repo.defaultBranch}">
+        <img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fraw.githubusercontent.com%2F${repo.owner}%2F${repo.name}%2F${repo.defaultBranch}%2F.github%2Fbadges%2Fnixpkgs-age.json">
       </a>
 
+      </div>
     '';
     github-actions = ''
       ## Running checks on GitHub Actions
@@ -237,6 +243,100 @@ in
             };
           };
         }
+        {
+          path_ = nixpkgsAgeFilePath;
+          drv = pkgs.writers.writeJSON "gh-actions-workflow-nixpkgs-age-badge.yaml" {
+            name = "Nixpkgs age badge";
+            on = {
+              workflow_dispatch = { };
+              schedule = [ { cron = "0 */12 * * *"; } ];
+              push.paths = [
+                "flake.lock"
+                "${nixpkgsAgeFilePath}"
+              ];
+            };
+            permissions.contents = "write";
+            jobs.update-nixpkgs-age-badge = {
+              runs-on = "ubuntu-latest";
+              steps = [
+                {
+                  uses = "actions/checkout@v4";
+                  "with" = {
+                    ref = repo.defaultBranch;
+                    fetch-depth = 0;
+                  };
+                }
+                {
+                  name = "Generate nixpkgs age badge JSON";
+                  run = ''
+                    set -euo pipefail
+
+                    rev="$(jq -r '.nodes.nixpkgs.locked.rev // empty' flake.lock)"
+
+                    if [ -z "$rev" ]; then
+                      echo "Could not find nixpkgs revision in flake.lock"
+                      exit 1
+                    fi
+
+                    commit_date="$(curl -fsSL "https://api.github.com/repos/NixOS/nixpkgs/commits/$rev" | jq -r '.commit.committer.date // empty')"
+
+                    if [ -z "$commit_date" ]; then
+                      echo "Could not resolve nixpkgs commit date for revision: $rev"
+                      exit 1
+                    fi
+
+                    commit_ts="$(date -u -d "$commit_date" +%s)"
+                    now_ts="$(date -u +%s)"
+                    age_days="$(( (now_ts - commit_ts) / 86400 ))"
+
+                    color="brightgreen"
+                    if [ "$age_days" -gt 7 ]; then color="green"; fi
+                    if [ "$age_days" -gt 14 ]; then color="yellowgreen"; fi
+                    if [ "$age_days" -gt 30 ]; then color="yellow"; fi
+                    if [ "$age_days" -gt 60 ]; then color="orange"; fi
+                    if [ "$age_days" -gt 90 ]; then color="red"; fi
+
+                    mkdir -p .github/badges
+                    jq -n \
+                      --arg message "''${age_days}d" \
+                      --arg color "$color" \
+                      '{schemaVersion: 1, label: "nixpkgs age", message: $message, color: $color}' \
+                      > ${nixpkgsAgeBadgeJsonPath}
+                  '';
+                }
+                {
+                  name = "Commit badge JSON when changed";
+                  run = ''
+                    set -euo pipefail
+
+                    if git diff --quiet -- ${nixpkgsAgeBadgeJsonPath}; then
+                      echo "No badge update needed"
+                      exit 0
+                    fi
+
+                    git config user.name "github-actions[bot]"
+                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                    git add ${nixpkgsAgeBadgeJsonPath}
+                    git commit -m "chore(ci): update nixpkgs age badge"
+                    git push
+                  '';
+                }
+              ];
+            };
+          };
+        }
+        {
+          path_ = nixpkgsAgeBadgeJsonPath;
+          drv = pkgs.writeText "nixpkgs-age.json" (
+            (builtins.toJSON {
+              schemaVersion = 1;
+              label = "nixpkgs age";
+              message = "unknown";
+              color = "lightgrey";
+            })
+            + "\n"
+          );
+        }
         # {
         #   path_ = ciFilePath;
         #   drv = pkgs.writers.writeJSON "gh-actions-workflow-ci.yml" {
@@ -280,6 +380,8 @@ in
 
       treefmt.settings.global.excludes = [
         filePath
+        nixpkgsAgeFilePath
+        nixpkgsAgeBadgeJsonPath
         ciFilePath
       ];
     };

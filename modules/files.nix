@@ -95,8 +95,9 @@
           meta.description = "Generate all automatically generated files for this repository";
         };
 
-        pre-commit.settings.hooks.generate-files = {
+        pre-commit.settings.hooks."00-generate-files" = {
           enable = true;
+          name = "generate-files";
           package = config.packages.generate-files;
           entry = self'.apps.generate-files.program;
           pass_filenames = false;

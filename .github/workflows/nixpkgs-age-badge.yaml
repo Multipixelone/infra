@@ -1,0 +1,42 @@
+{
+  "jobs": {
+    "update-nixpkgs-age-badge": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "fetch-depth": 0,
+            "ref": "main"
+          }
+        },
+        {
+          "name": "Generate nixpkgs age badge JSON",
+          "run": "set -euo pipefail\n\nrev=\"$(jq -r '.nodes.nixpkgs.locked.rev // empty' flake.lock)\"\n\nif [ -z \"$rev\" ]; then\n  echo \"Could not find nixpkgs revision in flake.lock\"\n  exit 1\nfi\n\ncommit_date=\"$(curl -fsSL \"https://api.github.com/repos/NixOS/nixpkgs/commits/$rev\" | jq -r '.commit.committer.date // empty')\"\n\nif [ -z \"$commit_date\" ]; then\n  echo \"Could not resolve nixpkgs commit date for revision: $rev\"\n  exit 1\nfi\n\ncommit_ts=\"$(date -u -d \"$commit_date\" +%s)\"\nnow_ts=\"$(date -u +%s)\"\nage_days=\"$(( (now_ts - commit_ts) / 86400 ))\"\n\ncolor=\"brightgreen\"\nif [ \"$age_days\" -gt 7 ]; then color=\"green\"; fi\nif [ \"$age_days\" -gt 14 ]; then color=\"yellowgreen\"; fi\nif [ \"$age_days\" -gt 30 ]; then color=\"yellow\"; fi\nif [ \"$age_days\" -gt 60 ]; then color=\"orange\"; fi\nif [ \"$age_days\" -gt 90 ]; then color=\"red\"; fi\n\nmkdir -p .github/badges\njq -n \\\n  --arg message \"${age_days}d\" \\\n  --arg color \"$color\" \\\n  '{schemaVersion: 1, label: \"nixpkgs age\", message: $message, color: $color}' \\\n  > .github/badges/nixpkgs-age.json\n"
+        },
+        {
+          "name": "Commit badge JSON when changed",
+          "run": "set -euo pipefail\n\nif git diff --quiet -- .github/badges/nixpkgs-age.json; then\n  echo \"No badge update needed\"\n  exit 0\nfi\n\ngit config user.name \"github-actions[bot]\"\ngit config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"\ngit add .github/badges/nixpkgs-age.json\ngit commit -m \"chore(ci): update nixpkgs age badge\"\ngit push\n"
+        }
+      ]
+    }
+  },
+  "name": "Nixpkgs age badge",
+  "on": {
+    "push": {
+      "paths": [
+        "flake.lock",
+        ".github/workflows/nixpkgs-age-badge.yaml"
+      ]
+    },
+    "schedule": [
+      {
+        "cron": "0 */12 * * *"
+      }
+    ],
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "write"
+  }
+}
