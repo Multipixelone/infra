@@ -4,8 +4,8 @@
     text.readme = {
       order = [
         "intro"
-        "ci-badges"
         "badges"
+        "ci-badges"
         "about"
         "hosts"
         "structure"

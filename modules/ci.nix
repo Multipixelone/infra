@@ -271,10 +271,17 @@ in
                   run = ''
                     set -euo pipefail
 
-                    rev="$(jq -r '.nodes.nixpkgs.locked.rev // empty' flake.lock)"
+                    nixpkgs_node="$(jq -r '.nodes.root.inputs.nixpkgs // empty' flake.lock)"
+
+                    if [ -z "$nixpkgs_node" ]; then
+                      echo "Could not find root nixpkgs input in flake.lock"
+                      exit 1
+                    fi
+
+                    rev="$(jq -r --arg node "$nixpkgs_node" '.nodes[$node].locked.rev // empty' flake.lock)"
 
                     if [ -z "$rev" ]; then
-                      echo "Could not find nixpkgs revision in flake.lock"
+                      echo "Could not find nixpkgs revision for root input ($nixpkgs_node) in flake.lock"
                       exit 1
                     fi
 
