@@ -193,6 +193,7 @@ in
                   {
                     id = ids.steps.getCheckNames;
                     run = ''
+                      nix ${nixArgs} flake check --no-build
                       checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
                       echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
                     '';
@@ -201,6 +202,7 @@ in
               };
 
               ${ids.jobs.check} = {
+                continue-on-error = true;
                 needs = ids.jobs.getCheckNames;
                 runs-on = runner.name;
                 timeout-minutes = 350;

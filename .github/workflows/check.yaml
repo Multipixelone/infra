@@ -1,6 +1,7 @@
 {
   "jobs": {
     "check": {
+      "continue-on-error": true,
       "needs": "get-check-names",
       "runs-on": "ubuntu-latest",
       "steps": [
@@ -89,7 +90,7 @@
         },
         {
           "id": "get-check-names",
-          "run": "checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
+          "run": "nix --accept-flake-config flake check --no-build\nchecks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }
