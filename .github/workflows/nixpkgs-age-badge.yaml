@@ -12,18 +12,18 @@
         },
         {
           "env": {
-            "GH_API_TOKEN": "${{ github.token }}"
+            "GH_TOKEN": "${{ github.token }}"
           },
           "name": "Generate nixpkgs age badge JSON",
-          "run": "set -euo pipefail\n\nnixpkgs_node=\"$(jq -r '.nodes.root.inputs.nixpkgs // empty' flake.lock)\"\n\nif [ -z \"$nixpkgs_node\" ]; then\n  echo \"Could not find root nixpkgs input in flake.lock\"\n  exit 1\nfi\n\nrev=\"$(jq -r --arg node \"$nixpkgs_node\" '.nodes[$node].locked.rev // empty' flake.lock)\"\n\nif [ -z \"$rev\" ]; then\n  echo \"Could not find nixpkgs revision for root input ($nixpkgs_node) in flake.lock\"\n  exit 1\nfi\n\ncommit_date=\"$(curl -fsSL \\\n  -H \"Authorization: Bearer $GH_API_TOKEN\" \\\n  -H \"Accept: application/vnd.github+json\" \\\n  \"https://api.github.com/repos/NixOS/nixpkgs/commits/$rev\" \\\n  | jq -r '.commit.committer.date // empty')\"\n\nif [ -z \"$commit_date\" ]; then\n  echo \"Could not resolve nixpkgs commit date for revision: $rev\"\n  exit 1\nfi\n\ncommit_ts=\"$(date -u -d \"$commit_date\" +%s)\"\nnow_ts=\"$(date -u +%s)\"\nage_days=\"$(( (now_ts - commit_ts) / 86400 ))\"\n\ncolor=\"brightgreen\"\nif [ \"$age_days\" -gt 7 ]; then color=\"green\"; fi\nif [ \"$age_days\" -gt 14 ]; then color=\"yellowgreen\"; fi\nif [ \"$age_days\" -gt 30 ]; then color=\"yellow\"; fi\nif [ \"$age_days\" -gt 60 ]; then color=\"orange\"; fi\nif [ \"$age_days\" -gt 90 ]; then color=\"red\"; fi\n\nbadge_json=\"$RUNNER_TEMP/nixpkgs-age.json\"\njq -n \\\n  --arg message \"${age_days}d\" \\\n  --arg color \"$color\" \\\n  '{schemaVersion: 1, label: \"nixpkgs age\", message: $message, color: $color}' \\\n  > \"$badge_json\"\n"
+          "run": "set -euo pipefail\n\nout=\"$RUNNER_TEMP/nixpkgs-age.json\"\n\n# Find the nixpkgs node name used by root, even if it's a list or a string\nnixpkgs_node=\"$(\n  jq -r '\n    .nodes.root.inputs.nixpkgs\n    | if type==\"array\" then .[0] else . end\n    // empty\n  ' flake.lock\n)\"\n\nif [ -z \"$nixpkgs_node\" ]; then\n  echo \"Could not find root nixpkgs input in flake.lock\"\n  cat >\"$out\" <<'JSON'\n{\"schemaVersion\":1,\"label\":\"nixpkgs age\",\"message\":\"unknown\",\"color\":\"lightgrey\"}\nJSON\n  exit 0\nfi\n\nrev=\"$(jq -r --arg node \"$nixpkgs_node\" '.nodes[$node].locked.rev // empty' flake.lock)\"\nif [ -z \"$rev\" ]; then\n  echo \"Could not find nixpkgs revision for root input ($nixpkgs_node) in flake.lock\"\n  cat >\"$out\" <<'JSON'\n{\"schemaVersion\":1,\"label\":\"nixpkgs age\",\"message\":\"unknown\",\"color\":\"lightgrey\"}\nJSON\n  exit 0\nfi\n\n# Query nixpkgs commit date from GitHub\ncommit_date=\"$(\n  gh api \"repos/NixOS/nixpkgs/commits/$rev\" \\\n    --jq '.commit.committer.date // empty' \\\n  || true\n)\"\n\nif [ -z \"$commit_date\" ]; then\n  echo \"Could not resolve nixpkgs commit date for revision: $rev\"\n  cat >\"$out\" <<'JSON'\n{\"schemaVersion\":1,\"label\":\"nixpkgs age\",\"message\":\"unknown\",\"color\":\"lightgrey\"}\nJSON\n  exit 0\nfi\n\n# Compute age in days\ncommit_ts=\"$(date -u -d \"$commit_date\" +%s)\"\nnow_ts=\"$(date -u +%s)\"\nage_days=\"$(( (now_ts - commit_ts) / 86400 ))\"\n\n# Pick a color\ncolor=\"brightgreen\"\nif [ \"$age_days\" -gt 7 ]; then color=\"green\"; fi\nif [ \"$age_days\" -gt 14 ]; then color=\"yellowgreen\"; fi\nif [ \"$age_days\" -gt 30 ]; then color=\"yellow\"; fi\nif [ \"$age_days\" -gt 60 ]; then color=\"orange\"; fi\nif [ \"$age_days\" -gt 90 ]; then color=\"red\"; fi\n\njq -n \\\n  --arg label \"nixpkgs age\" \\\n  --arg message \"${age_days}d\" \\\n  --arg color \"$color\" \\\n  '{schemaVersion:1,label:$label,message:$message,color:$color}' >\"$out\"\n\necho \"Wrote $out:\"\ncat \"$out\"\n"
         },
         {
           "env": {
-            "GH_TOKEN": "${{ secrets.BADGE_GIST_TOKEN }}",
-            "GIST_ID": "${{ vars.BADGE_GIST_ID }}"
+            "GH_TOKEN": "${{ secrets.GH_TOKEN_FOR_UPDATES }}",
+            "GIST_ID": "6b2a2a693da36488ff3a34274a2047fa"
           },
           "name": "Publish badge JSON to gist",
-          "run": "set -euo pipefail\ngh gist edit \"$GIST_ID\" -a nixpkgs-age.json < \"$RUNNER_TEMP/nixpkgs-age.json\"\n"
+          "run": "set -euo pipefail\ngh gist edit \"$GIST_ID\" -a \"$RUNNER_TEMP/nixpkgs-age.json\"\n"
         }
       ]
     }
