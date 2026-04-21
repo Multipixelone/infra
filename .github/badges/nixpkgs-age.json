@@ -1,6 +1,1 @@
-{
-  "schemaVersion": 1,
-  "label": "nixpkgs age",
-  "message": "6d",
-  "color": "brightgreen"
-}
+{"color":"lightgrey","label":"nixpkgs age","message":"unknown","schemaVersion":1}

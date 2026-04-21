@@ -19,7 +19,7 @@
       parts.intro =
         # markdown
         ''
-          # ${config.flake.meta.repo.name}
+          <h1 align="center">${config.flake.meta.repo.name} ❄️</h1>
         '';
 
       parts.badges =
@@ -39,6 +39,7 @@
       parts.about =
         # markdown
         ''
+
           > **One dotfile to rule them all.**
 
           `dotfiles` on steroids, this repository contains my declarative NixOS and Home Manager-based Infrastructure as Code (IaC) for personal devices and home servers.
