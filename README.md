@@ -10,7 +10,7 @@
   <img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/check.yaml?style=for-the-badge&branch=main&label=Check">
 </a>
 <a href="https://github.com/Multipixelone/infra/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3Amain">
-  <img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fraw.githubusercontent.com%2FMultipixelone%2Finfra%2Fmain%2F.github%2Fbadges%2Fnixpkgs-age.json">
+  <img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2FBADGE_GIST_ID%2Fraw%2Fnixpkgs-age.json">
 </a>
 
 </div>
@@ -98,7 +98,6 @@ The following files in this repository are generated and checked
 using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 
 - `.envrc`
-- `.github/badges/nixpkgs-age.json`
 - `.github/workflows/check.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.gitignore`
