@@ -139,7 +139,6 @@
                 offset = "1 3";
                 # only enable drop shadow on link
                 enabled = true;
-                ignore_window = true;
                 range = 30;
                 render_power = 4;
                 color = lib.mkForce "rgba(01010166)";
