@@ -16,6 +16,10 @@
   config = {
     caches = [
       {
+        url = "https://cache.nixos.org";
+        key = "cache.nixos.org-1:6NCHdD59X431o0gWypbY0EwA8p4P9YJf5vN2+6s8YfA=";
+      }
+      {
         url = "https://attic-cache.fly.dev/system?priority=50";
         key = "system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk=";
       }
