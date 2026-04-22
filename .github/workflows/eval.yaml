@@ -18,7 +18,7 @@
         },
         {
           "name": "Create attic netrc",
-          "run": "sudo mkdir -p /etc/nix\necho \"machine attic-cache.fly.dev login automated password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\ngit config --global url.\"https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n"
+          "run": "sudo mkdir -p /etc/nix /etc/determinate\necho \"machine attic-cache.fly.dev login automated password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\necho '{\"authentication\":{\"additionalNetrcSources\":[\"/etc/nix/netrc\"]}}' | sudo tee /etc/determinate/config.json > /dev/null\ngit config --global url.\"https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n"
         },
         {
           "uses": "DeterminateSystems/nix-installer-action@v22",
