@@ -90,7 +90,7 @@ let
       name = "Create attic netrc";
       run = ''
         sudo mkdir -p /etc/nix
-        echo "machine attic-cache.fly.dev password ''${{ secrets.ATTIC_KEY }}" | sudo tee /etc/nix/netrc > /dev/null
+        echo "machine attic-cache.fly.dev login automated password ''${{ secrets.ATTIC_KEY }}" | sudo tee /etc/nix/netrc > /dev/null
         git config --global url."https://''${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
       '';
     };
