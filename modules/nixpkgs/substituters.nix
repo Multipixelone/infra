@@ -21,7 +21,7 @@
       }
       {
         url = "https://attic-cache.fly.dev/system?priority=50";
-        key = "system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk=";
+        key = "system:qjMAtak3MMVYM2B3EoLvNG9duRTrjdNS65RTagsr+y4=";
       }
       {
         url = "https://nix-community.cachix.org";
