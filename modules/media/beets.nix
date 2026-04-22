@@ -5,6 +5,11 @@
   ...
 }:
 {
+  perSystem =
+    { system, ... }:
+    {
+      packages.beets-plugins = inputs.beets-plugins.packages.${system}.default;
+    };
   flake-file.inputs = {
     beets-plugins = {
       url = "github:Multipixelone/beets-plugins";
