@@ -7,5 +7,5 @@ inputs.flake-parts.lib.mkFlake { inherit inputs; } {
     (inputs.import-tree ./modules)
   ];
 
-  _module.args.rootPath = ./.;
+  _module.args.rootPath = inputs.self;
 }
