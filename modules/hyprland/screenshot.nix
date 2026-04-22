@@ -1,12 +1,9 @@
 {
   perSystem =
-    { pkgs, inputs', ... }:
+    { pkgs, ... }:
     let
-      hyprlandPkg = inputs'.hyprland.packages.hyprland;
-      grimblast = pkgs.grimblast.override { hyprland = hyprlandPkg; };
       screenshot-pkgs = [
-        hyprlandPkg
-        grimblast
+        pkgs.grimblast
         pkgs.tesseract
         pkgs.wl-clipboard
         pkgs.libnotify
