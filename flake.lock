@@ -344,9 +344,7 @@
     "beets-plugins": {
       "inputs": {
         "beets-plexsync": "beets-plexsync",
-        "beets-src": [
-          "beets-src"
-        ],
+        "beets-src": "beets-src",
         "beets-stylize": "beets-stylize",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs_3"
@@ -368,11 +366,11 @@
     "beets-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1776807064,
-        "narHash": "sha256-6b+jlsxPWcfFwJp9boKk436GswHFM7IZvIfamRl+mXg=",
+        "lastModified": 1776635946,
+        "narHash": "sha256-smaaWXOctsqP0zzEf6wrppkqev7p2DDyO+NrD2ovGCc=",
         "owner": "beetbox",
         "repo": "beets",
-        "rev": "e55048257c401d56594f78eef6f9f3c02a6a62d4",
+        "rev": "44ffbdf65080383430c06fa699b5bdf16a3cba98",
         "type": "github"
       },
       "original": {
@@ -3512,7 +3510,6 @@
         "auto-cpufreq": "auto-cpufreq",
         "base16": "base16",
         "beets-plugins": "beets-plugins",
-        "beets-src": "beets-src",
         "better-fox": "better-fox",
         "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
         "blocklist": "blocklist",

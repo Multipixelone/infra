@@ -8,12 +8,12 @@
   flake-file.inputs = {
     beets-plugins = {
       url = "github:Multipixelone/beets-plugins";
-      inputs.beets-src.follows = "beets-src";
+      # inputs.beets-src.follows = "beets-src";
     };
-    beets-src = {
-      url = "github:beetbox/beets";
-      flake = false;
-    };
+    # beets-src = {
+    #   url = "github:beetbox/beets";
+    #   flake = false;
+    # };
   };
   flake.modules.homeManager.base =
     hmArgs@{ pkgs, ... }:
