@@ -1,0 +1,102 @@
+{
+  "jobs": {
+    "check": {
+      "continue-on-error": true,
+      "needs": "get-check-names",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Remove unused toolkits",
+          "run": "sudo rm -rf $AGENT_TOOLSDIRECTORY\nsudo rm -rf /usr/local/.ghcup\nsudo rm -rf /usr/local/share/powershell\nsudo rm -rf /usr/local/share/chromium\nsudo rm -rf /usr/local/lib/node_modules\nsudo rm -rf /usr/local/lib/heroku\nsudo rm -rf /var/lib/docker/overlay2\nsudo rm -rf /home/linuxbrew\nsudo rm -rf /home/runner/.rustup\nsudo rm -rf /etc/ssh/sshd_config.d/50-cloud-init.conf\n"
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "submodules": true
+          }
+        },
+        {
+          "name": "Create attic netrc",
+          "run": "sudo mkdir -p /etc/nix\necho \"machine attic-cache.fly.dev password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\ngit config --global url.\"https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n"
+        },
+        {
+          "uses": "nixbuild/nix-quick-install-action@v34",
+          "with": {
+            "nix_conf": "fallback = true\nhttp-connections = 25\nmax-substitution-jobs = 16\nconnect-timeout = 15\nstalled-download-timeout = 15\ndownload-attempts = 100\nsubstituters = https://yazi.cachix.org https://helix.cachix.org https://cache.nixos.org https://attic-cache.fly.dev/system?priority=50 https://nix-community.cachix.org https://hyprland.cachix.org https://anyrun.cachix.org https://prismlauncher.cachix.org https://nix-gaming.cachix.org\ntrusted-public-keys = yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k= helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s= prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c= nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=\n",
+            "nix_version": "2.34.5"
+          }
+        },
+        {
+          "name": "Install SSH key",
+          "uses": "webfactory/ssh-agent@v0.9.0",
+          "with": {
+            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
+          }
+        },
+        {
+          "name": "Login to attic",
+          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+        },
+        {
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
+        }
+      ],
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "checks": "${{ fromJson(needs.get-check-names.outputs.checks) }}"
+        },
+        "max-parallel": 5
+      },
+      "timeout-minutes": 350
+    },
+    "get-check-names": {
+      "outputs": {
+        "checks": "${{ steps.get-check-names.outputs.checks }}"
+      },
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Remove unused toolkits",
+          "run": "sudo rm -rf $AGENT_TOOLSDIRECTORY\nsudo rm -rf /usr/local/.ghcup\nsudo rm -rf /usr/local/share/powershell\nsudo rm -rf /usr/local/share/chromium\nsudo rm -rf /usr/local/lib/node_modules\nsudo rm -rf /usr/local/lib/heroku\nsudo rm -rf /var/lib/docker/overlay2\nsudo rm -rf /home/linuxbrew\nsudo rm -rf /home/runner/.rustup\nsudo rm -rf /etc/ssh/sshd_config.d/50-cloud-init.conf\n"
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "submodules": true
+          }
+        },
+        {
+          "name": "Create attic netrc",
+          "run": "sudo mkdir -p /etc/nix\necho \"machine attic-cache.fly.dev password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\ngit config --global url.\"https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n"
+        },
+        {
+          "uses": "nixbuild/nix-quick-install-action@v34",
+          "with": {
+            "nix_conf": "fallback = true\nhttp-connections = 25\nmax-substitution-jobs = 16\nconnect-timeout = 15\nstalled-download-timeout = 15\ndownload-attempts = 100\nsubstituters = https://yazi.cachix.org https://helix.cachix.org https://cache.nixos.org https://attic-cache.fly.dev/system?priority=50 https://nix-community.cachix.org https://hyprland.cachix.org https://anyrun.cachix.org https://prismlauncher.cachix.org https://nix-gaming.cachix.org\ntrusted-public-keys = yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k= helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= system:XwpCBI5UHFzt9tEmiq3v8S062HvTqWPUwBR8PoHSfSk= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s= prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c= nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=\n",
+            "nix_version": "2.34.5"
+          }
+        },
+        {
+          "name": "Install SSH key",
+          "uses": "webfactory/ssh-agent@v0.9.0",
+          "with": {
+            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
+          }
+        },
+        {
+          "name": "Login to attic",
+          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+        },
+        {
+          "id": "get-check-names",
+          "run": "checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
+        }
+      ]
+    }
+  },
+  "name": "Build",
+  "on": {
+    "push": {}
+  }
+}

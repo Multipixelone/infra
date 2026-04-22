@@ -5,7 +5,7 @@
 
 </div>
 <div align="center">
-<a href="https://github.com/Multipixelone/infra/actions/workflows/check.yaml?query=branch%3Amain"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/check.yaml?style=for-the-badge&branch=main&label=Check"></a>
+<a href="https://github.com/Multipixelone/infra/actions/workflows/eval.yaml?query=branch%3Amain"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/eval.yaml?style=for-the-badge&branch=main&label=Eval"></a>
 <a href="https://github.com/Multipixelone/infra/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3Amain"><img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json"></a>
 </div>
 
@@ -80,10 +80,6 @@ Workflow files are generated using
 For better visibility, a job is spawned for each flake check.
 This is done dynamically.
 
-To prevent runners from running out of space,
-The action [Nothing but Nix](https://github.com/marketplace/actions/nothing-but-nix)
-is used.
-
 See [`modules/ci.nix`](modules/ci.nix).
 
 ## Generated files
@@ -92,7 +88,8 @@ The following files in this repository are generated and checked
 using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 
 - `.envrc`
-- `.github/workflows/check.yaml`
+- `.github/workflows/build.yaml`
+- `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.gitignore`
 - `README.md`

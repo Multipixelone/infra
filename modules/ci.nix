@@ -19,13 +19,16 @@ let
       trusted-public-keys = ${trustedKeys}
     '';
 
-  filename = "check.yaml";
-  filePath = ".github/workflows/${filename}";
+  evalFilename = "eval.yaml";
+  evalFilePath = ".github/workflows/${evalFilename}";
+  buildFilename = "build.yaml";
+  buildFilePath = ".github/workflows/${buildFilename}";
   nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
   nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
   nixpkgsAgeBadgeEndpoint = "https%3A%2F%2Fgist.githubusercontent.com%2F${repo.owner}%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json";
 
-  workflowName = "Check";
+  evalWorkflowName = "Eval";
+  buildWorkflowName = "Build";
 
   ids = {
     jobs = {
@@ -77,7 +80,7 @@ let
     nixInstaller = {
       uses = "nixbuild/nix-quick-install-action@v34";
       "with" = {
-        nix_version = "2.31.2";
+        nix_version = "2.34.5";
         nix_conf = mkNixConf;
       };
     };
@@ -134,7 +137,7 @@ in
   text.readme.parts = {
     ci-badges = ''
       <div align="center">
-      <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${filename}?query=branch%3A${repo.defaultBranch}"><img alt="CI status" src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${filename}?style=for-the-badge&branch=${repo.defaultBranch}&label=${workflowName}"></a>
+      <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${evalFilename}?query=branch%3A${repo.defaultBranch}"><img alt="CI status" src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${evalFilename}?style=for-the-badge&branch=${repo.defaultBranch}&label=${evalWorkflowName}"></a>
       <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${nixpkgsAgeFilename}?query=branch%3A${repo.defaultBranch}"><img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=${nixpkgsAgeBadgeEndpoint}"></a>
       </div>
     '';
@@ -151,15 +154,6 @@ in
       This is done dynamically.
 
     ''
-    + (
-      assert steps ? nothingButNix;
-      ''
-        To prevent runners from running out of space,
-        The action [Nothing but Nix](https://github.com/marketplace/actions/nothing-but-nix)
-        is used.
-
-      ''
-    )
     + ''
       See [`modules/ci.nix`](modules/ci.nix).
 
@@ -171,13 +165,45 @@ in
     {
       files.files = [
         {
-          path_ = filePath;
-          drv = pkgs.writers.writeJSON "gh-actions-workflow-check.yaml" {
-            name = workflowName;
+          path_ = evalFilePath;
+          drv = pkgs.writers.writeJSON "gh-actions-workflow-eval.yaml" {
+            name = evalWorkflowName;
             on = {
               push = { };
-              workflow_call = { };
+              workflow_call = {
+                outputs.${ids.outputs.jobs.getCheckNames} = {
+                  description = "JSON array of check names";
+                  value = "\${{ jobs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames} }}";
+                };
+              };
             };
+            jobs.${ids.jobs.getCheckNames} = {
+              runs-on = runner.name;
+              outputs.${ids.outputs.jobs.getCheckNames} =
+                "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
+              steps = [
+                steps.removeUnusedSoftware
+                steps.checkout
+                steps.createAtticNetrc
+                steps.nixInstaller
+                steps.installSshKey
+                steps.loginToAttic
+                {
+                  id = ids.steps.getCheckNames;
+                  run = ''
+                    checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
+                    echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
+                  '';
+                }
+              ];
+            };
+          };
+        }
+        {
+          path_ = buildFilePath;
+          drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
+            name = buildWorkflowName;
+            on.push = { };
             jobs = {
               ${ids.jobs.getCheckNames} = {
                 runs-on = runner.name;
@@ -193,7 +219,6 @@ in
                   {
                     id = ids.steps.getCheckNames;
                     run = ''
-                      nix ${nixArgs} flake check --no-build
                       checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
                       echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
                     '';
@@ -233,7 +258,6 @@ in
                         --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'
                     '';
                   }
-                  # steps.pushToAttic
                 ];
               };
             };
@@ -391,7 +415,8 @@ in
       ];
 
       treefmt.settings.global.excludes = [
-        filePath
+        evalFilePath
+        buildFilePath
         nixpkgsAgeFilePath
         ciFilePath
       ];
