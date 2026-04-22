@@ -1,13 +1,12 @@
 { withSystem, ... }:
 {
   perSystem =
-    { pkgs, inputs', ... }:
+    { pkgs, ... }:
     {
       packages.hyprctl-instance = pkgs.writeShellApplication {
         name = "hyprctl-instance";
         runtimeInputs = [
           pkgs.coreutils
-          inputs'.hyprland.packages.hyprland
           pkgs.jq
         ];
         text = ''
