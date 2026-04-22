@@ -46,7 +46,7 @@ let
 
   matrixParam = "checks";
 
-  nixArgs = "--accept-flake-config";
+  nixArgs = "--accept-flake-config --allow-import-from-derivation";
 
   runner = {
     name = "ubuntu-latest";

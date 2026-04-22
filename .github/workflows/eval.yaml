@@ -40,7 +40,7 @@
         },
         {
           "id": "get-check-names",
-          "run": "checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
+          "run": "checks=\"$(nix --accept-flake-config --allow-import-from-derivation eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }
