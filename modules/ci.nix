@@ -15,6 +15,8 @@ let
       connect-timeout = 15
       stalled-download-timeout = 15
       download-attempts = 100
+      accept-flake-config = true
+      netrc-file = /etc/nix/netrc
       substituters = ${substituters}
       trusted-public-keys = ${trustedKeys}
     '';
@@ -80,6 +82,7 @@ let
     nixInstaller = {
       uses = "DeterminateSystems/nix-installer-action@v22";
       "with" = {
+        flakehub = false;
         extra-conf = mkNixConf;
       };
     };
