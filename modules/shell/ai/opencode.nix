@@ -27,8 +27,9 @@
           claude-opus = "anthropic/claude-opus-4-6";
           claude-opus-next = "anthropic/claude-opus-4-7";
           claude-sonnet = "anthropic/claude-sonnet-4-6";
+          claude-haiku = "anthropic/claude-haiku-4-5";
           gemini-pro = "github-copilot/gemini-3.1-pro-preview";
-          claude-haiku = "github-copilot/claude-haiku-4.5";
+          claude-haiku-copilot = "github-copilot/claude-haiku-4.5";
           grok-fast = "github-copilot/grok-code-fast-1";
           gpt-codex = "github-copilot/gpt-5.3-codex";
           gpt-mini = "github-copilot/gpt-5.4-mini";
@@ -96,18 +97,28 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Shared specialist assignment (everything except orchestrator).
-        specialists = {
+        # Anthropic-only specialist assignment for the custom preset.
+        specialistsCustom = {
           oracle = "claude-opus-next";
           librarian = "claude-haiku";
+          explorer = "claude-haiku";
+          designer = "claude-sonnet";
+          fixer = "claude-sonnet";
+          observer = "claude-haiku";
+        };
+
+        # Copilot-mixed specialist assignment for the copilot preset.
+        specialistsCopilot = {
+          oracle = "claude-opus-next";
+          librarian = "claude-haiku-copilot";
           explorer = "grok-fast";
           designer = "gemini-pro";
           fixer = "gpt-codex";
           observer = "gpt-mini";
         };
 
-        presetCustom = mkPreset (specialists // { orchestrator = "claude-opus"; });
-        presetCopilot = mkPreset (specialists // { orchestrator = "gpt-codex"; });
+        presetCustom = mkPreset (specialistsCustom // { orchestrator = "claude-opus"; });
+        presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
 
         # ── Shared config sections ──────────────────────────────────────
 
@@ -290,7 +301,7 @@
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
-          preset = "copilot";
+          preset = "custom";
           council = councilConfig;
           fallback = fallbackConfig;
           todoContinuation = {
@@ -319,7 +330,7 @@
             plugin = [
               "@ex-machina/opencode-anthropic-auth"
               "@simonwjackson/opencode-direnv"
-              "oh-my-opencode-slim"
+              "oh-my-opencode-slim@1.0.0"
               "true-mem"
               "openrtk"
             ];
