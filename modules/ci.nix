@@ -36,11 +36,14 @@ let
     jobs = {
       getCheckNames = "get-check-names";
       check = "check";
+      checkNixos = "check-nixos";
     };
     steps.getCheckNames = "get-check-names";
     outputs = {
       jobs.getCheckNames = "checks";
+      jobs.getCheckNamesNixos = "checks-nixos";
       steps.getCheckNames = "checks";
+      steps.getCheckNamesNixos = "checks-nixos";
     };
   };
 
@@ -206,8 +209,12 @@ in
             jobs = {
               ${ids.jobs.getCheckNames} = {
                 runs-on = runner.name;
-                outputs.${ids.outputs.jobs.getCheckNames} =
-                  "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
+                outputs = {
+                  ${ids.outputs.jobs.getCheckNames} =
+                    "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
+                  ${ids.outputs.jobs.getCheckNamesNixos} =
+                    "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
+                };
                 steps = [
                   steps.removeUnusedSoftware
                   steps.checkout
@@ -218,8 +225,9 @@ in
                   {
                     id = ids.steps.getCheckNames;
                     run = ''
-                      checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
-                      echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
+                      all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
+                      echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
+                      echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
                     '';
                   }
                 ];
@@ -235,6 +243,44 @@ in
                   max-parallel = 5;
                   matrix.${matrixParam} =
                     "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
+                };
+                steps = [
+                  steps.removeUnusedSoftware
+                  steps.checkout
+                  steps.createAtticNetrc
+                  steps.nixInstaller
+                  steps.installSshKey
+                  steps.loginToAttic
+                  {
+                    run = ''
+                      nix run github:Mic92/nix-fast-build -- \
+                        --skip-cached \
+                        --no-nom \
+                        --attic-cache system \
+                        -j 1 \
+                        --eval-workers 1 \
+                        --eval-max-memory-size 2048 \
+                        --retries 2 \
+                        --no-link \
+                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'
+                    '';
+                  }
+                ];
+              };
+
+              ${ids.jobs.checkNixos} = {
+                continue-on-error = true;
+                needs = [
+                  ids.jobs.getCheckNames
+                  ids.jobs.check
+                ];
+                runs-on = runner.name;
+                timeout-minutes = 350;
+                strategy = {
+                  fail-fast = false;
+                  max-parallel = 5;
+                  matrix.${matrixParam} =
+                    "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
                 };
                 steps = [
                   steps.removeUnusedSoftware
