@@ -78,10 +78,9 @@ let
       "with".submodules = true;
     };
     nixInstaller = {
-      uses = "nixbuild/nix-quick-install-action@v34";
+      uses = "DeterminateSystems/nix-installer-action@v22";
       "with" = {
-        nix_version = "2.34.5";
-        nix_conf = mkNixConf;
+        extra-conf = mkNixConf;
       };
     };
     createAtticNetrc = {
