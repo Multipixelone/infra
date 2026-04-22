@@ -71,11 +71,7 @@ This repository follows the [dendritic](https://github.com/mightyiam/dendritic) 
 
 ## Running checks on GitHub Actions
 
-Running this repository's flake checks on GitHub Actions is merely a bonus
-and possibly more of a liability.
-
-Workflow files are generated using
-[the _files_ flake-parts module](https://github.com/mightyiam/files).
+This repository runs checks using GitHub Actions and pushes the results to an Attic cache.
 
 For better visibility, a job is spawned for each flake check.
 This is done dynamically.
