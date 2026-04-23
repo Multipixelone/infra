@@ -50,7 +50,7 @@
         # each role.
         roles = {
           orchestrator = {
-            variant = "medium";
+            variant = "low";
             skills = [ "*" ];
             # Keep context7/grep_app off orchestrator so it delegates
             # doc/code lookups to librarian instead of doing them itself.
@@ -127,7 +127,7 @@
           observer = "gpt-mini";
         };
 
-        presetCustom = mkPreset (specialistsCustom // { orchestrator = "claude-opus"; });
+        presetCustom = mkPreset (specialistsCustom // { orchestrator = "claude-opus-next"; });
         presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
 
         # ── Shared config sections ──────────────────────────────────────
