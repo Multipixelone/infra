@@ -61,7 +61,7 @@
             ];
           };
           oracle = {
-            variant = "high";
+            variant = "max";
             skills = [ "simplify" ];
             mcps = [ ];
           };
