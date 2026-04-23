@@ -78,6 +78,45 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `noctalia-shell` — `nix run github:Multipixelone/infra#noctalia-shell`
 
 
+## Packages
+
+<details>
+<summary>Packages exposed by this flake (30)</summary>
+
+- [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
+- [`beets-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#beets-lossyflac`
+- [`beets-plugins`](https://github.com/Multipixelone/infra/blob/main/modules/media/beets.nix) — Music tagger and library organizer · `nix run github:Multipixelone/infra#beets-plugins`
+- [`claude-status-line`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/status-line.nix) · `nix run github:Multipixelone/infra#claude-status-line`
+- [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
+- [`convert-mpc`](https://github.com/Multipixelone/infra/blob/main/modules/media/convert-mpc.nix) · `nix run github:Multipixelone/infra#convert-mpc`
+- [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
+- [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
+- [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
+- [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`
+- [`helix`](https://github.com/Multipixelone/infra/blob/main/modules/shell/helix.nix) · `nix run github:Multipixelone/infra#helix`
+- [`hyprctl-instance`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/instance.nix) · `nix run github:Multipixelone/infra#hyprctl-instance`
+- [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
+- [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
+- [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
+- [`musepack`](https://github.com/Multipixelone/infra/blob/main/modules/media/convert-mpc.nix) — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
+- [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A sleek and minimal desktop shell thoughtfully crafted for Wayland, built with Quickshell. · `nix run github:Multipixelone/infra#noctalia-shell`
+- [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
+- [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
+- [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`
+- [`ralph-wiggum-plugin`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/claude.nix) — Ralph Wiggum loop plugin for Claude Code — self-referential agentic loops · `nix run github:Multipixelone/infra#ralph-wiggum-plugin`
+- [`rb-albumart`](https://github.com/Multipixelone/infra/blob/main/modules/media/rockbox.nix) · `nix run github:Multipixelone/infra#rb-albumart`
+- [`rtk-rewrite`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/rtk-rewrite.nix) · `nix run github:Multipixelone/infra#rtk-rewrite`
+- [`screenshot-area`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area`
+- [`screenshot-area-ocr`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area-ocr`
+- [`system`](https://github.com/Multipixelone/infra/blob/main/modules/nix/utils.nix) · `nix run github:Multipixelone/infra#system`
+- [`upload-script`](https://github.com/Multipixelone/infra/blob/main/modules/shell/0x0.nix) · `nix run github:Multipixelone/infra#upload-script`
+- `write-flake` — Generate a flake.nix file · `nix run github:Multipixelone/infra#write-flake`
+- `write-inputs` — Generate an inputs.nix expression (for debugging) · `nix run github:Multipixelone/infra#write-inputs`
+- `write-lock` — Detect existing lock file and delegate to the appropriate writer. · `nix run github:Multipixelone/infra#write-lock`
+
+</details>
+
+
 ## Dendritic Pattern
 
 This repository follows the [dendritic](https://github.com/mightyiam/dendritic) pattern with flake-parts modules auto-discovered from `modules/`.

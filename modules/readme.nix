@@ -11,6 +11,7 @@
         "structure"
         "commands"
         "wrappers"
+        "packages"
         "dendritic"
         "github-actions"
         "files"
@@ -139,6 +140,109 @@
             ""
           ]
           ++ wrapperLines
+        )
+        |> lib.concatLines;
+
+      parts.packages =
+        let
+          inherit (config.flake.meta.repo) owner name defaultBranch;
+          repo = "${owner}/${name}";
+          repoUrl = "https://github.com/${repo}";
+          system = "x86_64-linux";
+          packages = config.flake.packages.${system} or { };
+          names = packages |> builtins.attrNames |> lib.naturalSort;
+
+          # Recursively collect all .nix files under a directory (relative paths).
+          collectNix =
+            base:
+            let
+              go =
+                sub:
+                let
+                  dir = base + "/${sub}";
+                  entries = builtins.readDir dir;
+                in
+                lib.flatten (
+                  lib.mapAttrsToList (
+                    n: t:
+                    let
+                      rel = if sub == "" then n else "${sub}/${n}";
+                    in
+                    if t == "directory" then
+                      go rel
+                    else if t == "regular" && lib.hasSuffix ".nix" n then
+                      [ rel ]
+                    else
+                      [ ]
+                  ) entries
+                );
+            in
+            go "";
+
+          # Build { name -> "modules/path.nix" } by scanning module sources for
+          # `packages.<name> =` and `wrappers.packages.<name> =` assignments.
+          sourceMap =
+            let
+              moduleFiles = collectNix ../modules;
+              # Quote regex meta-chars present in package names (just `-`, safe as-is in classes; we use literal match).
+              # Match `packages.<name> =` or `wrappers.packages.<name> =`.
+              dottedPattern =
+                n:
+                ".*(^|[^A-Za-z0-9_.-])(perSystem\\.)?(wrappers\\.)?packages\\.\"?${lib.escapeRegex n}\"?[[:space:]]*=.*";
+              # Match a bare `<name> =` line (inside an attrset like `packages = { … }`).
+              barePattern = n: "[[:space:]]*\"?${lib.escapeRegex n}\"?[[:space:]]*=.*";
+              fileMatches =
+                file: name:
+                let
+                  content = builtins.readFile (../modules + "/${file}");
+                  lines = lib.splitString "\n" content;
+                  hasDotted = lib.any (l: builtins.match (dottedPattern name) l != null) lines;
+                  hasPackagesBlock =
+                    builtins.match ".*(^|[^A-Za-z0-9_.])packages[[:space:]]*=[[:space:]]*\\{.*" content != null;
+                  hasBare = lib.any (l: builtins.match (barePattern name) l != null) lines;
+                in
+                hasDotted || (hasPackagesBlock && hasBare);
+              findFor =
+                n:
+                let
+                  hits = lib.filter (f: fileMatches f n) moduleFiles;
+                in
+                if hits == [ ] then null else builtins.head hits;
+            in
+            lib.genAttrs names findFor;
+
+          describe =
+            n:
+            let
+              pkg = packages.${n};
+              tried = builtins.tryEval (pkg.meta.description or "");
+              desc = if tried.success then tried.value else "";
+            in
+            if desc != "" then " — ${desc}" else "";
+
+          link =
+            n:
+            let
+              src = sourceMap.${n};
+            in
+            if src == null then "`${n}`" else "[`${n}`](${repoUrl}/blob/${defaultBranch}/modules/${src})";
+
+          rows = names |> map (n: "- ${link n}${describe n} · `nix run github:${repo}#${n}`");
+        in
+        (
+          [
+            ""
+            "## Packages"
+            ""
+            "<details>"
+            "<summary>Packages exposed by this flake (${toString (builtins.length names)})</summary>"
+            ""
+          ]
+          ++ rows
+          ++ [
+            ""
+            "</details>"
+          ]
         )
         |> lib.concatLines;
 
