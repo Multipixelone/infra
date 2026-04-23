@@ -1,4 +1,5 @@
 <h1 align="center">infra ❄️</h1>
+
 <div align="center">
 
 [![License](https://img.shields.io/github/license/Multipixelone/infra?style=for-the-badge&logo=creativecommons&color=cba6f7&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/blob/main/LICENSE)
@@ -7,14 +8,21 @@
 [![Dendritic](https://img.shields.io/badge/dendritic-pattern-fab387?style=for-the-badge&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAA5CAYAAAB0+HhyAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAbpJREFUaN7tWcGuwyAMW6L9/y/nXTZpr4PiJA6sqJwmrZQYjOOk8igcZmbv3yIilWvpY9L4BHVpINXjBnIDKRrP1arEUjZlgIiokr0GS9mo1GoFN0uKJUMBdkCt96J00wyt5DUYALLv0ch96O3kCgD0O+INqvdslK5ypApLJnsBjea25o1Ai4gIOvH4XARMdAOO81rPaEWOYCiXB8RpZkfoNtPuDwUnsusoOBa1kFg0ojozqYaqpLJywioAp5cdOZ2KU8kkXmEEiiY3RhLsvYObXQdSiUppZC312HAm3bL+7WuToi9F5rROpGotyfgi5qXP+jeJJi4mIM96PS8mTEsSzcrZ4s5V6s7KB+mafYsT2eaObKtal80jmeDOAjmjLHutbbzW3u63zNglTae7HkF2aGY7CFlbq0DM7rQoWov8WvPhGK9mi6mK5oKnf/CO/flr9Bm5jNb/ZmaK7soqkKhg6L/sCDbpop/XmL7sK+6M48wIAfMTRrdBN6MeiTar3Q06zy5lKTMyk8ipbPNVt6SsHXVnKvKWsncUokGBfCuD15HgWqAzAEsTG6OpsYRaK8cN5AZyRSAzXfIf7j4IjUJ5XtMAAAAASUVORK5CYII=&labelColor=313244&logoColor=cdd6f4)](https://github.com/mightyiam/dendritic)
 
 </div>
+
+<div align="center">
+
 [![Eval](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/eval.yaml?branch=main&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/eval.yaml?query=branch%3Amain)
 [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3Amain)
+
+</div>
+
 
 > **One dotfile to rule them all.**
 
 `dotfiles` on steroids, this repository contains my declarative NixOS and Home Manager-based Infrastructure as Code (IaC) for personal devices and home servers.
 
 Built on top of [flake-parts](https://flake.parts/), this setup manages system configurations, dotfiles, user secrets (via `agenix`), custom packages, and portable applications runnable anywhere via `nix run`.
+
 
 ## Hosts
 
@@ -28,6 +36,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 | `ipad` | Personal tablet | Apple | iPad | Tablet | - | - |
 
 
+
 ## Repository Structure
 
 - **`flake.nix`**: Auto-generated entrypoint (do not edit).
@@ -35,6 +44,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 - **`modules/`**: Flake-parts modules defining hosts, profiles, and services. Auto-discovered.
 - **`pkgs/`**: Custom packages and overrides.
 - **`docs/`**: Agent skills and internal documentation.
+
 
 ## Commands
 
@@ -58,6 +68,7 @@ Task execution is managed via `just`.
 
 > **Note:** Regenerate auto-generated files (like `flake.nix` or this `README.md`) using `nix run .#generate-files`.
 
+
 ## Wrappers
 
 Portable applications exposed by this flake and runnable on any Nix-enabled system.
@@ -66,9 +77,11 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `helix` — `nix run github:Multipixelone/infra#helix`
 - `noctalia-shell` — `nix run github:Multipixelone/infra#noctalia-shell`
 
+
 ## Dendritic Pattern
 
 This repository follows the [dendritic](https://github.com/mightyiam/dendritic) pattern with flake-parts modules auto-discovered from `modules/`.
+
 
 ## Running checks on GitHub Actions
 
@@ -78,6 +91,7 @@ For better visibility, a job is spawned for each flake check.
 This is done dynamically.
 
 See [`modules/ci.nix`](modules/ci.nix).
+
 
 ## Generated files
 

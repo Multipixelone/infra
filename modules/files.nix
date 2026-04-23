@@ -30,7 +30,7 @@
       if lib.isAttrs text then
         lib.pipe text.order [
           (map (lib.flip lib.getAttr text.parts))
-          lib.concatStrings
+          (lib.concatStringsSep "\n")
         ]
       else
         text

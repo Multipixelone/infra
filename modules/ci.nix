@@ -147,8 +147,12 @@ in
       in
       # markdown
       ''
+        <div align="center">
+
         [![Eval](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/eval.yaml?branch=${defaultBranch}&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/eval.yaml?query=branch%3A${defaultBranch})
         [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3A${defaultBranch})
+
+        </div>
       '';
     github-actions = ''
       ## Running checks on GitHub Actions
