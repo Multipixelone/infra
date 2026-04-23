@@ -379,13 +379,13 @@ in
                     now_ts="$(date -u +%s)"
                     age_days="$(( (now_ts - commit_ts) / 86400 ))"
 
-                    # Pick a color
-                    color="brightgreen"
-                    if [ "$age_days" -gt 7 ]; then color="green"; fi
-                    if [ "$age_days" -gt 14 ]; then color="yellowgreen"; fi
-                    if [ "$age_days" -gt 30 ]; then color="yellow"; fi
-                    if [ "$age_days" -gt 60 ]; then color="orange"; fi
-                    if [ "$age_days" -gt 90 ]; then color="red"; fi
+                    # Pick a color (catppuccin mocha)
+                    color="a6e3a1"
+                    if [ "$age_days" -gt 5 ]; then color="94e2d5"; fi
+                    if [ "$age_days" -gt 10 ]; then color="f9e2af"; fi
+                    if [ "$age_days" -gt 20 ]; then color="fab387"; fi
+                    if [ "$age_days" -gt 30 ]; then color="f38ba8"; fi
+                    if [ "$age_days" -gt 40 ]; then color="eba0ac"; fi
 
                     jq -n \
                       --arg label "nixpkgs age" \
