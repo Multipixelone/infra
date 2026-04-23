@@ -330,7 +330,7 @@
             plugin = [
               "@ex-machina/opencode-anthropic-auth"
               "@simonwjackson/opencode-direnv"
-              "oh-my-opencode-slim@1.0.0"
+              "oh-my-opencode-slim@1.0.1"
               "true-mem"
               "openrtk"
             ];
