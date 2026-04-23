@@ -85,7 +85,7 @@
             mcps = [ ];
           };
           fixer = {
-            variant = "low";
+            variant = "medium";
             skills = [ ];
             mcps = [ ];
           };
