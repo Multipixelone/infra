@@ -136,12 +136,12 @@
           master.model = models.kimi; # was: models.gpt-codex
           master_fallback = [
             models.claude-opus-next
-            models.qwen # was: models.gemini-pro
+            models.kimi # was: models.gemini-pro
           ];
           presets.default = {
             alpha.model = models.claude-opus-next;
             beta.model = models.qwen; # was: models.gemini-pro
-            gamma.model = models.kimi;
+            gamma.model = models.glm;
           };
         };
 
