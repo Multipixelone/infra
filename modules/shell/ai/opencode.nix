@@ -50,7 +50,7 @@
         # each role.
         roles = {
           orchestrator = {
-            variant = "low";
+            variant = "medium";
             skills = [ "*" ];
             # Keep context7/grep_app off orchestrator so it delegates
             # doc/code lookups to librarian instead of doing them itself.
