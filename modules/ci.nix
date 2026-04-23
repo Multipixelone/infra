@@ -27,7 +27,6 @@ let
   buildFilePath = ".github/workflows/${buildFilename}";
   nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
   nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
-  nixpkgsAgeBadgeEndpoint = "https%3A%2F%2Fgist.githubusercontent.com%2F${repo.owner}%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json";
 
   evalWorkflowName = "Eval";
   buildWorkflowName = "Build";
@@ -141,12 +140,7 @@ let
 in
 {
   text.readme.parts = {
-    ci-badges = ''
-      <div align="center">
-      <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${evalFilename}?query=branch%3A${repo.defaultBranch}"><img alt="CI status" src="https://img.shields.io/${repo.forge}/actions/workflow/status/${repo.owner}/${repo.name}/${evalFilename}?style=for-the-badge&branch=${repo.defaultBranch}&label=${evalWorkflowName}"></a>
-      <a href="https://github.com/${repo.owner}/${repo.name}/actions/workflows/${nixpkgsAgeFilename}?query=branch%3A${repo.defaultBranch}"><img alt="nixpkgs commit age" src="https://img.shields.io/endpoint?style=for-the-badge&url=${nixpkgsAgeBadgeEndpoint}"></a>
-      </div>
-    '';
+    ci-badges = "";
     github-actions = ''
       ## Running checks on GitHub Actions
 
