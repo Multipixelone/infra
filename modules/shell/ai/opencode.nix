@@ -113,7 +113,7 @@
           librarian = "kimi";
           explorer = "kimi";
           designer = "claude-sonnet";
-          fixer = "mimo-pro";
+          fixer = "glm";
           observer = "mimo-omni";
         };
 
@@ -123,7 +123,7 @@
           librarian = "kimi";
           explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
-          fixer = "mimo-pro";
+          fixer = "glm";
           observer = "gpt-mini";
         };
 
