@@ -357,6 +357,7 @@
             agent.plan.permission.task = {
               "*" = "allow";
             };
+            agent.orchestrator.permission.glob = "deny";
           };
         };
 
