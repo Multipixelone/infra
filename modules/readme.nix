@@ -249,9 +249,9 @@
       parts.hosts =
         let
           rolePriority =
-            role:
+            sortRole:
             let
-              normalized = if role == null then "" else lib.toLower role;
+              normalized = if sortRole == null then "" else lib.toLower sortRole;
             in
             if normalized == "server" then
               "2"
@@ -272,15 +272,16 @@
               _name: host:
               let
                 vOrDash = value: if value == null then "-" else value;
-                role =
+                displayRole =
                   if host.readmeRole != null then
                     host.readmeRole
                   else if host.roles == [ ] then
                     null
                   else
                     lib.toSentenceCase (builtins.head host.roles);
+                sortRole = if host.roles == [ ] then null else builtins.head host.roles;
               in
-              "${rolePriority role}::| `${host.hostName}` | ${vOrDash host.description} | ${vOrDash host.manufacturer} | ${vOrDash host.model} | ${vOrDash role} | ${vOrDash host.desktopWindowManager} | ${vOrDash host.notes} |"
+              "${rolePriority sortRole}::| `${host.hostName}` | ${vOrDash host.description} | ${vOrDash host.manufacturer} | ${vOrDash host.model} | ${vOrDash displayRole} | ${vOrDash host.desktopWindowManager} | ${vOrDash host.notes} |"
             )
             |> lib.naturalSort
             |> map (row: builtins.substring 3 ((builtins.stringLength row) - 3) row)

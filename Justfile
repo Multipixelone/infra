@@ -31,6 +31,21 @@ minishb:
 fastb:
   nix-fast-build --attic-cache system --no-link
 
+# Build a standalone home-manager activation package locally
+hm-build host:
+  nix build .#homeConfigurations.{{host}}.activationPackage
+
+# Build locally, copy closure to the target, and activate over SSH.
+# Nix is not on the non-interactive SSH PATH on DSM, so we pin remote-program
+# and prepend the nix bindir before invoking activate. Default points at the
+# multi-user daemon profile used by synology-nix-installer.
+hm-deploy host remote_nix_bindir="/nix/var/nix/profiles/default/bin":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out=$(nix build .#homeConfigurations.{{host}}.activationPackage --print-out-paths --no-link)
+  nix copy --to "ssh://{{host}}?remote-program={{remote_nix_bindir}}/nix-store" "$out"
+  ssh {{host}} "PATH={{remote_nix_bindir}}:\$PATH '$out/activate'"
+
 iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
 

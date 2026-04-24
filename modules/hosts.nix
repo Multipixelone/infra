@@ -142,6 +142,20 @@ in
       desktopWindowManager = "None";
       notes = "Audio + home services";
     };
+    alexandria = {
+      isNixOS = false;
+      homeAddress = "192.168.6.9";
+      roles = [
+        "server"
+        "nas"
+      ];
+      description = "Synology NAS (home-manager only, non-NixOS)";
+      manufacturer = "Synology";
+      model = "DS920+";
+      readmeRole = "NAS";
+      desktopWindowManager = "None";
+      notes = "DSM host managed via standalone home-manager";
+    };
     ipad = {
       roles = [ "tablet" ];
       description = "Personal tablet";

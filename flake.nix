@@ -95,13 +95,6 @@
       url = "github:zhaofengli/colmena";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    direnv-instant = {
-      url = "github:Mic92/direnv-instant";
-      inputs = {
-        flake-parts.follows = "flake-parts";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
     euphony = {
       url = "github:Multipixelone/euphony/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";

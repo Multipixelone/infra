@@ -30,6 +30,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 |----------|-------------|--------------|-------|------|------------|-------|
 | `link` | My desktop | Custom | Gaming PC | Desktop | Hyprland | - |
 | `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
+| `alexandria` | Synology NAS (home-manager only, non-NixOS) | Synology | DS920+ | NAS | None | DSM host managed via standalone home-manager |
 | `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
 | `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
 | `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |
@@ -58,6 +59,8 @@ Task execution is managed via `just`.
 | `just colmena-apply-tag <tag>` | Deploy configurations to a specific Colmena tag. |
 | `just minishb` | Build selected hosts and push resulting closures. |
 | `just fastb` | Fast build with `nix-fast-build` and Attic cache upload. |
+| `just hm-build` | See Justfile recipe. |
+| `just hm-deploy` | See Justfile recipe. |
 | `just iso` | Build an installer ISO. |
 | `just debug` | Run rebuild with `--show-trace` for debugging. |
 | `just update` | Update flake lockfile and Firefox addons. |

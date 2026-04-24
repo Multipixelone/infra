@@ -27,10 +27,13 @@
       };
     };
     pc = {
-      home-manager.users.${config.flake.meta.owner.username}.imports = [
-        config.flake.modules.homeManager.gui
-        config.flake.modules.homeManager.media
-      ];
+      home-manager.users.${config.flake.meta.owner.username} = {
+        dconf.enable = true;
+        imports = [
+          config.flake.modules.homeManager.gui
+          config.flake.modules.homeManager.media
+        ];
+      };
     };
     laptop = {
       home-manager.users.${config.flake.meta.owner.username}.imports = [
