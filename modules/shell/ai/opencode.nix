@@ -117,6 +117,16 @@
           observer = "mimo-omni";
         };
 
+        # opencode-go only (if I hit Claude & Copilot Limit)
+        specialistsGo = {
+          oracle = "glm";
+          librarian = "kimi";
+          explorer = "kimi";
+          designer = "mimo-pro";
+          fixer = "glm";
+          observer = "mimo-omni";
+        };
+
         # Copilot-mixed specialist assignment (default preset).
         specialistsCopilot = {
           oracle = "claude-opus-next";
@@ -124,10 +134,11 @@
           explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
           fixer = "glm";
-          observer = "gpt-mini";
+          observer = "mimo-pro";
         };
 
         presetCustom = mkPreset (specialistsCustom // { orchestrator = "claude-opus-next"; });
+        presetGo = mkPreset (specialistsGo // { orchestrator = "glm"; });
         presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
 
         # ── Shared config sections ──────────────────────────────────────
@@ -315,7 +326,7 @@
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
-          preset = "custom";
+          preset = "go";
           council = councilConfig;
           fallback = fallbackConfig;
           todoContinuation = {
@@ -329,6 +340,7 @@
           lsp = lspServers;
           presets = {
             custom = presetCustom;
+            go = presetGo;
             copilot = presetCopilot;
           };
         };
@@ -358,6 +370,8 @@
               "*" = "allow";
             };
             agent.orchestrator.permission.glob = "deny";
+            tui.scroll_speed = 1;
+            tui.scroll_acceleration.enabled = true;
           };
         };
 
