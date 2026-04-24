@@ -82,7 +82,7 @@
         '';
     };
 
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     let
       rb-albumart = withSystem pkgs.stdenv.hostPlatform.system (

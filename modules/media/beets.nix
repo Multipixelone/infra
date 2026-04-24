@@ -20,7 +20,7 @@
     #   flake = false;
     # };
   };
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     hmArgs@{ pkgs, ... }:
     let
       media-drive = "/volume1/Media";

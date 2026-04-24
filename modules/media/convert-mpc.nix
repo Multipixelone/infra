@@ -107,7 +107,7 @@
         '';
     };
 
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     let
       convert-mpc = withSystem pkgs.stdenv.hostPlatform.system (

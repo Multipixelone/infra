@@ -15,7 +15,7 @@
       flake = false;
     };
   };
-  flake.modules.homeManager.gui =
+  flake.modules.homeManager.media =
     hmArgs@{ pkgs, ... }:
     let
       bgutil-version =

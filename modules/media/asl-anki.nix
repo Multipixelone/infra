@@ -12,7 +12,7 @@
       };
     };
 
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     let
       asl-anki = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.asl-anki);

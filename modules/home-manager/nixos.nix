@@ -29,6 +29,7 @@
     pc = {
       home-manager.users.${config.flake.meta.owner.username}.imports = [
         config.flake.modules.homeManager.gui
+        config.flake.modules.homeManager.media
       ];
     };
     laptop = {
@@ -39,6 +40,11 @@
     gaming = {
       home-manager.users.${config.flake.meta.owner.username}.imports = [
         config.flake.modules.homeManager.gaming
+      ];
+    };
+    media = {
+      home-manager.users.${config.flake.meta.owner.username}.imports = [
+        config.flake.modules.homeManager.media
       ];
     };
   };

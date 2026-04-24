@@ -33,7 +33,7 @@
       };
     };
 
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     let
       beets-lossyflac = withSystem pkgs.stdenv.hostPlatform.system (

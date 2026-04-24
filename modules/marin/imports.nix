@@ -5,6 +5,7 @@
       efi
       wifi
       base
+      media
     ];
   };
 }

@@ -8,7 +8,7 @@
     inputs.nixpkgs.follows = "nixpkgs";
     inputs.flake-utils.follows = "flake-utils";
   };
-  flake.modules.homeManager.gui =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     {
       home.packages = [

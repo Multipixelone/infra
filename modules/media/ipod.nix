@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.modules.homeManager.gui =
+  flake.modules.homeManager.media =
     hmArgs@{
       pkgs,
       ...

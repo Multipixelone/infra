@@ -20,7 +20,7 @@
       };
     })
   ];
-  flake.modules.homeManager.gui =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     {
       home.packages = [

@@ -89,7 +89,7 @@
         '';
     };
 
-  flake.modules.homeManager.base =
+  flake.modules.homeManager.media =
     { pkgs, ... }:
     let
       playlist-transcode = withSystem pkgs.stdenv.hostPlatform.system (
