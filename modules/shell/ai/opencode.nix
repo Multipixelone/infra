@@ -370,8 +370,10 @@
               "*" = "allow";
             };
             agent.orchestrator.permission.glob = "deny";
-            tui.scroll_speed = 1;
-            tui.scroll_acceleration.enabled = true;
+          };
+          tui = {
+            scroll_speed = 1;
+            scroll_acceleration.enabled = true;
           };
         };
 
