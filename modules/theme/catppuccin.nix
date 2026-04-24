@@ -3,7 +3,7 @@
   ...
 }:
 {
-  flake.modules.homeManager.gui = {
+  flake.modules.homeManager.base = {
     imports = [
       inputs.catppuccin.homeModules.catppuccin
     ];
@@ -11,13 +11,19 @@
       enable = true;
       flavor = "mocha";
       accent = "mauve";
+      fish.enable = true;
+      # these need IFD, so I disable
+      bottom.enable = false;
+      starship.enable = false;
+      fzf.enable = false;
+    };
+  };
+  flake.modules.homeManager.gui = {
+    catppuccin = {
       mangohud.enable = false;
       lazygit.enable = true;
       # these need IFD, so I disable
       firefox.enable = false;
-      bottom.enable = false;
-      starship.enable = false;
-      fzf.enable = false;
       anki.enable = false;
     };
   };

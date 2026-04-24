@@ -464,6 +464,7 @@
             file = "${inputs.secrets}/github/copilot.age";
           };
         };
+        stylix.targets.helix.enable = false;
         programs.helix = {
           enable = true;
           package = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.helix);
