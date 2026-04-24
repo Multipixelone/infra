@@ -6,29 +6,30 @@
   flake.modules.homeManager = {
     base = {
       gtk.gtk4.theme = null;
+      stylix.targets = {
+        rofi.enable = false;
+        waybar.enable = false;
+        hyprpaper.enable = false;
+        hyprland.enable = false;
+        hyprlock.enable = false;
+        kde.enable = false;
+        gtk.enable = false;
+        mako.enable = false;
+        spicetify.enable = false;
+        fzf.enable = false;
+        bat.enable = false;
+        btop.enable = false;
+        helix.enable = false;
+        starship.enable = false;
+        yazi.enable = false;
+        mangohud.enable = false;
+        qt.enable = false;
+        opencode.enable = false;
+      };
     };
     gui =
       { pkgs, ... }:
       {
-        stylix.targets = lib.mkForce {
-          rofi.enable = false;
-          waybar.enable = false;
-          hyprpaper.enable = false;
-          hyprland.enable = false;
-          hyprlock.enable = false;
-          kde.enable = false;
-          gtk.enable = false;
-          mako.enable = false;
-          spicetify.enable = false;
-          fzf.enable = false;
-          bat.enable = false;
-          btop.enable = false;
-          helix.enable = false;
-          starship.enable = false;
-          yazi.enable = false;
-          mangohud.enable = false;
-          qt.enable = false;
-        };
         gtk = {
           enable = true;
           iconTheme = lib.mkForce {
