@@ -111,6 +111,14 @@ in
           )
           |> lib.concat [
             {
+              "alexandria" = {
+                hostname = resolveHostAddress "alexandria";
+                user = config.flake.meta.owner.username;
+                identityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
+                identitiesOnly = true;
+              };
+            }
+            {
               "*" = {
                 setEnv.TERM = "xterm-256color";
                 compression = true;

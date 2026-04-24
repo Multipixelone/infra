@@ -58,8 +58,32 @@
             recursive = true;
           };
         };
-        # allow apps like uwsm to read HM vars
-        programs.bash.enable = true;
+        # allow apps like uwsm to read HM vars, and drop into fish for
+        # interactive shells on non-NixOS hosts (e.g. Synology DSM) where
+        # the system-level bashrc doesn't already exec fish for us.
+        programs.bash = {
+          enable = true;
+          initExtra = ''
+            # Source the nix-daemon profile on non-NixOS hosts (no-op on NixOS)
+            if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+              . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+            fi
+
+            # Fix $SHELL on non-NixOS hosts where it may point to /bin/sh
+            export SHELL=${lib.getExe pkgs.fish}
+
+            # Drop into fish for interactive shells
+            case $- in
+              *i*)
+                if [ -z "$IN_NIX_SHELL" ] && [ -z "$BASH_EXECUTION_STRING" ] \
+                   && command -v ${lib.getExe pkgs.fish} >/dev/null 2>&1; then
+                  shopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=""
+                  exec ${lib.getExe pkgs.fish} $LOGIN_OPTION
+                fi
+                ;;
+            esac
+          '';
+        };
         programs.fish = {
           enable = true;
           shellAbbrs =
