@@ -15,6 +15,10 @@ in
       # sd-switch would fail at activation trying to talk to it.
       systemd.user.startServices = false;
 
+      # DSM has no terminal multiplexer use-case; zellij's fish hooks
+      # (rename-tab, switch-mode) hang on every command over SSH.
+      programs.zellij.enable = lib.mkForce false;
+
       # agenix decrypt paths — base pulls in many age.secrets via recursive
       # imports; all default to /home/tunnel/... which doesn't exist on DSM.
       age = {
