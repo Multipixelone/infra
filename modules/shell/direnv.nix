@@ -1,11 +1,6 @@
-{ inputs, ... }:
-{
+_: {
   flake.modules.homeManager.base = {
-    imports = [
-      inputs.direnv-instant.homeModules.direnv-instant
-    ];
     programs = {
-      direnv-instant.enable = true;
       direnv = {
         enable = true;
         # config = { };

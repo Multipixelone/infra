@@ -59,14 +59,6 @@
 
       nixpkgs-xr.url = "github:nix-community/nixpkgs-xr";
 
-      direnv-instant = {
-        url = "github:Mic92/direnv-instant";
-        inputs = {
-          nixpkgs.follows = "nixpkgs";
-          flake-parts.follows = "flake-parts";
-        };
-      };
-
       apple-emoji = {
         url = "github:samuelngs/apple-emoji-linux/b22ae7f";
         inputs.nixpkgs.follows = "nixpkgs";
