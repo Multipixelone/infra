@@ -94,6 +94,7 @@
       xdg.configFile = {
         "zellij/config.kdl".text = ''
           theme "default"
+          default_shell "${pkgs.fish}/bin/fish"
           default_layout "zjstatus"
           pane_frames false
           show_startup_tips false
