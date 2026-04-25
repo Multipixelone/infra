@@ -24,20 +24,19 @@
         # mkPreset: merges a model assignment onto the matching role config.
 
         models = {
-          # anthropic
-          claude-opus = "anthropic/claude-opus-4-6";
-          claude-opus-next = "anthropic/claude-opus-4-7";
-          claude-sonnet = "anthropic/claude-sonnet-4-6";
-          claude-haiku = "anthropic/claude-haiku-4-5";
           # copilot
           gemini-pro = "github-copilot/gemini-3.1-pro-preview";
           claude-haiku-copilot = "github-copilot/claude-haiku-4.5";
+          claude-sonnet-copilot = "github-copilot/claude-sonnet-4.6";
+          claude-opus-copilot = "github-copilot/claude-opus-4.5";
           grok-fast = "github-copilot/grok-code-fast-1";
           gpt-codex = "github-copilot/gpt-5.3-codex";
+          gpt-5-4 = "github-copilot/gpt-5.4";
           gpt-mini = "github-copilot/gpt-5.4-mini";
           gpt-5-2 = "github-copilot/gpt-5.2";
           # opencode go
           kimi = "opencode-go/kimi-k2.6";
+          deepseek-pro = "opencode-go/deepseek-v4-pro";
           glm = "opencode-go/glm-5.1";
           mimo-pro = "opencode-go/mimo-v2.5-pro";
           mimo-omni = "opencode-go/mimo-v2-omni";
@@ -106,20 +105,19 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # NOTE: kimi is used more then normal here because of 3x limits right now, switch off when no longer so high
-        # Anthropic & Opencode-Go only (for when copilot limit is hit)
+        # Copilot + Opencode-Go only (alternate profile)
         specialistsCustom = {
-          oracle = "claude-opus-next";
+          oracle = "claude-opus-copilot";
           librarian = "kimi";
           explorer = "kimi";
-          designer = "claude-sonnet";
+          designer = "gemini-pro";
           fixer = "glm";
           observer = "mimo-omni";
         };
 
-        # opencode-go only (if I hit Claude & Copilot Limit)
+        # opencode-go only (if I hit Copilot limits)
         specialistsGo = {
-          oracle = "glm";
+          oracle = "deepseek-pro";
           librarian = "kimi";
           explorer = "kimi";
           designer = "mimo-pro";
@@ -127,31 +125,32 @@
           observer = "mimo-omni";
         };
 
-        # Copilot-mixed specialist assignment (default preset).
+        # Copilot + Opencode-Go specialist assignment (default preset).
         specialistsCopilot = {
-          oracle = "claude-opus-next";
+          oracle = "claude-opus-copilot";
           librarian = "kimi";
           explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
           fixer = "glm";
-          observer = "mimo-pro";
+          observer = "mimo-omni";
         };
 
-        presetCustom = mkPreset (specialistsCustom // { orchestrator = "claude-opus-next"; });
+        presetCustom = mkPreset (specialistsCustom // { orchestrator = "gpt-5-4"; });
         presetGo = mkPreset (specialistsGo // { orchestrator = "glm"; });
         presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
 
         # ── Shared config sections ──────────────────────────────────────
 
         councilConfig = {
-          master.model = models.kimi; # was: models.gpt-codex
+          master.model = models.kimi;
           master_fallback = [
-            models.claude-opus-next
-            models.kimi # was: models.gemini-pro
+            models.gpt-codex
+            models.gemini-pro
+            models.qwen
           ];
           presets.default = {
-            alpha.model = models.claude-opus-next;
-            beta.model = models.qwen; # was: models.gemini-pro
+            alpha.model = models.gpt-codex;
+            beta.model = models.gemini-pro;
             gamma.model = models.glm;
           };
         };
@@ -162,18 +161,21 @@
           chains = {
             orchestrator = [
               models.gpt-codex
+              models.gpt-5-4
               models.gpt-5-2
-              models.claude-opus-next
+              models.kimi
             ];
             oracle = [
-              models.claude-opus-next
+              models.claude-sonnet-copilot
+              models.gpt-5-4
+              models.deepseek-pro
               models.kimi
               models.glm
             ];
             librarian = [
               models.kimi
               models.qwen
-              models.claude-haiku
+              models.claude-haiku-copilot
             ];
             explorer = [
               models.kimi
@@ -182,13 +184,14 @@
             ];
             designer = [
               models.gemini-pro
-              models.claude-opus-next
+              models.claude-sonnet-copilot
+              models.mimo-pro
               models.glm
             ];
             fixer = [
+              models.glm
               models.mimo-pro
               models.kimi
-              models.glm
             ];
           };
         };
@@ -326,7 +329,7 @@
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
-          preset = "go";
+          preset = "copilot";
           council = councilConfig;
           fallback = fallbackConfig;
           todoContinuation = {
@@ -354,14 +357,12 @@
           skills = aiConfig.skillsDir;
           settings = {
             plugin = [
-              "@ex-machina/opencode-anthropic-auth"
               "@simonwjackson/opencode-direnv"
               "oh-my-opencode-slim"
               # "true-mem"
               "openrtk"
             ];
-            # model = "github-copilot/gpt-5.3-codex";
-            model = "opencode-go/kimi-k2.6";
+            model = "github-copilot/gpt-5.3-codex";
             autoupdate = false;
             agent.build.permission.task = {
               "*" = "allow";
