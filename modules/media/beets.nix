@@ -737,7 +737,7 @@
             };
             smartplaylist = {
               relative_to = hmArgs.config.programs.beets.settings.directory;
-              playlist_dir = hmArgs.config.home.sessionVariables.PLAYLIST_DIR;
+              playlist_dir = hmArgs.config.infra.media.paths.playlistDir;
 
               playlists = [
                 {

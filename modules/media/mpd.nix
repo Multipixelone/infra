@@ -9,8 +9,8 @@
       mpd-mpris.enable = true;
       mpd = {
         enable = true;
-        playlistDirectory = "${hmArgs.config.home.sessionVariables.PLAYLIST_DIR}/.mpd";
-        musicDirectory = hmArgs.config.home.sessionVariables.MUSIC_DIR;
+        playlistDirectory = "${hmArgs.config.infra.media.paths.playlistDir}/.mpd";
+        musicDirectory = hmArgs.config.infra.media.paths.libraryDir;
         extraConfig = ''
           audio_output {
              type   "fifo"
