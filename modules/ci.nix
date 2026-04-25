@@ -269,7 +269,17 @@ in
                         --eval-max-memory-size 2048 \
                         --retries 2 \
                         --no-link \
-                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'
+                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
+                      || { echo "::warning::Attic upload failed, retrying without attic cache"; \
+                           nix run github:Mic92/nix-fast-build -- \
+                             --skip-cached \
+                             --no-nom \
+                             -j 1 \
+                             --eval-workers 1 \
+                             --eval-max-memory-size 2048 \
+                             --retries 2 \
+                             --no-link \
+                             --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
                     '';
                   }
                 ];
@@ -307,7 +317,17 @@ in
                         --eval-max-memory-size 2048 \
                         --retries 2 \
                         --no-link \
-                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'
+                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
+                      || { echo "::warning::Attic upload failed, retrying without attic cache"; \
+                           nix run github:Mic92/nix-fast-build -- \
+                             --skip-cached \
+                             --no-nom \
+                             -j 1 \
+                             --eval-workers 1 \
+                             --eval-max-memory-size 2048 \
+                             --retries 2 \
+                             --no-link \
+                             --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
                     '';
                   }
                 ];

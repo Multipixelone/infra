@@ -38,7 +38,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 1 \\\n       --eval-workers 1 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
         }
       ],
       "strategy": {
@@ -91,7 +91,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 1 \\\n       --eval-workers 1 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
         }
       ],
       "strategy": {
