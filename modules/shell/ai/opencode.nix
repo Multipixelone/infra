@@ -361,6 +361,7 @@
               "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim"
               "true-mem"
+              "opencode-history-search"
               "openrtk"
             ];
             model = "github-copilot/gpt-5.3-codex";
