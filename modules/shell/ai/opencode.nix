@@ -142,15 +142,15 @@
         # ── Shared config sections ──────────────────────────────────────
 
         councilConfig = {
-          master.model = models.kimi;
+          master.model = models.gpt-codex;
           master_fallback = [
             models.gpt-codex
             models.gemini-pro
             models.qwen
           ];
           presets.default = {
-            alpha.model = models.gpt-codex;
-            beta.model = models.gemini-pro;
+            alpha.model = models.gemini-pro;
+            beta.model = models.claude-sonnet-copilot;
             gamma.model = models.glm;
           };
         };
