@@ -9,7 +9,7 @@
     programs.atuin = {
       enable = true;
       enableFishIntegration = true;
-      daemon.enable = false;
+      daemon.enable = true;
       settings = {
         update_check = false;
 
@@ -28,7 +28,7 @@
         enter_accept = true;
 
         workspaces = true;
-        search_mode = "fuzzy";
+        search_mode = "daemon-fuzzy";
         filter_mode = "global";
         filter_mode_shell_up_key_binding = "session-preload";
 
@@ -36,9 +36,18 @@
         inline_height = 20;
 
         daemon = {
-          enabled = false;
+          autostart = true;
+        };
+
+        ai = {
+          enabled = true;
         };
       };
     };
+    # Hex PTY proxy — must come before atuin init so the popup
+    # renders over output without clearing the terminal.
+    programs.fish.interactiveShellInit = hmArgs.lib.mkBefore ''
+      ${hmArgs.lib.getExe hmArgs.config.programs.atuin.package} hex init fish | source
+    '';
   };
 }

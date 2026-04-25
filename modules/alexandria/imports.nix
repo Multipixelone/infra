@@ -15,6 +15,12 @@ in
       # sd-switch would fail at activation trying to talk to it.
       systemd.user.startServices = false;
 
+      # atuin daemon.enable creates a systemd user service;
+      # on DSM there's no systemd --user. autostart=true in
+      # settings means atuin manages its own daemon lifecycle.
+      programs.atuin.daemon.enable = lib.mkForce false;
+      programs.atuin.settings.daemon.enabled = true;
+
       # DSM has no terminal multiplexer use-case; zellij's fish hooks
       # (rename-tab, switch-mode) hang on every command over SSH.
       programs.zellij.enable = lib.mkForce false;
