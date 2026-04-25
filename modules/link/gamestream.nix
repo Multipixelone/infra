@@ -263,7 +263,7 @@
               cmd =
                 let
                   # args poached from https://gitlab.com/evlaV/jupiter-PKGBUILD/-/blob/master/gamescope/steam-launcher?ref_type=heads
-                  steam-gamescope = ''${lib.getExe gamescope-run} -x "-e" ${lib.getExe pkgs.steam} -steamos3 -steampal -steamdeck -gamepadui'';
+                  steam-gamescope = ''${lib.getExe gamescope-run} -x "-e" ${lib.getExe config.programs.steam.package} -steamos3 -steampal -steamdeck -gamepadui'';
                 in
                 ''${hypr-dispatch} "${steam-gamescope}"'';
               prep-cmd = [
