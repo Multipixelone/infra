@@ -111,7 +111,7 @@
           librarian = "kimi";
           explorer = "kimi";
           designer = "gemini-pro";
-          fixer = "glm";
+          fixer = "mimo-pro";
           observer = "mimo-omni";
         };
 
@@ -121,7 +121,7 @@
           librarian = "kimi";
           explorer = "kimi";
           designer = "mimo-pro";
-          fixer = "glm";
+          fixer = "mimo-pro";
           observer = "mimo-omni";
         };
 
@@ -131,7 +131,7 @@
           librarian = "kimi";
           explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
-          fixer = "glm";
+          fixer = "mimo-pro";
           observer = "mimo-omni";
         };
 
@@ -189,9 +189,9 @@
               models.glm
             ];
             fixer = [
-              models.glm
               models.mimo-pro
               models.kimi
+              models.glm
             ];
           };
         };
