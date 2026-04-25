@@ -60,7 +60,7 @@
             ];
           };
           oracle = {
-            variant = "max";
+            variant = "xhigh";
             skills = [ "simplify" ];
             mcps = [ ];
           };
@@ -107,7 +107,7 @@
 
         # Copilot + Opencode-Go only (alternate profile)
         specialistsCustom = {
-          oracle = "claude-opus-copilot";
+          oracle = "gpt-5-4";
           librarian = "kimi";
           explorer = "kimi";
           designer = "gemini-pro";
@@ -127,7 +127,7 @@
 
         # Copilot + Opencode-Go specialist assignment (default preset).
         specialistsCopilot = {
-          oracle = "claude-opus-copilot";
+          oracle = "gpt-5-4";
           librarian = "kimi";
           explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
