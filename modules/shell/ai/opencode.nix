@@ -358,6 +358,7 @@
           settings = {
             plugin = [
               "@simonwjackson/opencode-direnv"
+              "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim"
               # "true-mem"
               "openrtk"
