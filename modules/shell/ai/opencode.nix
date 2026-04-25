@@ -360,7 +360,7 @@
               "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim"
-              # "true-mem"
+              "true-mem"
               "openrtk"
             ];
             model = "github-copilot/gpt-5.3-codex";
