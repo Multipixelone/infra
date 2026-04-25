@@ -360,7 +360,7 @@
               "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim"
-              "true-mem"
+              # "true-mem"
               "opencode-history-search"
               "openrtk"
             ];
