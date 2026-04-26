@@ -109,7 +109,8 @@
             monitorSettings = lib.mkMerge [
               (lib.mkIf (hostname == "link") {
                 monitor = [
-                  "DP-1,2560x1440@240,1200x0,1,cm,hdr"
+                  # HDR re-enable: append ",cm,hdr" to advertise HDR colorspace.
+                  "DP-1,2560x1440@240,1200x0,1"
                   "DP-3,1920x1200@60,0x0,1,transform,1"
                   "HDMI-A-1,disabled"
                 ];

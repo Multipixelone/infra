@@ -15,7 +15,9 @@
       hypr-dispatch =
         lib.getExe' config.programs.hyprland.package "hyprctl" + " dispatch exec [workspace 7]";
       steam = lib.getExe config.programs.steam.package + " --";
-      stream-monitor = "DP-1";
+      # HDR re-enable: set `stream-monitor = "DP-1";` and reference it below in
+      # place of the literal "SUNSHINE" headless output to capture the physical
+      # HDR display directly.
       # pkgs-stable = inputs.nixpkgs-stable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
       # moondeck = pkgs.qt6.callPackage ../../pkgs/moondeck/default.nix {
       #   inherit (pkgs-stable) qt6;
@@ -38,7 +40,9 @@
         set -x ENABLE_GAMESCOPE_WSI 1
         set -x ENABLE_HDR_WSI 1
         set -x DXVK_HDR 1
-        # set -x DISABLE_HDR_WSI 1  # removed: conflicts with ENABLE_HDR_WSI
+        # HDR re-enable: comment the next line out — DISABLE_HDR_WSI overrides
+        # ENABLE_HDR_WSI above and forces gamescope into SDR.
+        set -x DISABLE_HDR_WSI 1
         set -x AMD_VULKAN_ICD RADV
         set -x RADV_PERFTEST aco
         set -x SDL_VIDEODRIVER wayland
@@ -60,6 +64,8 @@
         "--backend"
         "wayland"
         "--hdr-enabled"
+        # HDR re-enable: add "--hdr-debug-force-output" before the nits flag and
+        # bump nits from 203 → 600 to match the physical monitor's peak.
         "--hdr-sdr-content-nits"
         "203"
         "--rt"
@@ -120,9 +126,7 @@
         # Execute gamescope with the final arguments and the command
         exec ${lib.getExe config.programs.gamescope.package} $final_args -- $argv
       '';
-      # Monitor prep command — creates headless output for Sunshine capture.
-      # Currently unused by default (Sunshine targets physical DP-1), but kept
-      # so switching back to headless only requires changing output_name above.
+      # monitor prep command
       prep =
         let
           packages = [
@@ -143,14 +147,14 @@
               width=''${1:-3840}
               height=''${2:-2160}
               refresh_rate=''${3:-60}
-              mon_string="${stream-monitor},''${width}x''${height}@''${refresh_rate},0x1920,1,cm,hdr"
+              mon_string="SUNSHINE,''${width}x''${height}@''${refresh_rate},0x1920,1,cm,hdr"
               # Unlock PC (so I don't have to type password on Steam Deck)
               # pkill -USR1 hyprlock || true
-              # hyprctl output create headless ${stream-monitor}
+              hyprctl output create headless SUNSHINE
               sleep 2
               hyprctl keyword monitor "$mon_string"
               sleep 2
-              hyprctl dispatch moveworkspacetomonitor 7 ${stream-monitor}
+              hyprctl dispatch moveworkspacetomonitor 7 SUNSHINE
               # wait before we switch to the new workspace
               sleep 2
               hyprctl dispatch workspace 7
@@ -164,7 +168,7 @@
               HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
               export HYPRLAND_INSTANCE_SIGNATURE
               hyprctl dispatch moveworkspacetomonitor 7 0
-              # hyprctl output remove ${stream-monitor}
+              hyprctl output remove SUNSHINE
             '';
           };
         in
@@ -214,11 +218,12 @@
         openFirewall = true;
         settings = {
           channels = 2;
-          # Target physical HDR monitor (DP-1 = KMS index 1) for reliable HDR.
-          # To switch back to headless output, change to: output_name = 2;
-          output_name = 1;
+          # HDR re-enable: target physical DP-1 instead of the headless SUNSHINE
+          # output by setting `output_name = 1;` and `capture = "kms";` (KMS is
+          # required to capture HDR metadata; wlr loses it).
+          output_name = 2;
           gamepad = "ds5";
-          capture = "kms";
+          capture = "wlr";
           # allow guide press with back button after 2000 milliseconds
           back_button_timeout = 2000;
           # decrease fec percentage because I am not dropping many packets
