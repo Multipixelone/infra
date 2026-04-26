@@ -229,13 +229,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nur.url = "github:nix-community/NUR";
-    playlist-download = {
-      url = "github:Multipixelone/playlist-downloader";
-      inputs = {
-        flake-utils.follows = "flake-utils";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
+    playlist-download.url = "github:Multipixelone/playlist-downloader";
     qmd.url = "github:tobi/qmd";
     qtscrob = {
       url = "github:Multipixelone/QtScrobbler/nix-build";

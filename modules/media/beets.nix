@@ -15,6 +15,12 @@
       url = "github:Multipixelone/beets-plugins";
       # inputs.beets-src.follows = "beets-src";
     };
+    playlist-download.url = "github:Multipixelone/playlist-downloader";
+
+    rb-scrobbler = {
+      url = "github:Multipixelone/rb-scrobbler/nix-build";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # beets-src = {
     #   url = "github:beetbox/beets";
     #   flake = false;

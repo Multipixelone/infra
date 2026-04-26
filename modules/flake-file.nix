@@ -80,17 +80,6 @@
         inputs.flake-utils.follows = "flake-utils";
       };
 
-      playlist-download = {
-        url = "github:Multipixelone/playlist-downloader";
-        inputs.nixpkgs.follows = "nixpkgs";
-        inputs.flake-utils.follows = "flake-utils";
-      };
-
-      rb-scrobbler = {
-        url = "github:Multipixelone/rb-scrobbler/nix-build";
-        inputs.nixpkgs.follows = "nixpkgs";
-      };
-
       waybar-mediaplayer = {
         url = "github:Multipixelone/waybar-mediaplayer/artist";
         inputs.nixpkgs.follows = "nixpkgs";
