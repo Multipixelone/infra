@@ -63,6 +63,13 @@
         "match:class ^(it.catboy.ripdrag)$, pin on"
 
         ## gaming rules
+        # moonlight / gamescope rules
+        "match:class ^(moonlight-qt)$, workspace 7 silent"
+        "match:class ^(moonlight-qt)$, fullscreen on"
+        "match:class ^(moonlight-qt)$, immediate on"
+        "match:class ^(gamescope)$, fullscreen on"
+        "match:class ^(gamescope)$, immediate on"
+
         # steam rules
         "match:class ^(steam)$, workspace 7 silent"
         "match:title ^(Steam Big Picture Mode)$, fullscreen on"
