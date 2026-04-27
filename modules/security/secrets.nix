@@ -7,6 +7,21 @@ let
   };
 in
 {
+  flake-file.inputs = {
+    secrets = {
+      url = "git+ssh://git@github.com/Multipixelone/nix-secrets.git";
+      flake = false;
+    };
+    agenix = {
+      url = "github:ryantm/agenix";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        home-manager.follows = "home-manager";
+        systems.follows = "systems";
+      };
+    };
+  };
+
   flake.modules = {
     nixos.base = {
       imports = [

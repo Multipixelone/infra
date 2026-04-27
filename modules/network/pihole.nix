@@ -1,4 +1,9 @@
 {
+  flake-file.inputs.blocklist = {
+    url = "github:StevenBlack/hosts";
+    flake = false;
+  };
+
   flake.modules.nixos.pc =
     { lib, config, ... }:
     let

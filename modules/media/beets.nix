@@ -21,6 +21,10 @@
       url = "github:Multipixelone/rb-scrobbler/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    euphony = {
+      url = "github:Multipixelone/euphony/nix-build";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # beets-src = {
     #   url = "github:beetbox/beets";
     #   flake = false;

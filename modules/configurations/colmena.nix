@@ -33,6 +33,11 @@ let
       (defaultTargetHost name);
 in
 {
+  config.flake-file.inputs.colmena = {
+    url = "github:zhaofengli/colmena";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   config.flake.colmenaHive = inputs.colmena.lib.makeHive (
     {
       meta.nixpkgs = import inputs.nixpkgs {

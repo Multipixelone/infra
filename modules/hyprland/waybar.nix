@@ -4,6 +4,19 @@
   ...
 }:
 {
+  flake-file.inputs = {
+    nextmeeting = {
+      url = "github:Multipixelone/nextmeeting/reformat?dir=packaging";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+    waybar-mediaplayer = {
+      url = "github:Multipixelone/waybar-mediaplayer/artist";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+  };
+
   flake.modules = {
     homeManager.gui =
       {

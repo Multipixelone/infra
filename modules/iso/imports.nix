@@ -1,5 +1,10 @@
 { inputs, config, ... }:
 {
+  flake-file.inputs.nixos-generators = {
+    url = "github:nix-community/nixos-generators";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   configurations.nixos.iso.module = {
     hardware.graphics.enable = true;
     imports = with config.flake.modules.nixos; [

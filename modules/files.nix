@@ -38,6 +38,8 @@
   };
 
   config = {
+    flake-file.inputs.files.url = "github:mightyiam/files";
+
     text.readme.parts.files =
       withSystem (builtins.head config.systems) (psArgs: psArgs.config.files.files)
       |> map (file: "- `${file.path_}`")

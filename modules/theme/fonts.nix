@@ -5,6 +5,14 @@
   ...
 }:
 {
+  flake-file.inputs = {
+    apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
+    apple-emoji = {
+      url = "github:samuelngs/apple-emoji-ttf";
+      flake = false;
+    };
+  };
+
   perSystem =
     { pkgs, ... }:
     {
@@ -16,12 +24,18 @@
     "pragmata-pro"
     "vista-fonts"
     "corefonts"
-    "apple-emoji"
   ];
   flake.modules.nixos.pc =
     { pkgs, ... }:
     let
       pragmata = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.pragmata);
+      appleEmoji = pkgs.callPackage "${inputs.apple-emoji}/default.nix" {
+        src = inputs.apple-emoji;
+        ttc = pkgs.fetchurl {
+          url = "https://blusky.s3.us-west-2.amazonaws.com/apple-emoji.ttc";
+          sha256 = "0qpzsw0a1823g3igmgadpkz33k3k0ij3ibfxi7h73mi6bfvy0pj3";
+        };
+      };
     in
     {
       fonts = {
@@ -39,7 +53,7 @@
           # inputs.apple-fonts.packages.${pkgs.stdenv.hostPlatform.system}.sf-pro
           # inputs.apple-fonts.packages.${pkgs.stdenv.hostPlatform.system}.sf-compact
           # inputs.apple-fonts.packages.${pkgs.stdenv.hostPlatform.system}.sf-mono
-          inputs.apple-emoji.packages.${pkgs.stdenv.hostPlatform.system}.default
+          appleEmoji
 
           # my fonts
           nerd-fonts.iosevka
