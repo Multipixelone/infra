@@ -34,6 +34,13 @@
           gpt-5-4 = "github-copilot/gpt-5.4";
           gpt-mini = "github-copilot/gpt-5.4-mini";
           gpt-5-2 = "github-copilot/gpt-5.2";
+          # opencode free
+          gpt-5-nano = "opencode/gpt-5-nano";
+          hy3-preview-free = "opencode/hy3-preview-free";
+          ling-26-flash-free = "opencode/ling-2.6-flash-free";
+          minimax-m25-free = "opencode/minimax-m2.5-free";
+          nemotron-3-super-free = "opencode/nemotron-3-super-free";
+          big-pickle = "opencode/big-pickle";
           # opencode go
           kimi = "opencode-go/kimi-k2.6";
           deepseek-pro = "opencode-go/deepseek-v4-pro";
@@ -128,10 +135,10 @@
         # Copilot + Opencode-Go specialist assignment (default preset).
         specialistsCopilot = {
           oracle = "gpt-5-4";
-          librarian = "kimi";
-          explorer = "kimi"; # or grok-fast
           designer = "gemini-pro";
           fixer = "mimo-pro";
+          librarian = "ling-26-flash-free";
+          explorer = "hy3-preview-free";
           observer = "mimo-omni";
         };
 
@@ -161,6 +168,7 @@
           chains = {
             orchestrator = [
               models.gpt-codex
+              models.big-pickle
               models.gpt-5-4
               models.gpt-5-2
               models.kimi
@@ -175,6 +183,7 @@
             librarian = [
               models.kimi
               models.qwen
+              models.grok-fast
               models.claude-haiku-copilot
             ];
             explorer = [
@@ -324,6 +333,62 @@
           };
         };
 
+        # ── Dynamic context pruning ─────────────────────────────────────
+        #
+        # Tuned for Copilot's request-based billing: cache invalidation is
+        # free, so we compress aggressively. Per-model overrides bump the
+        # threshold for opencode-go models with windows >128k.
+        dcpConfig = builtins.toJSON {
+          "$schema" =
+            "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json";
+          enabled = true;
+          pruneNotification = "detailed";
+          pruneNotificationType = "chat";
+          experimental = {
+            allowSubAgents = false;
+            customPrompts = false;
+          };
+          compress = {
+            mode = "range";
+            permission = "allow";
+            showCompression = false;
+            summaryBuffer = true;
+            # 128k Copilot cap minus headroom for system prompt + next reply.
+            maxContextLimit = 96000;
+            minContextLimit = 48000;
+            # Only opencode-go models with documented 256k windows.
+            # grok-fast is Copilot-routed, so the Copilot cap dominates.
+            modelMaxLimits = {
+              ${models.kimi} = 192000;
+              ${models.minimax} = 192000;
+              ${models.qwen} = 192000;
+            };
+            modelMinLimits = {
+              ${models.kimi} = 96000;
+              ${models.minimax} = 96000;
+              ${models.qwen} = 96000;
+            };
+            # Free cache invalidation on Copilot — compress earlier and harder.
+            nudgeFrequency = 3;
+            iterationNudgeThreshold = 15;
+            nudgeForce = "strong";
+            protectedTools = [
+              "task"
+              "skill"
+              "todowrite"
+              "todoread"
+            ];
+            protectUserMessages = false;
+          };
+          strategies = {
+            deduplication.enabled = true;
+            purgeErrors = {
+              enabled = true;
+              turns = 4;
+            };
+          };
+        };
+
         # ── Final assembled config ──────────────────────────────────────
 
         omoConfig = builtins.toJSON {
@@ -407,6 +472,7 @@
         '';
 
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;
+        xdg.configFile."opencode/dcp.json".text = dcpConfig;
       };
   };
 }
