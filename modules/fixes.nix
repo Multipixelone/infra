@@ -35,6 +35,12 @@
         }
       );
     })
+    # calibre-web 0.6.27b0 declares requests<2.33.0 but works with 2.33.x
+    (_final: prev: {
+      calibre-web = prev.calibre-web.overridePythonAttrs (old: {
+        pythonRelaxDeps = (old.pythonRelaxDeps or [ ]) ++ [ "requests" ];
+      });
+    })
     # https://github.com/NixOS/nixpkgs/pull/493604
     # (final: prev: {
     #   anki = prev.anki.overrideAttrs {
