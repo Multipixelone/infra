@@ -51,8 +51,8 @@
       };
     };
     apple-emoji = {
-      url = "github:samuelngs/apple-emoji-linux/b22ae7f";
-      inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:samuelngs/apple-emoji-ttf";
+      flake = false;
     };
     apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
     auto-cpufreq = {
@@ -216,7 +216,6 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-mine.url = "github:Multipixelone/nixpkgs/init-soundshow";
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
-    nixpkgs-xr.url = "github:nix-community/nixpkgs-xr";
     noctalia = {
       url = "github:noctalia-dev/noctalia-shell";
       inputs = {

@@ -3,6 +3,8 @@
   ...
 }:
 {
+  flake-file.inputs.catppuccin.url = "github:catppuccin/nix";
+
   flake.modules.homeManager.base = {
     imports = [
       inputs.catppuccin.homeModules.catppuccin

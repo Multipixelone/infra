@@ -5,6 +5,12 @@
   ...
 }:
 {
+  flake-file.inputs.qtscrob = {
+    url = "github:Multipixelone/QtScrobbler/nix-build";
+    inputs.nixpkgs.follows = "nixpkgs";
+    inputs.flake-utils.follows = "flake-utils";
+  };
+
   flake.modules.homeManager.media =
     hmArgs@{
       pkgs,

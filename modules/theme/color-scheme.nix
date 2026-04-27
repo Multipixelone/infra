@@ -6,6 +6,14 @@ let
   };
 in
 {
+  flake-file.inputs = {
+    base16.url = "github:SenchoPens/base16.nix";
+    tinted-schemes = {
+      url = "github:tinted-theming/schemes";
+      flake = false;
+    };
+  };
+
   flake.modules = {
     nixos.base = polyModule;
     homeManager.base = polyModule;

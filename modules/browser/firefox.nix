@@ -3,9 +3,12 @@
   ...
 }:
 {
-  flake-file.inputs.better-fox = {
-    url = "github:yokoffing/Betterfox";
-    flake = false;
+  flake-file.inputs = {
+    better-fox = {
+      url = "github:yokoffing/Betterfox";
+      flake = false;
+    };
+    nur.url = "github:nix-community/NUR";
   };
   nixpkgs = {
     config.allowUnfreePackages = [ "betterttv" ];
@@ -15,7 +18,11 @@
   };
   flake.modules.homeManager = {
     gui =
-      { pkgs, ... }:
+      {
+        config,
+        pkgs,
+        ...
+      }:
       let
         inherit (inputs) better-fox;
         customAddons = pkgs.callPackage ../../pkgs/firefox-addons/generated.nix {
@@ -115,6 +122,7 @@
         stylix.targets.firefox.profileNames = [ "default" ];
         programs.firefox = {
           enable = true;
+          configPath = "${config.xdg.configHome}/mozilla/firefox";
           profiles = {
             default = {
               inherit settings;

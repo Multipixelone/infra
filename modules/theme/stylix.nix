@@ -12,6 +12,17 @@ let
   };
 in
 {
+  flake-file.inputs.stylix = {
+    url = "github:danth/stylix";
+    inputs = {
+      flake-parts.follows = "flake-parts";
+      nixpkgs.follows = "nixpkgs";
+      nur.follows = "nur";
+      systems.follows = "systems";
+      tinted-schemes.follows = "tinted-schemes";
+    };
+  };
+
   flake.modules = {
     nixos.base = {
       imports = [

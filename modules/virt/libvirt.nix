@@ -1,5 +1,7 @@
 { inputs, ... }:
 {
+  flake-file.inputs.quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
+
   flake.modules.homeManager.base = {
     imports = [
       inputs.quadlet-nix.homeManagerModules.quadlet

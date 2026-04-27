@@ -1,5 +1,7 @@
 { inputs, ... }:
 {
+  flake-file.inputs.nixpkgs-mine.url = "github:Multipixelone/nixpkgs/init-soundshow";
+
   nixpkgs.config.allowUnfreePackages = [ "soundshow" ];
   flake.modules.homeManager.gui =
     { pkgs, ... }:

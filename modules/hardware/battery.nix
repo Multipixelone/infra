@@ -1,4 +1,9 @@
 {
+  flake-file.inputs.auto-cpufreq = {
+    url = "github:AdnanHodzic/auto-cpufreq";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   flake.modules = {
     nixos.laptop = {
       imports = [

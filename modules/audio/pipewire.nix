@@ -1,5 +1,7 @@
 { inputs, config, ... }:
 {
+  flake-file.inputs.musnix.url = "github:musnix/musnix";
+
   flake.modules = {
     nixos.base = {
       users.extraGroups.audio.members = [ config.flake.meta.owner.username ];
