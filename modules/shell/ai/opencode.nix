@@ -1,21 +1,48 @@
 {
   config,
+  inputs,
   ...
 }:
 {
+  # Track upstream opencode directly — nixpkgs lags multiple point
+  # releases behind, and the JSON→SQLite migration banner bug
+  # (anomalyco/opencode#16885) is fixed only on dev.
+  flake-file.inputs.opencode = {
+    url = "github:anomalyco/opencode";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   flake.modules.homeManager = {
     gui = {
       stylix.targets.opencode.enable = false;
       catppuccin.opencode.enable = false;
     };
     base =
-      {
+      hmArgs@{
         pkgs,
         lib,
         ...
       }:
       let
         aiConfig = config.flake.aiConfig;
+
+        # Upstream opencode's package.json pins `bun@1.3.13`, but no public
+        # nixpkgs branch has bumped past 1.3.11 yet. Override bun's binary
+        # to the 1.3.13 release. `src` is set directly so the repo's
+        # `abort-on-warn` flag doesn't trip nixpkgs'
+        # warnForBadVersionOverride. Drop once nixpkgs ships ≥ 1.3.13.
+        bun13 = pkgs.bun.overrideAttrs (_old: {
+          version = "1.3.13";
+          src = pkgs.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64.zip";
+            hash = "sha256-ecB3H6i5LDOq5B4VoODTB+qZ0OLwAxfHHGxTI3p44lo=";
+          };
+        });
+        upstreamOpencode = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        opencodePkg = upstreamOpencode.override {
+          bun = bun13;
+          node_modules = upstreamOpencode.node_modules.override { bun = bun13; };
+        };
 
         # ── Composable building blocks ──────────────────────────────────
         #
@@ -417,6 +444,7 @@
       {
         programs.opencode = {
           enable = true;
+          package = opencodePkg;
           enableMcpIntegration = true;
           inherit (aiConfig) context;
           agents = aiConfig.agentsDir;
@@ -453,6 +481,11 @@
           set -l root (git rev-parse --show-toplevel 2>/dev/null; or echo $PWD)
           cd $root; or return
 
+          # oh-my-opencode-slim's tavily provider reads TAVILY_API_KEY
+          # directly from env; the tavily-mcp wrapper only injects it into
+          # its own subprocess. Forward the agenix env-file via `env`.
+          set -l envfile ${hmArgs.config.age.secrets.tavily.path}
+
           # Pick a free port so the oh-my-opencode-slim multiplexer (zellij)
           # can reach opencode's HTTP API. Starting at 4096 and scanning
           # upward lets multiple concurrent / forgotten opencode instances
@@ -469,7 +502,11 @@
             return 1
           end
 
-          opencode --port $port $argv
+          # `command env` bypasses fish-grc's auto-alias on `env`, which
+          # would otherwise wrap opencode's stdout in a line-based
+          # colorizer and shred the TUI.
+          command env (test -r $envfile; and string match -rv '^#|^$' < $envfile) \
+            opencode --port $port $argv
         '';
 
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;

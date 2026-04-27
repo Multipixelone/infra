@@ -228,6 +228,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nur.url = "github:nix-community/NUR";
+    opencode = {
+      url = "github:anomalyco/opencode";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     playlist-download.url = "github:Multipixelone/playlist-downloader";
     qmd.url = "github:tobi/qmd";
     qtscrob = {
