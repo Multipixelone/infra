@@ -3,6 +3,8 @@
   ...
 }:
 {
+  flake-file.inputs.nixpkgs-xr.url = "github:nix-community/nixpkgs-xr";
+
   flake.modules.homeManager.gaming =
     { pkgs, ... }:
     let
