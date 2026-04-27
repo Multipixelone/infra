@@ -35,16 +35,39 @@
 
     # Populate programs.mcp.servers so both claude-code and opencode can use
     # enableMcpIntegration = true without duplicating server definitions.
-    flake.modules.homeManager.base = hmArgs: {
-      imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
-      programs.mcp.enable = true;
-      mcp-servers.programs = {
-        nixos.enable = true;
-        github = {
-          enable = true;
-          envFile = hmArgs.config.age.secrets."gh".path;
+    flake.modules.homeManager.base =
+      hmArgs@{ pkgs, ... }:
+      {
+        imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
+        age.secrets."tavily".file = "${inputs.secrets}/tavily.age";
+        programs.mcp.enable = true;
+        mcp-servers.programs = {
+          context7.enable = true;
+          github = {
+            enable = true;
+            envFile = hmArgs.config.age.secrets."gh".path;
+          };
+          nixos.enable = true;
+        };
+        mcp-servers.settings.servers = {
+          grep_app = {
+            type = "http";
+            url = "https://mcp.grep.app";
+          };
+          websearch =
+            let
+              tavily = inputs.mcp-servers-nix.packages.${pkgs.stdenv.hostPlatform.system}.tavily-mcp;
+              wrapped = pkgs.writeShellScriptBin "tavily-mcp" ''
+                export $(${pkgs.coreutils}/bin/cat ${hmArgs.config.age.secrets."tavily".path} \
+                  | ${pkgs.gnugrep}/bin/grep -v '^#' \
+                  | ${pkgs.findutils}/bin/xargs -d '\n')
+                exec ${lib.getExe tavily} "$@"
+              '';
+            in
+            {
+              command = lib.getExe wrapped;
+            };
         };
       };
-    };
   };
 }
