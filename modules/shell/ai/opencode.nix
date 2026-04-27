@@ -395,6 +395,7 @@
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
           preset = "copilot";
+          websearch.provider = "tavily";
           council = councilConfig;
           fallback = fallbackConfig;
           todoContinuation = {
