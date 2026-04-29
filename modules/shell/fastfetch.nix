@@ -18,7 +18,7 @@
         display = {
           separator = "  ";
           key = {
-            width = 8;
+            width = 16;
             type = "string";
           };
           bar.char = {
@@ -39,37 +39,37 @@
           # Hardware
           {
             type = "custom";
-            format = "  Hardware";
-            outputColor = "1;33";
+            format = "   Hardware";
+            outputColor = "34";
           }
           {
             type = "host";
-            key = " 󰌢 PC";
-            keyColor = "red";
+            key = "  󰌢 PC";
+            keyColor = "36";
           }
           {
             type = "cpu";
-            key = "  CPU";
+            key = "   CPU";
             showPeCoreCount = true;
-            keyColor = "red";
+            keyColor = "36";
           }
           {
             type = "gpu";
-            key = " 󰢮 GPU";
-            keyColor = "red";
+            key = "  󰢮 GPU";
+            keyColor = "36";
           }
           {
             type = "memory";
-            key = "  MEM";
-            keyColor = "red";
+            key = "   MEM";
+            keyColor = "36";
             percent = {
               type = 10;
             };
           }
           {
             type = "disk";
-            key = " 󰋊 Disk ({2})";
-            keyColor = "red";
+            key = "  󰋊 Disk ({2})";
+            keyColor = "36";
             folders = "/nix:/home:/media/Data";
             percent = {
               type = 10;
@@ -80,130 +80,130 @@
           # Software
           {
             type = "custom";
-            format = " 󱄅 Software";
-            outputColor = "1;33";
+            format = "   Software";
+            outputColor = "34";
           }
           {
             type = "os";
-            key = " 󱄅 OS";
-            keyColor = "green";
+            key = "  󱄅 OS";
+            keyColor = "36";
           }
           {
             type = "kernel";
-            key = "  Kernel";
-            keyColor = "green";
+            key = "   Kernel";
+            keyColor = "36";
           }
           {
             type = "packages";
-            key = "  Pkgs";
-            keyColor = "green";
+            key = "   Pkgs";
+            keyColor = "36";
             format = "{} (nix)";
           }
           {
             type = "terminal";
-            key = "  Term";
-            keyColor = "green";
+            key = "   Term";
+            keyColor = "36";
           }
           {
             type = "shell";
-            key = "  Shell";
-            keyColor = "green";
+            key = "   Shell";
+            keyColor = "36";
           }
           "break"
 
-          # Desktop
-          {
-            type = "custom";
-            format = "  Desktop";
-            outputColor = "1;33";
-          }
-          {
-            type = "de";
-            key = "  DE";
-            keyColor = "blue";
-          }
-          {
-            type = "wm";
-            key = "  WM";
-            keyColor = "blue";
-          }
-          {
-            type = "wmtheme";
-            key = " 󰉼 Theme";
-            keyColor = "blue";
-          }
-          {
-            type = "font";
-            key = "  Font";
-            keyColor = "blue";
-          }
-          {
-            type = "cursor";
-            key = " 󰆿 Cursor";
-            keyColor = "blue";
-          }
-          "break"
+          # # Desktop
+          # {
+          #   type = "custom";
+          #   format = " 󰇄  Desktop";
+          #   outputColor = "34";
+          # }
+          # {
+          #   type = "de";
+          #   key = "   DE";
+          #   keyColor = "36";
+          # }
+          # {
+          #   type = "wm";
+          #   key = "   WM";
+          #   keyColor = "36";
+          # }
+          # {
+          #   type = "wmtheme";
+          #   key = "  󰉼 Theme";
+          #   keyColor = "36";
+          # }
+          # {
+          #   type = "font";
+          #   key = "   Font";
+          #   keyColor = "36";
+          # }
+          # {
+          #   type = "cursor";
+          #   key = "  󰆿 Cursor";
+          #   keyColor = "36";
+          # }
+          # "break"
 
-          # Network
-          {
-            type = "custom";
-            format = "  Network";
-            outputColor = "1;33";
-          }
-          {
-            type = "publicip";
-            key = " 󰩟 Pub IP";
-            keyColor = "blue";
-            format = "{1} - {2}";
-          }
-          {
-            type = "localip";
-            key = " 󰈀 Loc IP";
-            keyColor = "blue";
-            format = "{1} - {3}";
-            showMac = true;
-          }
-          {
-            type = "wifi";
-            key = " 󰖩 Wi-Fi";
-            keyColor = "blue";
-            format = "{4} - {7} - {13} GHz - {6} - {10}";
-          }
-          {
-            type = "bluetooth";
-            key = " 󰂯 BT Dev";
-            keyColor = "blue";
-            format = "{1} - {4}";
-          }
-          {
-            type = "bluetoothradio";
-            key = " 󰂱 BT Ver";
-            keyColor = "blue";
-            format = "{5}";
-          }
-          "break"
+          # # Network
+          # {
+          #   type = "custom";
+          #   format = " 󰤨  Network";
+          #   outputColor = "34";
+          # }
+          # {
+          #   type = "publicip";
+          #   key = "  󰩟 Pub IP";
+          #   keyColor = "36";
+          #   format = "{1} - {2}";
+          # }
+          # {
+          #   type = "localip";
+          #   key = "  󰈀 Loc IP";
+          #   keyColor = "36";
+          #   format = "{1} - {3}";
+          #   showMac = false;
+          # }
+          # {
+          #   type = "wifi";
+          #   key = "  󰖩 Wi-Fi";
+          #   keyColor = "36";
+          #   format = "{ssid}";
+          # }
+          # {
+          #   type = "bluetooth";
+          #   key = "  󰂯 BT Dev";
+          #   keyColor = "36";
+          #   format = "{1} - {4}";
+          # }
+          # {
+          #   type = "bluetoothradio";
+          #   key = "  󰂱 BT Ver";
+          #   keyColor = "36";
+          #   format = "{5}";
+          # }
+          # "break"
 
           # Misc
           {
             type = "custom";
-            format = " 󰣐 Misc";
-            outputColor = "1;33";
+            format = " 󰣐  Misc";
+            outputColor = "34";
           }
           {
             type = "uptime";
-            key = " 󰔚 Up";
-            keyColor = "magenta";
+            key = "  󰔚 Uptime";
+            keyColor = "36";
           }
           {
             type = "media";
-            key = " 󰝚 Music";
-            keyColor = "magenta";
+            key = "  󰝚 Music";
+            keyColor = "36";
             format = "{1} - {4}";
           }
           {
             type = "datetime";
-            key = " 󰃭 Date";
-            keyColor = "magenta";
+            key = "  󰃭 Date";
+            keyColor = "36";
             format = "{3}/{11}/{1} - {14}:{18} {22}";
           }
           "break"
@@ -216,7 +216,7 @@
 
           {
             type = "colors";
-            paddingLeft = 20;
+            paddingLeft = 18;
             symbol = "circle";
           }
           "break"
