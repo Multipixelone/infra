@@ -151,12 +151,20 @@
               # Unlock PC (so I don't have to type password on Steam Deck)
               # pkill -USR1 hyprlock || true
               hyprctl output create headless SUNSHINE
-              sleep 2
+
+              # Wait for the headless output to appear (up to ~10s)
+              timeout=20
+              while ! hyprctl monitors all 2>/dev/null | grep -q 'SUNSHINE'; do
+                if (( --timeout == 0 )); then
+                  echo "Timed out waiting for SUNSHINE output to appear" >&2
+                  exit 1
+                fi
+                sleep 0.5
+              done
+
               hyprctl keyword monitor "$mon_string"
-              sleep 2
+              sleep 1
               hyprctl dispatch moveworkspacetomonitor 7 SUNSHINE
-              # wait before we switch to the new workspace
-              sleep 2
               hyprctl dispatch workspace 7
             '';
           };
@@ -221,7 +229,7 @@
           # HDR re-enable: target physical DP-1 instead of the headless SUNSHINE
           # output by setting `output_name = 1;` and `capture = "kms";` (KMS is
           # required to capture HDR metadata; wlr loses it).
-          output_name = 2;
+          output_name = "SUNSHINE";
           gamepad = "ds5";
           capture = "wlr";
           # allow guide press with back button after 2000 milliseconds
