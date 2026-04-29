@@ -16,7 +16,11 @@
         };
 
         display = {
-          separator = " ";
+          separator = "  ";
+          key = {
+            width = 8;
+            type = "string";
+          };
           bar.char = {
             elapsed = "█";
             total = "░";
@@ -32,220 +36,183 @@
           }
           "break"
 
-          # ── Hardware ──────────────────────────────────────────
+          # Hardware
           {
             type = "custom";
-            format = "┌──────────────────────Hardware──────────────────────┐";
-            outputColor = "yellow";
+            format = "  Hardware";
+            outputColor = "1;33";
           }
           {
             type = "host";
-            key = " PC";
+            key = " 󰌢 PC";
             keyColor = "red";
           }
           {
             type = "cpu";
-            key = "│ ├";
+            key = "  CPU";
             showPeCoreCount = true;
             keyColor = "red";
           }
           {
             type = "gpu";
-            key = "│ ├󰢮";
+            key = " 󰢮 GPU";
             keyColor = "red";
           }
           {
             type = "memory";
-            key = "│ ├";
+            key = "  MEM";
             keyColor = "red";
-          }
-          {
-            type = "disk";
-            key = "│ └";
-            keyColor = "red";
-            format = "{1} / {2} - {9}";
-            showExternal = true;
-            showHidden = true;
-            showSubvolumes = true;
-            showUnknown = true;
-            showReadOnly = true;
             percent = {
-              type = 11;
+              type = 10;
             };
           }
           {
-            type = "custom";
-            format = "└────────────────────────────────────────────────────┘";
-            outputColor = "yellow";
+            type = "disk";
+            key = " 󰋊 Disk ({2})";
+            keyColor = "red";
+            folders = "/nix:/home:/media/Data";
+            percent = {
+              type = 10;
+            };
           }
           "break"
 
-          # ── Software ─────────────────────────────────────────
+          # Software
           {
             type = "custom";
-            format = "┌──────────────────────Software──────────────────────┐";
-            outputColor = "yellow";
+            format = " 󱄅 Software";
+            outputColor = "1;33";
           }
           {
             type = "os";
-            key = "󱄅 OS";
+            key = " 󱄅 OS";
             keyColor = "green";
           }
           {
             type = "kernel";
-            key = "│ ├ ";
+            key = "  Kernel";
             keyColor = "green";
           }
           {
             type = "packages";
-            key = "│ ├ ";
+            key = "  Pkgs";
             keyColor = "green";
             format = "{} (nix)";
           }
           {
             type = "terminal";
-            key = "│ ├ ";
+            key = "  Term";
             keyColor = "green";
           }
           {
             type = "shell";
-            key = "└ └ ";
+            key = "  Shell";
             keyColor = "green";
           }
           "break"
+
+          # Desktop
+          {
+            type = "custom";
+            format = "  Desktop";
+            outputColor = "1;33";
+          }
           {
             type = "de";
-            key = " DE";
+            key = "  DE";
             keyColor = "blue";
           }
           {
             type = "wm";
-            key = "│ ├";
+            key = "  WM";
             keyColor = "blue";
           }
           {
             type = "wmtheme";
-            key = "│ ├󰉼";
+            key = " 󰉼 Theme";
             keyColor = "blue";
           }
           {
             type = "font";
-            key = "│ ├ ";
+            key = "  Font";
             keyColor = "blue";
           }
           {
             type = "cursor";
-            key = "│ ├󰆿";
+            key = " 󰆿 Cursor";
             keyColor = "blue";
-          }
-          {
-            type = "custom";
-            format = "└────────────────────────────────────────────────────┘";
-            outputColor = "yellow";
           }
           "break"
 
-          # ── Network ─────────────────────────────────────────
+          # Network
           {
             type = "custom";
-            format = "┌──────────────────────Network───────────────────────┐";
-            outputColor = "yellow";
+            format = "  Network";
+            outputColor = "1;33";
           }
           {
             type = "publicip";
-            key = "│ ├󰩟 Pub IP";
+            key = " 󰩟 Pub IP";
             keyColor = "blue";
             format = "{1} - {2}";
           }
           {
             type = "localip";
-            key = "│ ├󰈀 Loc IP";
+            key = " 󰈀 Loc IP";
             keyColor = "blue";
             format = "{1} - {3}";
             showMac = true;
           }
-          # {
-          #   type = "dns";
-          #   key = "│ ├󰇖 DNS";
-          #   keyColor = "blue";
-          # }
           {
             type = "wifi";
-            key = "│ ├󰖩 Wi-Fi";
+            key = " 󰖩 Wi-Fi";
             keyColor = "blue";
             format = "{4} - {7} - {13} GHz - {6} - {10}";
           }
           {
             type = "bluetooth";
-            key = "│ ├󰂯 BT Dev";
+            key = " 󰂯 BT Dev";
             keyColor = "blue";
             format = "{1} - {4}";
           }
           {
             type = "bluetoothradio";
-            key = "│ └󰂱 BT Ver";
+            key = " 󰂱 BT Ver";
             keyColor = "blue";
             format = "{5}";
           }
-          {
-            type = "custom";
-            format = "└────────────────────────────────────────────────────┘";
-            outputColor = "yellow";
-          }
           "break"
 
-          # ── Miscellaneous ────────────────────────────────────
+          # Misc
           {
             type = "custom";
-            format = "┌───────────────────Miscellaneous────────────────────┐";
-            outputColor = "yellow";
+            format = " 󰣐 Misc";
+            outputColor = "1;33";
           }
           {
             type = "uptime";
-            key = "  Uptime";
+            key = " 󰔚 Up";
             keyColor = "magenta";
           }
           {
             type = "media";
-            key = "  Music";
+            key = " 󰝚 Music";
             keyColor = "magenta";
             format = "{1} - {4}";
           }
           {
             type = "datetime";
-            key = "  Date and Time";
+            key = " 󰃭 Date";
             keyColor = "magenta";
             format = "{3}/{11}/{1} - {14}:{18} {22}";
           }
+          "break"
           {
             type = "custom";
             format = "  A star can only truly be seen in the darkness...";
-            outputColor = "cyan";
-          }
-          {
-            type = "custom";
-            format = "└────────────────────────────────────────────────────┘";
-            outputColor = "yellow";
+            outputColor = "36";
           }
           "break"
-
-          # ── Weather ─────────────────────────────────────────
-          # {
-          #   type = "custom";
-          #   format = "┌──────────────────────Weather───────────────────────┐";
-          #   outputColor = "yellow";
-          # }
-          # {
-          #   type = "weather";
-          #   key = "│  Weather";
-          #   keyColor = "cyan";
-          # }
-          # {
-          #   type = "custom";
-          #   format = "└────────────────────────────────────────────────────┘";
-          #   outputColor = "yellow";
-          # }
-          # "break"
 
           {
             type = "colors";
