@@ -22,7 +22,7 @@
       ];
       virtualisation.oci-containers.containers = {
         minecraft-atm10 = {
-          autoStart = true;
+          autoStart = false;
           image = "itzg/minecraft-server:latest";
           ports = [ "25565:25565" ];
           # environmentFiles = [config.age.secrets."curseforge".path];
