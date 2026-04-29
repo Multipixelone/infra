@@ -145,7 +145,7 @@
           librarian = "kimi";
           explorer = "kimi";
           designer = "gemini-pro";
-          fixer = "mimo-pro";
+          fixer = "minimax";
           observer = "mimo-omni";
         };
 
@@ -163,7 +163,7 @@
         specialistsCopilot = {
           oracle = "gpt-5-4";
           designer = "gemini-pro";
-          fixer = "mimo-pro";
+          fixer = "minimax";
           librarian = "kimi";
           explorer = "hy3-preview-free";
           observer = "mimo-omni";
