@@ -176,8 +176,7 @@
               no_donation_nag = true;
             };
             dwindle = {
-              # keep floating dimentions while tiling
-              pseudotile = true;
+              # keep floating dimensions while tiling
               preserve_split = true;
             };
             # gestures = {
