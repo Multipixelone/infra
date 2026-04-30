@@ -202,8 +202,8 @@
                   lower_cutoff_freq: 50, // not passed to cava if not provided
                   higher_cutoff_freq: 10000, // not passed to cava if not provided
                   input: (
-                      method: Fifo,
-                      source: "/tmp/mpd.fifo",
+                      method: Pipewire,
+                      source: "auto",
                       sample_rate: 44100,
                       channels: 2,
                       sample_bits: 16,
