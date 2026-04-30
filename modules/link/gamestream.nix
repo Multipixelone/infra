@@ -229,7 +229,7 @@
           # HDR re-enable: target physical DP-1 instead of the headless SUNSHINE
           # output by setting `output_name = 1;` and `capture = "kms";` (KMS is
           # required to capture HDR metadata; wlr loses it).
-          output_name = "SUNSHINE";
+          output_name = 2;
           gamepad = "ds5";
           capture = "wlr";
           # allow guide press with back button after 2000 milliseconds
