@@ -153,9 +153,9 @@
         specialistsGo = {
           oracle = "deepseek-pro";
           librarian = "kimi";
-          explorer = "kimi";
+          explorer = "hy3-preview-free";
           designer = "mimo-pro";
-          fixer = "mimo-pro";
+          fixer = "minimax";
           observer = "mimo-omni";
         };
 
