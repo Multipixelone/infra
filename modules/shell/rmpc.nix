@@ -3,9 +3,13 @@
     {
       pkgs,
       lib,
+      osConfig,
+      hosts,
       ...
     }:
     let
+      isLink = (osConfig.networking.hostName or "") == "link";
+      mpdAddress = if isLink then "127.0.0.1:6600" else "${hosts.link.homeAddress}:6600";
       # NOTE probably not using this, but i'm leaving it here for posterity cause I'm gonna forget how to wrap a shell script in the future LMAO
       # kunst = pkgs.stdenv.mkDerivation rec {
       #   name = "kunst";
@@ -179,7 +183,7 @@
           #![enable(unwrap_newtypes)]
           #![enable(unwrap_variant_newtypes)]
           (
-              address: "127.0.0.1:6600",
+              address: "${mpdAddress}",
               password: None,
               theme: Some("cat"),
               cache_dir: None,
