@@ -15,6 +15,7 @@
       "https://cache.nixos.org"
       "https://attic-cache.fly.dev/system?priority=50"
       "https://nix-community.cachix.org"
+      "https://cache.garnix.io"
       "https://hyprland.cachix.org"
       "https://anyrun.cachix.org"
       "https://prismlauncher.cachix.org"
@@ -26,6 +27,7 @@
       "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
       "system:qjMAtak3MMVYM2B3EoLvNG9duRTrjdNS65RTagsr+y4="
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
       "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
       "anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s="
       "prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c="
@@ -228,6 +230,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nur.url = "github:nix-community/NUR";
+    openclaw.url = "github:openclaw/nix-openclaw";
     opencode = {
       url = "github:anomalyco/opencode";
       inputs.nixpkgs.follows = "nixpkgs";

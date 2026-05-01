@@ -84,7 +84,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (30)</summary>
+<summary>Packages exposed by this flake (31)</summary>
 
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
 - [`beets-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#beets-lossyflac`
@@ -112,6 +112,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`screenshot-area`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area`
 - [`screenshot-area-ocr`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area-ocr`
 - [`system`](https://github.com/Multipixelone/infra/blob/main/modules/nix/utils.nix) · `nix run github:Multipixelone/infra#system`
+- [`transparent-cursor-theme`](https://github.com/Multipixelone/infra/blob/main/modules/marin/greetd.nix) — Transparent cursor theme for Cage/Wayland sessions · `nix run github:Multipixelone/infra#transparent-cursor-theme`
 - [`upload-script`](https://github.com/Multipixelone/infra/blob/main/modules/shell/0x0.nix) · `nix run github:Multipixelone/infra#upload-script`
 - `write-flake` — Generate a flake.nix file · `nix run github:Multipixelone/infra#write-flake`
 - `write-inputs` — Generate an inputs.nix expression (for debugging) · `nix run github:Multipixelone/infra#write-inputs`
