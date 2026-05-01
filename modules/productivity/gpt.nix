@@ -20,7 +20,7 @@
           age = {
             secrets = {
               "openai" = {
-                file = "${inputs.secrets}/openai.age";
+                file = "${inputs.secrets}/ai/openai.age";
               };
             };
           };

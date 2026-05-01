@@ -39,7 +39,7 @@
       hmArgs@{ pkgs, ... }:
       {
         imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
-        age.secrets."tavily".file = "${inputs.secrets}/tavily.age";
+        age.secrets."tavily".file = "${inputs.secrets}/ai/tavily.age";
         programs.mcp.enable = true;
         mcp-servers.programs = {
           context7.enable = true;

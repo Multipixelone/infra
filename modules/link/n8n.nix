@@ -7,7 +7,7 @@
   configurations.nixos.link.module =
     { config, ... }:
     {
-      age.secrets."n8n".file = "${inputs.secrets}/n8n.age";
+      age.secrets."n8n".file = "${inputs.secrets}/ai/n8n.age";
       services.n8n = {
         enable = true;
         openFirewall = true;
