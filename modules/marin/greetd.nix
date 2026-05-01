@@ -1,10 +1,17 @@
 {
   lib,
   config,
+  rootPath,
   withSystem,
   ...
 }:
 {
+  perSystem =
+    { pkgs, ... }:
+    {
+      packages.transparent-cursor-theme = pkgs.callPackage "${rootPath}/pkgs/transparent-cursor" { };
+    };
+
   configurations.nixos.marin.module =
     { pkgs, ... }:
     let
