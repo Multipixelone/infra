@@ -11,6 +11,7 @@
       home-manager = {
         useGlobalPkgs = true;
         extraSpecialArgs.hasGlobalPkgs = true;
+        extraSpecialArgs.hosts = config.hosts;
         backupFileExtension = "bkp";
         # https://github.com/nix-community/home-manager/issues/6770
         #useUserPackages = true;
