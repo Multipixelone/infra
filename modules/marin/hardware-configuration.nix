@@ -7,6 +7,8 @@
     pkg:
     builtins.elem (lib.getName pkg) [
       "broadcom-sta"
+      # temp: this isn't merging right so I'm just putting this here for now
+      "openclaw"
     ];
   nixpkgs.config.allowUnfreePackages = [ "broadcom-sta" ];
   configurations.nixos.marin.module =
