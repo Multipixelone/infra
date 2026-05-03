@@ -146,86 +146,86 @@
           };
         };
       };
-      languages = {
-        language-server = {
-          tinymist = {
-            command = "tinymist";
-            config = {
-              exportPdf = "onType";
-              formatterMode = "typstyle";
-              formatterPrintWidth = 80;
-              preview.background = {
-                enabled = true;
-                args = [
-                  "--data-plane-host=127.0.0.1:0" # 0: pick a random port
-                  "--invert-colors=never"
-                  "--open"
-                ];
+      languages =
+        let
+          dprintConfig = builtins.toFile "dprint.json" (
+            builtins.toJSON {
+              lineWidth = 80;
+              typescript = {
+                quoteStyle = "preferSingle";
+                binaryExpression.operatorPosition = "sameLine";
               };
-            };
-          };
-          gpt = {
-            command = "copilot-language-server";
-            args = [ "--stdio" ];
-            config = {
-              editorInfo = {
-                name = "Helix";
-                version = "25.01";
-              };
-              editorPluginInfo = {
-                name = "helix-copilot";
-                version = "0.1.0";
-              };
-            };
-          };
-          taplo = {
-            command = lib.getExe pkgs.taplo;
-            args = [
-              "lsp"
-              "stdio"
-            ];
-          };
-          nixd = {
-            command = lib.getExe pkgs.nixd;
-            args = [ "--inlay-hints=true" ];
-            config = {
-              formatting.command = [ (lib.getExe pkgs.nixfmt) ];
-              nixpkgs.expr = "import <nixpkgs> {}";
-              options = {
-                nixos.expr = "(builtins.getFlake \"/etc/nixos\").nixosConfigurations.default.options";
-                home-manager.expr = "(builtins.getFlake \"/etc/nixos\").homeConfigurations.default.options";
-              };
-            };
-          };
-          basedpyright.command = "${pkgs.basedpyright}/bin/basedpyright-langserver";
-          ruff = {
-            command = lib.getExe pkgs.ruff;
-            args = [ "server" ];
-          };
-          fish-lsp = {
-            command = lib.getExe pkgs.fish-lsp;
-            args = [ "start" ];
-          };
-          dprint =
-            let
-              dprintConfig = builtins.toFile "dprint.json" (
-                builtins.toJSON {
-                  lineWidth = 80;
-                  typescript = {
-                    quoteStyle = "preferSingle";
-                    binaryExpression.operatorPosition = "sameLine";
-                  };
-                  json.indentWidth = 2;
-                  excludes = [ "**/*-lock.json" ];
-                  plugins = [
-                    "https://plugins.dprint.dev/typescript-0.93.0.wasm"
-                    "https://plugins.dprint.dev/json-0.19.3.wasm"
-                    "https://plugins.dprint.dev/markdown-0.17.8.wasm"
+              json.indentWidth = 2;
+              excludes = [ "**/*-lock.json" ];
+              plugins = [
+                "https://plugins.dprint.dev/typescript-0.93.0.wasm"
+                "https://plugins.dprint.dev/json-0.19.3.wasm"
+                "https://plugins.dprint.dev/markdown-0.17.8.wasm"
+              ];
+            }
+          );
+        in
+        {
+          language-server = {
+            tinymist = {
+              command = "tinymist";
+              config = {
+                exportPdf = "onType";
+                formatterMode = "typstyle";
+                formatterPrintWidth = 80;
+                preview.background = {
+                  enabled = true;
+                  args = [
+                    "--data-plane-host=127.0.0.1:0" # 0: pick a random port
+                    "--invert-colors=never"
+                    "--open"
                   ];
-                }
-              );
-            in
-            {
+                };
+              };
+            };
+            gpt = {
+              command = "copilot-language-server";
+              args = [ "--stdio" ];
+              config = {
+                editorInfo = {
+                  name = "Helix";
+                  version = "25.01";
+                };
+                editorPluginInfo = {
+                  name = "helix-copilot";
+                  version = "0.1.0";
+                };
+              };
+            };
+            taplo = {
+              command = lib.getExe pkgs.taplo;
+              args = [
+                "lsp"
+                "stdio"
+              ];
+            };
+            nixd = {
+              command = lib.getExe pkgs.nixd;
+              args = [ "--inlay-hints=true" ];
+              config = {
+                formatting.command = [ (lib.getExe pkgs.nixfmt) ];
+                nixpkgs.expr = "import <nixpkgs> {}";
+                options = {
+                  nixos.expr = "(builtins.getFlake \"/etc/nixos\").nixosConfigurations.default.options";
+                  home-manager.expr = "(builtins.getFlake \"/etc/nixos\").homeConfigurations.default.options";
+                };
+              };
+            };
+            basedpyright.command = "${pkgs.basedpyright}/bin/basedpyright-langserver";
+            ruff = {
+              command = lib.getExe pkgs.ruff;
+              args = [ "server" ];
+            };
+            fish-lsp = {
+              command = lib.getExe pkgs.fish-lsp;
+              args = [ "start" ];
+            };
+            dprint = {
               command = lib.getExe pkgs.dprint;
               args = [
                 "lsp"
@@ -233,208 +233,229 @@
                 dprintConfig
               ];
             };
-          astro-ls = {
-            command = "${pkgs.astro-language-server}/bin/astro-ls";
-            args = [ "--stdio" ];
-          };
-          typescript-language-server = {
-            command = lib.getExe pkgs.typescript-language-server;
-            args = [ "--stdio" ];
-            config = {
-              typescript-language-server.source = {
-                addMissingImports.ts = true;
-                fixAll.ts = true;
-                organizeImports.ts = true;
-                removeUnusedImports.ts = true;
-                sortImports.ts = true;
-              };
-              plugins = [
-                {
-                  name = "@vue/typescript-plugin";
-                  location = "${pkgs.vue-language-server}/lib/node_modules/@vue/language-server";
-                  languages = [ "vue" ];
-                }
-              ];
+            astro-ls = {
+              command = "${pkgs.astro-language-server}/bin/astro-ls";
+              args = [ "--stdio" ];
             };
-          };
-          uwu-colors = {
-            command = "${inputs.uwu-colors.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/uwu_colors";
-          };
-          vscode-css-language-server = {
-            command = "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server";
-            args = [ "--stdio" ];
-            config = {
-              provideFormatter = true;
-              css.validate.enable = true;
-              scss.validate.enable = true;
-            };
-          };
-          yaml-language-server = {
-            command = "${pkgs.yaml-language-server}/bin/yaml-language-server";
-            args = [ "--stdio" ];
-            config.yaml = {
-              schemaStore.enable = true;
-              format.enable = true;
-              validate = true;
-              completion = true;
-              hover = true;
-              schemas.kubernetes = [
-                "*.k8s.yaml"
-                "kustomization.yaml"
-                "**/values.yaml"
-                "helm/*.yaml"
-              ];
-            };
-          };
-          texlab = {
-            command = "texlab";
-            config.texlab = {
-              chktex = {
-                onOpenAndSave = true;
-                onEdit = true;
-              };
-              build = {
-                onSave = true;
-                forwardSearchAfter = true;
-                executable = "latexrun";
-                args = [ "%f" ];
-              };
-              forwardSearch = {
-                executable = "zathura";
-                args = [
-                  "%p"
-                  "--synctex-forward"
-                  "%l:1:%f"
+            typescript-language-server = {
+              command = lib.getExe pkgs.typescript-language-server;
+              args = [ "--stdio" ];
+              config = {
+                typescript-language-server.source = {
+                  addMissingImports.ts = true;
+                  fixAll.ts = true;
+                  organizeImports.ts = true;
+                  removeUnusedImports.ts = true;
+                  sortImports.ts = true;
+                };
+                plugins = [
+                  {
+                    name = "@vue/typescript-plugin";
+                    location = "${pkgs.vue-language-server}/lib/node_modules/@vue/language-server";
+                    languages = [ "vue" ];
+                  }
                 ];
               };
             };
-          };
-        };
-        language =
-          let
-            prettier = lang: {
-              command = lib.getExe pkgs.prettier;
-              args = [
-                "--parser"
-                lang
-              ];
+            uwu-colors = {
+              command = "${inputs.uwu-colors.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/uwu_colors";
             };
-          in
-          [
-            {
-              name = "nix";
-              language-servers = [
-                "nixd"
-                "gpt"
-              ];
-              formatter.command = lib.getExe pkgs.nixfmt;
-              auto-format = true;
-            }
-            {
-              name = "yaml";
-              auto-format = true;
-              language-servers = [ "yaml-language-server" ];
-            }
-            {
-              name = "fish";
-              language-servers = [
-                "fish-lsp"
-                "gpt"
-              ];
-            }
-            {
-              name = "markdown";
-              language-servers = [
-                "marksman"
-                "markdown-oxide"
-              ];
-              formatter = {
+            vscode-css-language-server = {
+              command = "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server";
+              args = [ "--stdio" ];
+              config = {
+                provideFormatter = true;
+                css.validate.enable = true;
+                scss.validate.enable = true;
+              };
+            };
+            vscode-json-language-server = {
+              command = "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server";
+              args = [ "--stdio" ];
+            };
+            yaml-language-server = {
+              command = "${pkgs.yaml-language-server}/bin/yaml-language-server";
+              args = [ "--stdio" ];
+              config.yaml = {
+                schemaStore.enable = true;
+                format.enable = true;
+                validate = true;
+                completion = true;
+                hover = true;
+                schemas.kubernetes = [
+                  "*.k8s.yaml"
+                  "kustomization.yaml"
+                  "**/values.yaml"
+                  "helm/*.yaml"
+                ];
+              };
+            };
+            texlab = {
+              command = "texlab";
+              config.texlab = {
+                chktex = {
+                  onOpenAndSave = true;
+                  onEdit = true;
+                };
+                build = {
+                  onSave = true;
+                  forwardSearchAfter = true;
+                  executable = "latexrun";
+                  args = [ "%f" ];
+                };
+                forwardSearch = {
+                  executable = "zathura";
+                  args = [
+                    "%p"
+                    "--synctex-forward"
+                    "%l:1:%f"
+                  ];
+                };
+              };
+            };
+          };
+          language =
+            let
+              prettier = lang: {
                 command = lib.getExe pkgs.prettier;
                 args = [
-                  "--stdin-filepath"
-                  "%{buffer_name}"
+                  "--parser"
+                  lang
                 ];
               };
-              auto-format = true;
-            }
-            {
-              name = "python";
-              auto-format = true;
-              language-servers = [
-                "basedpyright"
-                {
-                  name = "ruff";
-                  except-features = [ "hover" ];
-                }
-              ];
-            }
-            {
-              name = "latex";
-              file-types = [ "tex" ];
-              language-servers = [ "texlab" ];
-              text-width = 120;
-            }
-            {
-              name = "typst";
-              formatter.command = lib.getExe pkgs.typstyle;
-              auto-format = true;
-              language-servers = [ "tinymist" ];
-            }
-            {
-              name = "toml";
-              auto-format = true;
-              formatter = {
-                command = lib.getExe pkgs.taplo;
-                args = [
-                  "fmt"
-                  "-"
+            in
+            [
+              {
+                name = "nix";
+                language-servers = [
+                  "nixd"
+                  "gpt"
                 ];
-              };
-              language-servers = [ "taplo" ];
-            }
-            {
-              name = "css";
-              formatter = prettier "css";
-              auto-format = true;
-              language-servers = [
-                "vscode-css-language-server"
-                "uwu-colors"
-              ];
-            }
-            {
-              name = "html";
-              formatter = prettier "html";
-              language-servers = [ "vscode-html-language-server" ];
-            }
-            {
-              name = "javascript";
-              auto-format = true;
-              file-types = [
-                "js"
-                "jsx"
-                "mjs"
-              ];
-              language-servers = [
-                "dprint"
-                "typescript-language-server"
-              ];
-              formatter = {
-                command = lib.getExe pkgs.dprint;
-                args = [
-                  "fmt"
-                  "--stdin"
-                  "javascript"
+                formatter.command = lib.getExe pkgs.nixfmt;
+                auto-format = true;
+              }
+              {
+                name = "yaml";
+                auto-format = true;
+                language-servers = [ "yaml-language-server" ];
+              }
+              {
+                name = "fish";
+                language-servers = [
+                  "fish-lsp"
+                  "gpt"
                 ];
-              };
-            }
-            {
-              name = "astro";
-              auto-format = true;
-              formatter = prettier "astro";
-              language-servers = [ "astro-ls" ];
-            }
-          ];
-      };
+              }
+              {
+                name = "markdown";
+                language-servers = [
+                  "marksman"
+                  "markdown-oxide"
+                ];
+                formatter = {
+                  command = lib.getExe pkgs.prettier;
+                  args = [
+                    "--stdin-filepath"
+                    "%{buffer_name}"
+                  ];
+                };
+                auto-format = true;
+              }
+              {
+                name = "python";
+                auto-format = true;
+                language-servers = [
+                  "basedpyright"
+                  {
+                    name = "ruff";
+                    except-features = [ "hover" ];
+                  }
+                ];
+              }
+              {
+                name = "latex";
+                file-types = [ "tex" ];
+                language-servers = [ "texlab" ];
+                text-width = 120;
+              }
+              {
+                name = "typst";
+                formatter.command = lib.getExe pkgs.typstyle;
+                auto-format = true;
+                language-servers = [ "tinymist" ];
+              }
+              {
+                name = "toml";
+                auto-format = true;
+                formatter = {
+                  command = lib.getExe pkgs.taplo;
+                  args = [
+                    "fmt"
+                    "-"
+                  ];
+                };
+                language-servers = [ "taplo" ];
+              }
+              {
+                name = "css";
+                formatter = prettier "css";
+                auto-format = true;
+                language-servers = [
+                  "vscode-css-language-server"
+                  "uwu-colors"
+                ];
+              }
+              {
+                name = "html";
+                formatter = prettier "html";
+                language-servers = [ "vscode-html-language-server" ];
+              }
+              {
+                name = "javascript";
+                auto-format = true;
+                file-types = [
+                  "js"
+                  "jsx"
+                  "mjs"
+                ];
+                language-servers = [
+                  "dprint"
+                  "typescript-language-server"
+                ];
+                formatter = {
+                  command = lib.getExe pkgs.dprint;
+                  args = [
+                    "fmt"
+                    "--stdin"
+                    "javascript"
+                    "--config"
+                    dprintConfig
+                  ];
+                };
+              }
+              {
+                name = "json";
+                auto-format = true;
+                language-servers = [ "vscode-json-language-server" ];
+                formatter = {
+                  command = lib.getExe pkgs.dprint;
+                  args = [
+                    "fmt"
+                    "--stdin"
+                    "json"
+                    "--config"
+                    dprintConfig
+                  ];
+                };
+              }
+              {
+                name = "astro";
+                auto-format = true;
+                formatter = prettier "astro";
+                language-servers = [ "astro-ls" ];
+              }
+            ];
+        };
     };
   nixpkgs.config.allowUnfreePackages = [ "copilot-language-server" ];
   flake.modules = {
