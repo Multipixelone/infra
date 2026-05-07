@@ -121,6 +121,8 @@
             set -gx VISUAL hx
             set -gx NIXPKGS_ALLOW_UNFREE 1
             set -gx NIXPKGS_ALLOW_INSECURE 1
+            # OpenClaw is installed via npm --prefix "$HOME/.npm-global".
+            fish_add_path --global --move $HOME/.npm-global/bin
 
             if test "$TERM" != "dumb"
               ${getExe pkgs.zellij} setup --generate-completion fish | source
