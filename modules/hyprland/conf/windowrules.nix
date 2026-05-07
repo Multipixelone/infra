@@ -97,6 +97,8 @@
         "match:class looking-glass-client, fullscreen on"
 
         # gw2
+        "match:title ^(Guild Wars 2( Launcher)?)$, workspace 7 silent"
+        "match:class ^(.+exe)$, match:title ^(Guild Wars 2( Launcher)?)(.*)$, workspace 7 silent"
         "match:title ^(Guild Wars 2)$, border_size 0"
         "match:title ^(Guild Wars 2)$, opaque on"
         "match:title ^(Guild Wars 2)$, no_blur on"
