@@ -164,7 +164,7 @@
           oracle = "gpt-5-4";
           designer = "gemini-pro";
           fixer = "minimax";
-          librarian = "kimi";
+          librarian = "deepseek-pro";
           explorer = "hy3-preview-free";
           observer = "mimo-omni";
         };
