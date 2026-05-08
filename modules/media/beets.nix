@@ -416,7 +416,7 @@
               "rewrite"
               "scrub"
               "smartplaylist"
-              # "stylize"
+              "stylize"
               "savedformats"
               "titlecase"
               "the"
@@ -885,31 +885,31 @@
             };
 
             # TODO: enable these again when https://github.com/kergoth/beets-stylize/pull/94 is fixed :-)
-            # item_formats = {
-            #   format_item = "%ifdef{id,$format_id }%if{$singleton,,$format_album_title %nocolor{| }}$format_year %nocolor{- }$format_track";
+            item_formats = {
+              format_item = "%ifdef{id,$format_id }%if{$singleton,,$format_album_title %nocolor{| }}$format_year %nocolor{- }$format_track";
 
-            #   format_id = "%stylize{id,$id,[$id]}";
-            #   format_album_title = "%stylize{album,$album%aunique{}}%if{$albumtypes,%stylize{albumtypes,%ifdef{atypes,%if{$atypes, $atypes}}}}";
-            #   format_year = "%stylize{year,$year}";
+              format_id = "%stylize{id,$id,[$id]}";
+              format_album_title = "%stylize{album,$album%aunique{}}%if{$albumtypes,%stylize{albumtypes,%ifdef{atypes,%if{$atypes, $atypes}}}}";
+              format_year = "%stylize{year,$year}";
 
-            #   format_track = "%if{$singleton,,%if{$disc_and_track,$format_disc_and_track %nocolor{- }}}$format_artist$format_title";
-            #   format_disc_and_track = "%stylize{track,$disc_and_track}";
-            #   format_artist = "%stylize{artist,$artist} %nocolor{- }";
-            #   format_title = "%stylize{title,$title}";
-            # };
-            # album_formats = {
-            #   format_album = "%ifdef{id,$format_album_id }%if{$albumartist,$format_albumartist %nocolor{- }}$format_album_title %nocolor{| }$format_year";
+              format_track = "%if{$singleton,,%if{$disc_and_track,$format_disc_and_track %nocolor{- }}}$format_artist$format_title";
+              format_disc_and_track = "%stylize{track,$disc_and_track}";
+              format_artist = "%stylize{artist,$artist} %nocolor{- }";
+              format_title = "%stylize{title,$title}";
+            };
+            album_formats = {
+              format_album = "%ifdef{id,$format_album_id }%if{$albumartist,$format_albumartist %nocolor{- }}$format_album_title %nocolor{| }$format_year";
 
-            #   format_album_id = "%stylize{id,$id,[$id]}";
-            #   format_albumartist = "%stylize{albumartist,$albumartist}";
-            #   format_album_title = "%stylize{album,$album%aunique{}}%if{$albumtypes,%stylize{albumtypes,%ifdef{atypes,%if{$atypes, $atypes}}}}";
-            #   format_year = "%stylize{year,$year}";
+              format_album_id = "%stylize{id,$id,[$id]}";
+              format_albumartist = "%stylize{albumartist,$albumartist}";
+              format_album_title = "%stylize{album,$album%aunique{}}%if{$albumtypes,%stylize{albumtypes,%ifdef{atypes,%if{$atypes, $atypes}}}}";
+              format_year = "%stylize{year,$year}";
 
-            #   # Allow for aliases with `-f '$format_item'` to be used when `-a` is passed;
-            #   format_item = "$format_album";
-            # };
-            # format_album = "$format_album";
-            # format_item = "$format_item";
+              # Allow for aliases with `-f '$format_item'` to be used when `-a` is passed;
+              format_item = "$format_album";
+            };
+            format_album = "$format_album";
+            format_item = "$format_item";
 
             fetchart = {
               auto = true;
