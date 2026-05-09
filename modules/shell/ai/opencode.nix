@@ -153,7 +153,7 @@
         specialistsGo = {
           oracle = "deepseek-pro";
           librarian = "kimi";
-          explorer = "hy3-preview-free";
+          explorer = "minimax-m25-free";
           designer = "mimo-pro";
           fixer = "minimax";
           observer = "mimo-omni";
@@ -165,7 +165,7 @@
           designer = "gemini-pro";
           fixer = "minimax";
           librarian = "deepseek-pro";
-          explorer = "hy3-preview-free";
+          explorer = "minimax-m25-free";
           observer = "mimo-omni";
         };
 
