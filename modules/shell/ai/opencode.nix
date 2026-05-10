@@ -71,6 +71,7 @@
           # opencode go
           kimi = "opencode-go/kimi-k2.6";
           deepseek-pro = "opencode-go/deepseek-v4-pro";
+          deepseek = "opencode-go/deepseek-v4-flash";
           glm = "opencode-go/glm-5.1";
           mimo-pro = "opencode-go/mimo-v2.5-pro";
           mimo-omni = "opencode-go/mimo-v2-omni";
@@ -164,7 +165,7 @@
           oracle = "gpt-5-4";
           designer = "gemini-pro";
           fixer = "minimax";
-          librarian = "deepseek-pro";
+          librarian = "deepseek";
           explorer = "minimax-m25-free";
           observer = "mimo-omni";
         };
