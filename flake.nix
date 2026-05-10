@@ -97,6 +97,13 @@
       url = "github:zhaofengli/colmena";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    commutecompass = {
+      url = "github:Multipixelone/commutecompass";
+      inputs = {
+        flake-utils.follows = "flake-utils";
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
     euphony = {
       url = "github:Multipixelone/euphony/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";
