@@ -2,6 +2,7 @@
   configurations.nixos.iot.module = {
     services.home-assistant = {
       enable = true;
+      openFirewall = true;
       extraComponents = [
         "mobile_app"
         "webhook"
