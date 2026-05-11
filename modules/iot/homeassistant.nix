@@ -142,9 +142,9 @@
 
         config =
           let
-            eufyVacuumEntityId = "vacuum.robovac_x10_pro_omni"; # TODO: replace
-            eufyWaterLevelSensor = "sensor.robovac_x10_pro_omni_water_level"; # TODO: replace
-            eufyErrorSensor = "sensor.robovac_x10_pro_omni_error"; # TODO: replace
+            eufyVacuumEntityId = "vacuum.vaccum";
+            eufyWaterLevelSensor = "sensor.vaccum_water_level";
+            eufyErrorSensor = "sensor.vaccum_error_message";
             levoitWaterSensor = "binary_sensor.levoit_humidifier_water_lacks"; # TODO: verify entity_id
             todoistLabel = "care";
           in
