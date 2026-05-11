@@ -223,6 +223,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs-cloudflared.url = "github:wrbbz/nixpkgs/cloudflared-2025.4.0";
     nixpkgs-mine.url = "github:Multipixelone/nixpkgs/init-soundshow";
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
     noctalia = {

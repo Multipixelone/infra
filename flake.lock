@@ -2789,6 +2789,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-cloudflared": {
+      "locked": {
+        "lastModified": 1743673149,
+        "narHash": "sha256-jGucaQTPNN+j901QEALk1lRs73zAFuSCPnZJMY3YfXs=",
+        "owner": "wrbbz",
+        "repo": "nixpkgs",
+        "rev": "cf1af042a660fe1311403eddf5ed01e50037f44f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "wrbbz",
+        "ref": "cloudflared-2025.4.0",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixpkgs-lib": {
       "locked": {
         "lastModified": 1772328832,
@@ -3569,6 +3585,7 @@
         "nixos-facter-modules": "nixos-facter-modules",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs_16",
+        "nixpkgs-cloudflared": "nixpkgs-cloudflared",
         "nixpkgs-mine": "nixpkgs-mine",
         "nixpkgs-stable": "nixpkgs-stable",
         "noctalia": "noctalia",
@@ -3746,11 +3763,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1778347426,
-        "narHash": "sha256-OFNKUiPJBaqbyuASxmy0MafyZt9SE2OmC4nPLaeNvjQ=",
+        "lastModified": 1778423143,
+        "narHash": "sha256-wTwFHpexqzITBBKXiJXsn5kB4iDnpi3qN99uwG5tCCI=",
         "ref": "refs/heads/main",
-        "rev": "798c88aadb6c2ee59e0199c49e6e74123c4e10c5",
-        "revCount": 75,
+        "rev": "844539f73bdd53d828946e4a1d92572bba4ea31b",
+        "revCount": 76,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },

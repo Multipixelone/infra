@@ -5,8 +5,8 @@
 }:
 # FIXME https://github.com/NixOS/nixpkgs/issues/370185
 {
-  flake-file.input.nixpkgs-cloudflared.url = "github:wrbbz/nixpkgs/cloudflared-2025.4.0";
-  flake.modules.nixos.pc =
+  flake-file.inputs.nixpkgs-cloudflared.url = "github:wrbbz/nixpkgs/cloudflared-2025.4.0";
+  flake.modules.nixos.cloudflared =
     { pkgs, config, ... }:
     let
       _ = lib.getExe;
