@@ -156,11 +156,6 @@
                 icon = "mdi:water-alert";
                 initial = "off";
               };
-              eufy_water_refilled = {
-                name = "Eufy water refilled — clear task flag";
-                icon = "mdi:water-check";
-                initial = "off";
-              };
               levoit_water_task_open = {
                 name = "Levoit humidifier water Todoist task open";
                 icon = "mdi:water-alert";
@@ -292,10 +287,10 @@
                 ];
               }
 
-              # ── Eufy: water guard — return to base if water critically low ──
-              # Sends vacuum back to dock automatically when water is below 15%.
+              # ── Eufy: water guard — create task if water critically low ─────
+              # Creates a Todoist task when water is below 15%.
               {
-                alias = "Eufy: Guard — return to base if water critically low";
+                alias = "Eufy: Guard — create task if water critically low";
                 id = "eufy_water_guard";
                 trigger = [
                   {
@@ -322,21 +317,12 @@
                 ];
                 action = [
                   {
-                    service = "vacuum.return_to_base";
-                    target = {
-                      entity_id = eufyVacuumEntityId;
-                    };
-                  }
-                  {
-                    delay = {
-                      seconds = 5;
-                    };
-                  }
-                  {
                     service = "todoist.new_task";
                     data = {
                       content = "Refill Eufy vacuum water tank";
-                      description = "Refill tank before starting the next cycle. (Status: Returned to base)";
+                      description = "Refill tank before starting the next cycle. (Status: Water critically low)";
+                      project = "#Self";
+                      due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
                     };
@@ -350,18 +336,23 @@
                 ];
               }
 
-              # ── Eufy: reset dedupe flag when user refills ───────────────────
-              # Toggle input_boolean.eufy_water_refilled in the HA UI after
-              # refilling the water tank to clear the warning flag and allow
-              # future tasks to be created.
+              # ── Eufy: reset dedupe flag when tank is refilled ────────────────
+              # Clears the warning flag automatically when water returns to full.
               {
-                alias = "Eufy: Water refilled — reset warning flag";
-                id = "eufy_water_refilled";
+                alias = "Eufy: Water full — reset warning flag";
+                id = "eufy_water_full_reset";
                 trigger = [
                   {
-                    platform = "state";
-                    entity_id = "input_boolean.eufy_water_refilled";
-                    to = "on";
+                    platform = "numeric_state";
+                    entity_id = eufyWaterLevelSensor;
+                    above = 99;
+                  }
+                ];
+                condition = [
+                  {
+                    condition = "state";
+                    entity_id = "input_boolean.eufy_water_task_open";
+                    state = "on";
                   }
                 ];
                 action = [
@@ -369,12 +360,6 @@
                     service = "input_boolean.turn_off";
                     target = {
                       entity_id = "input_boolean.eufy_water_task_open";
-                    };
-                  }
-                  {
-                    service = "input_boolean.turn_off";
-                    target = {
-                      entity_id = "input_boolean.eufy_water_refilled";
                     };
                   }
                 ];
