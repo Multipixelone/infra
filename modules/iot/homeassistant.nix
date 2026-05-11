@@ -4,28 +4,44 @@
   ...
 }:
 {
-  # ── HACS (Home Assistant Community Store) per-system exposure ──────
+  # ── HACS (Home Assistant Community Store) ─────────────────────────────
   # HACS version 2.0.5 — pinned at:
   #   https://github.com/hacs/integration/releases/tag/2.0.5
   #
-  # Installs into $out/home-assistant/components/hacs/  (HA auto-discovers it).
+  # Installed as a custom component under custom_components/hacs so that HA
+  # discovers it via the service's preStart symlink logic (see module.nix
+  # copyCustomComponents).  This is the correct layout for custom integrations.
   #
   # Disable HACS self-update in HA UI after deploy:
   #   HACS → Configuration → uncheck "Check for new versions"
   #   (updates managed via Nix instead).
-  # ──────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────
   perSystem =
     { pkgs, ... }:
     {
-      packages.hacs = pkgs.fetchzip {
-        pname = "hacs";
+      packages.hacs = pkgs.stdenv.mkDerivation {
+        pname = "home-assistant-custom-component-hacs";
         version = "2.0.5";
-        url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
-        hash = "sha256-l75rgkpPOOaDcozG3XI2f2uLrQpDQosbO5h6MIet9BM=";
-        postFetch = ''
-          mkdir -p $out/home-assistant/components
-          mv hacs $out/home-assistant/components/
+        src = pkgs.fetchzip {
+          url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
+          hash = "sha256-l75rgkpPOOaDcozG3XI2f2uLrQpDQosbO5h6MIet9BM=";
+        };
+
+        # installPhase creates $out/custom_components/hacs — the layout the
+        # service preStart uses when symlinking into the HA config dir.
+        installPhase = ''
+          mkdir -p $out/custom_components
+          mv hacs $out/custom_components/
         '';
+
+        # Satisfies services.home-assistant.customComponents type check (isHomeAssistantComponent).
+        isHomeAssistantComponent = true;
+
+        # Used by the HA module's systemd service to enumerate component domains:
+        #   map (getAttr "domain") cfg.customComponents
+        # The actual manifest/domain resolution happens inside HA at runtime.
+        domain = "hacs";
+
         meta = with lib; {
           homepage = "https://hacs.xyz/";
           description = "Home Assistant Community Store (HACS)";
@@ -73,14 +89,12 @@
           "tplink"
           "vesync"
         ];
-        # ── HACS (Home Assistant Community Store) ──────────────────────────
-        # Disable self-update in HA UI after deploy: updates are managed via Nix.
-        # Consumed via withSystem from perSystem.packages.hacs.
-        # ──────────────────────────────────────────────────────────────────
+
+        # Python runtime dependencies required by integrations that are
+        # enabled in extraComponents or config but NOT yet in nixpkgs' HA package.
         extraPackages =
           ps: with ps; [
             gtts
-            (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.hacs))
             pyatv
             aiohomekit
             hap-python
@@ -97,6 +111,14 @@
             led-ble
             hueble
           ];
+
+        # ── HACS (Home Assistant Community Store) ─────────────────────────
+        # Consumed via withSystem from perSystem.packages.hacs.
+        # Mounted at custom_components/hacs by the service preStart symlink.
+        # ─────────────────────────────────────────────────────────────────
+        customComponents = [
+          (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.hacs))
+        ];
 
         config =
           let
