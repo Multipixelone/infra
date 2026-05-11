@@ -74,6 +74,8 @@
           "google_translate"
           "hue"
           "matter"
+          "mpd"
+          "snapcast"
           "apple_tv"
           "icloud"
           "plex"
