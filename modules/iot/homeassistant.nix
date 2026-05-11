@@ -405,6 +405,35 @@
                 ];
               }
 
+              # ── Levoit: reset dedupe flag when water is restored ───────────
+              # Clears the warning flag automatically when low-water state ends.
+              {
+                alias = "Levoit: Water restored — reset warning flag";
+                id = "levoit_water_restored_reset";
+                trigger = [
+                  {
+                    platform = "state";
+                    entity_id = levoitWaterSensor;
+                    to = "off";
+                  }
+                ];
+                condition = [
+                  {
+                    condition = "state";
+                    entity_id = "input_boolean.levoit_water_task_open";
+                    state = "on";
+                  }
+                ];
+                action = [
+                  {
+                    service = "input_boolean.turn_off";
+                    target = {
+                      entity_id = "input_boolean.levoit_water_task_open";
+                    };
+                  }
+                ];
+              }
+
               # Existing: Nightly Home Assistant backup
               {
                 alias = "Nightly Home Assistant Backup";
