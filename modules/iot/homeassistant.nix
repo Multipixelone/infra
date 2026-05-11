@@ -24,14 +24,32 @@
         version = "2.0.5";
         src = pkgs.fetchzip {
           url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
-          hash = "sha256-l75rgkpPOOaDcozG3XI2f2uLrQpDQosbO5h6MIet9BM=";
+          hash = "sha256-iMomioxH7Iydy+bzJDbZxt6BX31UkCvqhXrxYFQV8Gw=";
+          stripRoot = false;
+          postFetch = ''
+            # The zip is flat (no top-level directory); create the expected
+            # custom_components/hacs layout before installPhase runs.
+            mkdir -p $out/custom_components
+            mv $out/*/hacs $out/custom_components/ 2>/dev/null || true
+            # If the zip was truly flat with no subdir, the files land directly
+            # in $out — restructure them here.
+            if [ -d "$out/hacs" ]; then
+              mv $out/hacs $out/custom_components/
+            else
+              mkdir -p $out/custom_components/hacs
+              mv $out/*.{py,json,yaml,md} $out/custom_components/hacs/ 2>/dev/null || true
+              mv $out/*/ $out/custom_components/hacs/ 2>/dev/null || true
+            fi
+          '';
         };
 
         # installPhase creates $out/custom_components/hacs — the layout the
         # service preStart uses when symlinking into the HA config dir.
         installPhase = ''
-          mkdir -p $out/custom_components
-          mv hacs $out/custom_components/
+          # The zip is flat — all files land in the unpacked source dir.
+          # Move them into the custom_components/hacs layout.
+          mkdir -p $out/custom_components/hacs
+          cp -r * $out/custom_components/hacs/
         '';
 
         # Satisfies services.home-assistant.customComponents type check (isHomeAssistantComponent).
