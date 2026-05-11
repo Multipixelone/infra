@@ -234,6 +234,8 @@
                     data = {
                       content = "Refill Eufy vacuum water tank";
                       description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
+                      project = "#Self";
+                      due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
                     };
@@ -275,6 +277,8 @@
                     data = {
                       content = "Refill Eufy vacuum water tank";
                       description = "Refill tank and manually resume the vacuum. (Status: Paused with error)";
+                      project = "#Self";
+                      due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
                     };
@@ -401,8 +405,10 @@
                     data = {
                       content = "Refill Levoit humidifier water tank";
                       description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
+                      project = "#Self";
+                      due_date_string = "today";
                       labels = todoistLabel;
-                      priority = 2;
+                      priority = 3;
                     };
                   }
                   {
