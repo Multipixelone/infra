@@ -82,6 +82,11 @@
         config.services.home-assistant.finalPackage
       ];
 
+      # HomeKit bridge accessory port. services.home-assistant.openFirewall only
+      # opens 8123 (HTTP); the bridge configured via UI listens on 21064 and
+      # needs an explicit allow so iOS can reach it to pair.
+      networking.firewall.allowedTCPPorts = [ 21064 ];
+
       services.home-assistant = {
         enable = true;
         openFirewall = true;
@@ -127,7 +132,7 @@
             oauth2client
             ical
             paho-mqtt
-            aionanoleaf
+            aionanoleaf2
             led-ble
             hueble
           ];
@@ -145,7 +150,7 @@
             eufyVacuumEntityId = "vacuum.vaccum";
             eufyWaterLevelSensor = "sensor.vaccum_water_level";
             eufyErrorSensor = "sensor.vaccum_error_message";
-            levoitWaterSensor = "binary_sensor.levoit_humidifier_water_lacks"; # TODO: verify entity_id
+            levoitWaterSensor = "binary_sensor.humidifier_low_water";
             todoistLabel = "care";
           in
           {
