@@ -229,7 +229,7 @@
                     data = {
                       content = "Refill Eufy vacuum water tank";
                       description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
-                      project = "#Self";
+                      project = "Self";
                       due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
@@ -272,7 +272,7 @@
                     data = {
                       content = "Refill Eufy vacuum water tank";
                       description = "Refill tank and manually resume the vacuum. (Status: Paused with error)";
-                      project = "#Self";
+                      project = "Self";
                       due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
@@ -321,7 +321,7 @@
                     data = {
                       content = "Refill Eufy vacuum water tank";
                       description = "Refill tank before starting the next cycle. (Status: Water critically low)";
-                      project = "#Self";
+                      project = "Self";
                       due_date_string = "today";
                       labels = todoistLabel;
                       priority = 2;
@@ -389,8 +389,8 @@
                     service = "todoist.new_task";
                     data = {
                       content = "Refill Levoit humidifier water tank";
-                      description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
-                      project = "#Self";
+                      description = "Remember how nice it is to have nice air?";
+                      project = "Self";
                       due_date_string = "today";
                       labels = todoistLabel;
                       priority = 3;
@@ -429,6 +429,48 @@
                     service = "input_boolean.turn_off";
                     target = {
                       entity_id = "input_boolean.levoit_water_task_open";
+                    };
+                  }
+                ];
+              }
+
+              # ── Phone: low-battery calendar reminder ───────────────────────────
+              # Notifies 3 hours before a calendar event starts if battery is
+              # below 30% and the phone is not already charging.
+              {
+                alias = "Phone: Low battery — calendar charge reminder";
+                id = "phone_low_battery_calendar_reminder";
+                trigger = [
+                  {
+                    platform = "calendar";
+                    entity_id = "calendar.finn";
+                    offset = "-03:00:00";
+                    event = "start";
+                  }
+                ];
+                condition = [
+                  {
+                    condition = "numeric_state";
+                    entity_id = "sensor.nougat_battery_level";
+                    below = 30;
+                  }
+                  {
+                    condition = "not";
+                    conditions = [
+                      {
+                        condition = "state";
+                        entity_id = "sensor.nougat_battery_state";
+                        state = "Charging";
+                      }
+                    ];
+                  }
+                ];
+                action = [
+                  {
+                    service = "notify.mobile_app_nougat";
+                    data = {
+                      message = "Charge phone for {{ trigger.event.summary }} (battery at {{ states('sensor.nougat_battery_level') }}%)";
+                      title = "Charge phone before event";
                     };
                   }
                 ];
