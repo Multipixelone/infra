@@ -96,6 +96,7 @@
           "default_config"
           "google_translate"
           "hue"
+          "bring"
           "matter"
           "mpd"
           "snapcast"
