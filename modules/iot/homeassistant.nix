@@ -484,6 +484,51 @@
                 ];
               }
 
+              # ── Foodtown: keep shopping list sorted ─────────────────────────
+              # Fires on arrival at Foodtown, and on item additions while
+              # already there (state-change trigger with 30 s `for` debounces
+              # bursts of additions and ignores reductions via the template
+              # condition). shell_command asks OpenAI to reorder the list in
+              # Bedstuy walking order and rewrites each item with a prefix.
+              {
+                alias = "Foodtown: sort shopping list";
+                id = "foodtown_sort_shopping_list";
+                mode = "single";
+                trigger = [
+                  {
+                    platform = "zone";
+                    id = "arrival";
+                    entity_id = "person.finn";
+                    zone = "zone.foodtown";
+                    event = "enter";
+                  }
+                  {
+                    platform = "state";
+                    id = "list_grew";
+                    entity_id = "todo.foodtown";
+                    for = {
+                      seconds = 30;
+                    };
+                  }
+                ];
+                condition = [
+                  {
+                    condition = "template";
+                    value_template = ''
+                      {{ trigger.id == 'arrival'
+                         or (is_state('person.finn', 'Foodtown')
+                             and trigger.from_state is not none
+                             and (trigger.to_state.state | int(0)) > (trigger.from_state.state | int(0))) }}
+                    '';
+                  }
+                ];
+                action = [
+                  {
+                    service = "shell_command.sort_foodtown";
+                  }
+                ];
+              }
+
               # Existing: Nightly Home Assistant backup
               {
                 alias = "Nightly Home Assistant Backup";
