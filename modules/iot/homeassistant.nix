@@ -135,6 +135,8 @@
             aionanoleaf2
             led-ble
             hueble
+            ibeacon-ble
+            xiaomi-ble
           ];
 
         # ── HACS (Home Assistant Community Store) ─────────────────────────
