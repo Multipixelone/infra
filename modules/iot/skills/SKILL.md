@@ -19,7 +19,7 @@ The user pastes a grocery list and asks for it sorted, organized, "in store orde
 
 1. **Read the layout.** Open `references/store_layout.md` to load the walking order and section assignments. Do this every time — never sort from memory; the layout file is the source of truth and gets updated.
 
-2. **Detect input format.** Note the delimiter, whether items are bulleted/numbered/plain, the casing, and whether items have trailing notes or quantities. The output must match these exactly.
+2. **Detect input format.** Note the delimiter, whether items are bulleted/numbered/plain, and whether items have trailing notes or quantities. The output should match the input on those dimensions. Casing is normalized — see Format preservation rules.
 
 3. **Place each item in a section.** For each item in the input:
    - Look it up directly in the layout file (exact match or close variant).
@@ -36,7 +36,8 @@ The user pastes a grocery list and asks for it sorted, organized, "in store orde
 - Plain newline-separated in → plain newlines out
 - Comma-separated in → comma-separated out (single line)
 - Numbered (`1. item`) in → renumbered 1..N out
-- Casing: preserve exactly (don't title-case "milk" to "Milk")
+- Casing: normalize to Title Case in the output regardless of input casing. `canned tuna`, `CANNED TUNA`, `canned Tuna`, and `cAnNeD tUnA` all become `Canned Tuna`. Preserve internal capitalization in established brand names (`iPhone`, `K-Cups`, `M&M's`) and keep unit abbreviations lowercase (`oz`, `lb`, `ml`, `kg`).
+- Typos: silently correct obvious misspellings of common grocery items when confidence is high (`Yogirt` → `Yogurt`, `bannana` → `Banana`, `cilantor` → `Cilantro`, `brocoli` → `Broccoli`). Do not correct anything that could plausibly be a brand name, an intentional spelling, a regional variant, or a non-English ingredient. When in doubt, pass it through unchanged and sort it as best you can — false corrections are worse than uncorrected typos.
 - Trailing notes/quantities (`milk (2%)`, `2 lbs ground beef`) → keep attached to the item, move with it
 - Trailing whitespace, blank lines: preserve if structurally meaningful, drop if just noise
 
