@@ -172,6 +172,14 @@
                 icon = "mdi:water-alert";
                 initial = "off";
               };
+              living_room_appletv_dim_enabled = {
+                name = "Enable Apple TV light automation";
+                initial = "on";
+              };
+              living_room_appletv_dim_active = {
+                name = "Apple TV lights currently adjusted";
+                initial = "off";
+              };
             };
             # ────────────────────────────────────────────────────────────────
 
@@ -569,6 +577,169 @@
                 action = [
                   {
                     service = "backup.create";
+                  }
+                ];
+              }
+
+              # ── Living Room: media lighting ─────────────────────────────────
+              # Turn off corner lamp when Apple TV plays; dim Hue at night.
+              # Restore lights when playback stops.
+              {
+                alias = "Living Room media lighting";
+                id = "living_room_media_lighting";
+                mode = "queued";
+                max = 2;
+                trigger = [
+                  {
+                    platform = "state";
+                    entity_id = "media_player.living_room";
+                    id = "playing";
+                    to = "playing";
+                    for = {
+                      seconds = 1;
+                    };
+                  }
+                  {
+                    platform = "state";
+                    entity_id = "media_player.living_room";
+                    id = "not_playing";
+                    from = "playing";
+                    to = [
+                      "paused"
+                      "idle"
+                      "standby"
+                      "off"
+                    ];
+                    for = {
+                      seconds = 5;
+                    };
+                  }
+                ];
+                condition = [
+                  {
+                    condition = "state";
+                    entity_id = "input_boolean.living_room_appletv_dim_enabled";
+                    state = "on";
+                  }
+                ];
+                action = [
+                  {
+                    choose = [
+                      {
+                        conditions = [
+                          {
+                            condition = "trigger";
+                            id = "playing";
+                          }
+                          {
+                            condition = "state";
+                            entity_id = "input_boolean.living_room_appletv_dim_active";
+                            state = "off";
+                          }
+                        ];
+                        sequence = [
+                          {
+                            service = "scene.create";
+                            data = {
+                              scene_id = "living_room_pre_appletv";
+                              snapshot_entities = "{{ ['light.living_room', 'light.smart_led_bulb_2'] | select('is_state', 'on') | list }}";
+                            };
+                          }
+                          {
+                            service = "input_boolean.turn_on";
+                            target = {
+                              entity_id = "input_boolean.living_room_appletv_dim_active";
+                            };
+                          }
+                          {
+                            service = "light.turn_off";
+                            target = {
+                              entity_id = "light.smart_led_bulb_2";
+                            };
+                            data = {
+                              transition = 2;
+                            };
+                          }
+                          {
+                            choose = [
+                              {
+                                conditions = [
+                                  {
+                                    condition = "sun";
+                                    after = "sunset";
+                                    after_offset = "-00:30:00";
+                                  }
+                                ];
+                                sequence = [
+                                  {
+                                    service = "light.turn_on";
+                                    target = {
+                                      entity_id = "light.living_room";
+                                    };
+                                    data = {
+                                      brightness_pct = 15;
+                                      transition = 2;
+                                    };
+                                  }
+                                ];
+                              }
+                            ];
+                          }
+                        ];
+                      }
+                      {
+                        conditions = [
+                          {
+                            condition = "trigger";
+                            id = "not_playing";
+                          }
+                          {
+                            condition = "state";
+                            entity_id = "input_boolean.living_room_appletv_dim_active";
+                            state = "on";
+                          }
+                        ];
+                        sequence = [
+                          {
+                            service = "scene.turn_on";
+                            target = {
+                              entity_id = "scene.living_room_pre_appletv";
+                            };
+                            data = {
+                              transition = 2;
+                            };
+                          }
+                          {
+                            service = "input_boolean.turn_off";
+                            target = {
+                              entity_id = "input_boolean.living_room_appletv_dim_active";
+                            };
+                          }
+                        ];
+                      }
+                    ];
+                  }
+                ];
+              }
+
+              # ── Living Room: clear stale dim flag on HA restart ────────────
+              # Safety net: if HA restarts mid-playback, the dim flag could be
+              # stuck "on" preventing lights from restoring.
+              {
+                alias = "Clear stale Apple TV dim flag on HA start";
+                id = "living_room_appletv_dim_startup_reset";
+                trigger = [
+                  {
+                    platform = "homeassistant";
+                    event = "start";
+                  }
+                ];
+                action = [
+                  {
+                    service = "input_boolean.turn_off";
+                    target = {
+                      entity_id = "input_boolean.living_room_appletv_dim_active";
+                    };
                   }
                 ];
               }
