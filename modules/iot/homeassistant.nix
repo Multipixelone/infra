@@ -670,6 +670,126 @@
             ];
           }
 
+          # ── Vacuum: auto-run when both Finn & Ciara have been away 1h ──
+          # Fires `vacuum.start` when both persons have been `not_home` for
+          # at least 1h, gated by: time-of-day window, docked + battery
+          # preconditions, once-per-day cooldown, and a manual skip toggle.
+          # NOTE: the `for:` timer resets on HA restart (state-trigger
+          # behaviour); accepted trade-off vs an input_datetime-tracked clock.
+          {
+            alias = "Vacuum: Auto-run when both away ≥ 1h";
+            id = "vacuum_auto_when_both_away";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "person.finn";
+                to = "not_home";
+                for = {
+                  hours = 1;
+                };
+              }
+              {
+                platform = "state";
+                entity_id = "person.ciara";
+                to = "not_home";
+                for = {
+                  hours = 1;
+                };
+              }
+            ];
+            condition = [
+              # Both persons currently away.
+              {
+                condition = "state";
+                entity_id = "person.finn";
+                state = "not_home";
+              }
+              {
+                condition = "state";
+                entity_id = "person.ciara";
+                state = "not_home";
+              }
+              # Daytime window — never start at 3am.
+              {
+                condition = "time";
+                after = "09:00:00";
+                before = "21:00:00";
+              }
+              # Manual skip toggle.
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_auto_skip_today";
+                state = "off";
+              }
+              # Vacuum must be docked (not cleaning / returning / errored).
+              {
+                condition = "state";
+                entity_id = eufyVacuumEntityId;
+                state = "docked";
+              }
+              # Battery healthy enough to finish a run.
+              {
+                condition = "numeric_state";
+                entity_id = "sensor.vaccum_battery";
+                above = 30;
+              }
+              # Cooldown: ≥ 12h since last auto-run.
+              {
+                condition = "template";
+                value_template = ''
+                  {% set last = states('input_datetime.vacuum_last_auto_run') %}
+                  {{ last in ['unknown', 'unavailable', '''] or
+                     (as_timestamp(now()) - as_timestamp(last)) > 12 * 3600 }}
+                '';
+              }
+            ];
+            action = [
+              {
+                service = "input_datetime.set_datetime";
+                target = {
+                  entity_id = "input_datetime.vacuum_last_auto_run";
+                };
+                data = {
+                  datetime = "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}";
+                };
+              }
+              {
+                service = "vacuum.start";
+                target = {
+                  entity_id = eufyVacuumEntityId;
+                };
+              }
+              {
+                service = "notify.notify";
+                data = {
+                  title = "Vacuum started";
+                  message = "House empty ≥ 1h — starting auto clean.";
+                };
+              }
+            ];
+          }
+
+          # ── Vacuum: reset "skip today" toggle nightly ───────────────────
+          {
+            alias = "Vacuum: Reset skip-today toggle at midnight";
+            id = "vacuum_auto_skip_reset";
+            trigger = [
+              {
+                platform = "time";
+                at = "00:01:00";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_auto_skip_today";
+                };
+              }
+            ];
+          }
+
           # ── Living Room: clear stale dim flag on HA restart ────────────
           # Safety net: if HA restarts mid-playback, the dim flag could be
           # stuck "on" preventing lights from restoring.
@@ -702,6 +822,7 @@
             "default_config"
             "google_translate"
             "hue"
+            "steam_online"
             "bring"
             "matter"
             "mpd"
@@ -777,6 +898,20 @@
               living_room_appletv_dim_active = {
                 name = "Apple TV lights currently adjusted";
                 initial = "off";
+              };
+              vacuum_auto_skip_today = {
+                name = "Skip automatic vacuum today";
+                icon = "mdi:robot-vacuum-off";
+                initial = "off";
+              };
+            };
+            input_datetime = {
+              vacuum_last_auto_run = {
+                name = "Vacuum last auto-run";
+                has_date = true;
+                has_time = true;
+                # Seed far enough in the past that the first run isn't gated.
+                initial = "2020-01-01 00:00:00";
               };
             };
             # ────────────────────────────────────────────────────────────────
