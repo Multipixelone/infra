@@ -440,6 +440,13 @@
                 event = "enter";
               }
               {
+                platform = "zone";
+                id = "arrival";
+                entity_id = "person.ciara";
+                zone = "zone.foodtown";
+                event = "enter";
+              }
+              {
                 platform = "state";
                 id = "list_grew";
                 entity_id = "todo.foodtown";
@@ -535,6 +542,245 @@
                 data = {
                   option = "Twinkle Stars";
                 };
+              }
+            ];
+          }
+
+          # ── Welcome home lights ──────────────────────────────────────────
+          # When someone arrives home (zone.home transitions from empty to
+          # occupied), turn on lights appropriate to the time of day.
+          # Skips if Apple TV media lighting is active to avoid interfering
+          # with its snapshot/restore cycle.
+          {
+            alias = "Welcome home lights";
+            id = "welcome_home_lights";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "zone.home";
+                from = "0";
+              }
+            ];
+            condition = [
+              # Master toggle — disable for guests/parties from HA UI
+              {
+                condition = "state";
+                entity_id = "input_boolean.welcome_home_lights_enabled";
+                state = "on";
+              }
+              # Don't touch lights if ATV media lighting has them adjusted
+              {
+                condition = "state";
+                entity_id = "input_boolean.living_room_appletv_dim_active";
+                state = "off";
+              }
+              # Safety: ensure someone is actually home (defends against
+              # stale-state triggers on HA restart)
+              {
+                condition = "numeric_state";
+                entity_id = "zone.home";
+                above = "0";
+              }
+            ];
+            action = [
+              {
+                choose = [
+                  # ── Evening: sunset → 10pm ────────────────────────────
+                  # Living room dim warm red, corner lamp on.
+                  # Bedside lamp intentionally NOT touched.
+                  # Fairy lights: Twinkle Stars after 4pm, Clown otherwise.
+                  {
+                    conditions = [
+                      {
+                        condition = "sun";
+                        after = "sunset";
+                      }
+                      {
+                        condition = "time";
+                        before = "22:00:00";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "light.turn_on";
+                        target = {
+                          entity_id = "light.living_room";
+                        };
+                        data = {
+                          rgb_color = [
+                            255
+                            30
+                            0
+                          ];
+                          brightness_pct = 10;
+                          transition = 3;
+                        };
+                      }
+                      {
+                        service = "light.turn_on";
+                        target = {
+                          entity_id = "light.smart_led_bulb_2";
+                        };
+                        data = {
+                          brightness_pct = 25;
+                          transition = 3;
+                        };
+                      }
+                      {
+                        choose = [
+                          {
+                            conditions = [
+                              {
+                                condition = "time";
+                                after = "16:00:00";
+                              }
+                            ];
+                            sequence = [
+                              {
+                                service = "select.select_option";
+                                target = {
+                                  entity_id = "select.fairy_lights_preset";
+                                };
+                                data = {
+                                  option = "Twinkle Stars";
+                                };
+                              }
+                            ];
+                          }
+                        ];
+                        default = [
+                          {
+                            service = "select.select_option";
+                            target = {
+                              entity_id = "select.fairy_lights_preset";
+                            };
+                            data = {
+                              option = "Clown";
+                            };
+                          }
+                        ];
+                      }
+                    ];
+                  }
+                  # ── Late night: 10pm → 6am ────────────────────────────
+                  # Hues to Soho scene; corner lamp dim red. No bedside.
+                  # Fairy lights: Twinkle Stars after 4pm, Clown otherwise.
+                  {
+                    conditions = [
+                      {
+                        condition = "or";
+                        conditions = [
+                          {
+                            condition = "time";
+                            after = "22:00:00";
+                          }
+                          {
+                            condition = "time";
+                            before = "06:00:00";
+                          }
+                        ];
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "scene.turn_on";
+                        target = {
+                          entity_id = "scene.living_room_soho";
+                        };
+                        data = {
+                          transition = 5;
+                        };
+                      }
+                      {
+                        service = "light.turn_on";
+                        target = {
+                          entity_id = "light.smart_led_bulb_2";
+                        };
+                        data = {
+                          rgb_color = [
+                            255
+                            0
+                            0
+                          ];
+                          brightness_pct = 10;
+                          transition = 5;
+                        };
+                      }
+                      {
+                        choose = [
+                          {
+                            conditions = [
+                              {
+                                condition = "time";
+                                after = "16:00:00";
+                              }
+                            ];
+                            sequence = [
+                              {
+                                service = "select.select_option";
+                                target = {
+                                  entity_id = "select.fairy_lights_preset";
+                                };
+                                data = {
+                                  option = "Twinkle Stars";
+                                };
+                              }
+                            ];
+                          }
+                        ];
+                        default = [
+                          {
+                            service = "select.select_option";
+                            target = {
+                              entity_id = "select.fairy_lights_preset";
+                            };
+                            data = {
+                              option = "Clown";
+                            };
+                          }
+                        ];
+                      }
+                    ];
+                  }
+                ];
+                # ── Daytime (6am → sunset): only set fairy lights preset ─────────
+                default = [
+                  {
+                    choose = [
+                      {
+                        conditions = [
+                          {
+                            condition = "time";
+                            after = "16:00:00";
+                          }
+                        ];
+                        sequence = [
+                          {
+                            service = "select.select_option";
+                            target = {
+                              entity_id = "select.fairy_lights_preset";
+                            };
+                            data = {
+                              option = "Twinkle Stars";
+                            };
+                          }
+                        ];
+                      }
+                    ];
+                    default = [
+                      {
+                        service = "select.select_option";
+                        target = {
+                          entity_id = "select.fairy_lights_preset";
+                        };
+                        data = {
+                          option = "Clown";
+                        };
+                      }
+                    ];
+                  }
+                ];
               }
             ];
           }
@@ -978,6 +1224,11 @@
               living_room_appletv_dim_active = {
                 name = "Apple TV lights currently adjusted";
                 initial = "off";
+              };
+              welcome_home_lights_enabled = {
+                name = "Enable welcome home lights";
+                icon = "mdi:home-import-outline";
+                initial = "on";
               };
               vacuum_auto_skip_today = {
                 name = "Skip automatic vacuum today";
