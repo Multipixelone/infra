@@ -482,6 +482,63 @@
             ];
           }
 
+          # ── Sunset bedroom fade ─────────────────────────────────────────
+          # 30 min before sunset, fade Bedside Lamp -> Blue and Corner Lamp
+          # -> Red, both at 10% brightness, over a 15 minute transition.
+          {
+            alias = "Sunset bedroom fade";
+            id = "sunset_bedroom_fade";
+            mode = "single";
+            trigger = [
+              {
+                platform = "sun";
+                event = "sunset";
+                offset = "-00:30:00";
+              }
+            ];
+            action = [
+              {
+                service = "light.turn_on";
+                target = {
+                  entity_id = "light.smart_led_bulb";
+                };
+                data = {
+                  rgb_color = [
+                    0
+                    0
+                    255
+                  ];
+                  brightness_pct = 10;
+                  transition = 900;
+                };
+              }
+              {
+                service = "light.turn_on";
+                target = {
+                  entity_id = "light.smart_led_bulb_2";
+                };
+                data = {
+                  rgb_color = [
+                    255
+                    0
+                    0
+                  ];
+                  brightness_pct = 10;
+                  transition = 900;
+                };
+              }
+              {
+                service = "select.select_option";
+                target = {
+                  entity_id = "select.fairy_lights_preset";
+                };
+                data = {
+                  option = "Twinkle Stars";
+                };
+              }
+            ];
+          }
+
           # ── Living Room: media lighting ─────────────────────────────────
           # Turn off corner lamp when Apple TV plays; dim Hue at night.
           # Restore lights when playback stops.
