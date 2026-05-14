@@ -83,37 +83,40 @@
           todoist_hide_care = "${renameLabel}/bin/ha-todoist-rename-label care care_hidden";
           todoist_show_care = "${renameLabel}/bin/ha-todoist-rename-label care_hidden care";
         };
-
-        automation = [
-          {
-            alias = "Todoist: hide @care on leaving home";
-            trigger = [
-              {
-                platform = "zone";
-                entity_id = "person.finn";
-                zone = "zone.home";
-                event = "leave";
-              }
-            ];
-            action = [
-              { service = "shell_command.todoist_hide_care"; }
-            ];
-          }
-          {
-            alias = "Todoist: show @care on arriving home";
-            trigger = [
-              {
-                platform = "zone";
-                entity_id = "person.finn";
-                zone = "zone.home";
-                event = "enter";
-              }
-            ];
-            action = [
-              { service = "shell_command.todoist_show_care"; }
-            ];
-          }
-        ];
       };
+
+      # Todoist automations: moved to iotHass.nixAutomations so they're serialized
+      # into /etc/home-assistant/automations_nix.yaml and loaded via
+      # `automation manual: !include`, alongside the UI-managed automations.yaml.
+      iotHass.nixAutomations = [
+        {
+          alias = "Todoist: hide @care on leaving home";
+          trigger = [
+            {
+              platform = "zone";
+              entity_id = "person.finn";
+              zone = "zone.home";
+              event = "leave";
+            }
+          ];
+          action = [
+            { service = "shell_command.todoist_hide_care"; }
+          ];
+        }
+        {
+          alias = "Todoist: show @care on arriving home";
+          trigger = [
+            {
+              platform = "zone";
+              entity_id = "person.finn";
+              zone = "zone.home";
+              event = "enter";
+            }
+          ];
+          action = [
+            { service = "shell_command.todoist_show_care"; }
+          ];
+        }
+      ];
     };
 }
