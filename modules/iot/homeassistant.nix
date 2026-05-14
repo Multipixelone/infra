@@ -120,6 +120,9 @@
         # enabled in extraComponents or config but NOT yet in nixpkgs' HA package.
         extraPackages =
           ps: with ps; [
+            # Faster zlib for aiohttp_fast_zlib (silences "performance will be degraded" warning).
+            isal
+            zlib-ng
             gtts
             pyatv
             aiohomekit
