@@ -539,6 +539,29 @@
             ];
           }
 
+          # ── All lights off when nobody home ─────────────────────────────
+          # When zone.home empties out, kill every light in the house.
+          {
+            alias = "All lights off when nobody home";
+            id = "all_lights_off_when_nobody_home";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "zone.home";
+                to = "0";
+              }
+            ];
+            action = [
+              {
+                service = "light.turn_off";
+                target = {
+                  entity_id = "all";
+                };
+              }
+            ];
+          }
+
           # ── Living Room: media lighting ─────────────────────────────────
           # Turn off corner lamp when Apple TV plays; dim Hue at night.
           # Restore lights when playback stops.
