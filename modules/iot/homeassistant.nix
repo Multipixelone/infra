@@ -606,11 +606,12 @@
                                 ];
                                 sequence = [
                                   {
-                                    service = "light.turn_off";
+                                    service = "light.turn_on";
                                     target = {
                                       entity_id = "light.living_room";
                                     };
                                     data = {
+                                      brightness_pct = 10;
                                       transition = 2;
                                     };
                                   }
@@ -624,7 +625,7 @@
                                   entity_id = "light.living_room";
                                 };
                                 data = {
-                                  brightness_pct = 15;
+                                  brightness_pct = 50;
                                   transition = 2;
                                 };
                               }
