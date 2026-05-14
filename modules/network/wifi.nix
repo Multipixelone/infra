@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, config, ... }:
 {
   flake.modules.nixos.wifi = {
     networking.networkmanager = {
@@ -19,5 +19,7 @@
         Network.EnableIPv6 = true;
       };
     };
+
+    users.extraGroups.networkmanager.members = [ config.flake.meta.owner.username ];
   };
 }
