@@ -51,6 +51,8 @@
         # mkPreset: merges a model assignment onto the matching role config.
 
         models = {
+          # anthropic
+          opus = "anthropic/claude-opus-4-7";
           # copilot
           gemini-pro = "github-copilot/gemini-3.1-pro-preview";
           claude-haiku-copilot = "github-copilot/claude-haiku-4.5";
@@ -153,7 +155,7 @@
         # opencode-go only (if I hit Copilot limits)
         specialistsGo = {
           oracle = "deepseek-pro";
-          librarian = "kimi";
+          librarian = "deepseek";
           explorer = "minimax-m25-free";
           designer = "mimo-pro";
           fixer = "minimax";
@@ -171,7 +173,7 @@
         };
 
         presetCustom = mkPreset (specialistsCustom // { orchestrator = "gpt-5-4"; });
-        presetGo = mkPreset (specialistsGo // { orchestrator = "glm"; });
+        presetGo = mkPreset (specialistsGo // { orchestrator = "opus"; });
         presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
 
         # ── Shared config sections ──────────────────────────────────────
@@ -422,7 +424,7 @@
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
-          preset = "copilot";
+          preset = "go";
           websearch.provider = "tavily";
           council = councilConfig;
           fallback = fallbackConfig;
@@ -455,6 +457,7 @@
               "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim"
+              "opencode-claude-auth@latest"
               # "true-mem"
               "opencode-history-search"
               "openrtk"
