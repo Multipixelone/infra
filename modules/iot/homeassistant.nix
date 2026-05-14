@@ -179,6 +179,31 @@
               name = "Home";
               internal_url = "http://192.168.8.111:8123";
               external_url = "https://ha.finnrut.is";
+              # ── Auth providers ─────────────────────────────────────────────────
+              # When `auth_providers` is set, HA stops auto-adding defaults, so we
+              # re-include `homeassistant` (password login) explicitly alongside
+              # `trusted_networks` so regular browsers still work.
+              #
+              # MANUAL SETUP (one-time) — required for trusted_networks to auto-login:
+              #  1. In HA UI → Settings → People → Add Person, create a non-admin
+              #     user e.g. "kiosk".  Set a strong password (you'll never type it).
+              #  2. SSH to iot and get the kiosk user UUID:
+              #     sudo cat /var/lib/home-assistant/.storage/auth \
+              #       | jq -r '.data.users[] | select(.name=="kiosk") | .id'
+              #  3. Replace REPLACE_WITH_KIOSK_USER_UUID below with that UUID.
+              #  4. Restart the vnc-ipad container; it should bypass login.
+              # ──────────────────────────────────────────────────────────────────
+              auth_providers = [
+                { type = "homeassistant"; }
+                {
+                  type = "trusted_networks";
+                  trusted_networks = [ "10.88.0.0/16" ]; # podman bridge — iot only
+                  trusted_users = {
+                    "10.88.0.0/16" = "57d8c16f5c984f9e8b62fd2626086028";
+                  };
+                  allow_bypass_login = true;
+                }
+              ];
             };
 
             http = {
