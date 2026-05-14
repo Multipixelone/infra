@@ -539,6 +539,12 @@
                       }
                     ];
                     sequence = [
+                      # Brief delay so Apple TV populates app_id/media_content_type
+                      # attributes before we branch on them.
+                      { delay = "00:00:01"; }
+                      # Snapshot pre-playback state of lights currently on so
+                      # restore can return them to their actual previous values
+                      # (lights that were off stay off).
                       {
                         service = "scene.create";
                         data = {
@@ -552,26 +558,66 @@
                           entity_id = "input_boolean.living_room_appletv_dim_active";
                         };
                       }
-                      {
-                        service = "light.turn_off";
-                        target = {
-                          entity_id = "light.smart_led_bulb_2";
-                        };
-                        data = {
-                          transition = 2;
-                        };
-                      }
+                      # ── Content-based branching ──────────────────────────
+                      # YouTube → dim only the corner lamp (Hue untouched).
+                      # Otherwise → off corner lamp + dim Hue (or off Hue at night).
                       {
                         choose = [
                           {
                             conditions = [
                               {
-                                condition = "sun";
-                                after = "sunset";
-                                after_offset = "-00:30:00";
+                                condition = "template";
+                                value_template = "{{ 'youtube' in (state_attr('media_player.living_room', 'app_id') | default('') | lower) }}";
                               }
                             ];
                             sequence = [
+                              {
+                                service = "light.turn_on";
+                                target = {
+                                  entity_id = "light.smart_led_bulb_2";
+                                };
+                                data = {
+                                  brightness_pct = 15;
+                                  transition = 2;
+                                };
+                              }
+                            ];
+                          }
+                        ];
+                        default = [
+                          {
+                            service = "light.turn_off";
+                            target = {
+                              entity_id = "light.smart_led_bulb_2";
+                            };
+                            data = {
+                              transition = 2;
+                            };
+                          }
+                          {
+                            choose = [
+                              {
+                                conditions = [
+                                  {
+                                    condition = "sun";
+                                    after = "sunset";
+                                    after_offset = "-00:30:00";
+                                  }
+                                ];
+                                sequence = [
+                                  {
+                                    service = "light.turn_off";
+                                    target = {
+                                      entity_id = "light.living_room";
+                                    };
+                                    data = {
+                                      transition = 2;
+                                    };
+                                  }
+                                ];
+                              }
+                            ];
+                            default = [
                               {
                                 service = "light.turn_on";
                                 target = {
