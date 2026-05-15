@@ -515,7 +515,7 @@
                     0
                     255
                   ];
-                  brightness_pct = 10;
+                  brightness_pct = 1;
                   transition = 900;
                 };
               }
@@ -530,7 +530,7 @@
                     0
                     0
                   ];
-                  brightness_pct = 10;
+                  brightness_pct = 1;
                   transition = 900;
                 };
               }
