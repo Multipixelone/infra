@@ -73,6 +73,13 @@
           type = "http";
           url = "https://ai.todoist.net/mcp";
         };
+
+        # Home Assistant MCP server on iot (modules/iot/ha-mcp.nix). LAN-only;
+        # iot's homeAddress is 192.168.8.111 (modules/hosts.nix).
+        mcp-servers.settings.servers.ha-mcp = {
+          type = "http";
+          url = "http://192.168.8.111:8086/mcp";
+        };
       };
     };
 }
