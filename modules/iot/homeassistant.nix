@@ -503,6 +503,13 @@
                 offset = "-00:30:00";
               }
             ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.guest_mode";
+                state = "off";
+              }
+            ];
             action = [
               {
                 service = "light.turn_on";
@@ -563,7 +570,11 @@
               }
             ];
             condition = [
-              # Master toggle — disable for guests/parties from HA UI
+              {
+                condition = "state";
+                entity_id = "input_boolean.guest_mode";
+                state = "off";
+              }
               {
                 condition = "state";
                 entity_id = "input_boolean.welcome_home_lights_enabled";
@@ -798,6 +809,13 @@
                 to = "0";
               }
             ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.guest_mode";
+                state = "off";
+              }
+            ];
             action = [
               {
                 service = "light.turn_off";
@@ -1025,6 +1043,12 @@
               }
             ];
             condition = [
+              # Guest mode must be off
+              {
+                condition = "state";
+                entity_id = "input_boolean.guest_mode";
+                state = "off";
+              }
               # Both persons currently away.
               {
                 condition = "state";
@@ -1091,6 +1115,50 @@
                 data = {
                   title = "Vacuum started";
                   message = "House empty ≥ 1h — starting auto clean.";
+                };
+              }
+            ];
+          }
+
+          # ── Guest mode: disable light automations ─────────────────────────
+          {
+            alias = "Guest mode: disable light automations";
+            id = "guest_mode_disable_light_automations";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "input_boolean.guest_mode";
+                to = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.welcome_home_lights_enabled";
+                };
+              }
+            ];
+          }
+
+          # ── Guest mode: re-enable light automations ───────────────────────
+          {
+            alias = "Guest mode: re-enable light automations";
+            id = "guest_mode_reenable_light_automations";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "input_boolean.guest_mode";
+                to = "off";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.welcome_home_lights_enabled";
                 };
               }
             ];
@@ -1233,6 +1301,11 @@
               vacuum_auto_skip_today = {
                 name = "Skip automatic vacuum today";
                 icon = "mdi:robot-vacuum-off";
+                initial = "off";
+              };
+              guest_mode = {
+                name = "Guest Mode";
+                icon = "mdi:account-group";
                 initial = "off";
               };
             };
