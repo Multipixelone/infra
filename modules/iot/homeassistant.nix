@@ -1324,9 +1324,15 @@
           # ── HACS (Home Assistant Community Store) ─────────────────────────
           # Consumed via withSystem from perSystem.packages.hacs.
           # Mounted at custom_components/hacs by the service preStart symlink.
+          #
+          # ha_mcp_tools: companion HA integration for the ha-mcp MCP server
+          # (modules/iot/ha-mcp.nix). Registers the 5 file/YAML services that
+          # back ha-mcp's filesystem + YAML-edit tools. Config-flow only — finish
+          # the install once via Settings → Devices & Services → Add Integration.
           # ─────────────────────────────────────────────────────────────────
           customComponents = [
             (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.hacs))
+            pkgs.home-assistant-custom-components.ha_mcp_tools
           ];
 
           config = {
@@ -1374,6 +1380,29 @@
                 # Seed far enough in the past that the first run isn't gated.
                 initial = "2020-01-01 00:00:00";
               };
+            };
+            # ── CTA train sensors (fall back C → A when C unavailable) ───────────
+            template = {
+              sensor = [
+                {
+                  name = "Kingston-Throop N Next Arrival";
+                  unique_id = "kingston_throop_n_next_arrival";
+                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_next_arrival') if states('sensor.c_kingston_throop_avs_n_direction_next_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_next_arrival') }}";
+                  device_class = "timestamp";
+                }
+                {
+                  name = "Kingston-Throop N Second Arrival";
+                  unique_id = "kingston_throop_n_second_arrival";
+                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_second_arrival') if states('sensor.c_kingston_throop_avs_n_direction_second_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_second_arrival') }}";
+                  device_class = "timestamp";
+                }
+                {
+                  name = "Kingston-Throop N Third Arrival";
+                  unique_id = "kingston_throop_n_third_arrival";
+                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_third_arrival') if states('sensor.c_kingston_throop_avs_n_direction_third_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_third_arrival') }}";
+                  device_class = "timestamp";
+                }
+              ];
             };
             # ────────────────────────────────────────────────────────────────
 
