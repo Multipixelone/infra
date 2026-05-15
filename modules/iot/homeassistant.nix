@@ -1097,13 +1097,13 @@
                 offset = "-00:30:00";
               }
             ];
-            condition = [
-              {
-                condition = "state";
-                entity_id = "input_boolean.guest_mode";
-                state = "off";
-              }
-            ];
+            # condition = [
+            #   {
+            #     condition = "state";
+            #     entity_id = "input_boolean.guest_mode";
+            #     state = "off";
+            #   }
+            # ];
             action = [
               {
                 service = "light.turn_on";
@@ -1874,6 +1874,7 @@
             "snapcast"
             "apple_tv"
             "icloud"
+            "caldav"
             "plex"
             "homekit"
             "homekit_controller"
