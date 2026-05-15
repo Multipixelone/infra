@@ -174,7 +174,7 @@
                 data = {
                   content = "Refill Eufy vacuum water tank";
                   description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
-                  project = "Self";
+                  project = "Chores";
                   due_date_string = "today";
                   labels = todoistLabel;
                   priority = 2;
@@ -217,7 +217,7 @@
                 data = {
                   content = "Refill Eufy vacuum water tank";
                   description = "Refill tank and manually resume the vacuum. (Status: Paused with error)";
-                  project = "Self";
+                  project = "Chores";
                   due_date_string = "today";
                   labels = todoistLabel;
                   priority = 2;
@@ -266,7 +266,7 @@
                 data = {
                   content = "Refill Eufy vacuum water tank";
                   description = "Refill tank before starting the next cycle. (Status: Water critically low)";
-                  project = "Self";
+                  project = "Chores";
                   due_date_string = "today";
                   labels = todoistLabel;
                   priority = 2;
@@ -310,6 +310,425 @@
             ];
           }
 
+          # ── Eufy: consumable wear-life → Todoist tasks ──────────────────
+          # Mirrors the Eufy low-water pattern: each consumable has a
+          # warning automation (fires at ~10% of lifespan) and a reset
+          # automation (fires when the value jumps back above ~90% after
+          # the user presses the corresponding reset button in HA).
+          {
+            alias = "Eufy: Filter low — create Todoist task";
+            id = "eufy_filter_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_filter_remaining";
+                below = 36;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_filter_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_filter_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Replace Eufy vacuum HEPA filter";
+                  description = "Filter has {{ states('sensor.vaccum_filter_remaining') }}h life remaining (360h total). Press the Reset Filter button in HA after installing the new one.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_filter_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Filter renewed — reset warning flag";
+            id = "eufy_filter_renewed_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_filter_remaining";
+                above = 324;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_filter_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_filter_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Rolling brush low — create Todoist task";
+            id = "eufy_rolling_brush_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_rolling_brush_remaining";
+                below = 36;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_rolling_brush_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_rolling_brush_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Replace Eufy vacuum rolling brush";
+                  description = "Rolling brush has {{ states('sensor.vaccum_rolling_brush_remaining') }}h life remaining (360h total). Press the Reset Rolling Brush button in HA after installing the new one.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_rolling_brush_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Rolling brush renewed — reset warning flag";
+            id = "eufy_rolling_brush_renewed_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_rolling_brush_remaining";
+                above = 324;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_rolling_brush_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_rolling_brush_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Side brush low — create Todoist task";
+            id = "eufy_side_brush_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_side_brush_remaining";
+                below = 18;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_side_brush_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_side_brush_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Replace Eufy vacuum side brush";
+                  description = "Side brush has {{ states('sensor.vaccum_side_brush_remaining') }}h life remaining (180h total). Press the Reset Side Brush button in HA after installing the new one.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_side_brush_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Side brush renewed — reset warning flag";
+            id = "eufy_side_brush_renewed_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_side_brush_remaining";
+                above = 162;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_side_brush_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_side_brush_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Nav sensors due for cleaning — create Todoist task";
+            id = "eufy_sensors_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_sensor_remaining";
+                below = 6;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_sensors_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_sensor_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Clean Eufy vacuum nav sensors";
+                  description = "Wipe IR/cliff sensors with a dry microfibre cloth. {{ states('sensor.vaccum_sensor_remaining') }}h life remaining (60h total). Press the Reset Sensors button in HA when done.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_sensors_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Nav sensors cleaned — reset warning flag";
+            id = "eufy_sensors_cleaned_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_sensor_remaining";
+                above = 54;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_sensors_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_sensors_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Cleaning tray due for service — create Todoist task";
+            id = "eufy_cleaning_tray_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_cleaning_tray_remaining";
+                below = 3;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_cleaning_tray_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_cleaning_tray_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Clean Eufy vacuum cleaning tray";
+                  description = "Rinse the mopping tray and clear any debris. {{ states('sensor.vaccum_cleaning_tray_remaining') }}h life remaining (30h total). Press the Reset Cleaning Tray button in HA when done.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_cleaning_tray_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Cleaning tray serviced — reset warning flag";
+            id = "eufy_cleaning_tray_serviced_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_cleaning_tray_remaining";
+                above = 27;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_cleaning_tray_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_cleaning_tray_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Mop cloth low — create Todoist task";
+            id = "eufy_mopping_cloth_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_mopping_cloth_remaining";
+                below = 18;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_mopping_cloth_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.vaccum_mopping_cloth_remaining') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Wash Eufy mopping cloth (or replace if worn)";
+                  description = "Mopping cloth has {{ states('sensor.vaccum_mopping_cloth_remaining') }}h life remaining (180h total). Press the Reset Mopping Cloth button in HA after replacing.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.vacuum_mopping_cloth_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Eufy: Mop cloth renewed — reset warning flag";
+            id = "eufy_mopping_cloth_renewed_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.vaccum_mopping_cloth_remaining";
+                above = 162;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.vacuum_mopping_cloth_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.vacuum_mopping_cloth_task_open";
+                };
+              }
+            ];
+          }
+
           # ── Levoit: low-water Todoist task ──────────────────────────────
           # Uses a dedupe flag so repeated triggers do not spam Todoist.
           {
@@ -335,7 +754,7 @@
                 data = {
                   content = "Refill Levoit humidifier water tank";
                   description = "Remember how nice it is to have nice air?";
-                  project = "Self";
+                  project = "Chores";
                   due_date_string = "today";
                   labels = todoistLabel;
                   priority = 3;
@@ -374,6 +793,181 @@
                 service = "input_boolean.turn_off";
                 target = {
                   entity_id = "input_boolean.levoit_water_task_open";
+                };
+              }
+            ];
+          }
+
+          # ── Levoit: filter sponges → Todoist order task ─────────────────
+          # No reset button on the integration — sensor jumps back to ~100
+          # automatically when a new filter is installed and the device
+          # registers it.
+          {
+            alias = "Levoit: Filter sponges low — create Todoist task";
+            id = "levoit_filter_low_task";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.humidifier_filter_lifetime";
+                below = 15;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.levoit_filter_task_open";
+                state = "off";
+              }
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.humidifier_filter_lifetime') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                service = "todoist.new_task";
+                data = {
+                  content = "Order new Levoit humidifier filter sponges";
+                  description = "Filter at {{ states('sensor.humidifier_filter_lifetime') }}% — Levoit replacement sponges typically last ~3 months.";
+                  project = "Chores";
+                  due_date_string = "today";
+                  labels = todoistLabel;
+                  priority = 3;
+                };
+              }
+              {
+                service = "input_boolean.turn_on";
+                target = {
+                  entity_id = "input_boolean.levoit_filter_task_open";
+                };
+              }
+            ];
+          }
+
+          {
+            alias = "Levoit: Filter sponges renewed — reset warning flag";
+            id = "levoit_filter_renewed_reset";
+            trigger = [
+              {
+                platform = "numeric_state";
+                entity_id = "sensor.humidifier_filter_lifetime";
+                above = 95;
+              }
+            ];
+            condition = [
+              {
+                condition = "state";
+                entity_id = "input_boolean.levoit_filter_task_open";
+                state = "on";
+              }
+            ];
+            action = [
+              {
+                service = "input_boolean.turn_off";
+                target = {
+                  entity_id = "input_boolean.levoit_filter_task_open";
+                };
+              }
+            ];
+          }
+
+          # ── Consumables: clear dedupe flags when Todoist task is completed ──
+          # Reads the open items in todo.chores and clears any *_task_open flag
+          # whose corresponding task title is no longer present (i.e. task was
+          # completed, deleted, or moved out of the Chores project).
+          # Triggers on todo.chores state change (HA's Todoist integration polls
+          # ~every minute) plus a 30-minute safety-net poll.
+          {
+            alias = "Consumables: Sync flags from Todoist completion";
+            id = "consumable_flag_sync_from_todoist";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "todo.chores";
+              }
+              {
+                platform = "time_pattern";
+                minutes = "/30";
+              }
+            ];
+            action = [
+              {
+                service = "todo.get_items";
+                target = {
+                  entity_id = "todo.chores";
+                };
+                data = {
+                  status = "needs_action";
+                };
+                response_variable = "chores";
+              }
+              {
+                repeat = {
+                  for_each = [
+                    {
+                      flag = "eufy_water_task_open";
+                      summary = "Refill Eufy vacuum water tank";
+                    }
+                    {
+                      flag = "levoit_water_task_open";
+                      summary = "Refill Levoit humidifier water tank";
+                    }
+                    {
+                      flag = "vacuum_filter_task_open";
+                      summary = "Replace Eufy vacuum HEPA filter";
+                    }
+                    {
+                      flag = "vacuum_rolling_brush_task_open";
+                      summary = "Replace Eufy vacuum rolling brush";
+                    }
+                    {
+                      flag = "vacuum_side_brush_task_open";
+                      summary = "Replace Eufy vacuum side brush";
+                    }
+                    {
+                      flag = "vacuum_sensors_task_open";
+                      summary = "Clean Eufy vacuum nav sensors";
+                    }
+                    {
+                      flag = "vacuum_cleaning_tray_task_open";
+                      summary = "Clean Eufy vacuum cleaning tray";
+                    }
+                    {
+                      flag = "vacuum_mopping_cloth_task_open";
+                      summary = "Wash Eufy mopping cloth (or replace if worn)";
+                    }
+                    {
+                      flag = "levoit_filter_task_open";
+                      summary = "Order new Levoit humidifier filter sponges";
+                    }
+                  ];
+                  sequence = [
+                    {
+                      choose = [
+                        {
+                          conditions = [
+                            {
+                              condition = "template";
+                              value_template = ''
+                                {% set items = (chores | default({})).get('todo.chores', {}).get('items', []) %}
+                                {% set summaries = items | map(attribute='summary') | list %}
+                                {{ is_state('input_boolean.' ~ repeat.item.flag, 'on') and repeat.item.summary not in summaries }}
+                              '';
+                            }
+                          ];
+                          sequence = [
+                            {
+                              service = "input_boolean.turn_off";
+                              target = {
+                                entity_id = "input_boolean.{{ repeat.item.flag }}";
+                              };
+                            }
+                          ];
+                        }
+                      ];
+                    }
+                  ];
                 };
               }
             ];
@@ -1292,6 +1886,7 @@
             "govee_light_local"
             "tplink"
             "vesync"
+            "openweathermap"
           ];
 
           # Python runtime dependencies required by integrations that are
@@ -1371,6 +1966,41 @@
                 icon = "mdi:account-group";
                 initial = "off";
               };
+              vacuum_filter_task_open = {
+                name = "Vacuum filter Todoist task open";
+                icon = "mdi:air-filter";
+                initial = "off";
+              };
+              vacuum_rolling_brush_task_open = {
+                name = "Vacuum rolling brush Todoist task open";
+                icon = "mdi:broom";
+                initial = "off";
+              };
+              vacuum_side_brush_task_open = {
+                name = "Vacuum side brush Todoist task open";
+                icon = "mdi:broom";
+                initial = "off";
+              };
+              vacuum_sensors_task_open = {
+                name = "Vacuum sensor cleaning Todoist task open";
+                icon = "mdi:eye-check";
+                initial = "off";
+              };
+              vacuum_cleaning_tray_task_open = {
+                name = "Vacuum cleaning tray Todoist task open";
+                icon = "mdi:tray-alert";
+                initial = "off";
+              };
+              vacuum_mopping_cloth_task_open = {
+                name = "Vacuum mopping cloth Todoist task open";
+                icon = "mdi:dishwasher";
+                initial = "off";
+              };
+              levoit_filter_task_open = {
+                name = "Levoit filter sponges Todoist task open";
+                icon = "mdi:air-filter";
+                initial = "off";
+              };
             };
             input_datetime = {
               vacuum_last_auto_run = {
@@ -1382,28 +2012,54 @@
               };
             };
             # ── CTA train sensors (fall back C → A when C unavailable) ───────────
-            template = {
-              sensor = [
-                {
-                  name = "Kingston-Throop N Next Arrival";
-                  unique_id = "kingston_throop_n_next_arrival";
-                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_next_arrival') if states('sensor.c_kingston_throop_avs_n_direction_next_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_next_arrival') }}";
-                  device_class = "timestamp";
-                }
-                {
-                  name = "Kingston-Throop N Second Arrival";
-                  unique_id = "kingston_throop_n_second_arrival";
-                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_second_arrival') if states('sensor.c_kingston_throop_avs_n_direction_second_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_second_arrival') }}";
-                  device_class = "timestamp";
-                }
-                {
-                  name = "Kingston-Throop N Third Arrival";
-                  unique_id = "kingston_throop_n_third_arrival";
-                  state = "{{ states('sensor.c_kingston_throop_avs_n_direction_third_arrival') if states('sensor.c_kingston_throop_avs_n_direction_third_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_third_arrival') }}";
-                  device_class = "timestamp";
-                }
-              ];
-            };
+            template = [
+              {
+                sensor = [
+                  {
+                    name = "Kingston-Throop N Next Arrival";
+                    unique_id = "kingston_throop_n_next_arrival";
+                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_next_arrival') if states('sensor.c_kingston_throop_avs_n_direction_next_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_next_arrival') }}";
+                    device_class = "timestamp";
+                  }
+                  {
+                    name = "Kingston-Throop N Second Arrival";
+                    unique_id = "kingston_throop_n_second_arrival";
+                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_second_arrival') if states('sensor.c_kingston_throop_avs_n_direction_second_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_second_arrival') }}";
+                    device_class = "timestamp";
+                  }
+                  {
+                    name = "Kingston-Throop N Third Arrival";
+                    unique_id = "kingston_throop_n_third_arrival";
+                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_third_arrival') if states('sensor.c_kingston_throop_avs_n_direction_third_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_third_arrival') }}";
+                    device_class = "timestamp";
+                  }
+                ];
+              }
+              {
+                trigger = [
+                  {
+                    platform = "time_pattern";
+                    minutes = "/5";
+                  }
+                ];
+                action = [
+                  {
+                    service = "weather.get_forecasts";
+                    target.entity_id = "weather.openweathermap";
+                    data.type = "hourly";
+                    response_variable = "forecast";
+                  }
+                ];
+                sensor = [
+                  {
+                    name = "OpenWeatherMap Peak Rain Chance 12h";
+                    unique_id = "owm_peak_rain_chance_12h";
+                    state = "{{ forecast['weather.openweathermap'].forecast[:12] | map(attribute='precipitation_probability') | max | default(0) }}";
+                    unit_of_measurement = "%";
+                  }
+                ];
+              }
+            ];
             # ────────────────────────────────────────────────────────────────
 
             homeassistant = {
