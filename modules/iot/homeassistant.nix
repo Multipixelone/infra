@@ -1164,6 +1164,63 @@
             ];
           }
 
+          # ── Guest mode: auto-toggle for Emily ────────────────────────────
+          # When Emily is home, enable guest mode (suppress automated lights
+          # and vacuum). When she leaves, disable guest mode. Also runs on HA
+          # restart to recover from stale state.
+          {
+            alias = "Guest mode: auto-toggle for Emily";
+            id = "guest_mode_auto_toggle_emily";
+            mode = "single";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = "person.emily";
+                to = "home";
+              }
+              {
+                platform = "state";
+                entity_id = "person.emily";
+                from = "home";
+              }
+              {
+                platform = "homeassistant";
+                event = "start";
+              }
+            ];
+            action = [
+              {
+                choose = [
+                  {
+                    conditions = [
+                      {
+                        condition = "state";
+                        entity_id = "person.emily";
+                        state = "home";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "input_boolean.turn_on";
+                        target = {
+                          entity_id = "input_boolean.guest_mode";
+                        };
+                      }
+                    ];
+                  }
+                ];
+                default = [
+                  {
+                    service = "input_boolean.turn_off";
+                    target = {
+                      entity_id = "input_boolean.guest_mode";
+                    };
+                  }
+                ];
+              }
+            ];
+          }
+
           # ── Vacuum: reset "skip today" toggle nightly ───────────────────
           {
             alias = "Vacuum: Reset skip-today toggle at midnight";
