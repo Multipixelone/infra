@@ -871,12 +871,14 @@
             ];
           }
 
-          # ── Consumables: clear dedupe flags when Todoist task is completed ──
-          # Reads the open items in todo.chores and clears any *_task_open flag
-          # whose corresponding task title is no longer present (i.e. task was
-          # completed, deleted, or moved out of the Chores project).
-          # Triggers on todo.chores state change (HA's Todoist integration polls
-          # ~every minute) plus a 30-minute safety-net poll.
+          # ── Consumables: press hardware reset when Todoist task is completed ──
+          # Water + Levoit-filter sensors recover on their own (real-time level
+          # or device-side detection), so they are not synced here. The Eufy
+          # consumables below only reset when the corresponding HA button is
+          # pressed; doing it here lets checking the Todoist task off also
+          # reset the on-device wear-life counter. The existing
+          # `*_renewed_reset` automations then clear the dedupe flag once the
+          # sensor jumps back to ~100%.
           {
             alias = "Consumables: Sync flags from Todoist completion";
             id = "consumable_flag_sync_from_todoist";
@@ -906,40 +908,34 @@
                 repeat = {
                   for_each = [
                     {
-                      flag = "eufy_water_task_open";
-                      summary = "Refill Eufy vacuum water tank";
-                    }
-                    {
-                      flag = "levoit_water_task_open";
-                      summary = "Refill Levoit humidifier water tank";
-                    }
-                    {
                       flag = "vacuum_filter_task_open";
                       summary = "Replace Eufy vacuum HEPA filter";
+                      reset_button = "button.vaccum_reset_filter";
                     }
                     {
                       flag = "vacuum_rolling_brush_task_open";
                       summary = "Replace Eufy vacuum rolling brush";
+                      reset_button = "button.vaccum_reset_rolling_brush";
                     }
                     {
                       flag = "vacuum_side_brush_task_open";
                       summary = "Replace Eufy vacuum side brush";
+                      reset_button = "button.vaccum_reset_side_brush";
                     }
                     {
                       flag = "vacuum_sensors_task_open";
                       summary = "Clean Eufy vacuum nav sensors";
+                      reset_button = "button.vaccum_reset_sensors";
                     }
                     {
                       flag = "vacuum_cleaning_tray_task_open";
                       summary = "Clean Eufy vacuum cleaning tray";
+                      reset_button = "button.vaccum_reset_cleaning_tray";
                     }
                     {
                       flag = "vacuum_mopping_cloth_task_open";
                       summary = "Wash Eufy mopping cloth (or replace if worn)";
-                    }
-                    {
-                      flag = "levoit_filter_task_open";
-                      summary = "Order new Levoit humidifier filter sponges";
+                      reset_button = "button.vaccum_reset_mopping_cloth";
                     }
                   ];
                   sequence = [
@@ -958,9 +954,9 @@
                           ];
                           sequence = [
                             {
-                              service = "input_boolean.turn_off";
+                              service = "button.press";
                               target = {
-                                entity_id = "input_boolean.{{ repeat.item.flag }}";
+                                entity_id = "{{ repeat.item.reset_button }}";
                               };
                             }
                           ];
