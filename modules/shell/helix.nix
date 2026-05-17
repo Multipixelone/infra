@@ -457,7 +457,10 @@
             ];
         };
     };
-  nixpkgs.config.allowUnfreePackages = [ "copilot-language-server" ];
+  nixpkgs.config.allowUnfreePackages = [
+    "copilot-language-server"
+    "replace"
+  ];
   flake.modules = {
     homeManager.base =
       hmArgs@{
