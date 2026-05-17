@@ -2126,6 +2126,7 @@
             # /var/lib/hass/automations.yaml (loaded via `automation ui: !include`).
 
             mobile_app = { };
+            default_config = { };
           };
         };
 
