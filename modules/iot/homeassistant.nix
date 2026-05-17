@@ -1025,14 +1025,10 @@
               {
                 platform = "zone";
                 id = "arrival";
-                entity_id = "person.finn";
-                zone = "zone.foodtown";
-                event = "enter";
-              }
-              {
-                platform = "zone";
-                id = "arrival";
-                entity_id = "person.ciara";
+                entity_id = [
+                  "person.finn"
+                  "person.ciara"
+                ];
                 zone = "zone.foodtown";
                 event = "enter";
               }
@@ -1050,7 +1046,8 @@
                 condition = "template";
                 value_template = ''
                   {{ trigger.id == 'arrival'
-                     or (is_state('person.finn', 'Foodtown')
+                     or ((is_state('person.finn', 'Foodtown')
+                          or is_state('person.ciara', 'Foodtown'))
                          and trigger.from_state is not none
                          and (trigger.to_state.state | int(0)) > (trigger.from_state.state | int(0))) }}
                 '';
