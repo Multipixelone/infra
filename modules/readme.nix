@@ -313,7 +313,7 @@
       {
         files.files = [
           {
-            path_ = "README.md";
+            path = "README.md";
             drv = pkgs.writeText "README.md" (lib.removeSuffix "\n" config.text.readme + "\n");
           }
         ];

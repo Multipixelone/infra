@@ -13,7 +13,7 @@
 
       files.files = [
         {
-          path_ = ".envrc";
+          path = ".envrc";
           drv = pkgs.writeText ".envrc" ''
             #!/usr/bin/env sh
             # shellcheck shell=bash

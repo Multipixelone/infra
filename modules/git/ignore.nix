@@ -29,7 +29,7 @@
     {
       files.files = [
         {
-          path_ = ".gitignore";
+          path = ".gitignore";
           drv = inputs.ignoreBoy.lib.${system}.generateGitIgnore {
             # https://github.com/github/gitignore — filenames (sans extension)
             github.languages = [

@@ -6,7 +6,7 @@
   ...
 }:
 {
-  imports = [ inputs.files.flakeModules.default ];
+  imports = [ (inputs.files + "/flake-module.nix") ];
 
   options.text = lib.mkOption {
     default = { };
@@ -42,7 +42,7 @@
 
     text.readme.parts.files =
       withSystem (builtins.head config.systems) (psArgs: psArgs.config.files.files)
-      |> map (file: "- `${file.path_}`")
+      |> map (file: "- `${file.path}`")
       |> lib.naturalSort
       |> lib.concat [
         # markdown
