@@ -174,7 +174,7 @@ in
     {
       files.files = [
         {
-          path_ = evalFilePath;
+          path = evalFilePath;
           drv = pkgs.writers.writeJSON "gh-actions-workflow-eval.yaml" {
             name = evalWorkflowName;
             on = {
@@ -209,7 +209,7 @@ in
           };
         }
         {
-          path_ = buildFilePath;
+          path = buildFilePath;
           drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
             name = buildWorkflowName;
             on.push = { };
@@ -336,7 +336,7 @@ in
           };
         }
         {
-          path_ = nixpkgsAgeFilePath;
+          path = nixpkgsAgeFilePath;
           drv = pkgs.writers.writeJSON "gh-actions-workflow-nixpkgs-age-badge.yaml" {
             name = "Nixpkgs age badge";
             on = {
