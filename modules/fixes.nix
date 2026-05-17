@@ -41,6 +41,20 @@
         pythonRelaxDeps = (old.pythonRelaxDeps or [ ]) ++ [ "requests" ];
       });
     })
+    # john-rolling-2604: upstream GitHub re-generated the archive tarball,
+    # so the rev f514ece... now hashes to a different NAR. nixpkgs still
+    # pins the old hash, which breaks anything that depends on `john`
+    # (e.g. wifite2). Pin the correct content hash until nixpkgs catches up.
+    (_final: prev: {
+      john = prev.john.overrideAttrs (_old: {
+        src = prev.fetchFromGitHub {
+          owner = "openwall";
+          repo = "john";
+          rev = "f514ece8ec4ae5e38ad75aaa322eac86d73dcd76";
+          hash = "sha256-zO1/KUJe3LvYCGlwVpNg5uDwPRD0ql/7anErb7tywC0=";
+        };
+      });
+    })
     # https://github.com/NixOS/nixpkgs/pull/493604
     # (final: prev: {
     #   anki = prev.anki.overrideAttrs {
