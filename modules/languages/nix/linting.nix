@@ -1,3 +1,4 @@
+{ inputs, ... }:
 {
   flake-file.inputs.statix = {
     url = "github:molybdenumsoftware/statix";
@@ -7,25 +8,22 @@
     };
   };
 
-  perSystem =
-    { inputs', ... }:
-    {
-      treefmt.programs = {
-        deadnix.enable = true;
+  nixpkgs.overlays = [ (import "${inputs.statix}/overlay.nix") ];
 
-        nixf-diagnose = {
-          enable = true;
-          ignore = [
-            "sema-unused-def-lambda-noarg-formal"
-            "sema-unused-def-lambda-witharg-arg"
-            "sema-unused-def-lambda-witharg-formal"
-          ];
-        };
+  perSystem = {
+    treefmt.programs = {
+      deadnix.enable = true;
 
-        statix = {
-          enable = true;
-          package = inputs'.statix.packages.default;
-        };
+      nixf-diagnose = {
+        enable = true;
+        ignore = [
+          "sema-unused-def-lambda-noarg-formal"
+          "sema-unused-def-lambda-witharg-arg"
+          "sema-unused-def-lambda-witharg-formal"
+        ];
       };
+
+      statix.enable = true;
     };
+  };
 }
