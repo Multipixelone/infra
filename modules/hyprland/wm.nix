@@ -76,6 +76,7 @@
         systemd.user.targets.tray.Unit.Requires = lib.mkForce [ "graphical-session.target" ];
         wayland.windowManager.hyprland = {
           enable = true;
+          configType = "hyprlang";
           # use package definitions from NixOS
           package = null;
           portalPackage = null;
