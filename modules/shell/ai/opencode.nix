@@ -386,14 +386,17 @@
             # 128k Copilot cap minus headroom for system prompt + next reply.
             maxContextLimit = 96000;
             minContextLimit = 48000;
-            # Only opencode-go models with documented 256k windows.
+            # Models with windows >128k. Anthropic Opus is 200k direct
+            # (not Copilot-routed), opencode-go models are 256k.
             # grok-fast is Copilot-routed, so the Copilot cap dominates.
             modelMaxLimits = {
+              ${models.opus} = 150000;
               ${models.kimi} = 192000;
               ${models.minimax} = 192000;
               ${models.qwen} = 192000;
             };
             modelMinLimits = {
+              ${models.opus} = 75000;
               ${models.kimi} = 96000;
               ${models.minimax} = 96000;
               ${models.qwen} = 96000;
