@@ -1080,6 +1080,63 @@
             ];
           }
 
+          # ── Fridge: write nudges ───────────────────────────────────────
+          # Refreshes sensor.fridge_nudges every 10 min and on relevant
+          # state changes. The dashboard card gates on the sensor's
+          # `valid_until` attribute so the card silently disappears if the
+          # script ever fails to refresh.
+          {
+            alias = "Fridge: write nudges";
+            id = "fridge_write_nudges";
+            mode = "single";
+            trigger = [
+              {
+                platform = "time_pattern";
+                minutes = "/10";
+              }
+              {
+                platform = "state";
+                entity_id = [
+                  "todo.chores"
+                  "todo.foodtown"
+                ];
+              }
+              {
+                platform = "state";
+                entity_id = [
+                  "person.finn"
+                  "person.ciara"
+                  "person.emily"
+                ];
+              }
+              {
+                platform = "calendar";
+                event = "start";
+                entity_id = "calendar.finn";
+              }
+              {
+                platform = "calendar";
+                event = "start";
+                entity_id = "calendar.ciara";
+              }
+              {
+                platform = "calendar";
+                event = "start";
+                entity_id = "calendar.theatre_2";
+              }
+              {
+                platform = "calendar";
+                event = "start";
+                entity_id = "calendar.holidays_in_united_states";
+              }
+            ];
+            action = [
+              {
+                service = "shell_command.write_nudges";
+              }
+            ];
+          }
+
           # Existing: Nightly Home Assistant backup
           {
             alias = "Nightly Home Assistant Backup";
