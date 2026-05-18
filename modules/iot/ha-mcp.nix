@@ -19,7 +19,7 @@ _: {
         wantedBy = [ "multi-user.target" ];
 
         # Runs as `hass` so the existing homeassistant-token secret
-        # (declared in foodtown-sort.nix, owner=hass, mode=0400) is readable
+        # (declared in homeassistant.nix, owner=hass, mode=0400) is readable
         # without touching ownership. Same trust domain as HA itself.
         serviceConfig = {
           User = "hass";

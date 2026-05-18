@@ -1,5 +1,4 @@
-{ inputs, ... }:
-{
+_: {
   configurations.nixos.iot.module =
     {
       config,
@@ -40,21 +39,6 @@
       };
     in
     {
-      age.secrets = {
-        "homeassistant-token" = {
-          file = "${inputs.secrets}/iot/homeassistant-token.age";
-          owner = "hass";
-          group = "hass";
-          mode = "0400";
-        };
-        "openai" = {
-          file = "${inputs.secrets}/ai/openai.age";
-          owner = "hass";
-          group = "hass";
-          mode = "0400";
-        };
-      };
-
       services.home-assistant.config.shell_command = {
         sort_foodtown = "${lib.getExe runner}";
       };

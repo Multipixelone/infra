@@ -1,4 +1,5 @@
 {
+  inputs,
   lib,
   withSystem,
   ...
@@ -140,6 +141,25 @@
         # opens 8123 (HTTP); the bridge configured via UI listens on 21064 and
         # needs an explicit allow so iOS can reach it to pair.
         networking.firewall.allowedTCPPorts = [ 21064 ];
+
+        # Shared agenix secrets for HA-adjacent shell_command scripts
+        # (foodtown-sort.nix, nudge-writer.nix). Declared once here so multiple
+        # consumers can reference config.age.secrets.<name>.path without
+        # conflicting double-declarations.
+        age.secrets = {
+          "homeassistant-token" = {
+            file = "${inputs.secrets}/iot/homeassistant-token.age";
+            owner = "hass";
+            group = "hass";
+            mode = "0400";
+          };
+          "openai" = {
+            file = "${inputs.secrets}/ai/openai.age";
+            owner = "hass";
+            group = "hass";
+            mode = "0400";
+          };
+        };
 
         # ── Nix-managed automations ────────────────────────────────────────
         # Moved out of services.home-assistant.config so HA merges both Nix and UI
