@@ -24,7 +24,7 @@
         version = "2.0.5";
         src = pkgs.fetchzip {
           url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
-          hash = "sha256-iMomioxH7Iydy+bzJDbZxt6BX31UkCvqhXrxYFQV8Gw=";
+          hash = "sha256-ZVJhH0SC9DeVFE6eEv3g6ZQyyOpY+UMG18DvCnukrh8=";
           stripRoot = false;
           postFetch = ''
             # The zip is flat (no top-level directory); create the expected
