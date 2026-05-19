@@ -47,7 +47,7 @@ Soda/beverage end-caps and grab-and-go coolers may also exist near checkout.
 
 - Olive bar
 - Imported / specialty cheese
-- Hummus, dips _(often here)_
+- Hummus, dips
 
 ### Deli Meats
 
@@ -124,6 +124,7 @@ _Directory: Bob's Red Mill, cereal, oatmeal, pancake, juice, granola bars_
 - Hot cereal: oatmeal, instant oatmeal, grits, cream of wheat
 - Pancake mix, waffle mix
 - Pancake syrup (Pearl Milling, Log Cabin)
+- Real maple syrup
 - Bob's Red Mill flours, oats, baking grains
 - Shelf-stable juice (apple, cranberry, V8, juice boxes)
 - Granola bars (Quaker Chewy, Nature Valley, KIND, Clif)
@@ -145,6 +146,7 @@ _Directory: gluten free, chocolate, jelly, peanut butter, coffee/tea, paper plat
 - Chocolate bars, baking chocolate
 - Cookies (Oreos, Chips Ahoy, sandwich cookies)
 - Candy (chocolate, hard candy, gum)
+- Crackers
 - Gluten-free products (GF flour, GF crackers, GF pasta, GF cookies)
 - Paper plates, paper cups
 - Plastic utensils, plastic cups
@@ -158,7 +160,7 @@ _Directory: jar sauce, tuna fish, pasta, canned vegetables, soups, wraps, ramen,
 - Dry pasta (spaghetti, penne, rigatoni, ziti, lasagna)
 - Boxed pasta meals (mac & cheese, Hamburger Helper)
 - Canned vegetables (corn, green beans, peas, carrots)
-- Canned beans _(may overlap with Aisle 3)_
+- Canned beans
 - Soup (canned, broth boxes)
 - Ramen noodles (cups, packs)
 - Large flour wraps / burrito tortillas
@@ -178,7 +180,6 @@ _Directory: oil, vinegar, salad dressing, sugar/spice, baking products, canned f
 - Chocolate chips, sprinkles, frosting
 - Canned fruit (peaches, pears, pineapple, mandarin oranges)
 - Condiments (ketchup, mustard, mayo, hot sauce, BBQ sauce, ranch, Worcestershire, soy sauce overflow)
-- Real maple syrup _(probable; could also be Aisle 4 — confirm)_
 
 ### Aisle 8 — Household, Cleaning, Pet
 
@@ -249,13 +250,35 @@ _Directory: dairy products, frozen meat, organic frozen food, juices_
 
 ---
 
+## Disambiguations
+
+Items that could plausibly belong in multiple sections. **The aisle item lists above are the source of truth — do not fall back to general grocery store conventions when the layout file says otherwise.**
+
+- **Disposable tableware** (paper plates, paper cups, plastic utensils, plastic forks/knives/spoons, plastic cups) → **Aisle 5**. _Do not_ place these in Aisle 8 — "paper products" in Aisle 8 means household paper only.
+- **Household paper** (toilet paper, paper towels, facial tissues, Kleenex) → **Aisle 8**.
+- **Everyday packaged cheese** (sliced, block, shredded, string cheese) → **Aisle 1**.
+- **Specialty / imported cheese** → **Olives & Cheese perimeter**.
+- **Refrigerated juice** (orange juice, fresh-pressed, apple cider, lemonade) → **Aisle 12** (with dairy).
+- **Shelf-stable juice** (V8, juice boxes, cartons of apple juice on shelves) → **Aisle 4**.
+- **Fresh bakery bread** (loaves, rolls, buns, bagels, English muffins) → **Aisle 1**.
+- **Packaged shelf-stable bread overflow** → **Aisle 10**.
+- **Hummus and refrigerated dips** → **Olives & Cheese perimeter**.
+- **Dry beans** → **Aisle 3** (rice & beans).
+- **Canned beans** → **Aisle 6** (canned).
+- **Canned tuna and canned fish** → **Aisle 6**. Fresh fish → Meat & Seafood perimeter.
+- **Soda** (including Diet Wild Cherry Pepsi) → **Aisle 9**. _Not_ the front coolers.
+- **Ramen** → **Aisle 6** by default (it's the directory keyword there). Aisle 3 also stocks Asian noodles; use Aisle 6 unless the item is specifically a Korean or Japanese-style noodle.
+- **Cat food, dog food, pet treats, litter** → **Aisle 8** (pet products).
+- **Maple syrup** (real maple, not pancake syrup) → **Aisle 4**, confirmed.
+- **Crackers** → **Aisle 5**, confirmed.
+- **Cream cheese** → **Aisle 12** dairy, not Aisle 1 cheese.
+
+When an item's category is ambiguous and not listed above, prefer the more specific aisle over the broader one (e.g., "Bob's Red Mill" → Aisle 4 per directory, even though their flour could fit Aisle 7 baking).
+
+---
+
 ## Items to confirm next store visit
 
-- [ ] Real maple syrup — Aisle 7 baking vs Aisle 4 breakfast
 - [ ] Tortillas (corn vs flour, taco vs burrito) — Aisle 1 bakery, Aisle 3 Mexican, or Aisle 6 wraps
-- [ ] Crackers — Aisle 5 (with cookies) or Aisle 10 (with nuts/popcorn)
 - [ ] Tofu — Produce or Aisle 12 dairy
 - [ ] Bacon — perimeter meat case or Aisle 12 dairy
-- [ ] Cream cheese — Aisle 1 cheese or Aisle 12 dairy
-- [ ] Hummus / dips — Olives & Cheese perimeter or Aisle 12 dairy
-- [ ] Canned beans — Aisle 3 (rice & beans) vs Aisle 6 (canned)

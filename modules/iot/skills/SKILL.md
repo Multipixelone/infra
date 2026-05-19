@@ -22,8 +22,9 @@ The user pastes a grocery list and asks for it sorted, organized, "in store orde
 2. **Detect input format.** Note the delimiter, whether items are bulleted/numbered/plain, and whether items have trailing notes or quantities. The output should match the input on those dimensions. Casing is normalized — see Format preservation rules.
 
 3. **Place each item in a section.** For each item in the input:
-   - Look it up directly in the layout file (exact match or close variant).
-   - If not found, use general grocery knowledge to assign the most likely section (e.g., "almond milk" → Dairy, "olive oil" → Aisle 5 / spreads & oils, "tortilla chips" → Snacks).
+   - Look it up directly in the layout file (exact match or close variant). For items that could plausibly fit multiple aisles (paper products, cheese, juice, bread, beans, ramen, etc.), check the **Disambiguations** section of the layout file before deciding.
+   - **The layout file overrides general grocery intuition.** If your prior says "plastic utensils go with household disposables late in the store" but the layout places them in Aisle 5, the layout wins. Always. This store is not a generic supermarket; quirks like disposable tableware sharing an aisle with peanut butter and cookies are real and must be respected.
+   - If the item is not in the layout file at all, use general grocery knowledge to assign the most likely section (e.g., "almond milk" → Aisle 12 / dairy, "olive oil" → Aisle 7 / oils).
    - If genuinely ambiguous (e.g., "the thing for Sarah", "snacks"), keep the item in its original position relative to its neighbors and add a comment at the end of the output: `# unplaced: <item>`.
 
 4. **Sort by walking order.** Across sections, follow the walking order defined in the layout (entrance → produce → ... → checkout). Within a section, preserve the user's original ordering — don't alphabetize, don't reorder by aisle side.
