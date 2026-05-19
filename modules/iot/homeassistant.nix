@@ -1081,7 +1081,7 @@
           }
 
           # ── Fridge: write nudges ───────────────────────────────────────
-          # Refreshes sensor.fridge_nudges every 10 min and on relevant
+          # Refreshes sensor.fridge_nudges every 30 min and on relevant
           # state changes. The dashboard card gates on the sensor's
           # `valid_until` attribute so the card silently disappears if the
           # script ever fails to refresh.
@@ -1092,7 +1092,7 @@
             trigger = [
               {
                 platform = "time_pattern";
-                minutes = "/10";
+                minutes = "/30";
               }
               {
                 platform = "state";

@@ -122,7 +122,7 @@ def get_todo_items(entity_id: str) -> list[dict]:
 
 def slim_forecast(forecast: list[dict]) -> list[dict]:
     out: list[dict] = []
-    for entry in forecast[:6]:
+    for entry in forecast[:3]:
         out.append(
             {
                 "datetime": entry.get("datetime"),
@@ -166,14 +166,22 @@ def gather_facts() -> dict:
         attrs = s.get("attributes") or {}
         start = attrs.get("start_time")
         start_date = parse_date(start)
+        starts_today = start_date == today if start_date else None
+        if key == "holidays":
+            calendars[key] = {"state": s.get("state"), "starts_today": starts_today}
+            continue
+        mins = minutes_until(start, now)
+        if mins is None or mins > 1440:
+            calendars[key] = None
+            continue
         calendars[key] = {
             "state": s.get("state"),
             "message": attrs.get("message"),
             "start_time": start,
             "end_time": attrs.get("end_time"),
             "all_day": attrs.get("all_day"),
-            "minutes_until_start": minutes_until(start, now),
-            "starts_today": start_date == today if start_date else None,
+            "minutes_until_start": mins,
+            "starts_today": starts_today,
         }
 
     weather_state = get_state(WEATHER_ENTITY)
@@ -200,13 +208,46 @@ def gather_facts() -> dict:
     return facts
 
 
+def has_anything_to_nudge(facts: dict) -> bool:
+    if facts["overdue"] or facts["due_today"]:
+        return True
+    if facts["foodtown_count"] >= 5:
+        return True
+
+    cals = facts["calendars"]
+    if (h := cals.get("holidays")) and h.get("starts_today"):
+        return True
+    if (t := cals.get("theatre")) and t.get("starts_today"):
+        return True
+
+    for who in ("finn", "ciara"):
+        cal = cals.get(who)
+        if not cal:
+            continue
+        m = cal.get("minutes_until_start")
+        if m is not None and 0 <= m <= 75:
+            if facts["persons"].get(f"person.{who}") == "home":
+                return True
+
+    try:
+        rain = float(facts["weather"].get("peak_rain_chance_12h") or 0)
+    except (TypeError, ValueError):
+        rain = 0
+    if rain >= 50 and any((c or {}).get("starts_today") for c in cals.values()):
+        return True
+
+    return False
+
+
 def call_llm(facts: dict) -> list[str]:
     system = (SKILL_DIR / "SKILL.md").read_text()
-    user = "Facts:\n" + json.dumps(facts, indent=2, default=str)
+    user = "Facts:\n" + json.dumps(facts, default=str)
     client = OpenAI(timeout=30.0)
     resp = client.chat.completions.create(
         model=MODEL,
         response_format={"type": "json_object"},
+        reasoning_effort="low",
+        max_completion_tokens=1500,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -249,6 +290,15 @@ def main() -> int:
     except Exception as e:
         print(f"nudge-writer: gather_facts failed: {e}", file=sys.stderr)
         return 1
+
+    if not has_anything_to_nudge(facts):
+        try:
+            post_sensor([], VALID_MINUTES)
+        except Exception as e:
+            print(f"nudge-writer: HA POST failed: {e}", file=sys.stderr)
+            return 1
+        print("nudge-writer: gate skipped LLM, posted empty", file=sys.stderr)
+        return 0
 
     try:
         lines = call_llm(facts)
