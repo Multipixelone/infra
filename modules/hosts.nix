@@ -142,6 +142,16 @@ in
       desktopWindowManager = "None";
       notes = "Audio + home services";
     };
+    minish = {
+      isNixOS = true;
+      roles = [ "wsl" ];
+      description = "NixOS-WSL instance on Windows";
+      manufacturer = "Microsoft";
+      model = "WSL2";
+      readmeRole = "WSL";
+      desktopWindowManager = "None";
+      notes = "NixOS under Windows Subsystem for Linux";
+    };
     alexandria = {
       isNixOS = false;
       homeAddress = "192.168.6.9";
