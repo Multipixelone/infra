@@ -197,8 +197,13 @@
                   content = builtins.readFile (../modules + "/${file}");
                   lines = lib.splitString "\n" content;
                   hasDotted = lib.any (l: builtins.match (dottedPattern name) l != null) lines;
-                  hasPackagesBlock =
-                    builtins.match ".*(^|[^A-Za-z0-9_.])packages[[:space:]]*=[[:space:]]*\\{.*" content != null;
+                  # Line-based to avoid std::regex stack overflow on large
+                  # files (libstdc++'s engine recurses on backtracking; a
+                  # whole-file `.*…packages…\{.*` blows the C stack on inputs
+                  # like modules/iot/homeassistant.nix).
+                  hasPackagesBlock = lib.any (
+                    l: builtins.match ".*(^|[^A-Za-z0-9_.])packages[[:space:]]*=[[:space:]]*\\{.*" l != null
+                  ) lines;
                   hasBare = lib.any (l: builtins.match (barePattern name) l != null) lines;
                 in
                 hasDotted || (hasPackagesBlock && hasBare);
