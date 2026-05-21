@@ -1498,8 +1498,10 @@
           #   user_override → user manually touched a dimmed light → set flag
           #                   so subsequent re-dims and restore are suppressed
           #   not_playing   → restore the snapshot (unless overridden) + clear flags
-          # `not_playing` is split: off/standby restores immediately; paused/idle
-          # waits 5 s to ignore scrubbing/ad-skip blips.
+          # `not_playing` is split three ways: off/standby from playing restores
+          # immediately; paused/idle from playing waits 5 s to ignore
+          # scrubbing/ad-skip blips; any non-playing state held for 2 min is a
+          # safety net for playing→unavailable→off paths the others miss.
           # Content classes: music (skip dim entirely), youtube (corner lamp
           # only), video (corner lamp off + Hue dim/off by sun).
           {
@@ -1542,6 +1544,28 @@
                 ];
                 for = {
                   seconds = 5;
+                };
+              }
+              # Safety net: the two triggers above require from=playing, so a
+              # playing → unavailable → off path (Apple TV reboot, network
+              # blip, integration restart) skips them and would leave the
+              # lights dimmed forever. After 2 min steady in any non-playing
+              # state, force-restore. Long debounce keeps this clear of HA
+              # startup races and normal pause/resume cycles (which are
+              # handled by the 5 s trigger above well before 2 min).
+              {
+                platform = "state";
+                entity_id = "media_player.living_room";
+                id = "not_playing";
+                to = [
+                  "off"
+                  "standby"
+                  "idle"
+                  "paused"
+                  "unavailable"
+                ];
+                for = {
+                  minutes = 2;
                 };
               }
               # Fires when the foreground app on the Apple TV changes
@@ -1788,8 +1812,11 @@
                       }
                       {
                         choose = [
-                          # Music: restore snapshot and clear the flag —
-                          # treat as "playback ended" for lighting purposes.
+                          # Music: restore lights but keep dim_active=on so
+                          # a switch back to video re-fires this branch (the
+                          # scene snapshot stays valid for end-of-session
+                          # restore). Treats music as a visual pause, not
+                          # the end of the session.
                           {
                             conditions = [
                               {
@@ -1805,12 +1832,6 @@
                                 };
                                 data = {
                                   transition = 2;
-                                };
-                              }
-                              {
-                                service = "input_boolean.turn_off";
-                                target = {
-                                  entity_id = "input_boolean.living_room_appletv_dim_active";
                                 };
                               }
                             ];
