@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Write 0-3 nudge lines to sensor.fridge_nudges for the kitchen-iPad fridge dashboard.
 
-Reads household state from HA's REST API (todos, calendars, weather, presence),
-flags overdue / due-today chores and minutes-until-event in Python (LLM date
-math is unreliable), asks OpenAI for a strict JSON object of ranked nudge
-lines, and POSTs the result to sensor.fridge_nudges with state = first line,
+Reads household state from HA's REST API (todos, calendars, weather, presence).
+Python deterministically picks at most one chore (CHORE_WEIGHTS table breaks
+ties: weight asc, due-today first, oldest-due first, alphabetic) plus any
+firing cross-cutting cues (umbrella / foodtown / theatre / layers). The LLM
+only rephrases the picked chore summary into a Title-Case sticky-note
+imperative — cross-cutting cues are fixed strings and never see the LLM.
+If no chore qualifies, the LLM is not called at all.
+
+The result is POSTed to sensor.fridge_nudges with state = first line,
 attributes = {lines, valid_until}.
 
 On any failure (HA error, OpenAI exception, JSON parse error, schema mismatch)
@@ -54,6 +59,27 @@ TEMP_SENSOR = "sensor.openweathermap_temperature"
 CONDITION_SENSOR = "sensor.openweathermap_condition"
 PERSONS = ["person.finn", "person.ciara", "person.emily"]
 SUN_SENSOR = "sensor.sun_next_setting"
+
+# Edit me to nudge which chore the dashboard surfaces first. Lower = preferred.
+# Keys are exact-match (case-insensitive) against todo.chores summaries.
+# Anything not listed defaults to CHORE_DEFAULT_WEIGHT — add an entry if a
+# chore needs tuning.
+CHORE_WEIGHTS = {
+    "refill med case": 1,
+    "clip fingernails": 1,
+    "fill ice maker": 1,
+    "change hand towel": 1,
+    "refill soap": 1,
+    "take out trash": 2,
+    "take out recycling": 2,
+    "clip toenails": 2,
+    "open new contact": 2,
+    "toss expired food in fridge": 3,
+    "water plants": 3,
+    "add coned to hass": 4,
+    "clean washer tub": 5,
+}
+CHORE_DEFAULT_WEIGHT = 3
 
 
 def ha_request(method: str, path: str, payload: dict | None = None) -> dict:
@@ -208,64 +234,101 @@ def gather_facts() -> dict:
     return facts
 
 
-def has_anything_to_nudge(facts: dict) -> bool:
-    if facts["overdue"] or facts["due_today"]:
-        return True
-    if facts["foodtown_count"] >= 5:
-        return True
+def chore_weight(summary: str) -> int:
+    return CHORE_WEIGHTS.get(summary.strip().lower(), CHORE_DEFAULT_WEIGHT)
+
+
+def select_candidates(facts: dict) -> dict:
+    # Tag each item with is_today so we can prefer due-today over older
+    # overdue at the same weight. 0-before-1 in the key = today wins.
+    pool = [(i, False) for i in facts["overdue"]] + [
+        (i, True) for i in facts["due_today"]
+    ]
+    pool.sort(
+        key=lambda x: (
+            chore_weight(x[0].get("summary") or ""),
+            0 if x[1] else 1,
+            x[0].get("due") or "9999-99-99",
+            x[0].get("summary") or "",
+        )
+    )
+    chore_summary = pool[0][0]["summary"] if pool else None
 
     cals = facts["calendars"]
-    if (h := cals.get("holidays")) and h.get("starts_today"):
-        return True
-    if (t := cals.get("theatre")) and t.get("starts_today"):
-        return True
-
-    for who in ("finn", "ciara"):
-        cal = cals.get(who)
-        if not cal:
-            continue
-        m = cal.get("minutes_until_start")
-        if m is not None and 0 <= m <= 75:
-            if facts["persons"].get(f"person.{who}") == "home":
-                return True
-
+    any_today = any((c or {}).get("starts_today") for c in cals.values())
     try:
         rain = float(facts["weather"].get("peak_rain_chance_12h") or 0)
     except (TypeError, ValueError):
         rain = 0
-    if rain >= 50 and any((c or {}).get("starts_today") for c in cals.values()):
-        return True
+    try:
+        temp = float(facts["weather"].get("temp_f") or 999)
+    except (TypeError, ValueError):
+        temp = 999
+    evening_event = any(
+        (c or {}).get("starts_today")
+        and ((c or {}).get("start_time") or "")[11:13].isdigit()
+        and int(((c or {}).get("start_time") or "")[11:13]) >= 17
+        for c in cals.values()
+    )
 
-    return False
+    return {
+        "chore_summary": chore_summary,
+        "umbrella": rain >= 50 and any_today,
+        "foodtown": facts["foodtown_count"] >= 5,
+        "theatre_tonight": bool((cals.get("theatre") or {}).get("starts_today")),
+        "layers_tonight": temp < 45 and evening_event,
+    }
 
 
-def call_llm(facts: dict) -> list[str]:
+def phrase_chore(summary: str) -> str:
     system = (SKILL_DIR / "SKILL.md").read_text()
-    user = "Facts:\n" + json.dumps(facts, default=str)
     client = OpenAI(timeout=30.0)
     resp = client.chat.completions.create(
         model=MODEL,
-        response_format={"type": "json_object"},
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "nudge_line",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["line"],
+                    "properties": {
+                        "line": {"type": "string", "maxLength": 60},
+                    },
+                },
+            },
+        },
         reasoning_effort="low",
         max_completion_tokens=1500,
+        seed=42,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {"role": "user", "content": summary},
         ],
     )
     text = resp.choices[0].message.content or "{}"
     obj = json.loads(text)
-    lines = obj.get("lines")
-    if not isinstance(lines, list):
-        raise ValueError(f"non-list lines field: {text!r}")
-    cleaned: list[str] = []
-    for entry in lines:
-        if not isinstance(entry, str):
-            raise ValueError(f"non-string line: {entry!r}")
-        s = entry.strip()
-        if s:
-            cleaned.append(s)
-    return cleaned[:3]
+    line = obj.get("line")
+    if not isinstance(line, str):
+        raise ValueError(f"non-string line field: {text!r}")
+    return line.strip()
+
+
+def assemble_lines(picks: dict, chore_line: str | None) -> list[str]:
+    lines: list[str] = []
+    if chore_line:
+        lines.append(chore_line)
+    if picks["umbrella"]:
+        lines.append("Bring Umbrella")
+    if picks["foodtown"]:
+        lines.append("Foodtown Run")
+    if picks["theatre_tonight"]:
+        lines.append("Theatre Tonight")
+    if picks["layers_tonight"]:
+        lines.append("Bring Layers Tonight")
+    return lines[:3]
 
 
 def post_sensor(lines: list[str], valid_minutes: int) -> None:
@@ -291,20 +354,17 @@ def main() -> int:
         print(f"nudge-writer: gather_facts failed: {e}", file=sys.stderr)
         return 1
 
-    if not has_anything_to_nudge(facts):
-        try:
-            post_sensor([], VALID_MINUTES)
-        except Exception as e:
-            print(f"nudge-writer: HA POST failed: {e}", file=sys.stderr)
-            return 1
-        print("nudge-writer: gate skipped LLM, posted empty", file=sys.stderr)
-        return 0
+    picks = select_candidates(facts)
 
-    try:
-        lines = call_llm(facts)
-    except Exception as e:
-        print(f"nudge-writer: LLM call failed: {e}", file=sys.stderr)
-        return 1
+    chore_line: str | None = None
+    if picks["chore_summary"]:
+        try:
+            chore_line = phrase_chore(picks["chore_summary"])
+        except Exception as e:
+            print(f"nudge-writer: phrase_chore failed: {e}", file=sys.stderr)
+            return 1
+
+    lines = assemble_lines(picks, chore_line)
 
     try:
         post_sensor(lines, VALID_MINUTES)
@@ -312,7 +372,8 @@ def main() -> int:
         print(f"nudge-writer: HA POST failed: {e}", file=sys.stderr)
         return 1
 
-    print(f"nudge-writer: posted {len(lines)} line(s)", file=sys.stderr)
+    joined = " | ".join(lines) if lines else "(empty)"
+    print(f"nudge-writer: posted: {joined}", file=sys.stderr)
     return 0
 
 
