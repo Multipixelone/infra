@@ -35,6 +35,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 | `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
 | `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |
 | `ipad` | Personal tablet | Apple | iPad | Tablet | - | - |
+| `minish` | NixOS-WSL instance on Windows | Microsoft | WSL2 | WSL | None | NixOS under Windows Subsystem for Linux |
 
 
 
