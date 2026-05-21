@@ -1414,10 +1414,15 @@
           }
 
           # ── Living Room: media lighting ─────────────────────────────────
-          # Apple TV / living_room media player. Three triggers:
-          #   playing      → snapshot lights, dim per content class
-          #   app_changed  → re-evaluate dim if user switches apps mid-playback
-          #   not_playing  → restore the snapshot and clear the flag
+          # Apple TV / living_room media player. Triggers:
+          #   playing       → snapshot lights, dim per content class
+          #   app_changed   → re-evaluate dim if user switches apps mid-playback
+          #   sun_crossed   → re-evaluate dim when sun crosses sunset mid-playback
+          #   user_override → user manually touched a dimmed light → set flag
+          #                   so subsequent re-dims and restore are suppressed
+          #   not_playing   → restore the snapshot (unless overridden) + clear flags
+          # `not_playing` is split: off/standby restores immediately; paused/idle
+          # waits 5 s to ignore scrubbing/ad-skip blips.
           # Content classes: music (skip dim entirely), youtube (corner lamp
           # only), video (corner lamp off + Hue dim/off by sun).
           {
@@ -1435,6 +1440,20 @@
                   seconds = 1;
                 };
               }
+              # Hard stop: restore immediately so lights come back the moment
+              # you flip the TV off.
+              {
+                platform = "state";
+                entity_id = "media_player.living_room";
+                id = "not_playing";
+                from = "playing";
+                to = [
+                  "off"
+                  "standby"
+                ];
+              }
+              # Soft stop: 5 s debounce to ignore brief paused/idle blips
+              # (scrubbing, intro-skip, brief ad transitions).
               {
                 platform = "state";
                 entity_id = "media_player.living_room";
@@ -1443,8 +1462,6 @@
                 to = [
                   "paused"
                   "idle"
-                  "standby"
-                  "off"
                 ];
                 for = {
                   seconds = 5;
@@ -1458,6 +1475,26 @@
                 entity_id = "media_player.living_room";
                 id = "app_changed";
                 attribute = "app_id";
+              }
+              # Sun crosses the dim threshold mid-playback — re-apply the
+              # video dim so day-bright Hue becomes night-dim (or vice versa).
+              {
+                platform = "sun";
+                event = "sunset";
+                offset = "-00:30:00";
+                id = "sun_crossed";
+              }
+              # User touched one of the dimmed lights — detected as a state
+              # change with a non-null context.user_id (UI / voice / HomeKit).
+              # The branch's conditions check user_id to filter out our own
+              # service calls and other automations.
+              {
+                platform = "state";
+                entity_id = [
+                  "light.living_room"
+                  "light.smart_led_bulb_2"
+                ];
+                id = "user_override";
               }
             ];
             condition = [
@@ -1499,7 +1536,7 @@
                           content_class = ''
                             {% set app = state_attr('media_player.living_room', 'app_id') | default(''') | lower %}
                             {% set mtype = state_attr('media_player.living_room', 'media_content_type') | default(''') | lower %}
-                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app'] %}
+                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app', 'com.google.ios.youtubemusic'] %}
                             {{ 'music' if (mtype == 'music' or app in music_apps) else ('youtube' if 'youtube' in app else 'video') }}
                           '';
                         };
@@ -1510,6 +1547,14 @@
                         alias = "Skip if music playback";
                         condition = "template";
                         value_template = "{{ content_class | trim != 'music' }}";
+                      }
+                      # Fresh playback session — clear any leftover user
+                      # override flag from a previous session.
+                      {
+                        service = "input_boolean.turn_off";
+                        target = {
+                          entity_id = "input_boolean.living_room_appletv_user_override";
+                        };
                       }
                       # Snapshot pre-playback state of both lights (incl.
                       # off-state) so restore puts them back exactly.
@@ -1590,6 +1635,15 @@
                               }
                             ];
                             default = [
+                              # Daytime: only dim the Hue if it was already
+                              # on — don't turn on lights that the user had
+                              # deliberately off.
+                              {
+                                alias = "Skip Hue dim if it's off (daytime video)";
+                                condition = "state";
+                                entity_id = "light.living_room";
+                                state = "on";
+                              }
                               {
                                 service = "light.turn_on";
                                 target = {
@@ -1606,20 +1660,30 @@
                       }
                     ];
                   }
-                  # ── 2. App switched mid-playback: re-evaluate dim ─────
-                  # Only acts if dim is already active and the TV is still
-                  # playing. Music switch → restore + clear flag; otherwise
-                  # re-apply the appropriate dim (no re-snapshot).
+                  # ── 2. Re-evaluate dim mid-playback ───────────────────
+                  # Fires on app change (YouTube↔Netflix↔Music) or when the
+                  # sun crosses the dim threshold. Skipped if the user took
+                  # manual control of a light during playback. Music switch
+                  # → restore + clear flag; otherwise re-apply the dim
+                  # (no re-snapshot).
                   {
                     conditions = [
                       {
                         condition = "trigger";
-                        id = "app_changed";
+                        id = [
+                          "app_changed"
+                          "sun_crossed"
+                        ];
                       }
                       {
                         condition = "state";
                         entity_id = "input_boolean.living_room_appletv_dim_active";
                         state = "on";
+                      }
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.living_room_appletv_user_override";
+                        state = "off";
                       }
                       {
                         condition = "state";
@@ -1640,7 +1704,7 @@
                           content_class = ''
                             {% set app = state_attr('media_player.living_room', 'app_id') | default(''') | lower %}
                             {% set mtype = state_attr('media_player.living_room', 'media_content_type') | default(''') | lower %}
-                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app'] %}
+                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app', 'com.google.ios.youtubemusic'] %}
                             {{ 'music' if (mtype == 'music' or app in music_apps) else ('youtube' if 'youtube' in app else 'video') }}
                           '';
                         };
@@ -1732,6 +1796,15 @@
                               }
                             ];
                             default = [
+                              # Daytime: only dim the Hue if it was already
+                              # on — don't turn on lights that the user had
+                              # deliberately off.
+                              {
+                                alias = "Skip Hue dim if it's off (daytime video)";
+                                condition = "state";
+                                entity_id = "light.living_room";
+                                state = "on";
+                              }
                               {
                                 service = "light.turn_on";
                                 target = {
@@ -1748,7 +1821,48 @@
                       }
                     ];
                   }
-                  # ── 3. Playback ended: restore snapshot + clear flag ──
+                  # ── 3. User manual override during playback ───────────
+                  # User touched one of the dimmed lights via UI/voice/HomeKit
+                  # — set the override flag so subsequent app_changed /
+                  # sun_crossed re-dims and not_playing restore are
+                  # suppressed for the rest of this session. The user_id
+                  # check filters out our own service calls (which run
+                  # without a user context) and other automations.
+                  {
+                    conditions = [
+                      {
+                        condition = "trigger";
+                        id = "user_override";
+                      }
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.living_room_appletv_dim_active";
+                        state = "on";
+                      }
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.living_room_appletv_user_override";
+                        state = "off";
+                      }
+                      {
+                        condition = "template";
+                        value_template = "{{ trigger.to_state.context.user_id is not none }}";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "input_boolean.turn_on";
+                        target = {
+                          entity_id = "input_boolean.living_room_appletv_user_override";
+                        };
+                      }
+                    ];
+                  }
+                  # ── 4. Playback ended: restore snapshot + clear flags ─
+                  # Restore is skipped if the user took manual control during
+                  # the session — don't fight a deliberate user override.
+                  # Flags are cleared either way so the next session starts
+                  # fresh.
                   {
                     conditions = [
                       {
@@ -1763,18 +1877,36 @@
                     ];
                     sequence = [
                       {
-                        service = "scene.turn_on";
-                        target = {
-                          entity_id = "scene.living_room_pre_appletv";
-                        };
-                        data = {
-                          transition = 2;
-                        };
+                        choose = [
+                          {
+                            conditions = [
+                              {
+                                condition = "state";
+                                entity_id = "input_boolean.living_room_appletv_user_override";
+                                state = "off";
+                              }
+                            ];
+                            sequence = [
+                              {
+                                service = "scene.turn_on";
+                                target = {
+                                  entity_id = "scene.living_room_pre_appletv";
+                                };
+                                data = {
+                                  transition = 2;
+                                };
+                              }
+                            ];
+                          }
+                        ];
                       }
                       {
                         service = "input_boolean.turn_off";
                         target = {
-                          entity_id = "input_boolean.living_room_appletv_dim_active";
+                          entity_id = [
+                            "input_boolean.living_room_appletv_dim_active"
+                            "input_boolean.living_room_appletv_user_override"
+                          ];
                         };
                       }
                     ];
@@ -2027,7 +2159,10 @@
               {
                 service = "input_boolean.turn_off";
                 target = {
-                  entity_id = "input_boolean.living_room_appletv_dim_active";
+                  entity_id = [
+                    "input_boolean.living_room_appletv_dim_active"
+                    "input_boolean.living_room_appletv_user_override"
+                  ];
                 };
               }
             ];
@@ -2126,6 +2261,10 @@
               };
               living_room_appletv_dim_active = {
                 name = "Apple TV lights currently adjusted";
+                initial = "off";
+              };
+              living_room_appletv_user_override = {
+                name = "Apple TV dim — user manual override";
                 initial = "off";
               };
               welcome_home_lights_enabled = {
