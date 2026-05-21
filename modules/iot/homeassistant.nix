@@ -1491,8 +1491,12 @@
           }
 
           # ── Living Room: media lighting ─────────────────────────────────
-          # Turn off corner lamp when Apple TV plays; dim Hue at night.
-          # Restore lights when playback stops.
+          # Apple TV / living_room media player. Three triggers:
+          #   playing      → snapshot lights, dim per content class
+          #   app_changed  → re-evaluate dim if user switches apps mid-playback
+          #   not_playing  → restore the snapshot and clear the flag
+          # Content classes: music (skip dim entirely), youtube (corner lamp
+          # only), video (corner lamp off + Hue dim/off by sun).
           {
             alias = "Living Room media lighting";
             id = "living_room_media_lighting";
@@ -1523,6 +1527,15 @@
                   seconds = 5;
                 };
               }
+              # Fires when the foreground app on the Apple TV changes
+              # (e.g. YouTube → Netflix, or Netflix → Apple Music) without
+              # leaving the playing state.
+              {
+                platform = "state";
+                entity_id = "media_player.living_room";
+                id = "app_changed";
+                attribute = "app_id";
+              }
             ];
             condition = [
               {
@@ -1534,6 +1547,7 @@
             action = [
               {
                 choose = [
+                  # ── 1. Playback start: classify, snapshot, dim ────────
                   {
                     conditions = [
                       {
@@ -1547,17 +1561,43 @@
                       }
                     ];
                     sequence = [
-                      # Brief delay so Apple TV populates app_id/media_content_type
-                      # attributes before we branch on them.
-                      { delay = "00:00:01"; }
-                      # Snapshot pre-playback state of lights currently on so
-                      # restore can return them to their actual previous values
-                      # (lights that were off stay off).
+                      # Apple TV populates app_id/media_content_type
+                      # asynchronously; wait up to 5 s, then carry on with
+                      # whatever's there (the `video` arm is a safe default).
+                      {
+                        wait_template = "{{ state_attr('media_player.living_room', 'app_id') not in [none, ''] }}";
+                        timeout = {
+                          seconds = 5;
+                        };
+                        continue_on_timeout = true;
+                      }
+                      {
+                        variables = {
+                          content_class = ''
+                            {% set app = state_attr('media_player.living_room', 'app_id') | default(''') | lower %}
+                            {% set mtype = state_attr('media_player.living_room', 'media_content_type') | default(''') | lower %}
+                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app'] %}
+                            {{ 'music' if (mtype == 'music' or app in music_apps) else ('youtube' if 'youtube' in app else 'video') }}
+                          '';
+                        };
+                      }
+                      # Music: bail out before snapshot/flag/dim. Inline
+                      # condition stops the sequence cleanly if false.
+                      {
+                        alias = "Skip if music playback";
+                        condition = "template";
+                        value_template = "{{ content_class | trim != 'music' }}";
+                      }
+                      # Snapshot pre-playback state of both lights (incl.
+                      # off-state) so restore puts them back exactly.
                       {
                         service = "scene.create";
                         data = {
                           scene_id = "living_room_pre_appletv";
-                          snapshot_entities = "{{ ['light.living_room', 'light.smart_led_bulb_2'] | select('is_state', 'on') | list }}";
+                          snapshot_entities = [
+                            "light.living_room"
+                            "light.smart_led_bulb_2"
+                          ];
                         };
                       }
                       {
@@ -1566,16 +1606,16 @@
                           entity_id = "input_boolean.living_room_appletv_dim_active";
                         };
                       }
-                      # ── Content-based branching ──────────────────────────
-                      # YouTube → dim only the corner lamp (Hue untouched).
-                      # Otherwise → off corner lamp + dim Hue (or off Hue at night).
+                      # Apply dim per content_class. YouTube → corner lamp
+                      # only; video → corner off + Hue dim (off-darker at
+                      # night, half-bright in day).
                       {
                         choose = [
                           {
                             conditions = [
                               {
                                 condition = "template";
-                                value_template = "{{ 'youtube' in (state_attr('media_player.living_room', 'app_id') | default('') | lower) }}";
+                                value_template = "{{ content_class | trim == 'youtube' }}";
                               }
                             ];
                             sequence = [
@@ -1643,6 +1683,149 @@
                       }
                     ];
                   }
+                  # ── 2. App switched mid-playback: re-evaluate dim ─────
+                  # Only acts if dim is already active and the TV is still
+                  # playing. Music switch → restore + clear flag; otherwise
+                  # re-apply the appropriate dim (no re-snapshot).
+                  {
+                    conditions = [
+                      {
+                        condition = "trigger";
+                        id = "app_changed";
+                      }
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.living_room_appletv_dim_active";
+                        state = "on";
+                      }
+                      {
+                        condition = "state";
+                        entity_id = "media_player.living_room";
+                        state = "playing";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        wait_template = "{{ state_attr('media_player.living_room', 'app_id') not in [none, ''] }}";
+                        timeout = {
+                          seconds = 5;
+                        };
+                        continue_on_timeout = true;
+                      }
+                      {
+                        variables = {
+                          content_class = ''
+                            {% set app = state_attr('media_player.living_room', 'app_id') | default(''') | lower %}
+                            {% set mtype = state_attr('media_player.living_room', 'media_content_type') | default(''') | lower %}
+                            {% set music_apps = ['com.spotify.client', 'com.apple.music', 'com.apple.podcasts', 'com.audible.app'] %}
+                            {{ 'music' if (mtype == 'music' or app in music_apps) else ('youtube' if 'youtube' in app else 'video') }}
+                          '';
+                        };
+                      }
+                      {
+                        choose = [
+                          # Music: restore snapshot and clear the flag —
+                          # treat as "playback ended" for lighting purposes.
+                          {
+                            conditions = [
+                              {
+                                condition = "template";
+                                value_template = "{{ content_class | trim == 'music' }}";
+                              }
+                            ];
+                            sequence = [
+                              {
+                                service = "scene.turn_on";
+                                target = {
+                                  entity_id = "scene.living_room_pre_appletv";
+                                };
+                                data = {
+                                  transition = 2;
+                                };
+                              }
+                              {
+                                service = "input_boolean.turn_off";
+                                target = {
+                                  entity_id = "input_boolean.living_room_appletv_dim_active";
+                                };
+                              }
+                            ];
+                          }
+                          # YouTube: corner lamp 15 %, Hue untouched.
+                          {
+                            conditions = [
+                              {
+                                condition = "template";
+                                value_template = "{{ content_class | trim == 'youtube' }}";
+                              }
+                            ];
+                            sequence = [
+                              {
+                                service = "light.turn_on";
+                                target = {
+                                  entity_id = "light.smart_led_bulb_2";
+                                };
+                                data = {
+                                  brightness_pct = 15;
+                                  transition = 2;
+                                };
+                              }
+                            ];
+                          }
+                        ];
+                        # Video: corner off + Hue dim per sun.
+                        default = [
+                          {
+                            service = "light.turn_off";
+                            target = {
+                              entity_id = "light.smart_led_bulb_2";
+                            };
+                            data = {
+                              transition = 2;
+                            };
+                          }
+                          {
+                            choose = [
+                              {
+                                conditions = [
+                                  {
+                                    condition = "sun";
+                                    after = "sunset";
+                                    after_offset = "-00:30:00";
+                                  }
+                                ];
+                                sequence = [
+                                  {
+                                    service = "light.turn_on";
+                                    target = {
+                                      entity_id = "light.living_room";
+                                    };
+                                    data = {
+                                      brightness_pct = 10;
+                                      transition = 2;
+                                    };
+                                  }
+                                ];
+                              }
+                            ];
+                            default = [
+                              {
+                                service = "light.turn_on";
+                                target = {
+                                  entity_id = "light.living_room";
+                                };
+                                data = {
+                                  brightness_pct = 50;
+                                  transition = 2;
+                                };
+                              }
+                            ];
+                          }
+                        ];
+                      }
+                    ];
+                  }
+                  # ── 3. Playback ended: restore snapshot + clear flag ──
                   {
                     conditions = [
                       {
