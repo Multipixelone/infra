@@ -141,6 +141,7 @@
         # opens 8123 (HTTP); the bridge configured via UI listens on 21064 and
         # needs an explicit allow so iOS can reach it to pair.
         networking.firewall.allowedTCPPorts = [ 21064 ];
+        networking.firewall.allowedUDPPorts = [ 5353 ]; # mDNS multicast
 
         # Shared agenix secrets for HA-adjacent shell_command scripts
         # (foodtown-sort.nix, nudge-writer.nix). Declared once here so multiple
