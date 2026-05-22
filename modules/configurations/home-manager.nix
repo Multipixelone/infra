@@ -38,6 +38,9 @@
         { pkgs, ... }:
         inputs.home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
+          extraSpecialArgs = {
+            inherit (config) hosts;
+          };
           modules = [
             config.flake.modules.homeManager.base
             module
