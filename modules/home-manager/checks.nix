@@ -27,6 +27,9 @@
               {
                 inherit pkgs;
                 modules = modules ++ [ { home.stateVersion = "25.05"; } ];
+                extraSpecialArgs = {
+                  inherit (config) hosts;
+                };
               }
               |> inputs.home-manager.lib.homeManagerConfiguration
               |> lib.getAttrFromPath [
