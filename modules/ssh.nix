@@ -87,12 +87,12 @@ in
         enable = true;
         enableDefaultConfig = false;
         includes = [ "${args.config.home.homeDirectory}/.ssh/hosts/*" ];
-        matchBlocks =
+        settings =
           reachableNixoss
           |> lib.mapAttrsToList (
             _name: nixos: {
               "${nixos.config.networking.fqdn}" = {
-                identityFile = "~/.ssh/keys/id_ed25519";
+                IdentityFile = "~/.ssh/keys/id_ed25519";
               };
             }
           )
@@ -101,10 +101,10 @@ in
             |> lib.mapAttrsToList (
               name: _: {
                 "colmena.${name}" = {
-                  hostname = resolveHostAddress name;
-                  user = "root";
-                  identityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
-                  identitiesOnly = true;
+                  HostName = resolveHostAddress name;
+                  User = "root";
+                  IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
+                  IdentitiesOnly = true;
                 };
               }
             )
@@ -112,27 +112,27 @@ in
           |> lib.concat [
             {
               "alexandria" = {
-                hostname = resolveHostAddress "alexandria";
-                user = config.flake.meta.owner.username;
-                identityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
-                identitiesOnly = true;
+                HostName = resolveHostAddress "alexandria";
+                User = config.flake.meta.owner.username;
+                IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
+                IdentitiesOnly = true;
               };
             }
             {
               "*" = {
-                setEnv.TERM = "xterm-256color";
-                compression = true;
-                identitiesOnly = true;
-                hashKnownHosts = false;
-                identityFile = "${args.config.home.homeDirectory}/.ssh/id_ed25519";
-                forwardAgent = true;
-                addKeysToAgent = "yes";
-                serverAliveInterval = 0;
-                serverAliveCountMax = 3;
-                userKnownHostsFile = "~/.ssh/known_hosts";
-                controlMaster = "no";
-                controlPath = "~/.ssh/master-%r@%n:%p";
-                controlPersist = "no";
+                SetEnv.TERM = "xterm-256color";
+                Compression = true;
+                IdentitiesOnly = true;
+                HashKnownHosts = false;
+                IdentityFile = "${args.config.home.homeDirectory}/.ssh/id_ed25519";
+                ForwardAgent = true;
+                AddKeysToAgent = "yes";
+                ServerAliveInterval = 0;
+                ServerAliveCountMax = 3;
+                UserKnownHostsFile = "~/.ssh/known_hosts";
+                ControlMaster = "no";
+                ControlPath = "~/.ssh/master-%r@%n:%p";
+                ControlPersist = "no";
               };
             }
           ]
