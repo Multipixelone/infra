@@ -26,23 +26,16 @@
       let
         aiConfig = config.flake.aiConfig;
 
-        # Upstream opencode's package.json pins `bun@1.3.13`, but no public
-        # nixpkgs branch has bumped past 1.3.11 yet. Override bun's binary
-        # to the 1.3.13 release. `src` is set directly so the repo's
-        # `abort-on-warn` flag doesn't trip nixpkgs'
-        # warnForBadVersionOverride. Drop once nixpkgs ships ≥ 1.3.13.
-        bun13 = pkgs.bun.overrideAttrs (_old: {
-          version = "1.3.13";
-          src = pkgs.fetchurl {
-            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64.zip";
-            hash = "sha256-ecB3H6i5LDOq5B4VoODTB+qZ0OLwAxfHHGxTI3p44lo=";
-          };
-        });
         upstreamOpencode = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
-        opencodePkg = upstreamOpencode.override {
-          bun = bun13;
-          node_modules = upstreamOpencode.node_modules.override { bun = bun13; };
-        };
+        # opencode's root package.json requires bun@1.3.14, but nixpkgs ships
+        # 1.3.13 and the node_modules are built for 1.3.13. Downgrade the
+        # packageManager version in package.json so bun's semver check passes.
+        # Drop once nixpkgs ships bun ≥ 1.3.14.
+        opencodePkg = upstreamOpencode.overrideAttrs (_old: {
+          postConfigure = ''
+            sed -i 's/"packageManager": "bun@1.3.14"/"packageManager": "bun@1.3.13"/' package.json
+          '';
+        });
 
         # ── Composable building blocks ──────────────────────────────────
         #
@@ -68,6 +61,7 @@
           hy3-preview-free = "opencode/hy3-preview-free";
           ling-26-flash-free = "opencode/ling-2.6-flash-free";
           minimax-m25-free = "opencode/minimax-m2.5-free";
+          deepseek-free = "opencode/deepseek-v4-flash-free";
           nemotron-3-super-free = "opencode/nemotron-3-super-free";
           big-pickle = "opencode/big-pickle";
           # opencode go
@@ -156,7 +150,7 @@
         specialistsGo = {
           oracle = "deepseek-pro";
           librarian = "deepseek";
-          explorer = "minimax-m25-free";
+          explorer = "deepseek-free";
           designer = "mimo-pro";
           fixer = "minimax";
           observer = "mimo-omni";
@@ -168,7 +162,7 @@
           designer = "gemini-pro";
           fixer = "minimax";
           librarian = "deepseek";
-          explorer = "minimax-m25-free";
+          explorer = "deepseek-free";
           observer = "mimo-omni";
         };
 
