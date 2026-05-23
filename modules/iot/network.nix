@@ -37,6 +37,7 @@ in
                   address1 = "${iotHost.iotAddress}/24";
                   gateway = "192.168.5.1";
                   method = "manual";
+                  never-default = true;
                 };
                 ipv6 = {
                   addr-gen-mode = "stable-privacy";
