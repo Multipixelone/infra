@@ -28,7 +28,11 @@
         file = "${inputs.secrets}/commutecompass/tokens.age";
         owner = "commutecompass";
         group = "commutecompass";
-        mode = "0400";
+        # Group-readable so tunnel (added to commutecompass via skill.users
+        # below) can source the env file through the commutecompass-skill
+        # wrapper. Without this, on-demand chat dispatch can't load the API
+        # keys the systemd timers get via EnvironmentFile=.
+        mode = "0440";
       };
 
       services.commutecompass = {
@@ -36,6 +40,11 @@
         configFile = "${inputs.secrets}/commutecompass/config.toml";
         venuesFile = "${inputs.secrets}/commutecompass/known_venues.yaml";
         environmentFile = config.age.secrets."commutecompass".path;
+
+        # Lets tunnel (the openclaw gateway user) invoke skill scripts
+        # directly: installs `commutecompass-skill` on PATH and joins tunnel
+        # to the commutecompass group so it can read the env file above.
+        skill.users = [ "tunnel" ];
 
         openclaw = {
           package = openclawPkg;
