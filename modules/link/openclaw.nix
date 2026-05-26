@@ -51,18 +51,22 @@
             Wants = [ "network-online.target" ];
           };
           Service = {
+            # NOTE: paths are spelled absolutely (not via %h) because
+            # `openclaw doctor` reads the raw unit file rather than the
+            # runtime-expanded environment, and treats `%h` literally —
+            # which makes its service-config and PATH validations fail.
             ExecStartPre = ''
               ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g openclaw; fi'
             '';
-            ExecStart = "%h/.npm-global/bin/openclaw gateway --port 18789";
-            WorkingDirectory = "%h/.openclaw";
+            ExecStart = "/home/tunnel/.npm-global/bin/openclaw gateway --port 18789";
+            WorkingDirectory = "/home/tunnel/.openclaw";
             Restart = "always";
             RestartSec = "5s";
             Environment = [
-              "HOME=%h"
-              "PATH=%h/.local/bin:%h/.npm-global/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/tunnel/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:${pkgs.coreutils}/bin:${pkgs.nodejs}/bin"
-              "NPM_CONFIG_PREFIX=%h/.npm-global"
-              "OPENCLAW_STATE_DIR=%h/.openclaw"
+              "HOME=/home/tunnel"
+              "PATH=/home/tunnel/.local/bin:/home/tunnel/.npm-global/bin:/home/tunnel/bin:/home/tunnel/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/home/tunnel/.nix-profile/bin:/nix/profile/bin:/home/tunnel/.local/state/nix/profile/bin:/etc/profiles/per-user/tunnel/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:${pkgs.coreutils}/bin:${pkgs.nodejs}/bin"
+              "NPM_CONFIG_PREFIX=/home/tunnel/.npm-global"
+              "OPENCLAW_STATE_DIR=/home/tunnel/.openclaw"
             ];
           };
           Install.WantedBy = [ "default.target" ];
