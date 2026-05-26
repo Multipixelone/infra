@@ -7,7 +7,12 @@
   };
 
   configurations.nixos.link.module =
-    { config, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       # Reuse the openclaw binary that modules/link/openclaw.nix installs into
       # tunnel's home via `npm install -g openclaw`. The wrapper adds nodejs to
@@ -26,8 +31,8 @@
 
       age.secrets."commutecompass" = {
         file = "${inputs.secrets}/commutecompass/tokens.age";
-        owner = "commutecompass";
-        group = "commutecompass";
+        owner = "tunnel";
+        group = "users";
         # Group-readable so tunnel (added to commutecompass via skill.users
         # below) can source the env file through the commutecompass-skill
         # wrapper. Without this, on-demand chat dispatch can't load the API
@@ -37,6 +42,14 @@
 
       services.commutecompass = {
         enable = true;
+        # Run as the tunnel login user so the service can reach openclaw's
+        # npm install at /home/tunnel/.npm-global and its per-user state at
+        # /home/tunnel/.openclaw (both 0700, owned by tunnel).
+        user = "tunnel";
+        group = "users";
+        createUser = false;
+        createGroup = false;
+
         configFile = "${inputs.secrets}/commutecompass/config.toml";
         venuesFile = "${inputs.secrets}/commutecompass/known_venues.yaml";
         environmentFile = config.age.secrets."commutecompass".path;
@@ -55,21 +68,27 @@
         };
       };
 
-      # Upstream sets ProtectHome=true, which hides /home/tunnel from the unit.
-      # Re-expose tunnel's npm prefix + openclaw state dir so the wrapper above
-      # can exec the binary and openclaw can read its channel config.
+      # Loosen two upstream hardening defaults so the openclaw (Node.js)
+      # stage can run:
+      #   * ProtectHome=true → read-only, plus a ReadWritePaths carve-out
+      #     so openclaw can read its credentials and write its delivery
+      #     queue under /home/tunnel/.openclaw.
+      #   * MemoryDenyWriteExecute=true → false. V8 needs W^X mappings to
+      #     bring up its JIT; with MDWE on, node aborts in
+      #     v8::base::OS::SetPermissions before main().
       systemd.services =
         let
-          bind = {
-            serviceConfig.BindReadOnlyPaths = [
-              "/home/tunnel/.npm-global"
-              "/home/tunnel/.openclaw"
-            ];
+          openclawHardening = {
+            serviceConfig = {
+              ProtectHome = lib.mkForce "read-only";
+              ReadWritePaths = [ "/home/tunnel/.openclaw" ];
+              MemoryDenyWriteExecute = lib.mkForce false;
+            };
           };
         in
         {
-          "commutecompass-morning" = bind;
-          "commutecompass-poll" = bind;
+          "commutecompass-morning" = openclawHardening;
+          "commutecompass-poll" = openclawHardening;
         };
     };
 }
