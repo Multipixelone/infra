@@ -107,6 +107,18 @@
       baseConfigYaml = yamlFormat.generate "configuration-base.yaml" (filterConfig mergedConfig);
       automationsNixYaml = yamlFormat.generate "automations_nix.yaml" config.iotHass.nixAutomations;
 
+      # Scripts declared via Nix get serialised separately and loaded under the
+      # `script manual:` key, mirroring how automations work.  Each entry must
+      # be `{ id = "script_id"; ... }`; the loader converts the list to the
+      # `{ script_id: { ... } }` shape HA expects.
+      scriptsNixAttrs = builtins.listToAttrs (
+        map (s: {
+          name = s.id;
+          value = removeAttrs s [ "id" ];
+        }) config.iotHass.nixScripts
+      );
+      scriptsNixYaml = yamlFormat.generate "scripts_nix.yaml" scriptsNixAttrs;
+
       finalConfigYaml = pkgs.runCommand "configuration.yaml" { } ''
         cp ${baseConfigYaml} $out
         chmod +w $out
@@ -117,6 +129,10 @@
         # ── Automations ──
         automation manual: !include /etc/home-assistant/automations_nix.yaml
         automation ui: !include automations.yaml
+
+        # ── Scripts ──
+        script manual: !include /etc/home-assistant/scripts_nix.yaml
+        script ui: !include scripts.yaml
         EOF
       '';
     in
@@ -129,6 +145,20 @@
           into /etc/home-assistant/automations_nix.yaml, loaded by HA via
           `automation manual: !include`. Coexists with the UI-managed
           /var/lib/hass/automations.yaml (loaded via `automation ui: !include`).
+        '';
+      };
+
+      options.iotHass.nixScripts = lib.mkOption {
+        type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
+        default = [ ];
+        description = ''
+          Home Assistant scripts declared via Nix. Each entry must include an
+          `id` attribute (the script_id; the entity becomes script.<id>); the
+          rest of the attrs (alias, description, mode, fields, sequence, …)
+          are serialised verbatim under that key into
+          /etc/home-assistant/scripts_nix.yaml and loaded via
+          `script manual: !include`. Coexists with UI-managed
+          /var/lib/hass/scripts.yaml (loaded via `script ui: !include`).
         '';
       };
 
@@ -2553,20 +2583,24 @@
         # !include directives so HA loads both Nix-declared and UI-declared
         # automations. automations_nix.yaml is the serialized Nix automation list.
         environment.etc."home-assistant/automations_nix.yaml".source = automationsNixYaml;
+        environment.etc."home-assistant/scripts_nix.yaml".source = scriptsNixYaml;
         environment.etc."home-assistant/configuration.yaml".source = lib.mkForce finalConfigYaml;
 
         # Ensure systemd picks up changes to generated files on reload/restart
         systemd.services.home-assistant.reloadTriggers = lib.mkAfter [
           automationsNixYaml
+          scriptsNixYaml
           finalConfigYaml
         ];
 
-        # Ensure the UI-managed automations file exists on first boot so the
-        # `!include automations.yaml` directive doesn't fail.
+        # Ensure the UI-managed automations/scripts files exist on first boot
+        # so the `!include` directives don't fail.
         systemd.services.home-assistant.preStart = lib.mkAfter ''
-          if [ ! -e "${config.services.home-assistant.configDir}/automations.yaml" ]; then
-            touch "${config.services.home-assistant.configDir}/automations.yaml"
-          fi
+          for f in automations.yaml scripts.yaml; do
+            if [ ! -e "${config.services.home-assistant.configDir}/$f" ]; then
+              touch "${config.services.home-assistant.configDir}/$f"
+            fi
+          done
         '';
       };
     };
