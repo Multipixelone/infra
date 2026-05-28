@@ -1185,8 +1185,8 @@
           }
 
           # ── Sunset bedroom fade ─────────────────────────────────────────
-          # 30 min before sunset, fade Bedside Lamp -> Blue and Corner Lamp
-          # -> Red, both at 10% brightness, over a 15 minute transition.
+          # 30 min before sunset: bedside lamp → fully off, corner lamp → Red
+          # at 1% brightness, both over a 15 minute transition.
           {
             alias = "Sunset bedroom fade";
             id = "sunset_bedroom_fade";
@@ -1206,19 +1206,16 @@
             #   }
             # ];
             action = [
+              # Bedside lamp: fully off (was: turn_on blue 0,0,255 at 1%)
               {
-                service = "light.turn_on";
+                service = "light.turn_off";
                 target = {
                   entity_id = "light.smart_led_bulb";
                 };
                 data = {
-                  rgb_color = [
-                    0
-                    0
-                    255
-                  ];
-                  brightness_pct = 1;
                   transition = 900;
+                  # rgb_color = [ 0 0 255 ];
+                  # brightness_pct = 1;
                 };
               }
               {
