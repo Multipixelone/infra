@@ -49,12 +49,12 @@
                   if test -z "$album"; set album "Unknown Album"; end
 
                   # Clean up artist and album for a valid filename (remove slashes, etc.).
-                  set -l underscores_artist (string replace -r '[/\\:\*\?\<\>|]' '_' -- $artist)
-                  set -l underscores_album (string replace -r '[/\\:\*\?\<\>|]' '_' -- $album)
+                  set -l underscores_artist (string replace -ra '[/\\:\*\?\<\>|]' '_' -- $artist)
+                  set -l underscores_album (string replace -ra '[/\\:\*\?\<\>|]' '_' -- $album)
 
                   # Fix quotes (double to single)
-                  set -l clean_artist (string replace -r '[\"]' '\''' -- $underscores_artist)
-                  set -l clean_album (string replace -r '[\"]' '\''' -- $underscores_album)
+                  set -l clean_artist (string replace -ra '[\"]' '\''' -- $underscores_artist)
+                  set -l clean_album (string replace -ra '[\"]' '\''' -- $underscores_album)
 
                   set -l new_filename "$clean_artist-$clean_album.bmp"
                   set -l output_path "$ARTWORK_DIR/$new_filename"
