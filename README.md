@@ -85,7 +85,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (32)</summary>
+<summary>Packages exposed by this flake (34)</summary>
 
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
 - [`beets-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#beets-lossyflac`
@@ -100,6 +100,8 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`hacs`](https://github.com/Multipixelone/infra/blob/main/modules/iot/homeassistant.nix) — Home Assistant Community Store (HACS) · `nix run github:Multipixelone/infra#hacs`
 - [`helix`](https://github.com/Multipixelone/infra/blob/main/modules/shell/helix.nix) · `nix run github:Multipixelone/infra#helix`
 - [`hyprctl-instance`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/instance.nix) · `nix run github:Multipixelone/infra#hyprctl-instance`
+- [`ipod-sync`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync`
+- [`ipod-sync-inner`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync-inner`
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`

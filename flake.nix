@@ -251,13 +251,6 @@
     };
     playlist-download.url = "github:Multipixelone/playlist-downloader";
     qmd.url = "github:tobi/qmd";
-    qtscrob = {
-      url = "github:Multipixelone/QtScrobbler/nix-build";
-      inputs = {
-        flake-utils.follows = "flake-utils";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
     quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
     rb-scrobbler = {
       url = "github:Multipixelone/rb-scrobbler/nix-build";
