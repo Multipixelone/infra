@@ -538,11 +538,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779755392,
-        "narHash": "sha256-sFtHjiuL5ObhhWYNG10BOF7Tlpib96Xe7oZA1+Ufc1k=",
+        "lastModified": 1779856070,
+        "narHash": "sha256-Qz1VzGNhQKvy6XVe3dMCBCRLnkNabkeasYLVs4esnJY=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "ca92b81f70c9130bde9c2c964a284523fbbe770f",
+        "rev": "a1e09c527613875b71eda3d096eb4225058fe9ce",
         "type": "github"
       },
       "original": {
@@ -3342,11 +3342,11 @@
         "treefmt-nix": "treefmt-nix_3"
       },
       "locked": {
-        "lastModified": 1779150147,
-        "narHash": "sha256-BfdglINhdd7V2V05XN1io2xxRUjqrsFwM2ygw8BkJxg=",
+        "lastModified": 1779898693,
+        "narHash": "sha256-8cg0twr+0SYrIyhyE9Mcldar3/gq247iZnkKXarIlNI=",
         "owner": "Multipixelone",
         "repo": "playlist-downloader",
-        "rev": "be6e7cfa341bcaa7c8ff3640a32abb134636afc1",
+        "rev": "db80b834de90b9eb2e2b9a7c562a7521c596e8a3",
         "type": "github"
       },
       "original": {
@@ -3463,30 +3463,6 @@
       "original": {
         "owner": "tobi",
         "repo": "qmd",
-        "type": "github"
-      }
-    },
-    "qtscrob": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1751754757,
-        "narHash": "sha256-nQVsATHHC8dLS29PWn2ud4pSlszBP+5sPAEy07LsNs8=",
-        "owner": "Multipixelone",
-        "repo": "QtScrobbler",
-        "rev": "3e33a2c9c8523aaed2b07c9fc1ae48e7d88544b0",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Multipixelone",
-        "ref": "nix-build",
-        "repo": "QtScrobbler",
         "type": "github"
       }
     },
@@ -3614,7 +3590,6 @@
         "opencode": "opencode",
         "playlist-download": "playlist-download",
         "qmd": "qmd",
-        "qtscrob": "qtscrob",
         "quadlet-nix": "quadlet-nix",
         "rb-scrobbler": "rb-scrobbler",
         "room": "room",
