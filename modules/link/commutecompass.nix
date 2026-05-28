@@ -54,6 +54,13 @@
         venuesFile = "${inputs.secrets}/commutecompass/known_venues.yaml";
         environmentFile = config.age.secrets."commutecompass".path;
 
+        # Default upstream is 20:45, which misses calendar events added later
+        # in the evening (observed: 2026-05-26 22:01 + 00:27 additions silently
+        # produced "no plan-able commutes tomorrow"). 22:30 catches typical
+        # late-evening adds while still leaving margin before quiet_hours_start
+        # (23:00) and any iOS Shortcut poll later in the night.
+        tomorrowTime = "22:30:00";
+
         # Lets tunnel (the openclaw gateway user) invoke skill scripts
         # directly: installs `commutecompass-skill` on PATH and joins tunnel
         # to the commutecompass group so it can read the env file above.
