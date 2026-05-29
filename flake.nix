@@ -89,6 +89,7 @@
       url = "github:JuliusBrussee/caveman";
       flake = false;
     };
+    claude-code-pkg.url = "github:ryoppippi/nix-claude-code";
     claude-code-src = {
       url = "github:anthropics/claude-code";
       flake = false;

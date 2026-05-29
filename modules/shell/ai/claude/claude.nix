@@ -16,6 +16,9 @@
       url = "github:anthropics/claude-code";
       flake = false;
     };
+    claude-code-pkg = {
+      url = "github:ryoppippi/nix-claude-code";
+    };
   };
   perSystem =
     { pkgs, ... }:
@@ -59,6 +62,7 @@
           # "${inputs.claude-code-src}/plugins/security-guidance"
         ];
         enable = true;
+        package = inputs.claude-code-pkg.packages.${pkgs.stdenv.hostPlatform.system}.claude;
         settings = {
           theme = "dark";
           autoUpdates = false;
