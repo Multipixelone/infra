@@ -3,7 +3,7 @@
   ...
 }:
 {
-  flake-file.inputs.nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
+  flake-file.inputs.nixcord.url = "github:FlameFlag/nixcord";
 
   nixpkgs.config.allowUnfreePackages = [ "discord" ];
   flake.modules.homeManager.gui = {
