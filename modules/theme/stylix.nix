@@ -30,6 +30,7 @@ in
         polyModule
       ];
       stylix.homeManagerIntegration.autoImport = false;
+      stylix.targets.kmscon.enable = false;
     };
 
     homeManager.base = {

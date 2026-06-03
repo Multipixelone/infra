@@ -41,8 +41,9 @@
     flake-file.inputs.files.url = "github:mightyiam/files";
 
     text.readme.parts.files =
-      withSystem (builtins.head config.systems) (psArgs: psArgs.config.files.files)
-      |> map (file: "- `${file.path}`")
+      withSystem (builtins.head config.systems) (psArgs: psArgs.config.files.file)
+      |> builtins.attrNames
+      |> map (path: "- `${path}`")
       |> lib.naturalSort
       |> lib.concat [
         # markdown

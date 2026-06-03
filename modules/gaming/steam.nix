@@ -14,38 +14,30 @@
         "steam"
         "steam-unwrapped"
       ];
-      packageOverrides =
-        pkgs:
-        let
-          patchedMillennium = pkgs.callPackage ../../pkgs/millennium-patched.nix {
-            inherit (inputs.millennium.inputs) millennium-src luajit-src;
-          };
-        in
-        {
-          steam = inputs.millennium.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
-            millennium = patchedMillennium;
-            extraProfile = ''
-              # Fixes timezones
-              unset TZ
-            '';
-            extraPkgs =
-              pkgs: with pkgs; [
-                libxcursor
-                libxi
-                libxinerama
-                libxscrnsaver
-                libpng
-                libpulseaudio
-                libvorbis
-                stdenv.cc.cc.lib
-                libkrb5
-                keyutils
-                # Steam VR
-                procps
-                usbutils
-              ];
-          };
+      packageOverrides = pkgs: {
+        steam = inputs.millennium.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
+          extraProfile = ''
+            # Fixes timezones
+            unset TZ
+          '';
+          extraPkgs =
+            pkgs: with pkgs; [
+              libxcursor
+              libxi
+              libxinerama
+              libxscrnsaver
+              libpng
+              libpulseaudio
+              libvorbis
+              stdenv.cc.cc.lib
+              libkrb5
+              keyutils
+              # Steam VR
+              procps
+              usbutils
+            ];
         };
+      };
     };
   };
   flake.modules = {

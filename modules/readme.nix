@@ -313,17 +313,10 @@
         '';
     };
 
-    perSystem =
-      { pkgs, ... }:
-      {
-        files.files = [
-          {
-            path = "README.md";
-            drv = pkgs.writeText "README.md" (lib.removeSuffix "\n" config.text.readme + "\n");
-          }
-        ];
+    perSystem = _: {
+      files.file."README.md".text = lib.removeSuffix "\n" config.text.readme + "\n";
 
-        treefmt.settings.global.excludes = [ "README.md" ];
-      };
+      treefmt.settings.global.excludes = [ "README.md" ];
+    };
   };
 }

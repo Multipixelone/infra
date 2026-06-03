@@ -172,56 +172,25 @@ in
   perSystem =
     { pkgs, ... }:
     {
-      files.files = [
-        {
-          path = evalFilePath;
-          drv = pkgs.writers.writeJSON "gh-actions-workflow-eval.yaml" {
-            name = evalWorkflowName;
-            on = {
-              push = { };
-              workflow_call = {
-                outputs.${ids.outputs.jobs.getCheckNames} = {
-                  description = "JSON array of check names";
-                  value = "\${{ jobs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames} }}";
+      files.file =
+        [
+          {
+            path = evalFilePath;
+            drv = pkgs.writers.writeJSON "gh-actions-workflow-eval.yaml" {
+              name = evalWorkflowName;
+              on = {
+                push = { };
+                workflow_call = {
+                  outputs.${ids.outputs.jobs.getCheckNames} = {
+                    description = "JSON array of check names";
+                    value = "\${{ jobs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames} }}";
+                  };
                 };
               };
-            };
-            jobs.${ids.jobs.getCheckNames} = {
-              runs-on = runner.name;
-              outputs.${ids.outputs.jobs.getCheckNames} =
-                "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
-              steps = [
-                steps.removeUnusedSoftware
-                steps.checkout
-                steps.createAtticNetrc
-                steps.nixInstaller
-                steps.installSshKey
-                steps.loginToAttic
-                {
-                  id = ids.steps.getCheckNames;
-                  run = ''
-                    checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
-                    echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
-                  '';
-                }
-              ];
-            };
-          };
-        }
-        {
-          path = buildFilePath;
-          drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
-            name = buildWorkflowName;
-            on.push = { };
-            jobs = {
-              ${ids.jobs.getCheckNames} = {
+              jobs.${ids.jobs.getCheckNames} = {
                 runs-on = runner.name;
-                outputs = {
-                  ${ids.outputs.jobs.getCheckNames} =
-                    "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
-                  ${ids.outputs.jobs.getCheckNamesNixos} =
-                    "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
-                };
+                outputs.${ids.outputs.jobs.getCheckNames} =
+                  "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
                 steps = [
                   steps.removeUnusedSoftware
                   steps.checkout
@@ -232,259 +201,293 @@ in
                   {
                     id = ids.steps.getCheckNames;
                     run = ''
-                      all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
-                      echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
-                      echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
-                    '';
-                  }
-                ];
-              };
-
-              ${ids.jobs.check} = {
-                continue-on-error = true;
-                needs = ids.jobs.getCheckNames;
-                runs-on = runner.name;
-                timeout-minutes = 350;
-                strategy = {
-                  fail-fast = false;
-                  max-parallel = 5;
-                  matrix.${matrixParam} =
-                    "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
-                };
-                steps = [
-                  steps.removeUnusedSoftware
-                  steps.checkout
-                  steps.createAtticNetrc
-                  steps.nixInstaller
-                  steps.installSshKey
-                  steps.loginToAttic
-                  {
-                    run = ''
-                      nix run github:Mic92/nix-fast-build -- \
-                        --skip-cached \
-                        --no-nom \
-                        --attic-cache system \
-                        -j 1 \
-                        --eval-workers 1 \
-                        --eval-max-memory-size 2048 \
-                        --retries 2 \
-                        --no-link \
-                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
-                      || { echo "::warning::Attic upload failed, retrying without attic cache"; \
-                           nix run github:Mic92/nix-fast-build -- \
-                             --skip-cached \
-                             --no-nom \
-                             -j 1 \
-                             --eval-workers 1 \
-                             --eval-max-memory-size 2048 \
-                             --retries 2 \
-                             --no-link \
-                             --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
-                    '';
-                  }
-                ];
-              };
-
-              ${ids.jobs.checkNixos} = {
-                continue-on-error = true;
-                needs = [
-                  ids.jobs.getCheckNames
-                  ids.jobs.check
-                ];
-                runs-on = runner.name;
-                timeout-minutes = 350;
-                strategy = {
-                  fail-fast = false;
-                  max-parallel = 5;
-                  matrix.${matrixParam} =
-                    "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
-                };
-                steps = [
-                  steps.removeUnusedSoftware
-                  steps.checkout
-                  steps.createAtticNetrc
-                  steps.nixInstaller
-                  steps.installSshKey
-                  steps.loginToAttic
-                  {
-                    run = ''
-                      nix run github:Mic92/nix-fast-build -- \
-                        --skip-cached \
-                        --no-nom \
-                        --attic-cache system \
-                        -j 1 \
-                        --eval-workers 1 \
-                        --eval-max-memory-size 2048 \
-                        --retries 2 \
-                        --no-link \
-                        --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
-                      || { echo "::warning::Attic upload failed, retrying without attic cache"; \
-                           nix run github:Mic92/nix-fast-build -- \
-                             --skip-cached \
-                             --no-nom \
-                             -j 1 \
-                             --eval-workers 1 \
-                             --eval-max-memory-size 2048 \
-                             --retries 2 \
-                             --no-link \
-                             --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
+                      checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
+                      echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
                     '';
                   }
                 ];
               };
             };
-          };
-        }
-        {
-          path = nixpkgsAgeFilePath;
-          drv = pkgs.writers.writeJSON "gh-actions-workflow-nixpkgs-age-badge.yaml" {
-            name = "Nixpkgs age badge";
-            on = {
-              workflow_dispatch = { };
-              schedule = [ { cron = "0 */12 * * *"; } ];
-              push.paths = [
-                "flake.lock"
-                "${nixpkgsAgeFilePath}"
-              ];
-            };
-            permissions.contents = "read";
-            jobs.update-nixpkgs-age-badge = {
-              runs-on = "ubuntu-latest";
-              steps = [
-                {
-                  uses = "actions/checkout@v4";
-                  "with" = {
-                    ref = repo.defaultBranch;
-                    fetch-depth = 0;
+          }
+          {
+            path = buildFilePath;
+            drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
+              name = buildWorkflowName;
+              on.push = { };
+              jobs = {
+                ${ids.jobs.getCheckNames} = {
+                  runs-on = runner.name;
+                  outputs = {
+                    ${ids.outputs.jobs.getCheckNames} =
+                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
+                    ${ids.outputs.jobs.getCheckNamesNixos} =
+                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
                   };
-                }
-                {
-                  name = "Generate nixpkgs age badge JSON";
-                  env.GH_TOKEN = "\${{ github.token }}";
-                  run = ''
-                    set -euo pipefail
+                  steps = [
+                    steps.removeUnusedSoftware
+                    steps.checkout
+                    steps.createAtticNetrc
+                    steps.nixInstaller
+                    steps.installSshKey
+                    steps.loginToAttic
+                    {
+                      id = ids.steps.getCheckNames;
+                      run = ''
+                        all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
+                        echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
+                        echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
+                      '';
+                    }
+                  ];
+                };
 
-                    out="$RUNNER_TEMP/nixpkgs-age.json"
-
-                    # Find the nixpkgs node name used by root, even if it's a list or a string
-                    nixpkgs_node="$(
-                      jq -r '
-                        .nodes.root.inputs.nixpkgs
-                        | if type=="array" then .[0] else . end
-                        // empty
-                      ' flake.lock
-                    )"
-
-                    if [ -z "$nixpkgs_node" ]; then
-                      echo "Could not find root nixpkgs input in flake.lock"
-                      cat >"$out" <<'JSON'
-                    {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
-                    JSON
-                      exit 0
-                    fi
-
-                    rev="$(jq -r --arg node "$nixpkgs_node" '.nodes[$node].locked.rev // empty' flake.lock)"
-                    if [ -z "$rev" ]; then
-                      echo "Could not find nixpkgs revision for root input ($nixpkgs_node) in flake.lock"
-                      cat >"$out" <<'JSON'
-                    {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
-                    JSON
-                      exit 0
-                    fi
-
-                    # Query nixpkgs commit date from GitHub
-                    commit_date="$(
-                      gh api "repos/NixOS/nixpkgs/commits/$rev" \
-                        --jq '.commit.committer.date // empty' \
-                      || true
-                    )"
-
-                    if [ -z "$commit_date" ]; then
-                      echo "Could not resolve nixpkgs commit date for revision: $rev"
-                      cat >"$out" <<'JSON'
-                    {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
-                    JSON
-                      exit 0
-                    fi
-
-                    # Compute age in days
-                    commit_ts="$(date -u -d "$commit_date" +%s)"
-                    now_ts="$(date -u +%s)"
-                    age_days="$(( (now_ts - commit_ts) / 86400 ))"
-
-                    # Pick a color (catppuccin mocha)
-                    color="a6e3a1"
-                    if [ "$age_days" -gt 5 ]; then color="94e2d5"; fi
-                    if [ "$age_days" -gt 10 ]; then color="f9e2af"; fi
-                    if [ "$age_days" -gt 20 ]; then color="fab387"; fi
-                    if [ "$age_days" -gt 30 ]; then color="f38ba8"; fi
-                    if [ "$age_days" -gt 40 ]; then color="eba0ac"; fi
-
-                    jq -n \
-                      --arg label "nixpkgs age" \
-                      --arg message "''${age_days}d" \
-                      --arg color "$color" \
-                      '{schemaVersion:1,label:$label,message:$message,color:$color}' >"$out"
-
-                    echo "Wrote $out:"
-                    cat "$out"
-                  '';
-                }
-                {
-                  name = "Publish badge JSON to gist";
-                  env = {
-                    GH_TOKEN = "\${{ secrets.GH_TOKEN_FOR_UPDATES }}";
-                    GIST_ID = "6b2a2a693da36488ff3a34274a2047fa";
+                ${ids.jobs.check} = {
+                  continue-on-error = true;
+                  needs = ids.jobs.getCheckNames;
+                  runs-on = runner.name;
+                  timeout-minutes = 350;
+                  strategy = {
+                    fail-fast = false;
+                    max-parallel = 5;
+                    matrix.${matrixParam} =
+                      "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
                   };
-                  run = ''
-                    set -euo pipefail
-                    gh gist edit "$GIST_ID" -a "$RUNNER_TEMP/nixpkgs-age.json"
-                  '';
-                }
-              ];
+                  steps = [
+                    steps.removeUnusedSoftware
+                    steps.checkout
+                    steps.createAtticNetrc
+                    steps.nixInstaller
+                    steps.installSshKey
+                    steps.loginToAttic
+                    {
+                      run = ''
+                        nix run github:Mic92/nix-fast-build -- \
+                          --skip-cached \
+                          --no-nom \
+                          --attic-cache system \
+                          -j 1 \
+                          --eval-workers 1 \
+                          --eval-max-memory-size 2048 \
+                          --retries 2 \
+                          --no-link \
+                          --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
+                        || { echo "::warning::Attic upload failed, retrying without attic cache"; \
+                             nix run github:Mic92/nix-fast-build -- \
+                               --skip-cached \
+                               --no-nom \
+                               -j 1 \
+                               --eval-workers 1 \
+                               --eval-max-memory-size 2048 \
+                               --retries 2 \
+                               --no-link \
+                               --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
+                      '';
+                    }
+                  ];
+                };
+
+                ${ids.jobs.checkNixos} = {
+                  continue-on-error = true;
+                  needs = [
+                    ids.jobs.getCheckNames
+                    ids.jobs.check
+                  ];
+                  runs-on = runner.name;
+                  timeout-minutes = 350;
+                  strategy = {
+                    fail-fast = false;
+                    max-parallel = 5;
+                    matrix.${matrixParam} =
+                      "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
+                  };
+                  steps = [
+                    steps.removeUnusedSoftware
+                    steps.checkout
+                    steps.createAtticNetrc
+                    steps.nixInstaller
+                    steps.installSshKey
+                    steps.loginToAttic
+                    {
+                      run = ''
+                        nix run github:Mic92/nix-fast-build -- \
+                          --skip-cached \
+                          --no-nom \
+                          --attic-cache system \
+                          -j 1 \
+                          --eval-workers 1 \
+                          --eval-max-memory-size 2048 \
+                          --retries 2 \
+                          --no-link \
+                          --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
+                        || { echo "::warning::Attic upload failed, retrying without attic cache"; \
+                             nix run github:Mic92/nix-fast-build -- \
+                               --skip-cached \
+                               --no-nom \
+                               -j 1 \
+                               --eval-workers 1 \
+                               --eval-max-memory-size 2048 \
+                               --retries 2 \
+                               --no-link \
+                               --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
+                      '';
+                    }
+                  ];
+                };
+              };
             };
-          };
-        }
-        # {
-        #   path_ = ciFilePath;
-        #   drv = pkgs.writers.writeJSON "gh-actions-workflow-ci.yml" {
-        #     name = ciWorkflowName;
-        #     on = {
-        #       push.branches = [ "main" ];
-        #       pull_request = { };
-        #       workflow_dispatch = { };
-        #     };
-        #     jobs = {
-        #       checks = {
-        #         uses = "./${filePath}";
-        #         secrets = "inherit";
-        #       };
-        #       build = {
-        #         name = "build machines";
-        #         needs = "checks";
-        #         runs-on = ciRunner;
-        #         strategy = {
-        #           fail-fast = false;
-        #           matrix.machine = machines;
-        #         };
-        #         steps = [
-        #           ciSteps.mkdirNix
-        #           steps.removeUnusedSoftware
-        #           ciSteps.maximizeDiskSpace
-        #           ciSteps.chownNix
-        #           ciSteps.checkout
-        #           steps.createAtticNetrc
-        #           ciSteps.nixInstaller
-        #           steps.installSshKey
-        #           steps.loginToAttic
-        #           ciSteps.buildSystem
-        #           steps.pushToAttic
-        #         ];
-        #       };
-        #     };
-        #   };
-        # }
-      ];
+          }
+          {
+            path = nixpkgsAgeFilePath;
+            drv = pkgs.writers.writeJSON "gh-actions-workflow-nixpkgs-age-badge.yaml" {
+              name = "Nixpkgs age badge";
+              on = {
+                workflow_dispatch = { };
+                schedule = [ { cron = "0 */12 * * *"; } ];
+                push.paths = [
+                  "flake.lock"
+                  "${nixpkgsAgeFilePath}"
+                ];
+              };
+              permissions.contents = "read";
+              jobs.update-nixpkgs-age-badge = {
+                runs-on = "ubuntu-latest";
+                steps = [
+                  {
+                    uses = "actions/checkout@v4";
+                    "with" = {
+                      ref = repo.defaultBranch;
+                      fetch-depth = 0;
+                    };
+                  }
+                  {
+                    name = "Generate nixpkgs age badge JSON";
+                    env.GH_TOKEN = "\${{ github.token }}";
+                    run = ''
+                      set -euo pipefail
+
+                      out="$RUNNER_TEMP/nixpkgs-age.json"
+
+                      # Find the nixpkgs node name used by root, even if it's a list or a string
+                      nixpkgs_node="$(
+                        jq -r '
+                          .nodes.root.inputs.nixpkgs
+                          | if type=="array" then .[0] else . end
+                          // empty
+                        ' flake.lock
+                      )"
+
+                      if [ -z "$nixpkgs_node" ]; then
+                        echo "Could not find root nixpkgs input in flake.lock"
+                        cat >"$out" <<'JSON'
+                      {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
+                      JSON
+                        exit 0
+                      fi
+
+                      rev="$(jq -r --arg node "$nixpkgs_node" '.nodes[$node].locked.rev // empty' flake.lock)"
+                      if [ -z "$rev" ]; then
+                        echo "Could not find nixpkgs revision for root input ($nixpkgs_node) in flake.lock"
+                        cat >"$out" <<'JSON'
+                      {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
+                      JSON
+                        exit 0
+                      fi
+
+                      # Query nixpkgs commit date from GitHub
+                      commit_date="$(
+                        gh api "repos/NixOS/nixpkgs/commits/$rev" \
+                          --jq '.commit.committer.date // empty' \
+                        || true
+                      )"
+
+                      if [ -z "$commit_date" ]; then
+                        echo "Could not resolve nixpkgs commit date for revision: $rev"
+                        cat >"$out" <<'JSON'
+                      {"schemaVersion":1,"label":"nixpkgs age","message":"unknown","color":"lightgrey"}
+                      JSON
+                        exit 0
+                      fi
+
+                      # Compute age in days
+                      commit_ts="$(date -u -d "$commit_date" +%s)"
+                      now_ts="$(date -u +%s)"
+                      age_days="$(( (now_ts - commit_ts) / 86400 ))"
+
+                      # Pick a color (catppuccin mocha)
+                      color="a6e3a1"
+                      if [ "$age_days" -gt 5 ]; then color="94e2d5"; fi
+                      if [ "$age_days" -gt 10 ]; then color="f9e2af"; fi
+                      if [ "$age_days" -gt 20 ]; then color="fab387"; fi
+                      if [ "$age_days" -gt 30 ]; then color="f38ba8"; fi
+                      if [ "$age_days" -gt 40 ]; then color="eba0ac"; fi
+
+                      jq -n \
+                        --arg label "nixpkgs age" \
+                        --arg message "''${age_days}d" \
+                        --arg color "$color" \
+                        '{schemaVersion:1,label:$label,message:$message,color:$color}' >"$out"
+
+                      echo "Wrote $out:"
+                      cat "$out"
+                    '';
+                  }
+                  {
+                    name = "Publish badge JSON to gist";
+                    env = {
+                      GH_TOKEN = "\${{ secrets.GH_TOKEN_FOR_UPDATES }}";
+                      GIST_ID = "6b2a2a693da36488ff3a34274a2047fa";
+                    };
+                    run = ''
+                      set -euo pipefail
+                      gh gist edit "$GIST_ID" -a "$RUNNER_TEMP/nixpkgs-age.json"
+                    '';
+                  }
+                ];
+              };
+            };
+          }
+          # {
+          #   path_ = ciFilePath;
+          #   drv = pkgs.writers.writeJSON "gh-actions-workflow-ci.yml" {
+          #     name = ciWorkflowName;
+          #     on = {
+          #       push.branches = [ "main" ];
+          #       pull_request = { };
+          #       workflow_dispatch = { };
+          #     };
+          #     jobs = {
+          #       checks = {
+          #         uses = "./${filePath}";
+          #         secrets = "inherit";
+          #       };
+          #       build = {
+          #         name = "build machines";
+          #         needs = "checks";
+          #         runs-on = ciRunner;
+          #         strategy = {
+          #           fail-fast = false;
+          #           matrix.machine = machines;
+          #         };
+          #         steps = [
+          #           ciSteps.mkdirNix
+          #           steps.removeUnusedSoftware
+          #           ciSteps.maximizeDiskSpace
+          #           ciSteps.chownNix
+          #           ciSteps.checkout
+          #           steps.createAtticNetrc
+          #           ciSteps.nixInstaller
+          #           steps.installSshKey
+          #           steps.loginToAttic
+          #           ciSteps.buildSystem
+          #           steps.pushToAttic
+          #         ];
+          #       };
+          #     };
+          #   };
+          # }
+        ]
+        |> map (file: lib.nameValuePair file.path { source = file.drv; })
+        |> builtins.listToAttrs;
 
       treefmt.settings.global.excludes = [
         evalFilePath

@@ -217,7 +217,7 @@
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixcord.url = "github:ScarsTRF/nixcord/pnpmFix";
+    nixcord.url = "github:FlameFlag/nixcord";
     nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
     nixos-generators = {
       url = "github:nix-community/nixos-generators";

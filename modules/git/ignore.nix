@@ -27,23 +27,18 @@
   config.perSystem =
     { system, ... }:
     {
-      files.files = [
-        {
-          path = ".gitignore";
-          drv = inputs.ignoreBoy.lib.${system}.generateGitIgnore {
-            # https://github.com/github/gitignore — filenames (sans extension)
-            github.languages = [
-              "Nix"
-            ];
+      files.file.".gitignore".source = inputs.ignoreBoy.lib.${system}.generateGitIgnore {
+        # https://github.com/github/gitignore — filenames (sans extension)
+        github.languages = [
+          "Nix"
+        ];
 
-            # https://www.toptal.com/developers/gitignore/
-            # `curl -sL https://www.toptal.com/developers/gitignore/api/list`
-            gitignoreio.languages = [ ];
+        # https://www.toptal.com/developers/gitignore/
+        # `curl -sL https://www.toptal.com/developers/gitignore/api/list`
+        gitignoreio.languages = [ ];
 
-            extraConfig = config.gitignore |> lib.naturalSort |> lib.concatLines;
-          };
-        }
-      ];
+        extraConfig = config.gitignore |> lib.naturalSort |> lib.concatLines;
+      };
 
       treefmt.settings.global.excludes = [ "*/.gitignore" ];
     };

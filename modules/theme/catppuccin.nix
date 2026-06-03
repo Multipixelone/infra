@@ -11,6 +11,7 @@
     ];
     catppuccin = {
       enable = true;
+      autoEnable = true;
       flavor = "mocha";
       accent = "mauve";
       fish.enable = true;

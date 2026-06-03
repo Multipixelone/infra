@@ -6,28 +6,21 @@
   };
   imports = [ inputs.make-shell.flakeModules.default ];
 
-  perSystem =
-    { pkgs, ... }:
-    {
-      make-shells.default.name = config.flake.meta.repo.name;
+  perSystem = _: {
+    make-shells.default.name = config.flake.meta.repo.name;
 
-      files.files = [
-        {
-          path = ".envrc";
-          drv = pkgs.writeText ".envrc" ''
-            #!/usr/bin/env sh
-            # shellcheck shell=bash
+    files.file.".envrc".text = ''
+      #!/usr/bin/env sh
+      # shellcheck shell=bash
 
-            # This file is generated. Do not edit by hand.
-            # Regenerate with: nix run .#generate-files
+      # This file is generated. Do not edit by hand.
+      # Regenerate with: nix run .#generate-files
 
-            use flake
-            #use flake path:. --impure
+      use flake
+      #use flake path:. --impure
 
-            dotenv_if_exists .env.private
-            source_env_if_exists .envrc.private
-          '';
-        }
-      ];
-    };
+      dotenv_if_exists .env.private
+      source_env_if_exists .envrc.private
+    '';
+  };
 }

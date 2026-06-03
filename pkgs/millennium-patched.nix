@@ -80,7 +80,14 @@ let
 
     installPhase = ''
       mkdir -p $out/src/typescript
-      cp -r src/typescript/node_modules $out/src/typescript/node_modules
+      if [ -d src/typescript/node_modules ]; then
+        cp -r src/typescript/node_modules $out/src/typescript/node_modules
+      elif [ -d node_modules ]; then
+        cp -r node_modules $out/src/typescript/node_modules
+      else
+        echo "No node_modules directory found" >&2
+        exit 1
+      fi
 
       for dir in ${tsDirs}; do
         if [ -d "$dir" ]; then
@@ -92,7 +99,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = lib.fakeHash;
+    outputHash = "sha256-MwasByfgJESfhKIGI8V1IxwL16UfqwgSjtx4HdIFMss=";
   };
 
   build32 = pkgsi686Linux.stdenv.mkDerivation (
