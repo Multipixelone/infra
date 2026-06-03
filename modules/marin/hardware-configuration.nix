@@ -7,8 +7,7 @@
     pkg:
     builtins.elem (lib.getName pkg) [
       "broadcom-sta"
-      # temp: this isn't merging right so I'm just putting this here for now
-      "openclaw"
+      "nodejs-20.20.2"
     ];
   nixpkgs.config.allowUnfreePackages = [ "broadcom-sta" ];
   configurations.nixos.marin.module =
