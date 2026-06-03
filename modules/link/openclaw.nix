@@ -1,4 +1,7 @@
-{ inputs, ... }:
+{ inputs, rootPath, ... }:
+let
+  agentmail-scripts = ./agentmail-scripts;
+in
 {
   caches = [
     {
@@ -6,13 +9,93 @@
       key = "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g=";
     }
   ];
+
   configurations.nixos.link.module =
-    { config, pkgs, ... }:
     {
+      config,
+      pkgs,
+      ...
+    }:
+    let
+      # --- Python environments ------------------------------------------------
+
+      # python3 defaults to 3.14 which has broken pydantic-core. Pin 3.12
+      # and scrub PYTHON* env that HA's systemd service leaks.
+      agentmail-pkg = pkgs.python312Packages.callPackage "${rootPath}/pkgs/agentmail" { };
+
+      pyEnv = pkgs.python312.withPackages (_ps: [ agentmail-pkg ]);
+
+      pyEnvStdlib = pkgs.python312;
+
+      # --- AgentMail script wrappers ------------------------------------------
+
+      checkInbox = pkgs.writeShellScriptBin "agentmail-check-inbox" ''
+        unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
+        exec ${pyEnv}/bin/python3 ${agentmail-scripts}/check_inbox.py "$@"
+      '';
+
+      sendEmail = pkgs.writeShellScriptBin "agentmail-send-email" ''
+        unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
+        exec ${pyEnv}/bin/python3 ${agentmail-scripts}/send_email.py "$@"
+      '';
+
+      setupWebhook = pkgs.writeShellScriptBin "agentmail-setup-webhook" ''
+        unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
+        exec ${pyEnv}/bin/python3 ${agentmail-scripts}/setup_webhook.py "$@"
+      '';
+
+      # --- AgentMail runners (inject secrets at runtime) ----------------------
+
+      checkInboxRunner = pkgs.writeShellApplication {
+        name = "agentmail-check-inbox-runner";
+        runtimeInputs = [ checkInbox ];
+        text = ''
+          AGENTMAIL_API_KEY="$(< "${config.age.secrets."agentmail-api-key".path}")"
+          export AGENTMAIL_API_KEY
+          exec agentmail-check-inbox "$@"
+        '';
+      };
+
+      sendEmailRunner = pkgs.writeShellApplication {
+        name = "agentmail-send-email-runner";
+        runtimeInputs = [ sendEmail ];
+        text = ''
+          AGENTMAIL_API_KEY="$(< "${config.age.secrets."agentmail-api-key".path}")"
+          export AGENTMAIL_API_KEY
+          exec agentmail-send-email "$@"
+        '';
+      };
+
+      setupWebhookRunner = pkgs.writeShellApplication {
+        name = "agentmail-setup-webhook-runner";
+        runtimeInputs = [ setupWebhook ];
+        text = ''
+          AGENTMAIL_API_KEY="$(< "${config.age.secrets."agentmail-api-key".path}")"
+          export AGENTMAIL_API_KEY
+          exec agentmail-setup-webhook "$@"
+        '';
+      };
+
+      # --- Morning nudge time (stdlib only) ----------------------------------
+
+      nudgeTime = pkgs.writeShellScriptBin "nudge-time" ''
+        unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
+        exec ${pyEnvStdlib}/bin/python3 ${./nudge_time.py} "$@"
+      '';
+    in
+    {
+      nixpkgs.config.permittedInsecurePackages = [ "nodejs-20.20.2" ];
+
       # Reuse existing secrets already used by productivity modules.
       age.secrets."gcalclient".file = "${inputs.secrets}/gcal/client.age";
       age.secrets."gcalsecret".file = "${inputs.secrets}/gcal/secret.age";
       age.secrets."todoist".file = "${inputs.secrets}/todoist.age";
+      age.secrets."agentmail-api-key" = {
+        file = "${inputs.secrets}/ai/agentmail.age";
+        owner = "tunnel";
+        group = "users";
+        mode = "0400";
+      };
 
       home-manager.users.tunnel = {
         home.packages = [
@@ -42,6 +125,14 @@
             echo "Run: gog auth credentials \"$tmp/client_secret.json\""
             gog auth credentials "$tmp/client_secret.json"
           '')
+
+          # AgentMail script runners (with API key injected)
+          checkInboxRunner
+          sendEmailRunner
+          setupWebhookRunner
+
+          # Morning nudge time calculator (stdlib only, no secrets needed)
+          nudgeTime
         ];
 
         systemd.user.services.openclaw-gateway = {
@@ -56,7 +147,7 @@
             # runtime-expanded environment, and treats `%h` literally —
             # which makes its service-config and PATH validations fail.
             ExecStartPre = ''
-              ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g openclaw; fi'
+              ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; NEED_INSTALL=0; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then NEED_INSTALL=1; elif ! "$HOME/.npm-global/bin/openclaw" --version >/dev/null 2>&1; then NEED_INSTALL=1; fi; if [ "$NEED_INSTALL" = "1" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g openclaw; fi'
             '';
             ExecStart = "/home/tunnel/.npm-global/bin/openclaw gateway --port 18789";
             WorkingDirectory = "/home/tunnel/.openclaw";
