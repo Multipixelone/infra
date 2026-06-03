@@ -25,6 +25,10 @@
         mangohud.enable = false;
         qt.enable = false;
         opencode.enable = false;
+        # Disabled: inject nixpkgs overlays into HM scope (non-functional
+        # with useGlobalPkgs=true); NixOS-level stylix already handles these.
+        nixos-icons.enable = false;
+        gtksourceview.enable = false;
       };
     };
     gui =

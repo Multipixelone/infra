@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  lib,
   ...
 }:
 {
@@ -16,15 +17,22 @@
         # https://github.com/nix-community/home-manager/issues/6770
         #useUserPackages = true;
 
-        users.${config.flake.meta.owner.username}.imports = [
-          (
-            { osConfig, ... }:
-            {
-              home.stateVersion = osConfig.system.stateVersion;
-            }
-          )
-          config.flake.modules.homeManager.base
-        ];
+        users.${config.flake.meta.owner.username} = {
+          imports = [
+            (
+              { osConfig, ... }:
+              {
+                home.stateVersion = osConfig.system.stateVersion;
+              }
+            )
+            config.flake.modules.homeManager.base
+          ];
+
+          # stylix HM modules add nixpkgs.overlays unconditionally,
+          # but with useGlobalPkgs=true they're already at NixOS level
+          # and the HM-level ones are non-functional. Silence the warning.
+          nixpkgs.overlays = lib.mkForce null;
+        };
       };
     };
     pc = {
