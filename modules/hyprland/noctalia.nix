@@ -648,8 +648,9 @@
         imports = [
           inputs.noctalia.homeModules.default
         ];
-        programs.noctalia-shell = {
+        programs.noctalia = {
           enable = true;
+          systemd.enable = true;
           package = withSystem pkgs.stdenv.hostPlatform.system (
             psArgs: psArgs.config.packages.noctalia-shell
           );

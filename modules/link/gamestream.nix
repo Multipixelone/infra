@@ -147,7 +147,12 @@
               width=''${1:-3840}
               height=''${2:-2160}
               refresh_rate=''${3:-60}
-              mon_string="SUNSHINE,''${width}x''${height}@''${refresh_rate},0x1920,1,cm,hdr"
+              # HDR re-enable: append ",cm,hdr" to enable color-managed HDR on the
+              # headless output. Currently SDR — committing an HDR/color-managed
+              # virtual output segfaults Hyprland 0.55's aquamarine backend
+              # (CHeadlessOutput::commit), which crashed the whole session and
+              # made Sunshine app launches fail.
+              mon_string="SUNSHINE,''${width}x''${height}@''${refresh_rate},0x1920,1"
               # Unlock PC (so I don't have to type password on Steam Deck)
               # pkill -USR1 hyprlock || true
               hyprctl output create headless SUNSHINE
@@ -197,6 +202,47 @@
         {
           do = "";
           undo = "${sh} -c \"${lib.getExe kill-script}\"";
+        };
+      # Self-contained launcher for the gamescope Big Picture app.
+      # Hyprland 0.55 regressed the `fullscreen` window-rule effect: it is a
+      # silent no-op for every window (the `fullscreen` dispatcher still works,
+      # and `match:class ^(gamescope)$, fullscreen on` in windowrules.nix no
+      # longer fires at open). Until the upstream fullscreen refactor lands
+      # (hyprwm/Hyprland#14705), fullscreen the gamescope window ourselves once
+      # it maps. One-shot: polls, fixes, exits — no persistent socket listener.
+      # Idempotent: only acts when fs == 0, so it becomes a no-op the moment the
+      # window rule starts working again.
+      bigpicture-launch =
+        let
+          steam-gamescope = "${lib.getExe gamescope-run} -x -e ${lib.getExe config.programs.steam.package} -steamos3 -steampal -steamdeck -gamepadui";
+        in
+        pkgs.writeShellApplication {
+          name = "bigpicture-launch";
+          runtimeInputs = [
+            hyprctl-instance
+            pkgs.jq
+            pkgs.coreutils
+            config.programs.hyprland.package
+          ];
+          text = ''
+            HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
+            export HYPRLAND_INSTANCE_SIGNATURE
+
+            hyprctl dispatch exec "[workspace 7]" "${steam-gamescope}"
+
+            for _ in $(seq 1 80); do
+              line=$(hyprctl -j clients \
+                | jq -r 'first(.[] | select(.class == "gamescope")) // empty | "\(.address) \(.fullscreen)"')
+              if [ -n "$line" ]; then
+                if [ "''${line##* }" = "0" ]; then
+                  hyprctl dispatch focuswindow "address:''${line%% *}"
+                  hyprctl dispatch fullscreen 0
+                fi
+                break
+              fi
+              sleep 0.25
+            done
+          '';
         };
     in
     {
@@ -277,12 +323,10 @@
             }
             {
               name = "Steam (Big Picture)";
-              cmd =
-                let
-                  # args poached from https://gitlab.com/evlaV/jupiter-PKGBUILD/-/blob/master/gamescope/steam-launcher?ref_type=heads
-                  steam-gamescope = ''${lib.getExe gamescope-run} -x "-e" ${lib.getExe config.programs.steam.package} -steamos3 -steampal -steamdeck -gamepadui'';
-                in
-                ''${hypr-dispatch} "${steam-gamescope}"'';
+              # args poached from https://gitlab.com/evlaV/jupiter-PKGBUILD/-/blob/master/gamescope/steam-launcher?ref_type=heads
+              # bigpicture-launch wraps the gamescope launch and force-fullscreens
+              # the gamescope window (Hyprland 0.55 `fullscreen` rule regression).
+              cmd = lib.getExe bigpicture-launch;
               prep-cmd = [
                 prep
                 steam-kill

@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
 - [`musepack`](https://github.com/Multipixelone/infra/blob/main/modules/media/convert-mpc.nix) — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
-- [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A sleek and minimal desktop shell thoughtfully crafted for Wayland, built with Quickshell. · `nix run github:Multipixelone/infra#noctalia-shell`
+- [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A lightweight Wayland shell and bar built directly on Wayland + OpenGL ES · `nix run github:Multipixelone/infra#noctalia-shell`
 - [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
 - [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
 - [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`
