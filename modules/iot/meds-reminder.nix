@@ -120,16 +120,46 @@
           ];
         }
 
-        # 3. Morning Meds — 11 AM Reminder
-        #    First reminder of the day at 11 AM.
+        # 3. Morning Meds — 7:30 AM wake cue
+        #    Soft wake-time ping. Fires only if morning meds not yet taken.
         {
-          alias = "Meds: Morning — 11 AM reminder";
-          id = "meds_morning_reminder";
+          alias = "Meds: Morning — 7:30 AM wake cue";
+          id = "meds_morning_wake";
           mode = "single";
           triggers = [
             {
               trigger = "time";
-              at = "11:00:00";
+              at = "07:30:00";
+            }
+          ];
+          conditions = [
+            {
+              condition = "state";
+              entity_id = morningBool;
+              state = "off";
+            }
+          ];
+          actions = [
+            {
+              action = notifyFinn;
+              data = {
+                title = "Good morning";
+                message = "Good morning. Water + meds when you're up.";
+              };
+            }
+          ];
+        }
+
+        # 3b. Morning Meds — 11:30 AM late-nag
+        #     Mid-morning escalation. Distinct, more direct tone.
+        {
+          alias = "Meds: Morning — 11:30 AM late-nag";
+          id = "meds_morning_late_nag";
+          mode = "single";
+          triggers = [
+            {
+              trigger = "time";
+              at = "11:30:00";
             }
           ];
           conditions = [
@@ -144,7 +174,7 @@
               action = notifyFinn;
               data = {
                 title = "Morning meds";
-                message = "Time to take your morning meds.";
+                message = "AM meds still pending — quick reminder.";
               };
             }
           ];
