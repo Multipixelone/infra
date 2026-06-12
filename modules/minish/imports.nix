@@ -9,9 +9,10 @@
   };
 
   configurations.nixos.minish.module = {
-    imports = (with config.flake.modules.nixos; [
-      base
-    ])
-    ++ [ inputs.nixos-wsl.nixosModules.default ];
+    imports =
+      (with config.flake.modules.nixos; [
+        base
+      ])
+      ++ [ inputs.nixos-wsl.nixosModules.default ];
   };
 }
