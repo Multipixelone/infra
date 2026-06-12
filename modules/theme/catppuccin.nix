@@ -19,6 +19,7 @@
       bottom.enable = false;
       starship.enable = false;
       fzf.enable = false;
+      hyprland.enable = false;
     };
   };
   flake.modules.homeManager.gui = {
