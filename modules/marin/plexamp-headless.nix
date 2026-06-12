@@ -5,6 +5,8 @@
 }:
 {
   nixpkgs.config.allowUnfreePackages = [ "plexamp-headless" ];
+  # plexamp-headless bundles nodejs_20 (now EOL), which nixpkgs flags as insecure.
+  nixpkgs.config.permittedInsecurePackages = [ "nodejs" ];
 
   perSystem =
     { pkgs, ... }:

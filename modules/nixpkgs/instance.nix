@@ -22,7 +22,7 @@
       };
       allowInsecurePredicate = lib.mkOption {
         type = lib.types.functionTo lib.types.bool;
-        default = pkg: builtins.elem pkg.name config.nixpkgs.config.permittedInsecurePackages;
+        default = pkg: builtins.elem (lib.getName pkg) config.nixpkgs.config.permittedInsecurePackages;
       };
       permittedInsecurePackages = lib.mkOption {
         type = lib.types.listOf lib.types.singleLineStr;

@@ -84,7 +84,6 @@ in
       '';
     in
     {
-      nixpkgs.config.permittedInsecurePackages = [ "nodejs-20.20.2" ];
 
       # Reuse existing secrets already used by productivity modules.
       age.secrets."gcalclient".file = "${inputs.secrets}/gcal/client.age";
