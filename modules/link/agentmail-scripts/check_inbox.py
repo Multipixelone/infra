@@ -32,27 +32,25 @@ except ImportError:
     sys.exit(1)
 
 
-def format_timestamp(iso_string):
-    """Format ISO timestamp for display"""
-    try:
-        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        return iso_string
+def format_timestamp(ts):
+    """Format a datetime or ISO string for display"""
+    if isinstance(ts, str):
+        try:
+            ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except ValueError:
+            return ts
+    return ts.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def print_message_summary(message):
     """Print a summary of a message"""
-    from_addr = message.get("from", [{}])[0].get("email", "Unknown")
-    from_name = message.get("from", [{}])[0].get("name", "")
-    subject = message.get("subject", "(no subject)")
-    timestamp = format_timestamp(message.get("timestamp", ""))
-    preview = message.get("preview", message.get("text", ""))[:100]
+    from_addr = message.from_
+    subject = message.subject or "(no subject)"
+    timestamp = format_timestamp(message.timestamp)
+    preview = (message.preview or "")[:100]
 
-    print(f"📧 {message.get('message_id', 'N/A')}")
-    print(
-        f"   From: {from_name} <{from_addr}>" if from_name else f"   From: {from_addr}"
-    )
+    print(f"📧 {message.message_id}")
+    print(f"   From: {from_addr}")
     print(f"   Subject: {subject}")
     print(f"   Time: {timestamp}")
     if preview:
@@ -62,12 +60,12 @@ def print_message_summary(message):
 
 def print_thread_summary(thread):
     """Print a summary of a thread"""
-    subject = thread.get("subject", "(no subject)")
-    participants = ", ".join(thread.get("participants", []))
-    count = thread.get("message_count", 0)
-    timestamp = format_timestamp(thread.get("last_message_at", ""))
+    subject = thread.subject or "(no subject)"
+    participants = ", ".join(thread.senders)
+    count = thread.message_count
+    timestamp = format_timestamp(thread.timestamp)
 
-    print(f"🧵 {thread.get('thread_id', 'N/A')}")
+    print(f"🧵 {thread.thread_id}")
     print(f"   Subject: {subject}")
     print(f"   Participants: {participants}")
     print(f"   Messages: {count}")
@@ -120,7 +118,7 @@ def main():
                     current_message_ids = set()
 
                     for message in messages.messages:
-                        msg_id = message.get("message_id")
+                        msg_id = message.message_id
                         current_message_ids.add(msg_id)
 
                         if msg_id not in last_message_ids:
@@ -150,41 +148,27 @@ def main():
             )
 
             print("📧 Message Details:")
-            print(f"   ID: {message.get('message_id')}")
-            print(f"   Thread: {message.get('thread_id')}")
+            print(f"   ID: {message.message_id}")
+            print(f"   Thread: {message.thread_id}")
+            print(f"   From: {message.from_}")
+            print(f"   To: {', '.join(message.to)}")
+            print(f"   Subject: {message.subject or '(no subject)'}")
+            print(f"   Time: {format_timestamp(message.timestamp)}")
 
-            from_addr = message.get("from", [{}])[0].get("email", "Unknown")
-            from_name = message.get("from", [{}])[0].get("name", "")
-            print(
-                f"   From: {from_name} <{from_addr}>"
-                if from_name
-                else f"   From: {from_addr}"
-            )
-
-            to_addrs = ", ".join(
-                [addr.get("email", "") for addr in message.get("to", [])]
-            )
-            print(f"   To: {to_addrs}")
-
-            print(f"   Subject: {message.get('subject', '(no subject)')}")
-            print(f"   Time: {format_timestamp(message.get('timestamp', ''))}")
-
-            if message.get("labels"):
-                print(f"   Labels: {', '.join(message.get('labels'))}")
+            if message.labels:
+                print(f"   Labels: {', '.join(message.labels)}")
 
             print("\n📝 Content:")
-            if message.get("text"):
-                print(message["text"])
-            elif message.get("html"):
-                print("(HTML content - use API to get full HTML)")
+            if message.preview:
+                print(message.preview)
             else:
                 print("(No text content)")
 
-            if message.get("attachments"):
-                print(f"\n📎 Attachments ({len(message['attachments'])}):")
-                for att in message["attachments"]:
+            if message.attachments:
+                print(f"\n📎 Attachments ({len(message.attachments)}):")
+                for att in message.attachments:
                     print(
-                        f"   • {att.get('filename', 'unnamed')} ({att.get('content_type', 'unknown type')})"
+                        f"   • {att.filename or 'unnamed'} ({att.content_type or 'unknown type'})"
                     )
 
         except Exception as e:
