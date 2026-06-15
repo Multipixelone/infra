@@ -4,10 +4,10 @@
       "d /srv/slskd 0770 tunnel users -"
     ];
     virtualisation.oci-containers.containers.nicotine = {
-      autoStart = false;
+      autoStart = true;
       image = "ghcr.io/fletchto99/nicotine-plus-docker:latest";
       ports = [
-        "5030:6080"
+        "5031:6080"
         "2234:2234"
       ];
       # user = "1000:100";

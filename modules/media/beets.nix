@@ -35,6 +35,8 @@
     let
       media-drive = "/volume1/Media";
       download-dir = "${media-drive}/ImportMusic/slskd";
+      # Staging dir where Explo drops discovery tracks; imported as singletons.
+      explo-import-dir = "${media-drive}/ImportMusic/Explo";
       music-dir = "${media-drive}/Music";
       transcoded-music = "${media-drive}/TranscodedMusic";
       beets-dir = "/home/tunnel/.config/beets";
@@ -68,6 +70,22 @@
         text = ''
           beet -c ${beets-config} import -q ${download-dir}
           rm -f ${detect-file}
+        '';
+      };
+      # Explo downloads loose recommendation tracks (not albums), so import them
+      # as singletons (-s). beets autotags via the MBIDs Explo embeds and moves
+      # them into the library (move = true), where Plex indexes them. Guarded so
+      # beets isn't invoked on an empty staging dir.
+      explo-beets-import = pkgs.writeShellApplication {
+        name = "explo-beets-import";
+        runtimeInputs = [
+          beets-plugins
+          pkgs.findutils
+        ];
+        text = ''
+          if [ -n "$(find ${explo-import-dir} -type f -print -quit 2>/dev/null)" ]; then
+            beet -c ${beets-config} import -q -s --set import_source=Explo ${explo-import-dir}
+          fi
         '';
       };
       hr = "${lib.getExe pkgs.hr} ━";
@@ -189,8 +207,17 @@
           track_path = "$disc_and_track$artist - $title";
           # show my custom field if there is a re-release or tagged disambiguation
           disambig_rerelease = "%if{$disambig,($disambig) }";
+          # singletons have no album-level fields (albumartist/original_year/etc),
+          # so build the path from item fields only. Drops them straight into the
+          # artist folder (same top-level as albums) rather than beets' default
+          # "Non-Album/$artist/$title".
+          singleton_path = "%the{%titlecase{$artist}}/$artist - $title%if{$year, ($year)}";
         in
         [
+          {
+            category = "singleton";
+            path = singleton_path;
+          }
           {
             category = "genres:mt, genres:broadway, genres:Musical";
             path = "0. Musicals/%the{$album} ${disambig_rerelease}${date}[$media_type$source]/$disc_and_track$title";
@@ -289,6 +316,26 @@
           Path.PathChanged = detect-file;
           Install.WantedBy = [ "default.target" ];
         };
+        paths.explo-beets-import = {
+          Unit.Description = "Watch Explo staging directory for new tracks";
+          # Don't import the moment a file appears: arm a 20-minute timer instead
+          # (Path.Unit overrides the default of starting the like-named service).
+          # This lets a download batch settle before beets moves it into the
+          # library / Plex. Re-triggers while the timer is already armed are
+          # no-ops, so the window counts from the first new file in a batch.
+          #
+          # Must watch each subdirectory explicitly — PathChanged on a directory
+          # only fires for direct children, not for changes inside subdirectories
+          # like Weekly-Exploration/ or Weekly-Jams/.
+          Path = {
+            PathChanged = [
+              explo-import-dir
+              "${explo-import-dir}/Weekly-Exploration"
+              "${explo-import-dir}/Weekly-Jams"
+            ];
+          };
+          Install.WantedBy = [ "default.target" ];
+        };
         services.beets = {
           Unit.Description = "Automatically import and organize downloads using beets";
           Service = {
@@ -342,6 +389,19 @@
                 "PLEXAPI_CONFIG_PATH=${hmArgs.config.age.secrets."plexapi".path}"
               ];
               ExecStart = lib.getExe inputs.playlist-download.packages.${pkgs.stdenv.hostPlatform.system}.default;
+            };
+          };
+          explo-beets-import = {
+            Unit.Description = "Import Explo discovery downloads as singletons via beets";
+            Service = {
+              Type = "oneshot";
+              ReadOnlyPaths = [ beets-config ];
+              ReadWritePaths = [
+                explo-import-dir
+                music-dir
+                beets-dir
+              ];
+              ExecStart = lib.getExe explo-beets-import;
             };
           };
         };
