@@ -98,13 +98,7 @@
       url = "github:zhaofengli/colmena";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    commutecompass = {
-      url = "github:Multipixelone/commutecompass";
-      inputs = {
-        flake-utils.follows = "flake-utils";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
+    commutecompass.url = "github:Multipixelone/commutecompass";
     euphony = {
       url = "github:Multipixelone/euphony/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -236,13 +230,6 @@
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
     noctalia = {
       url = "github:noctalia-dev/noctalia-shell";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        noctalia-qs.follows = "noctalia-qs";
-      };
-    };
-    noctalia-qs = {
-      url = "github:noctalia-dev/noctalia-qs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nur.url = "github:nix-community/NUR";
@@ -258,6 +245,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     room.url = "github:Multipixelone/room/reduce-binary-size";
+    roomieorder.url = "github:Multipixelone/roomieorder";
     secrets = {
       url = "git+ssh://git@github.com/Multipixelone/nix-secrets.git";
       flake = false;

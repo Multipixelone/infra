@@ -2,8 +2,6 @@
 {
   flake-file.inputs.commutecompass = {
     url = "github:Multipixelone/commutecompass";
-    inputs.nixpkgs.follows = "nixpkgs";
-    inputs.flake-utils.follows = "flake-utils";
   };
 
   configurations.nixos.link.module =

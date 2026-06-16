@@ -1,0 +1,95 @@
+# roomieorder — Home Assistant buttons + dashboard, generated from catalog.json.
+#
+# Do NOT hand-write a button list. `roomieorder.lib.haButtons` turns
+# catalog.json into the rest_command + per-item scripts + status sensors + a
+# Lovelace grid, so catalog.json (shared with the service on link via
+# inputs.secrets) stays the single source of truth: ADD A STAPLE THERE AND ITS
+# BUTTON APPEARS ON THE DASHBOARD — that catalog edit is the *only* step.
+#
+# This host routes Nix-managed scripts through iotHass.nixScripts (separate from
+# the UI-managed scripts.yaml), so we feed `.scripts` (a list), not
+# `.scriptsAttrs`. rest_command + rest are plain config and need no include-split.
+#
+# The visible buttons live on a dedicated, Nix-managed "Reorder" Lovelace
+# dashboard (YAML mode) — generated here from buttons.dashboardCardDynamic — so
+# they regenerate on every rebuild with no manual ha-mcp push. The iPad kiosk
+# (main-home, storage mode / UI-managed) is left untouched.
+{ inputs, config, ... }:
+let
+  buttons = inputs.roomieorder.lib.haButtons {
+    # Same file the service on link loads (modules/link/roomieorder.nix).
+    catalogFile = "${inputs.secrets}/roomieorder/catalog.json";
+    # link's LAN address + intake port (see ROOMIEORDER_HOST/PORT on link).
+    endpoint = "http://${config.hosts.link.homeAddress}:8723";
+    # requester defaults to "household" — no per-roommate attribution.
+  };
+in
+{
+  configurations.nixos.iot.module =
+    { pkgs, ... }:
+    let
+      yamlFormat = pkgs.formats.yaml { };
+
+      # The dynamic grid uses custom:mushroom-template-card (gray-out + "N ago"),
+      # so the mushroom frontend must be loaded. Shipping it as a customLovelace
+      # module makes the HA module (a) serve it at
+      # /local/nixos-lovelace-modules/mushroom.js, (b) auto-set
+      # lovelace.resource_mode = "yaml", and (c) emit the lovelace.resources entry
+      # (via homeassistant.nix's customLovelaceModules → resources merge) — which
+      # is what loads the JS even though the DEFAULT dashboard stays storage mode.
+      mushroom = pkgs.home-assistant-custom-lovelace-modules.mushroom;
+
+      # One YAML-mode dashboard, one view, the catalog-derived dynamic grid.
+      # yamlFormat.generate's out path IS the .yaml file, so we can point HA's
+      # `filename` straight at the store path (it ends in .yaml and HA resolves an
+      # absolute filename as-is). Changing catalog.json changes this derivation,
+      # which trips the reloadTrigger below.
+      reorderDashboard = yamlFormat.generate "lovelace-reorder.yaml" {
+        title = "Reorder";
+        views = [
+          {
+            title = "Reorder";
+            path = "reorder";
+            icon = "mdi:cart";
+            cards = [ buttons.dashboardCardDynamic ];
+          }
+        ];
+      };
+    in
+    {
+      services.home-assistant.customLovelaceModules = [ mushroom ];
+
+      services.home-assistant.config = {
+        rest_command = buttons.restCommand;
+        # Per-item status sensors (one GET /items poll, one sensor per item) that
+        # drive the dashboard gray-out: each sensor.roomieorder_<key> carries an
+        # `on_cooldown` attribute, true while the item is inside its catalog
+        # cooldown window of the last *placed* order. `rest` is a top-level list
+        # and nothing else on iot defines it, so this is the sole `rest:` block.
+        rest = buttons.sensors;
+
+        lovelace = {
+          # Default dashboard (main-home, the iPad kiosk) stays storage mode /
+          # UI-managed — that's HA's default, so `lovelace.mode` is left unset
+          # (the module deprecated it). resource_mode = "yaml" (auto, from
+          # customLovelaceModules) still loads the mushroom resource, so the
+          # dynamic cards render here.
+          # The generated, self-updating Reorder dashboard. A separate sidebar
+          # entry; does not touch the kiosk.
+          dashboards.nixos-reorder = {
+            mode = "yaml";
+            filename = "${reorderDashboard}";
+            title = "Reorder";
+            icon = "mdi:cart";
+            show_in_sidebar = true;
+          };
+        };
+      };
+
+      iotHass.nixScripts = buttons.scripts;
+
+      # Pick up dashboard changes (a catalog edit) on rebuild without a manual
+      # reload. Mirrors how homeassistant.nix triggers on its generated YAML.
+      systemd.services.home-assistant.reloadTriggers = [ reorderDashboard ];
+    };
+}
