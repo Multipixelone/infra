@@ -14,6 +14,12 @@
       # Disable systemd-resolved to allow blocky to bind to port 53
       services.resolved.enable = false;
 
+      # Let blocky bind 10.100.0.1:53 (wg0's address) even before the wg0
+      # interface is up, so a slow/failed WireGuard start can't take down the
+      # whole DNS resolver. Without this, the missing address yields
+      # "bind: cannot assign requested address" and blocky restart-loops.
+      boot.kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
+
       # Use blocky on localhost for DNS resolution
       networking.nameservers = [
         "127.0.0.1"
@@ -93,7 +99,25 @@
             "[::1]:${toString unboundPort}"
           ];
 
+          # Don't exit if the upstream chain (unbound→dnscrypt) isn't ready at
+          # start — on first boot dnscrypt is still fetching its resolver list,
+          # so the initial probe fails. blocky stays up and serves once the
+          # chain comes online.
+          startVerifyUpstream = false;
+
+          # Resolve blocklist URLs (raw.githubusercontent.com, …) via unbound
+          # directly instead of the system resolver, which is blocky itself —
+          # that circular bootstrap is what produced the first-boot
+          # "device or resource busy" download failures.
+          bootstrapDns = [
+            { upstream = "tcp+udp:127.0.0.1:${toString unboundPort}"; }
+          ];
+
           blocking = {
+            # Serve immediately and load denylists in the background; a failed
+            # first download no longer aborts startup (it retries on refresh).
+            loading.strategy = "fast";
+
             denylists = {
               ads = [
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
@@ -124,8 +148,15 @@
       };
 
       systemd.services.blocky = {
-        after = [ "unbound.service" ];
+        after = [
+          "unbound.service"
+        ]
+        # On link, prefer to start after wg0 so 10.100.0.1 is normally present.
+        # `wants` (not `requires`) + ip_nonlocal_bind means a wg0 failure
+        # degrades gracefully instead of taking blocky down.
+        ++ lib.optionals (config.networking.hostName == "link") [ "wireguard-wg0.service" ];
         requires = [ "unbound.service" ];
+        wants = lib.optionals (config.networking.hostName == "link") [ "wireguard-wg0.service" ];
       };
     };
 }
