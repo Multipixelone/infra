@@ -601,11 +601,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1779856070,
-        "narHash": "sha256-Qz1VzGNhQKvy6XVe3dMCBCRLnkNabkeasYLVs4esnJY=",
+        "lastModified": 1781621920,
+        "narHash": "sha256-EJw4JxTzyAtXATVYR5HdTdV6LtO0ovwshpWiQeWsLMs=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "a1e09c527613875b71eda3d096eb4225058fe9ce",
+        "rev": "c9de55f95953fe47ca1ffb1c82c9cf404876bab3",
         "type": "github"
       },
       "original": {
@@ -1403,11 +1403,11 @@
         "nixpkgs": "nixpkgs_7"
       },
       "locked": {
-        "lastModified": 1776796298,
-        "narHash": "sha256-PcRvlWayisPSjd0UcRQbhG8Oqw78AcPE6x872cPRHN8=",
+        "lastModified": 1778507602,
+        "narHash": "sha256-kTwur1wV+01SdqskVMSo6JMEpg71ps3HpbFY2GsflKs=",
         "owner": "cachix",
         "repo": "git-hooks.nix",
-        "rev": "3cfd774b0a530725a077e17354fbdb87ea1c4aad",
+        "rev": "61ab0e80d9c7ab14c256b5b453d8b3fb0189ba0a",
         "type": "github"
       },
       "original": {
@@ -3704,11 +3704,11 @@
         "nixpkgs": "nixpkgs_26"
       },
       "locked": {
-        "lastModified": 1781549444,
-        "narHash": "sha256-7UHhhxo3kWMT5jx8ZK5RaWvjBMtFeBc2V/pLkpJqnDY=",
+        "lastModified": 1781621607,
+        "narHash": "sha256-SGbq1Lall9NduKjI+0QE7UDK+PjeXq1b+eeVHp29q60=",
         "owner": "Multipixelone",
         "repo": "roomieorder",
-        "rev": "0f7ec52bff28af80d35ad794abf2aea6b77e2ac2",
+        "rev": "e0c56df0d3bd339616db30ff22ebb50a51c886f1",
         "type": "github"
       },
       "original": {
@@ -3950,11 +3950,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1781553096,
-        "narHash": "sha256-cdGXm0ituFV0JbVwMMbQYIFNJKpErpoMwOzJdfXgaDQ=",
+        "lastModified": 1781621188,
+        "narHash": "sha256-S9i/R5ysq4agd+KYBig6Ux7fWxZ7lzhgcy2y/Fwnjas=",
         "ref": "refs/heads/main",
-        "rev": "e9da5ad9276a22d8154f4d991d9e7091ff6de07a",
-        "revCount": 105,
+        "rev": "f59be7391ddb5f502324e85616cf6d5ceb068397",
+        "revCount": 109,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },
