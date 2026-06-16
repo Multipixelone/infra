@@ -15,6 +15,10 @@ let
   linkLanIp = config.hosts.link.homeAddress;
 in
 {
+  nixpkgs.config.allowUnfreePackages = [
+    "google-chrome"
+  ];
+
   flake-file.inputs.roomieorder = {
     url = "github:Multipixelone/roomieorder";
   };
