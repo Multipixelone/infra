@@ -48,19 +48,7 @@
         psArgs: psArgs.config.packages.convert-mpc
       );
       # use my custom build of beets with included plugins
-      beets-plugins =
-        inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs
-          (old: {
-            # upstream fish.py passes a `set` to optparse's `choices=`, which
-            # Python 3.13's optparse rejects ("choices must be a list of strings").
-            # Wrap it in `list()` so completion generation works.
-            postPatch = (old.postPatch or "") + ''
-              substituteInPlace beetsplug/fish.py \
-                --replace-fail \
-                  'choices=library.Item.all_keys() | library.Album.all_keys(),' \
-                  'choices=list(library.Item.all_keys() | library.Album.all_keys()),'
-            '';
-          });
+      beets-plugins = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default;
       beets-import = pkgs.writeShellApplication {
         name = "beets-import";
         runtimeInputs = [
