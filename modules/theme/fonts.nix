@@ -8,7 +8,7 @@
   flake-file.inputs = {
     apple-fonts.url = "github:Lyndeno/apple-fonts.nix";
     apple-emoji = {
-      url = "github:samuelngs/apple-emoji-ttf";
+      url = "github:samuelngs/apple-emoji-ttf/870d48f3ca643552bb757bb299be9f954bdf101a";
       flake = false;
     };
   };
