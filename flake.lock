@@ -74,16 +74,17 @@
     "apple-emoji": {
       "flake": false,
       "locked": {
-        "lastModified": 1781545818,
-        "narHash": "sha256-lWoN9wWkFCBZrBBDG8qIwVnt3G8Es9xALKYkavpvcLU=",
+        "lastModified": 1779245638,
+        "narHash": "sha256-g+cI7Cni9tFUPzYd2P6Jt2qEt2ON69/7THwrhhlq+u8=",
         "owner": "samuelngs",
         "repo": "apple-emoji-ttf",
-        "rev": "07e9648918230c1989f334ba82a5f163a51d6fb3",
+        "rev": "870d48f3ca643552bb757bb299be9f954bdf101a",
         "type": "github"
       },
       "original": {
         "owner": "samuelngs",
         "repo": "apple-emoji-ttf",
+        "rev": "870d48f3ca643552bb757bb299be9f954bdf101a",
         "type": "github"
       }
     },
