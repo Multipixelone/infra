@@ -591,7 +591,10 @@ _: {
                   {
                     condition = "state";
                     entity = "media_player.living_room";
-                    state_not = "off";
+                    state = [
+                      "playing"
+                      "paused"
+                    ];
                   }
                 ];
               }
