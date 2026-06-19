@@ -45,6 +45,23 @@ _: {
         hoursOnSameLine = true;
         eventDateFormat = "ddd MMM D";
         language = "en";
+
+        # Colour + typography polish so the agenda reads as a designed card
+        # rather than a flat grey list: titles/bars carry the member's accent,
+        # a "now" line marks the current time, and finished items dim instead
+        # of vanishing so the day still has shape by evening.
+        showColors = true;
+        showCurrentEventLine = true;
+        showProgressBar = true;
+        dimFinishedEvents = true;
+        showRelativeTime = true;
+        eventTitleSize = 95;
+        timeSize = 78;
+        nameColor = color;
+        dayWrapperLineColor = color;
+        eventBarColor = color;
+        defaultColor = "var(--primary-text-color)";
+
         entities = [
           {
             entity = cal;
@@ -55,6 +72,32 @@ _: {
           action = "navigate";
           navigation_path = "/nixos-home/week?kiosk";
         };
+
+        # Rounded accent card with a faint colour wash + tighter padding so the
+        # event rows don't float in dead space.
+        card_mod.style = ''
+          ha-card {
+            border-radius: 18px !important;
+            border: none !important;
+            border-left: 4px solid ${color} !important;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07) !important;
+            background:
+              linear-gradient(135deg, ${color}14 0%, transparent 60%),
+              var(--ha-card-background, var(--card-background-color)) !important;
+            padding: 2px 14px 10px !important;
+          }
+          /* Compact mode sets line-height: 80% on the card, which jams the
+             relative-time row ("(in x hours)") up against the event title.
+             Give each event a little vertical breathing room and a gap
+             between the title row and the time/relative-time row. */
+          .event-right {
+            row-gap: 3px !important;
+          }
+          .event-right-top,
+          .event-right-bottom {
+            line-height: 1.2 !important;
+          }
+        '';
       };
 
       # Back-to-home chip that opens every sub-view (kiosk has no sidebar).
@@ -146,11 +189,90 @@ _: {
         // (if color then { show_color_control = true; } else { })
         // (if collapsible == null then { } else { collapsible_controls = collapsible; });
 
+      # Soft accent card: rounded corners, an accent-coloured left edge and a
+      # gentle shadow. Merged into people/calendar cards so each household member
+      # is colour-coded and the whole board reads as one cohesive set.
+      accentStyle = color: {
+        card_mod.style = ''
+          ha-card {
+            border-radius: 18px !important;
+            border: none !important;
+            border-left: 4px solid ${color} !important;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07) !important;
+          }
+        '';
+      };
+
+      # Per-person presence tile (vertical avatar) in the member's accent colour.
+      personCard =
+        entity: color:
+        {
+          type = "custom:mushroom-person-card";
+          inherit entity;
+          primary_info = "state";
+          secondary_info = "last-changed";
+          icon_type = "entity-picture";
+          layout = "vertical";
+        }
+        // (accentStyle color);
+
+      # Time-aware greeting header for the top of the home view.
+      greetingCard = {
+        type = "custom:mushroom-template-card";
+        primary = "{% set h = now().hour %}{{ 'Good morning' if h < 12 else 'Good afternoon' if h < 18 else 'Good evening' }}";
+        secondary = "{{ now().strftime('%A, %B ') }}{{ now().day }}";
+        icon = "{% set h = now().hour %}{{ 'mdi:weather-sunset-up' if h < 8 else 'mdi:weather-sunny' if h < 18 else 'mdi:weather-night' }}";
+        icon_color = "{% set h = now().hour %}{{ 'amber' if h < 18 else 'deep-purple' }}";
+      }
+      // (accentStyle "var(--primary-color)");
+
+      # Glanceable meds toggle: green check when taken, amber prompt otherwise.
+      medToggle = entity: label: icon: {
+        type = "custom:mushroom-template-card";
+        inherit entity;
+        primary = label;
+        secondary = "{{ 'Taken' if is_state('${entity}', 'on') else 'Not taken' }}";
+        icon = "{{ 'mdi:check-circle' if is_state('${entity}', 'on') else '${icon}' }}";
+        icon_color = "{{ 'green' if is_state('${entity}', 'on') else 'orange' }}";
+        tap_action.action = "toggle";
+      };
+
       # ── Finn-only cards ───────────────────────────────────────────────────
       # These live on the separate Finn dashboard (nixos-finn), not the shared
-      # iPad kiosk: a pending-meds alert, Finn's chore to-do list, and the
-      # vacuum/humidifier consumable warning chips (the upkeep work is now
-      # ChoreOps chores assigned to specific people, so it's off the shared view).
+      # iPad kiosk: a pending-meds alert, Finn's chore to-do list, the personal
+      # fridge-nudges banner, and the vacuum/humidifier consumable warning chips
+      # (the upkeep work is now ChoreOps chores assigned to specific people, so
+      # it's off the shared view).
+
+      # Personal reminder banner: bulleted nudges from sensor.fridge_nudges,
+      # hidden entirely when there's nothing to say. Amber accent + glowing
+      # bullets so it reads as a soft prompt rather than an alert.
+      nudgesCard = {
+        type = "markdown";
+        content = ''
+          {% set lines = state_attr('sensor.fridge_nudges', 'lines') or [] %}{% if lines %}{% for line in lines %}- {{ line }}
+          {% endfor %}{% endif %}'';
+        visibility = [
+          {
+            condition = "state";
+            entity = "sensor.fridge_nudges";
+            state_not = [
+              ""
+              "unknown"
+              "unavailable"
+            ];
+          }
+        ];
+        card_mod.style = {
+          "." = ''
+            ha-card {   background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.02)) !important;   border-radius: 16px !important;   border: none !important;   border-left: 4px solid var(--warning-color, #f59e0b) !important;   box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important; }
+          '';
+          "ha-markdown$" = ''
+            .markdown-body { padding: 2px 6px; } ul { padding-left: 0; margin: 0; list-style: none; } li {   font-size: 1.25em;   font-weight: 500;   line-height: 1.45;   padding: 8px 4px 8px 32px;   position: relative;   letter-spacing: -0.005em;   border-bottom: 1px solid rgba(245,158,11,0.12); } li:last-child { border-bottom: none; } li::before {   content: "";   position: absolute;   left: 8px;   top: 0.85em;   width: 10px;   height: 10px;   border-radius: 50%;   background: var(--warning-color, #f59e0b);   box-shadow: 0 0 10px rgba(245,158,11,0.5); }
+          '';
+        };
+      };
+
       medsCard = {
         type = "conditional";
         conditions = [
@@ -256,11 +378,6 @@ _: {
 
         badges = [
           {
-            type = "custom:mushroom-template-badge";
-            content = "{{ now().strftime('%a %b %d') }}";
-            icon = "mdi:calendar";
-          }
-          {
             type = "entity";
             entity = "sensor.humidifier_humidity";
             name = "Humidity";
@@ -314,47 +431,16 @@ _: {
         ];
 
         sections = [
-          # ── Fridge nudges (LLM-written reminders; hidden when empty) ───────
-          {
-            type = "grid";
-            column_span = 4;
-            cards = [
-              {
-                type = "markdown";
-                content = ''
-                  {% set lines = state_attr('sensor.fridge_nudges', 'lines') or [] %}{% if lines %}{% for line in lines %}- {{ line }}
-                  {% endfor %}{% endif %}'';
-                visibility = [
-                  {
-                    condition = "state";
-                    entity = "sensor.fridge_nudges";
-                    state_not = [
-                      ""
-                      "unknown"
-                      "unavailable"
-                    ];
-                  }
-                ];
-                card_mod.style = {
-                  "." = ''
-                    ha-card {   background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.02)) !important;   border-radius: 16px !important;   border: none !important;   border-left: 4px solid var(--warning-color, #f59e0b) !important;   box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important; }
-                  '';
-                  "ha-markdown$" = ''
-                    .markdown-body { padding: 2px 6px; } ul { padding-left: 0; margin: 0; list-style: none; } li {   font-size: 1.25em;   font-weight: 500;   line-height: 1.45;   padding: 8px 4px 8px 32px;   position: relative;   letter-spacing: -0.005em;   border-bottom: 1px solid rgba(245,158,11,0.12); } li:last-child { border-bottom: none; } li::before {   content: "";   position: absolute;   left: 8px;   top: 0.85em;   width: 10px;   height: 10px;   border-radius: 50%;   background: var(--warning-color, #f59e0b);   box-shadow: 0 0 10px rgba(245,158,11,0.5); }
-                  '';
-                };
-              }
-            ];
-          }
-
-          # ── Finn & Emily: presence + Finn's calendar ──────────────────────
+          # ── Finn & Emily: greeting, presence + Finn's calendar ────────────
           {
             type = "grid";
             cards = [
+              greetingCard
               {
                 type = "heading";
                 heading = "Finn & Emily";
                 heading_style = "title";
+                icon = "mdi:account-multiple";
                 badges = [
                   {
                     type = "entity";
@@ -366,20 +452,13 @@ _: {
                 ];
               }
               {
-                type = "custom:mushroom-person-card";
-                entity = "person.finn";
-                fill_container = false;
-                secondary_info = "last-changed";
-                primary_info = "state";
-                icon_type = "entity-picture";
-              }
-              {
-                type = "custom:mushroom-person-card";
-                entity = "person.emily";
-                fill_container = false;
-                secondary_info = "last-changed";
-                primary_info = "state";
-                icon_type = "entity-picture";
+                type = "grid";
+                columns = 2;
+                square = false;
+                cards = [
+                  (personCard "person.finn" "#f97316")
+                  (personCard "person.emily" "#f43f5e")
+                ];
               }
               (calendarToday "calendar.finn" "#f97316")
             ];
@@ -393,6 +472,7 @@ _: {
                 type = "heading";
                 heading = "Ciara & Holland";
                 heading_style = "title";
+                icon = "mdi:account-multiple";
                 badges = [
                   {
                     type = "entity";
@@ -404,18 +484,13 @@ _: {
                 ];
               }
               {
-                type = "custom:mushroom-person-card";
-                entity = "person.ciara";
-                primary_info = "state";
-                secondary_info = "last-changed";
-                icon_type = "entity-picture";
-              }
-              {
-                type = "custom:mushroom-person-card";
-                entity = "person.holland";
-                primary_info = "state";
-                secondary_info = "last-changed";
-                icon_type = "entity-picture";
+                type = "grid";
+                columns = 2;
+                square = false;
+                cards = [
+                  (personCard "person.ciara" "#10b981")
+                  (personCard "person.holland" "#a855f7")
+                ];
               }
               (calendarToday "calendar.ciara" "#10b981")
               # Holland's calendar — entity arrives later; the card stays empty
@@ -1188,6 +1263,10 @@ _: {
                 compactMode = true;
                 showTimeRemaining = false;
                 hoursOnSameLine = true;
+                showColors = true;
+                dimFinishedEvents = true;
+                eventTitleSize = 95;
+                timeSize = 80;
                 language = "en";
                 entities = [
                   {
@@ -1235,6 +1314,12 @@ _: {
           }
         ];
         sections = [
+          # ── Reminders: personal fridge nudges (hidden when empty) ─────────
+          {
+            type = "grid";
+            column_span = 2;
+            cards = [ nudgesCard ];
+          }
           # ── Meds: alert (when pending) + mark-taken toggles ───────────────
           {
             type = "grid";
@@ -1251,18 +1336,8 @@ _: {
                 columns = 2;
                 square = false;
                 cards = [
-                  {
-                    type = "tile";
-                    entity = "input_boolean.morning_meds_taken";
-                    name = "Morning";
-                    icon = "mdi:weather-sunny";
-                  }
-                  {
-                    type = "tile";
-                    entity = "input_boolean.night_meds_taken";
-                    name = "Night";
-                    icon = "mdi:weather-night";
-                  }
+                  (medToggle "input_boolean.morning_meds_taken" "Morning" "mdi:weather-sunny")
+                  (medToggle "input_boolean.night_meds_taken" "Night" "mdi:weather-night")
                 ];
               }
             ];
