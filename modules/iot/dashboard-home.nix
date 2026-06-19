@@ -146,6 +146,108 @@ _: {
         // (if color then { show_color_control = true; } else { })
         // (if collapsible == null then { } else { collapsible_controls = collapsible; });
 
+      # ── Finn-only cards ───────────────────────────────────────────────────
+      # These live on the separate Finn dashboard (nixos-finn), not the shared
+      # iPad kiosk: a pending-meds alert, Finn's chore to-do list, and the
+      # vacuum/humidifier consumable warning chips (the upkeep work is now
+      # ChoreOps chores assigned to specific people, so it's off the shared view).
+      medsCard = {
+        type = "conditional";
+        conditions = [
+          {
+            entity = "binary_sensor.meds_needed";
+            state = "on";
+          }
+        ];
+        card = {
+          type = "markdown";
+          card_mod.style = {
+            "." = ''
+              ha-card {
+                background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+                color: #fff;
+                --card-primary-text-color: #fff;
+                --card-secondary-text-color: rgba(255, 255, 255, 0.85);
+                --ha-card-border-radius: 16px;
+                padding: 20px 24px;
+                font-size: 1.3em;
+                border: 2px solid rgba(255, 255, 255, 0.15);
+                box-shadow: 0 8px 32px rgba(183, 28, 28, 0.4);
+              }
+            '';
+            "ha-markdown$" = ''
+              .markdown-body h2 { margin: 0 0 8px 0; }
+              .markdown-body p { margin: 0; }
+            '';
+          };
+          content = ''
+            {% set morning = state_attr('binary_sensor.meds_needed', 'morning_pending') %}
+            {% set night   = state_attr('binary_sensor.meds_needed', 'night_pending') %}
+            {% if morning and night %}
+            ## <ha-icon icon="mdi:alert-circle"></ha-icon> Morning & Night Meds
+            **Both** still need to be taken today.
+            {% elif morning %}
+            ## <ha-icon icon="mdi:alert-circle"></ha-icon> Morning Meds
+            Not taken yet today.
+            {% elif night %}
+            ## <ha-icon icon="mdi:alert-circle"></ha-icon> Night Meds
+            Not taken yet tonight.
+            {% endif %}
+          '';
+        };
+      };
+
+      consumableChips = {
+        type = "custom:auto-entities";
+        card_param = "chips";
+        show_empty = false;
+        card = {
+          type = "custom:mushroom-chips-card";
+          alignment = "start";
+        };
+        filter.template = ''
+          [
+          {%- set entries = [
+            ('sensor.vaccum_filter_remaining', 'Filter', 'mdi:air-filter'),
+            ('sensor.vaccum_rolling_brush_remaining', 'Roller', 'mdi:rotate-3d-variant'),
+            ('sensor.vaccum_side_brush_remaining', 'Side brush', 'mdi:fan'),
+            ('sensor.vaccum_mopping_cloth_remaining', 'Mop', 'mdi:waves'),
+            ('sensor.vaccum_sensor_remaining', 'Sensors', 'mdi:eye-outline'),
+            ('sensor.vaccum_cleaning_tray_remaining', 'Tray', 'mdi:wiper'),
+          ] -%}
+          {%- for s, label, icon in entries -%}
+            {%- set t = state_attr(s, 'total_life_hours') | float(0) -%}
+            {%- if t > 0 -%}
+              {%- set pct = (states(s) | float(0) / t * 100) | int -%}
+              {%- if pct < 20 -%}
+                {'entity': '{{ s }}', 'type': 'template', 'icon': '{{ icon }}', 'icon_color': 'orange', 'content': '{{ label }} {{ pct }}%', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- set sponge = states('sensor.humidifier_filter_lifetime') | float(100) -%}
+          {%- if sponge < 30 -%}
+            {'entity': 'sensor.humidifier_filter_lifetime', 'type': 'template', 'icon': 'mdi:air-filter', 'icon_color': 'orange', 'content': 'Sponge {{ sponge | int }}%', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
+          {%- endif -%}
+          {%- if is_state('binary_sensor.humidifier_low_water', 'on') -%}
+            {'entity': 'binary_sensor.humidifier_low_water', 'type': 'template', 'icon': 'mdi:water-alert', 'icon_color': 'red', 'content': 'Tank empty', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
+          {%- endif -%}
+          {%- set err = states('sensor.vaccum_error_message') | string -%}
+          {%- if err and err | length > 0 and err != 'unknown' and err != 'unavailable' -%}
+            {'entity': 'sensor.vaccum_error_message', 'type': 'template', 'icon': 'mdi:robot-vacuum-alert', 'icon_color': 'red', 'content': '{{ err }}', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}}
+          {%- endif -%}
+          ]
+        '';
+      };
+
+      choresTodo = {
+        display_order = "duedate_asc";
+        type = "todo-list";
+        entity = "todo.chores";
+        hide_create = false;
+        hide_completed = true;
+        hide_section_headers = true;
+      };
+
       homeView = {
         type = "sections";
         title = "Home";
@@ -212,107 +314,6 @@ _: {
         ];
 
         sections = [
-          # ── Meds alert (only renders when a dose is pending) ──────────────
-          {
-            type = "grid";
-            cards = [
-              {
-                type = "conditional";
-                conditions = [
-                  {
-                    entity = "binary_sensor.meds_needed";
-                    state = "on";
-                  }
-                ];
-                card = {
-                  type = "markdown";
-                  card_mod.style = {
-                    "." = ''
-                      ha-card {
-                        background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
-                        color: #fff;
-                        --card-primary-text-color: #fff;
-                        --card-secondary-text-color: rgba(255, 255, 255, 0.85);
-                        --ha-card-border-radius: 16px;
-                        padding: 20px 24px;
-                        font-size: 1.3em;
-                        border: 2px solid rgba(255, 255, 255, 0.15);
-                        box-shadow: 0 8px 32px rgba(183, 28, 28, 0.4);
-                      }
-                    '';
-                    "ha-markdown$" = ''
-                      .markdown-body h2 { margin: 0 0 8px 0; }
-                      .markdown-body p { margin: 0; }
-                    '';
-                  };
-                  content = ''
-                    {% set morning = state_attr('binary_sensor.meds_needed', 'morning_pending') %}
-                    {% set night   = state_attr('binary_sensor.meds_needed', 'night_pending') %}
-                    {% if morning and night %}
-                    ## <ha-icon icon="mdi:alert-circle"></ha-icon> Morning & Night Meds
-                    **Both** still need to be taken today.
-                    {% elif morning %}
-                    ## <ha-icon icon="mdi:alert-circle"></ha-icon> Morning Meds
-                    Not taken yet today.
-                    {% elif night %}
-                    ## <ha-icon icon="mdi:alert-circle"></ha-icon> Night Meds
-                    Not taken yet tonight.
-                    {% endif %}
-                  '';
-                };
-              }
-            ];
-          }
-
-          # ── Vacuum / humidifier consumable warnings (auto-populated chips) ─
-          {
-            type = "grid";
-            column_span = 4;
-            cards = [
-              {
-                type = "custom:auto-entities";
-                card_param = "chips";
-                show_empty = false;
-                card = {
-                  type = "custom:mushroom-chips-card";
-                  alignment = "start";
-                };
-                filter.template = ''
-                  [
-                  {%- set entries = [
-                    ('sensor.vaccum_filter_remaining', 'Filter', 'mdi:air-filter'),
-                    ('sensor.vaccum_rolling_brush_remaining', 'Roller', 'mdi:rotate-3d-variant'),
-                    ('sensor.vaccum_side_brush_remaining', 'Side brush', 'mdi:fan'),
-                    ('sensor.vaccum_mopping_cloth_remaining', 'Mop', 'mdi:waves'),
-                    ('sensor.vaccum_sensor_remaining', 'Sensors', 'mdi:eye-outline'),
-                    ('sensor.vaccum_cleaning_tray_remaining', 'Tray', 'mdi:wiper'),
-                  ] -%}
-                  {%- for s, label, icon in entries -%}
-                    {%- set t = state_attr(s, 'total_life_hours') | float(0) -%}
-                    {%- if t > 0 -%}
-                      {%- set pct = (states(s) | float(0) / t * 100) | int -%}
-                      {%- if pct < 20 -%}
-                        {'entity': '{{ s }}', 'type': 'template', 'icon': '{{ icon }}', 'icon_color': 'orange', 'content': '{{ label }} {{ pct }}%', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
-                      {%- endif -%}
-                    {%- endif -%}
-                  {%- endfor -%}
-                  {%- set sponge = states('sensor.humidifier_filter_lifetime') | float(100) -%}
-                  {%- if sponge < 30 -%}
-                    {'entity': 'sensor.humidifier_filter_lifetime', 'type': 'template', 'icon': 'mdi:air-filter', 'icon_color': 'orange', 'content': 'Sponge {{ sponge | int }}%', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
-                  {%- endif -%}
-                  {%- if is_state('binary_sensor.humidifier_low_water', 'on') -%}
-                    {'entity': 'binary_sensor.humidifier_low_water', 'type': 'template', 'icon': 'mdi:water-alert', 'icon_color': 'red', 'content': 'Tank empty', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}},
-                  {%- endif -%}
-                  {%- set err = states('sensor.vaccum_error_message') | string -%}
-                  {%- if err and err | length > 0 and err != 'unknown' and err != 'unavailable' -%}
-                    {'entity': 'sensor.vaccum_error_message', 'type': 'template', 'icon': 'mdi:robot-vacuum-alert', 'icon_color': 'red', 'content': '{{ err }}', 'tap_action': {'action': 'navigate', 'navigation_path': '/nixos-home/cleaning?kiosk'}}
-                  {%- endif -%}
-                  ]
-                '';
-              }
-            ];
-          }
-
           # ── Fridge nudges (LLM-written reminders; hidden when empty) ───────
           {
             type = "grid";
@@ -346,13 +347,13 @@ _: {
             ];
           }
 
-          # ── Finn: presence, today's calendar, chores ──────────────────────
+          # ── Finn & Emily: presence + Finn's calendar ──────────────────────
           {
             type = "grid";
             cards = [
               {
                 type = "heading";
-                heading = "Finn";
+                heading = "Finn & Emily";
                 heading_style = "title";
                 badges = [
                   {
@@ -381,24 +382,16 @@ _: {
                 icon_type = "entity-picture";
               }
               (calendarToday "calendar.finn" "#f97316")
-              {
-                display_order = "duedate_asc";
-                type = "todo-list";
-                entity = "todo.chores";
-                hide_create = false;
-                hide_completed = true;
-                hide_section_headers = true;
-              }
             ];
           }
 
-          # ── Ciara: presence, today's calendar, shopping list ──────────────
+          # ── Ciara & Holland: presence + their calendars + shopping list ───
           {
             type = "grid";
             cards = [
               {
                 type = "heading";
-                heading = "Ciara";
+                heading = "Ciara & Holland";
                 heading_style = "title";
                 badges = [
                   {
@@ -425,6 +418,9 @@ _: {
                 icon_type = "entity-picture";
               }
               (calendarToday "calendar.ciara" "#10b981")
+              # Holland's calendar — entity arrives later; the card stays empty
+              # until calendar.holland exists.
+              (calendarToday "calendar.holland" "#a855f7")
               {
                 display_order = "none";
                 type = "todo-list";
@@ -1204,8 +1200,114 @@ _: {
                     name = "Ciara";
                     color = "#10b981";
                   }
+                  # Holland's calendar — entity arrives later.
+                  {
+                    entity = "calendar.holland";
+                    name = "Holland";
+                    color = "#a855f7";
+                  }
                 ];
                 grid_options.columns = "full";
+              }
+            ];
+          }
+        ];
+      };
+
+      # ── Finn dashboard (private; phone/sidebar, NOT on the shared kiosk) ──
+      # Holds the items split out of the shared home view: a pending-meds alert
+      # with quick "taken" toggles, the vacuum/humidifier consumable warning
+      # chips (now ChoreOps chores assigned to specific people), and Finn's
+      # chore to-do list. Single view; reachable from the HA sidebar.
+      finnView = {
+        type = "sections";
+        title = "Finn";
+        icon = "mdi:account";
+        path = "finn";
+        max_columns = 2;
+        badges = [
+          {
+            type = "entity";
+            show_state = true;
+            show_icon = true;
+            entity = "sensor.nougat_battery_level";
+            color = "state";
+          }
+        ];
+        sections = [
+          # ── Meds: alert (when pending) + mark-taken toggles ───────────────
+          {
+            type = "grid";
+            cards = [
+              {
+                type = "heading";
+                heading = "Meds";
+                heading_style = "title";
+                icon = "mdi:pill";
+              }
+              medsCard
+              {
+                type = "grid";
+                columns = 2;
+                square = false;
+                cards = [
+                  {
+                    type = "tile";
+                    entity = "input_boolean.morning_meds_taken";
+                    name = "Morning";
+                    icon = "mdi:weather-sunny";
+                  }
+                  {
+                    type = "tile";
+                    entity = "input_boolean.night_meds_taken";
+                    name = "Night";
+                    icon = "mdi:weather-night";
+                  }
+                ];
+              }
+            ];
+          }
+          # ── To-do: Finn's chores + today's calendar ───────────────────────
+          {
+            type = "grid";
+            cards = [
+              {
+                type = "heading";
+                heading = "To-do";
+                heading_style = "title";
+                icon = "mdi:format-list-checks";
+              }
+              choresTodo
+              (calendarToday "calendar.finn" "#f97316")
+            ];
+          }
+          # ── Upkeep: vacuum / humidifier consumable warnings ───────────────
+          {
+            type = "grid";
+            column_span = 2;
+            cards = [
+              {
+                type = "heading";
+                heading = "Upkeep";
+                heading_style = "title";
+                icon = "mdi:wrench";
+              }
+              consumableChips
+              {
+                type = "custom:mushroom-chips-card";
+                alignment = "start";
+                chips = [
+                  {
+                    type = "template";
+                    icon = "mdi:robot-vacuum-variant";
+                    icon_color = "blue";
+                    content = "Cleaning";
+                    tap_action = {
+                      action = "navigate";
+                      navigation_path = "/nixos-home/cleaning";
+                    };
+                  }
+                ];
               }
             ];
           }
@@ -1220,6 +1322,11 @@ _: {
           lightsView
           weekView
         ];
+      };
+
+      finnDashboard = yamlFormat.generate "lovelace-finn.yaml" {
+        title = "Finn";
+        views = [ finnView ];
       };
     in
     {
@@ -1248,7 +1355,20 @@ _: {
         show_in_sidebar = true;
       };
 
-      # Reload on rebuild when the generated dashboard changes (no manual push).
-      systemd.services.home-assistant.reloadTriggers = [ homeDashboard ];
+      # Finn's private dashboard — sidebar only (the shared iPad kiosk points at
+      # /nixos-home/home and never shows the sidebar, so this stays off it).
+      services.home-assistant.config.lovelace.dashboards.nixos-finn = {
+        mode = "yaml";
+        filename = "${finnDashboard}";
+        title = "Finn";
+        icon = "mdi:account";
+        show_in_sidebar = true;
+      };
+
+      # Reload on rebuild when either generated dashboard changes (no manual push).
+      systemd.services.home-assistant.reloadTriggers = [
+        homeDashboard
+        finnDashboard
+      ];
     };
 }
