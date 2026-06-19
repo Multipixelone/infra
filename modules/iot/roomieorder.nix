@@ -31,13 +31,13 @@ in
       yamlFormat = pkgs.formats.yaml { };
 
       # The dynamic grid uses custom:mushroom-template-card (gray-out + "N ago"),
-      # so the mushroom frontend must be loaded. Shipping it as a customLovelace
-      # module makes the HA module (a) serve it at
-      # /local/nixos-lovelace-modules/mushroom.js, (b) auto-set
-      # lovelace.resource_mode = "yaml", and (c) emit the lovelace.resources entry
-      # (via homeassistant.nix's customLovelaceModules → resources merge) — which
-      # is what loads the JS even though the DEFAULT dashboard stays storage mode.
-      mushroom = pkgs.home-assistant-custom-lovelace-modules.mushroom;
+      # so the mushroom frontend must be loaded. mushroom (and every other custom
+      # module on iot) is declared once in dashboard-home.nix's
+      # customLovelaceModules list — the single source of truth for frontend
+      # resources — so we do NOT re-declare it here (that would emit a duplicate
+      # lovelace.resources entry). The HA module serves it at
+      # /local/nixos-lovelace-modules/mushroom.js and auto-sets
+      # lovelace.resource_mode = "yaml", which loads the JS for this dashboard too.
 
       # One YAML-mode dashboard, one view, the catalog-derived dynamic grid.
       # yamlFormat.generate's out path IS the .yaml file, so we can point HA's
@@ -51,14 +51,31 @@ in
             title = "Reorder";
             path = "reorder";
             icon = "mdi:cart";
-            cards = [ buttons.dashboardCardDynamic ];
+            cards = [
+              # Back to the kiosk home view (the kiosk has no sidebar). The
+              # nixos-home dashboard's Reorder chip navigates here.
+              {
+                type = "custom:mushroom-chips-card";
+                alignment = "start";
+                chips = [
+                  {
+                    type = "template";
+                    icon = "mdi:arrow-left";
+                    content = "Back";
+                    tap_action = {
+                      action = "navigate";
+                      navigation_path = "/nixos-home/home?kiosk";
+                    };
+                  }
+                ];
+              }
+              buttons.dashboardCardDynamic
+            ];
           }
         ];
       };
     in
     {
-      services.home-assistant.customLovelaceModules = [ mushroom ];
-
       services.home-assistant.config = {
         rest_command = buttons.restCommand;
         # Per-item status sensors (one GET /items poll, one sensor per item) that
