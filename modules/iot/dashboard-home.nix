@@ -216,15 +216,14 @@ _: {
         }
         // (accentStyle color);
 
-      # Time-aware greeting header for the top of the home view.
-      greetingCard = {
-        type = "custom:mushroom-template-card";
-        primary = "{% set h = now().hour %}{{ 'Good morning' if h < 12 else 'Good afternoon' if h < 18 else 'Good evening' }}";
-        secondary = "{{ now().strftime('%A, %B ') }}{{ now().day }}";
+      # Date + time chip for the top badge row (replaces the old greeting card,
+      # so it no longer pushes the people columns down). Time-aware icon kept.
+      dateTimeBadge = {
+        type = "custom:mushroom-template-badge";
+        content = "{{ now().strftime('%a %-d %b · %-I:%M %p') }}";
         icon = "{% set h = now().hour %}{{ 'mdi:weather-sunset-up' if h < 8 else 'mdi:weather-sunny' if h < 18 else 'mdi:weather-night' }}";
-        icon_color = "{% set h = now().hour %}{{ 'amber' if h < 18 else 'deep-purple' }}";
-      }
-      // (accentStyle "var(--primary-color)");
+        color = "{% set h = now().hour %}{{ 'amber' if h < 18 else 'deep-purple' }}";
+      };
 
       # Glanceable meds toggle: green check when taken, amber prompt otherwise.
       medToggle = entity: label: icon: {
@@ -377,6 +376,7 @@ _: {
         max_columns = 4;
 
         badges = [
+          dateTimeBadge
           {
             type = "entity";
             entity = "sensor.humidifier_humidity";
@@ -435,7 +435,6 @@ _: {
           {
             type = "grid";
             cards = [
-              greetingCard
               {
                 type = "heading";
                 heading = "Finn & Emily";
