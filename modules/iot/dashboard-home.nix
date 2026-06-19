@@ -18,6 +18,13 @@
 # cleaning, lights and week sub-views (all declarative here). The Reorder chip
 # crosses to the separate `nixos-reorder` dashboard (same catalog.json generator,
 # so not a second source of truth); that dashboard has a Back chip home.
+#
+# The home view leads with a "Household" section that surfaces the shared
+# ChoreOps state — a points leaderboard + a "needs doing" strip — which taps
+# through to ChoreOps's own auto-managed `cod-chores` storage dashboard for the
+# actionable claim/approve UI. Those links intentionally OMIT `?kiosk` so HA's
+# chrome (sidebar + per-person view tabs) stays available on cod-chores: it is
+# integration-managed, so we never edit it to add our own back/nav chrome.
 # `?kiosk` chrome (hidden header/sidebar) is the kiosk-mode plugin, declared below.
 # The storage `main-home` dashboard is left intact as a fallback.
 _: {
@@ -369,6 +376,136 @@ _: {
         hide_section_headers = true;
       };
 
+      # ── ChoreOps (shared household) ───────────────────────────────────────
+      # ChoreOps runs the apartment's shared chores + points. The actionable
+      # claim/approve UI lives on the integration's own auto-managed `cod-chores`
+      # storage dashboard (per-person pages, kept in sync by the integration and
+      # built from custom:button-card + custom:auto-entities — both already in
+      # customLovelaceModules, so it renders under this host's yaml resource mode).
+      # The shared kitchen view carries only a glanceable standings + what's-due
+      # summary that taps through to that dashboard.
+
+      # One roommate's standing: points balance + how many chores are due/overdue
+      # right now, tinted red when anything is overdue. Taps into that person's
+      # page on cod-chores to claim/complete.
+      leaderCard =
+        user: name: color:
+        {
+          type = "custom:mushroom-template-card";
+          primary = name;
+          secondary = "{{ states('sensor.${user}_choreops_points') | int(0) }} pts · {% set d = (state_attr('sensor.${user}_choreops_chores', 'chore_stat_current_due_today') | int(0)) + (state_attr('sensor.${user}_choreops_chores', 'chore_stat_current_overdue') | int(0)) %}{{ (d ~ ' to do') if d > 0 else 'all done' }}";
+          icon = "mdi:star-circle";
+          icon_color = "{% set o = state_attr('sensor.${user}_choreops_chores', 'chore_stat_current_overdue') | int(0) %}{{ 'red' if o > 0 else '${color}' }}";
+          badge_icon = "{% set o = state_attr('sensor.${user}_choreops_chores', 'chore_stat_current_overdue') | int(0) %}{{ 'mdi:alert-circle' if o > 0 else '' }}";
+          badge_color = "red";
+          # No ?kiosk: the auto-managed cod-chores dashboard is left untouched, so
+          # we rely on HA's own chrome (sidebar + per-person view tabs) there for
+          # claim/approve, switching roommates, and getting back to Home.
+          tap_action = {
+            action = "navigate";
+            navigation_path = "/cod-chores/${user}";
+          };
+        }
+        // (accentStyle color);
+
+      # "Needs doing" chips: every chore that needs doing TODAY — overdue or
+      # due today — deduped by chore name across the household (shared chores show
+      # up per-person). "Due today" is gated on the sensor's own due_date (local
+      # date <= today): a chore that's merely pending but not due for days/weeks
+      # (or has no deadline at all, due_date null) is left off, so the strip
+      # matches the leaderboard's due_today+overdue "to do" count rather than
+      # listing the whole backlog. Each is labelled + colour-coded by owner (the
+      # per-person accent scheme, keyed off the sensor's user_name) and TAPS TO COMPLETE
+      # it — pressing the chore's own per-owner button (claim if present, else
+      # approve), exactly the button.press action ChoreOps's own cod-chores card
+      # fires, so the chore is marked done + points awarded to the current owner.
+      # A confirmation guards against accidental taps on the shared kiosk. Only
+      # chores that expose a button are listed; hidden entirely when none remain.
+      needsDoingChips = {
+        type = "custom:auto-entities";
+        card_param = "chips";
+        show_empty = false;
+        card = {
+          type = "custom:mushroom-chips-card";
+          alignment = "start";
+        };
+        filter.template = ''
+          {%- set colors = {'Finn': '#f97316', 'Ciara': '#10b981', 'Holland': '#a855f7'} -%}
+          {%- set today = now().date() -%}
+          {%- set ns = namespace(chips=[], seen=[]) -%}
+          {%- for s in states.sensor | selectattr('entity_id', 'search', '_choreops_chore_status_') -%}
+            {%- set cn = s.attributes.chore_name | default("") -%}
+            {%- set btn = s.attributes.claim_button_eid or s.attributes.approve_button_eid -%}
+            {%- set dd = s.attributes.due_date -%}
+            {%- set due_today = dd and (dd | as_datetime | as_local).date() <= today -%}
+            {%- if s.state in ['pending', 'overdue'] and due_today and cn and btn and cn not in ns.seen -%}
+              {%- set ns.seen = ns.seen + [cn] -%}
+              {%- set owner = s.attributes.user_name | default("") -%}
+              {%- set chip = {
+                'type': 'template',
+                'icon': s.attributes.icon | default('mdi:checkbox-marked-circle-outline'),
+                'icon_color': colors.get(owner, 'grey'),
+                'content': (cn ~ (' · ' ~ owner if owner else "")),
+                'tap_action': {
+                  'action': 'perform-action',
+                  'perform_action': 'button.press',
+                  'target': {'entity_id': btn},
+                  'confirmation': {'text': ('Complete ' ~ cn ~ (' for ' ~ owner if owner else "") ~ '?')}
+                }
+              } -%}
+              {%- set ns.chips = ns.chips + [chip] -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.chips[:12] | tojson }}
+        '';
+      };
+
+      # Combined "today" agenda across the residents' calendars + the shared
+      # household calendar. Same atomic-calendar-revive polish as calendarToday
+      # but multi-entity, with the calendar name shown so events read as "whose".
+      sharedAgenda = entities: accent: {
+        type = "custom:atomic-calendar-revive";
+        name = "Today";
+        maxDaysToShow = 1;
+        maxEventCount = 12;
+        showLoader = false;
+        showDate = false;
+        showLocation = false;
+        showCalendarName = true;
+        showNoEventsForToday = true;
+        hideFinishedEvents = true;
+        disableEventLink = true;
+        compactMode = true;
+        hoursOnSameLine = true;
+        eventDateFormat = "ddd MMM D";
+        language = "en";
+        showColors = true;
+        showCurrentEventLine = true;
+        showProgressBar = true;
+        dimFinishedEvents = true;
+        showRelativeTime = true;
+        eventTitleSize = 95;
+        timeSize = 78;
+        defaultColor = "var(--primary-text-color)";
+        inherit entities;
+        tap_action = {
+          action = "navigate";
+          navigation_path = "/nixos-home/week?kiosk";
+        };
+        card_mod.style = ''
+          ha-card {
+            border-radius: 18px !important;
+            border: none !important;
+            border-left: 4px solid ${accent} !important;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07) !important;
+            padding: 2px 14px 10px !important;
+          }
+          .event-right { row-gap: 3px !important; }
+          .event-right-top,
+          .event-right-bottom { line-height: 1.2 !important; }
+        '';
+      };
+
       homeView = {
         type = "sections";
         title = "Home";
@@ -431,15 +568,15 @@ _: {
         ];
 
         sections = [
-          # ── Finn & Emily: greeting, presence + Finn's calendar ────────────
+          # ── Today: who's home + the shared agenda ─────────────────────────
           {
             type = "grid";
             cards = [
               {
                 type = "heading";
-                heading = "Finn & Emily";
+                heading = "Today";
                 heading_style = "title";
-                icon = "mdi:account-multiple";
+                icon = "mdi:account-group";
                 badges = [
                   {
                     type = "entity";
@@ -448,31 +585,6 @@ _: {
                     entity = "sensor.nougat_battery_level";
                     color = "state";
                   }
-                ];
-              }
-              {
-                type = "grid";
-                columns = 2;
-                square = false;
-                cards = [
-                  (personCard "person.finn" "#f97316")
-                  (personCard "person.emily" "#f43f5e")
-                ];
-              }
-              (calendarToday "calendar.finn" "#f97316")
-            ];
-          }
-
-          # ── Ciara & Holland: presence + their calendars + shopping list ───
-          {
-            type = "grid";
-            cards = [
-              {
-                type = "heading";
-                heading = "Ciara & Holland";
-                heading_style = "title";
-                icon = "mdi:account-multiple";
-                badges = [
                   {
                     type = "entity";
                     show_state = true;
@@ -487,20 +599,74 @@ _: {
                 columns = 2;
                 square = false;
                 cards = [
+                  (personCard "person.finn" "#f97316")
                   (personCard "person.ciara" "#10b981")
                   (personCard "person.holland" "#a855f7")
+                  (personCard "person.emily" "#f43f5e")
                 ];
               }
-              (calendarToday "calendar.ciara" "#10b981")
-              # Holland's calendar — entity arrives later; the card stays empty
-              # until calendar.holland exists.
-              (calendarToday "calendar.holland" "#a855f7")
+              (sharedAgenda [
+                {
+                  entity = "calendar.finn";
+                  color = "#f97316";
+                }
+                {
+                  entity = "calendar.ciara";
+                  color = "#10b981";
+                }
+                {
+                  entity = "calendar.holland";
+                  color = "#a855f7";
+                }
+              ] "#64748b")
+            ];
+          }
+
+          # ── Household: chore standings + tap-to-complete ─────────────────
+          # The apartment's shared chores live in ChoreOps. A points leaderboard
+          # (each taps to that person's cod-chores page) sits above a "needs
+          # doing" strip whose chips complete the chore inline on tap.
+          {
+            type = "grid";
+            cards = [
               {
-                display_order = "none";
-                type = "todo-list";
-                entity = "todo.foodtown";
-                hide_completed = true;
-                hide_section_headers = true;
+                type = "heading";
+                heading = "Household";
+                heading_style = "title";
+                icon = "mdi:trophy";
+              }
+              {
+                type = "grid";
+                columns = 3;
+                square = false;
+                cards = [
+                  (leaderCard "finn" "Finn" "#f97316")
+                  (leaderCard "ciara" "Ciara" "#10b981")
+                  (leaderCard "holland" "Holland" "#a855f7")
+                ];
+              }
+              {
+                type = "heading";
+                heading = "Needs doing";
+                heading_style = "subtitle";
+                icon = "mdi:clipboard-list-outline";
+              }
+              needsDoingChips
+              {
+                type = "custom:mushroom-chips-card";
+                alignment = "start";
+                chips = [
+                  {
+                    type = "template";
+                    icon = "mdi:clipboard-check-multiple-outline";
+                    icon_color = "teal";
+                    content = "All chores";
+                    tap_action = {
+                      action = "navigate";
+                      navigation_path = "/cod-chores";
+                    };
+                  }
+                ];
               }
             ];
           }
@@ -579,6 +745,19 @@ _: {
                     };
                   }
                 ];
+              }
+              {
+                type = "heading";
+                heading = "Shopping list";
+                heading_style = "subtitle";
+                icon = "mdi:cart-outline";
+              }
+              {
+                display_order = "none";
+                type = "todo-list";
+                entity = "todo.foodtown";
+                hide_completed = true;
+                hide_section_headers = true;
               }
               {
                 type = "media-control";
@@ -1281,7 +1460,6 @@ _: {
                     name = "Ciara";
                     color = "#10b981";
                   }
-                  # Holland's calendar — entity arrives later.
                   {
                     entity = "calendar.holland";
                     name = "Holland";
