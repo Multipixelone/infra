@@ -930,11 +930,14 @@
           # once the sensor jumps back to ~100%.
           #
           # ChoreOps fires no events, so we watch each chore's status sensor.
-          # Finn-only ("independent") chores expose only a per-assignee sensor
-          # (sensor.finn_choreops_chore_status_<slug>); shared chores expose a
-          # global-status sensor (sensor.office_system_choreops_<slug>_global_status).
-          # The time_pattern trigger re-checks periodically in case a status
-          # transition is missed.
+          # Cleaning chores ("shared_first") expose a global-status sensor
+          # (sensor.office_system_choreops_<slug>_global_status) whose STATE is the
+          # overall state. Part-swap chores ("rotation_primary_standby") expose no
+          # global-status sensor — we watch Finn's per-assignee sensor
+          # (sensor.finn_choreops_chore_status_<slug>) and read its `global_state`
+          # ATTRIBUTE, which reflects completion by Finn OR a standby roommate. The
+          # condition below checks both forms. The time_pattern trigger re-checks
+          # periodically in case a status (or attribute-only) transition is missed.
           {
             alias = "Consumables: Press hardware reset when ChoreOps chore completed";
             id = "consumable_reset_from_choreops";
@@ -1000,7 +1003,8 @@
                               condition = "template";
                               value_template = ''
                                 {{ is_state('input_boolean.' ~ repeat.item.flag, 'on')
-                                   and states(repeat.item.status_sensor) in ['approved', 'completed'] }}
+                                   and (states(repeat.item.status_sensor) in ['approved', 'completed']
+                                        or state_attr(repeat.item.status_sensor, 'global_state') in ['approved', 'completed']) }}
                               '';
                             }
                           ];
@@ -1448,8 +1452,32 @@
                     ];
                   }
                 ];
-                # ── Daytime (6am → sunset): only set fairy lights preset ─────────
+                # ── Daytime (6am → sunset): bright warm lights on arrival ────────
+                # Room lights still come on so arrivals before sunset aren't
+                # left dark (summer evenings, overcast days). Brighter + neutral
+                # warm white rather than the dim red used after dark.
                 default = [
+                  {
+                    service = "light.turn_on";
+                    target = {
+                      entity_id = "light.living_room";
+                    };
+                    data = {
+                      color_temp_kelvin = 2700;
+                      brightness_pct = 70;
+                      transition = 3;
+                    };
+                  }
+                  {
+                    service = "light.turn_on";
+                    target = {
+                      entity_id = "light.smart_led_bulb_2";
+                    };
+                    data = {
+                      brightness_pct = 60;
+                      transition = 3;
+                    };
+                  }
                   {
                     choose = [
                       {
