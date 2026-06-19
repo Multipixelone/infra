@@ -84,7 +84,11 @@
       eufyWaterLevelSensor = "sensor.vaccum_water_level";
       eufyErrorSensor = "sensor.vaccum_error_message";
       levoitWaterSensor = "binary_sensor.humidifier_low_water";
-      todoistLabel = "care";
+
+      # Telemetry automations make the matching ChoreOps chore due via
+      # choreops.set_chore_due_date. The service rejects past dates, so nudge the
+      # timestamp 1 minute ahead — the chore shows as due/overdue immediately.
+      choreDueSoon = "{{ (now() + timedelta(minutes=1)).isoformat() }}";
 
       # ── YAML generation ─────────────────────────────────────────────────
       yamlFormat = pkgs.formats.yaml { };
@@ -196,10 +200,10 @@
         # Moved out of services.home-assistant.config so HA merges both Nix and UI
         # automations via `automation manual:` / `automation ui:` !include directives.
         iotHass.nixAutomations = [
-          # ── Eufy: low-water Todoist task ────────────────────────────────
-          # Uses a dedupe flag so repeated triggers do not spam Todoist.
+          # ── Eufy: low-water → make ChoreOps chore due ───────────────────
+          # Uses a dedupe flag so repeated triggers do not re-set the due date.
           {
-            alias = "Eufy: Low water — create Todoist task";
+            alias = "Eufy: Low water — make ChoreOps chore due";
             id = "eufy_low_water_task";
             trigger = [
               {
@@ -221,14 +225,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Refill Eufy vacuum water tank";
-                  description = "Refill tank to prevent cleaning interruptions. (Status: Low water warning)";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 2;
+                  chore_name = "Fill Vacuum Water Tank";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -240,10 +240,10 @@
             ];
           }
 
-          # ── Eufy: error + Todoist task ──────────────────────────────────
+          # ── Eufy: error → make ChoreOps chore due ───────────────────────
           # Fires for low-water error states; dedupe-guarded.
           {
-            alias = "Eufy: Error — create Todoist task";
+            alias = "Eufy: Error — make ChoreOps chore due";
             id = "eufy_error_task";
             trigger = [
               {
@@ -264,14 +264,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Refill Eufy vacuum water tank";
-                  description = "Refill tank and manually resume the vacuum. (Status: Paused with error)";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 2;
+                  chore_name = "Fill Vacuum Water Tank";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -284,7 +280,7 @@
           }
 
           # ── Eufy: water guard — create task if water critically low ─────
-          # Creates a Todoist task when water is below 15%.
+          # Makes the chore due when water is below 15%.
           {
             alias = "Eufy: Guard — create task if water critically low";
             id = "eufy_water_guard";
@@ -313,14 +309,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Refill Eufy vacuum water tank";
-                  description = "Refill tank before starting the next cycle. (Status: Water critically low)";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 2;
+                  chore_name = "Fill Vacuum Water Tank";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -358,16 +350,22 @@
                   entity_id = "input_boolean.eufy_water_task_open";
                 };
               }
+              {
+                # Resolved outside ChoreOps — clear the due date so the chore
+                # returns to dormant (no due_date ⇒ cleared).
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Fill Vacuum Water Tank";
+              }
             ];
           }
 
-          # ── Eufy: consumable wear-life → Todoist tasks ──────────────────
+          # ── Eufy: consumable wear-life → make ChoreOps chores due ───────
           # Mirrors the Eufy low-water pattern: each consumable has a
           # warning automation (fires at ~10% of lifespan) and a reset
           # automation (fires when the value jumps back above ~90% after
           # the user presses the corresponding reset button in HA).
           {
-            alias = "Eufy: Filter low — create Todoist task";
+            alias = "Eufy: Filter low — make ChoreOps chore due";
             id = "eufy_filter_low_task";
             trigger = [
               {
@@ -389,14 +387,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Replace Eufy vacuum HEPA filter";
-                  description = "Filter has {{ states('sensor.vaccum_filter_remaining') }}h life remaining (360h total). Press the Reset Filter button in HA after installing the new one.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Replace Vacuum HEPA Filter";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -432,11 +426,15 @@
                   entity_id = "input_boolean.vacuum_filter_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Replace Vacuum HEPA Filter";
+              }
             ];
           }
 
           {
-            alias = "Eufy: Rolling brush low — create Todoist task";
+            alias = "Eufy: Rolling brush low — make ChoreOps chore due";
             id = "eufy_rolling_brush_low_task";
             trigger = [
               {
@@ -458,14 +456,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Replace Eufy vacuum rolling brush";
-                  description = "Rolling brush has {{ states('sensor.vaccum_rolling_brush_remaining') }}h life remaining (360h total). Press the Reset Rolling Brush button in HA after installing the new one.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Replace Vacuum Rolling Brush";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -501,11 +495,15 @@
                   entity_id = "input_boolean.vacuum_rolling_brush_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Replace Vacuum Rolling Brush";
+              }
             ];
           }
 
           {
-            alias = "Eufy: Side brush low — create Todoist task";
+            alias = "Eufy: Side brush low — make ChoreOps chore due";
             id = "eufy_side_brush_low_task";
             trigger = [
               {
@@ -527,14 +525,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Replace Eufy vacuum side brush";
-                  description = "Side brush has {{ states('sensor.vaccum_side_brush_remaining') }}h life remaining (180h total). Press the Reset Side Brush button in HA after installing the new one.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Replace Vacuum Side Brush";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -570,11 +564,15 @@
                   entity_id = "input_boolean.vacuum_side_brush_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Replace Vacuum Side Brush";
+              }
             ];
           }
 
           {
-            alias = "Eufy: Nav sensors due for cleaning — create Todoist task";
+            alias = "Eufy: Nav sensors due for cleaning — make ChoreOps chore due";
             id = "eufy_sensors_low_task";
             trigger = [
               {
@@ -596,14 +594,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Clean Eufy vacuum nav sensors";
-                  description = "Wipe IR/cliff sensors with a dry microfibre cloth. {{ states('sensor.vaccum_sensor_remaining') }}h life remaining (60h total). Press the Reset Sensors button in HA when done.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Clean Vacuum Nav Sensors";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -639,11 +633,15 @@
                   entity_id = "input_boolean.vacuum_sensors_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Clean Vacuum Nav Sensors";
+              }
             ];
           }
 
           {
-            alias = "Eufy: Cleaning tray due for service — create Todoist task";
+            alias = "Eufy: Cleaning tray due for service — make ChoreOps chore due";
             id = "eufy_cleaning_tray_low_task";
             trigger = [
               {
@@ -665,14 +663,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Clean Eufy vacuum cleaning tray";
-                  description = "Rinse the mopping tray and clear any debris. {{ states('sensor.vaccum_cleaning_tray_remaining') }}h life remaining (30h total). Press the Reset Cleaning Tray button in HA when done.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Clean Vacuum Cleaning Tray";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -708,11 +702,15 @@
                   entity_id = "input_boolean.vacuum_cleaning_tray_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Clean Vacuum Cleaning Tray";
+              }
             ];
           }
 
           {
-            alias = "Eufy: Mop cloth low — create Todoist task";
+            alias = "Eufy: Mop cloth low — make ChoreOps chore due";
             id = "eufy_mopping_cloth_low_task";
             trigger = [
               {
@@ -734,14 +732,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Wash Eufy mopping cloth (or replace if worn)";
-                  description = "Mopping cloth has {{ states('sensor.vaccum_mopping_cloth_remaining') }}h life remaining (180h total). Press the Reset Mopping Cloth button in HA after replacing.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Wash Vacuum Mop Cloth";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -777,13 +771,17 @@
                   entity_id = "input_boolean.vacuum_mopping_cloth_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Wash Vacuum Mop Cloth";
+              }
             ];
           }
 
-          # ── Levoit: low-water Todoist task ──────────────────────────────
-          # Uses a dedupe flag so repeated triggers do not spam Todoist.
+          # ── Levoit: low-water → make ChoreOps chore due ─────────────────
+          # Uses a dedupe flag so repeated triggers do not re-set the due date.
           {
-            alias = "Levoit: Low water — create Todoist task";
+            alias = "Levoit: Low water — make ChoreOps chore due";
             id = "levoit_low_water_task";
             trigger = [
               {
@@ -801,14 +799,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Refill Levoit humidifier water tank";
-                  description = "Remember how nice it is to have nice air?";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Fill Humidifier";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -846,15 +840,19 @@
                   entity_id = "input_boolean.levoit_water_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Fill Humidifier";
+              }
             ];
           }
 
-          # ── Levoit: filter sponges → Todoist order task ─────────────────
+          # ── Levoit: filter sponges → make ChoreOps order chore due ──────
           # No reset button on the integration — sensor jumps back to ~100
           # automatically when a new filter is installed and the device
           # registers it.
           {
-            alias = "Levoit: Filter sponges low — create Todoist task";
+            alias = "Levoit: Filter sponges low — make ChoreOps chore due";
             id = "levoit_filter_low_task";
             trigger = [
               {
@@ -876,14 +874,10 @@
             ];
             action = [
               {
-                service = "todoist.new_task";
+                service = "choreops.set_chore_due_date";
                 data = {
-                  content = "Order new Levoit humidifier filter sponges";
-                  description = "Filter at {{ states('sensor.humidifier_filter_lifetime') }}% — Levoit replacement sponges typically last ~3 months.";
-                  project = "Chores";
-                  due_date_string = "today";
-                  labels = todoistLabel;
-                  priority = 3;
+                  chore_name = "Order Levoit Filter Sponges";
+                  due_date = choreDueSoon;
                 };
               }
               {
@@ -919,25 +913,43 @@
                   entity_id = "input_boolean.levoit_filter_task_open";
                 };
               }
+              {
+                service = "choreops.set_chore_due_date";
+                data.chore_name = "Order Levoit Filter Sponges";
+              }
             ];
           }
 
-          # ── Consumables: press hardware reset when Todoist task is completed ──
+          # ── Consumables: press hardware reset when ChoreOps chore completed ──
           # Water + Levoit-filter sensors recover on their own (real-time level
           # or device-side detection), so they are not synced here. The Eufy
           # consumables below only reset when the corresponding HA button is
-          # pressed; doing it here lets checking the Todoist task off also
-          # reset the on-device wear-life counter. The existing
-          # `*_renewed_reset` automations then clear the dedupe flag once the
-          # sensor jumps back to ~100%.
+          # pressed; doing it here lets completing the ChoreOps chore also reset
+          # the on-device wear-life counter. The existing `*_renewed_reset`
+          # automations then clear the dedupe flag (and the chore's due date)
+          # once the sensor jumps back to ~100%.
+          #
+          # ChoreOps fires no events, so we watch each chore's status sensor.
+          # Finn-only ("independent") chores expose only a per-assignee sensor
+          # (sensor.finn_choreops_chore_status_<slug>); shared chores expose a
+          # global-status sensor (sensor.office_system_choreops_<slug>_global_status).
+          # The time_pattern trigger re-checks periodically in case a status
+          # transition is missed.
           {
-            alias = "Consumables: Sync flags from Todoist completion";
-            id = "consumable_flag_sync_from_todoist";
+            alias = "Consumables: Press hardware reset when ChoreOps chore completed";
+            id = "consumable_reset_from_choreops";
             mode = "single";
             trigger = [
               {
                 platform = "state";
-                entity_id = "todo.chores";
+                entity_id = [
+                  "sensor.finn_choreops_chore_status_replace_vacuum_hepa_filter"
+                  "sensor.finn_choreops_chore_status_replace_vacuum_rolling_brush"
+                  "sensor.finn_choreops_chore_status_replace_vacuum_side_brush"
+                  "sensor.office_system_choreops_clean_vacuum_nav_sensors_global_status"
+                  "sensor.office_system_choreops_clean_vacuum_cleaning_tray_global_status"
+                  "sensor.office_system_choreops_wash_vacuum_mop_cloth_global_status"
+                ];
               }
               {
                 platform = "time_pattern";
@@ -946,46 +958,36 @@
             ];
             action = [
               {
-                service = "todo.get_items";
-                target = {
-                  entity_id = "todo.chores";
-                };
-                data = {
-                  status = "needs_action";
-                };
-                response_variable = "chores";
-              }
-              {
                 repeat = {
                   for_each = [
                     {
                       flag = "vacuum_filter_task_open";
-                      summary = "Replace Eufy vacuum HEPA filter";
+                      status_sensor = "sensor.finn_choreops_chore_status_replace_vacuum_hepa_filter";
                       reset_button = "button.vaccum_reset_filter";
                     }
                     {
                       flag = "vacuum_rolling_brush_task_open";
-                      summary = "Replace Eufy vacuum rolling brush";
+                      status_sensor = "sensor.finn_choreops_chore_status_replace_vacuum_rolling_brush";
                       reset_button = "button.vaccum_reset_rolling_brush";
                     }
                     {
                       flag = "vacuum_side_brush_task_open";
-                      summary = "Replace Eufy vacuum side brush";
+                      status_sensor = "sensor.finn_choreops_chore_status_replace_vacuum_side_brush";
                       reset_button = "button.vaccum_reset_side_brush";
                     }
                     {
                       flag = "vacuum_sensors_task_open";
-                      summary = "Clean Eufy vacuum nav sensors";
+                      status_sensor = "sensor.office_system_choreops_clean_vacuum_nav_sensors_global_status";
                       reset_button = "button.vaccum_reset_sensors";
                     }
                     {
                       flag = "vacuum_cleaning_tray_task_open";
-                      summary = "Clean Eufy vacuum cleaning tray";
+                      status_sensor = "sensor.office_system_choreops_clean_vacuum_cleaning_tray_global_status";
                       reset_button = "button.vaccum_reset_cleaning_tray";
                     }
                     {
                       flag = "vacuum_mopping_cloth_task_open";
-                      summary = "Wash Eufy mopping cloth (or replace if worn)";
+                      status_sensor = "sensor.office_system_choreops_wash_vacuum_mop_cloth_global_status";
                       reset_button = "button.vaccum_reset_mopping_cloth";
                     }
                   ];
@@ -997,9 +999,8 @@
                             {
                               condition = "template";
                               value_template = ''
-                                {% set items = (chores | default({})).get('todo.chores', {}).get('items', []) %}
-                                {% set summaries = items | map(attribute='summary') | list %}
-                                {{ is_state('input_boolean.' ~ repeat.item.flag, 'on') and repeat.item.summary not in summaries }}
+                                {{ is_state('input_boolean.' ~ repeat.item.flag, 'on')
+                                   and states(repeat.item.status_sensor) in ['approved', 'completed'] }}
                               '';
                             }
                           ];
@@ -2372,12 +2373,12 @@
             # ── Eufy vacuum helpers ──────────────────────────────────────────
             input_boolean = {
               eufy_water_task_open = {
-                name = "Eufy water Todoist task open";
+                name = "Eufy water chore due";
                 icon = "mdi:water-alert";
                 initial = "off";
               };
               levoit_water_task_open = {
-                name = "Levoit humidifier water Todoist task open";
+                name = "Levoit humidifier water chore due";
                 icon = "mdi:water-alert";
                 initial = "off";
               };
@@ -2409,37 +2410,37 @@
                 initial = "off";
               };
               vacuum_filter_task_open = {
-                name = "Vacuum filter Todoist task open";
+                name = "Vacuum filter chore due";
                 icon = "mdi:air-filter";
                 initial = "off";
               };
               vacuum_rolling_brush_task_open = {
-                name = "Vacuum rolling brush Todoist task open";
+                name = "Vacuum rolling brush chore due";
                 icon = "mdi:broom";
                 initial = "off";
               };
               vacuum_side_brush_task_open = {
-                name = "Vacuum side brush Todoist task open";
+                name = "Vacuum side brush chore due";
                 icon = "mdi:broom";
                 initial = "off";
               };
               vacuum_sensors_task_open = {
-                name = "Vacuum sensor cleaning Todoist task open";
+                name = "Vacuum sensor cleaning chore due";
                 icon = "mdi:eye-check";
                 initial = "off";
               };
               vacuum_cleaning_tray_task_open = {
-                name = "Vacuum cleaning tray Todoist task open";
+                name = "Vacuum cleaning tray chore due";
                 icon = "mdi:tray-alert";
                 initial = "off";
               };
               vacuum_mopping_cloth_task_open = {
-                name = "Vacuum mopping cloth Todoist task open";
+                name = "Vacuum mopping cloth chore due";
                 icon = "mdi:dishwasher";
                 initial = "off";
               };
               levoit_filter_task_open = {
-                name = "Levoit filter sponges Todoist task open";
+                name = "Levoit filter sponges chore due";
                 icon = "mdi:air-filter";
                 initial = "off";
               };
