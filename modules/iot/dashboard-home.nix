@@ -212,7 +212,7 @@ _: {
           primary_info = "state";
           secondary_info = "last-changed";
           icon_type = "entity-picture";
-          layout = "vertical";
+          layout = "horizontal";
         }
         // (accentStyle color);
 
