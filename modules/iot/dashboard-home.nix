@@ -19,10 +19,12 @@
 # crosses to the separate `nixos-reorder` dashboard (same catalog.json generator,
 # so not a second source of truth); that dashboard has a Back chip home.
 #
-# The home view leads with a "Household" section that surfaces the shared
-# ChoreOps state — a points leaderboard + a "needs doing" strip — which taps
-# through to ChoreOps's own auto-managed `cod-chores` storage dashboard for the
-# actionable claim/approve UI. Those links intentionally OMIT `?kiosk` so HA's
+# The home view's "Today" column carries the shared ChoreOps state — a points
+# leaderboard + a "needs doing" strip — folded in directly under the day's
+# agenda (the chores are due today, so they read as part of "today" rather than
+# floating in their own auto-placed column). Those cards tap through to
+# ChoreOps's own auto-managed `cod-chores` storage dashboard for the actionable
+# claim/approve UI. Those links intentionally OMIT `?kiosk` so HA's
 # chrome (sidebar + per-person view tabs) stays available on cod-chores: it is
 # integration-managed, so we never edit it to add our own back/nav chrome.
 # `?kiosk` chrome (hidden header/sidebar) is the kiosk-mode plugin, declared below.
@@ -409,13 +411,15 @@ _: {
         // (accentStyle color);
 
       # "Needs doing" chips: every chore that needs doing TODAY — overdue or
-      # due today — deduped by chore name across the household (shared chores show
-      # up per-person). "Due today" is gated on the sensor's own due_date (local
-      # date <= today): a chore that's merely pending but not due for days/weeks
-      # (or has no deadline at all, due_date null) is left off, so the strip
-      # matches the leaderboard's due_today+overdue "to do" count rather than
-      # listing the whole backlog. Each is labelled + colour-coded by owner (the
-      # per-person accent scheme, keyed off the sensor's user_name) and TAPS TO COMPLETE
+      # due today — deduped by chore name across the household (one chip per chore,
+      # first matching per-person status sensor wins). "Due today" is gated on the
+      # sensor's own due_date (local date <= today): a chore that's merely pending
+      # but not due for days/weeks (or has no deadline at all, due_date null) is
+      # left off, so the strip matches the leaderboard's due_today+overdue "to do"
+      # count rather than listing the whole backlog. Solo chores are labelled +
+      # colour-coded by owner (the per-person accent scheme, keyed off the sensor's
+      # user_name); shared chores (assigned_user_names > 1) read "· Everyone" in
+      # neutral grey rather than collapsing onto whichever assignee sorts first. Each TAPS TO COMPLETE
       # it — pressing the chore's own per-owner button (claim if present, else
       # approve), exactly the button.press action ChoreOps's own cod-chores card
       # fires, so the chore is marked done + points awarded to the current owner.
@@ -440,17 +444,21 @@ _: {
             {%- set due_today = dd and (dd | as_datetime | as_local).date() <= today -%}
             {%- if s.state in ['pending', 'overdue'] and due_today and cn and btn and cn not in ns.seen -%}
               {%- set ns.seen = ns.seen + [cn] -%}
+              {%- set assignees = s.attributes.assigned_user_names | default([]) -%}
+              {%- set shared = assignees | length > 1 -%}
               {%- set owner = s.attributes.user_name | default("") -%}
+              {%- set label = 'Everyone' if shared else owner -%}
+              {%- set chip_color = 'grey' if shared else colors.get(owner, 'grey') -%}
               {%- set chip = {
                 'type': 'template',
                 'icon': s.attributes.icon | default('mdi:checkbox-marked-circle-outline'),
-                'icon_color': colors.get(owner, 'grey'),
-                'content': (cn ~ (' · ' ~ owner if owner else "")),
+                'icon_color': chip_color,
+                'content': (cn ~ (' · ' ~ label if label else "")),
                 'tap_action': {
                   'action': 'perform-action',
                   'perform_action': 'button.press',
                   'target': {'entity_id': btn},
-                  'confirmation': {'text': ('Complete ' ~ cn ~ (' for ' ~ owner if owner else "") ~ '?')}
+                  'confirmation': {'text': ('Complete ' ~ cn ~ (' for ' ~ label if label else "") ~ '?')}
                 }
               } -%}
               {%- set ns.chips = ns.chips + [chip] -%}
@@ -568,7 +576,7 @@ _: {
         ];
 
         sections = [
-          # ── Today: who's home + the shared agenda ─────────────────────────
+          # ── Today: who's home + the shared agenda + today's chores ────────
           {
             type = "grid";
             cards = [
@@ -619,16 +627,13 @@ _: {
                   color = "#a855f7";
                 }
               ] "#64748b")
-            ];
-          }
 
-          # ── Household: chore standings + tap-to-complete ─────────────────
-          # The apartment's shared chores live in ChoreOps. A points leaderboard
-          # (each taps to that person's cod-chores page) sits above a "needs
-          # doing" strip whose chips complete the chore inline on tap.
-          {
-            type = "grid";
-            cards = [
+              # ── Household: chore standings + tap-to-complete ───────────────
+              # Folded into the Today column on purpose: these chores are due
+              # TODAY, so they belong directly under the day's agenda rather than
+              # floating in their own auto-placed column. A points leaderboard
+              # (each taps to that person's cod-chores page) sits above a "needs
+              # doing" strip whose chips complete the chore inline on tap.
               {
                 type = "heading";
                 heading = "Household";
