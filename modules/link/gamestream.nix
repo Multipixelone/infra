@@ -37,6 +37,15 @@
       #   pkgs.runCommand "${lib.nameFromURL url "."}.png" {} ''${pkgs.imagemagick}/bin/convert ${image} -background none -gravity center -extent 600x800 $out'';
       # implementation from https://github.com/TophC7/dot.nix/blob/724e87bb986f4e722490b0b739b8cbf57f1d5fcc/home/global/common/gaming/gamescope.nix
       gamescope-env = ''
+        # MangoHud's session-wide env vars (modules/gaming/mangohud.nix) hook
+        # every Vulkan process, including gamescope's own internal compositor
+        # device. That double-hook crashes gamescope at shutdown (SIGSEGV in
+        # libMangoHud.so during gamescope's CVulkanDevice teardown). gamescope
+        # ships its own --mangoapp overlay specifically to avoid this; unset
+        # the global hook here and rely on --mangoapp (added in
+        # gamescope-base-opts below) instead.
+        set -e MANGOHUD
+        set -e MANGOHUD_DLSYM
         set -x ENABLE_GAMESCOPE_WSI 1
         set -x ENABLE_HDR_WSI 1
         set -x DXVK_HDR 1
@@ -73,6 +82,7 @@
         "--force-grab-cursor"
         "--hide-cursor-delay"
         "3000"
+        "--mangoapp"
       ];
       # exec ${config.security.wrappers.gamescope.program} $final_args -- $argv
       gamescope-run = pkgs.writers.writeFishBin "gamescope-run" ''
