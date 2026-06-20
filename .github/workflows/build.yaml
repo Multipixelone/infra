@@ -6,8 +6,10 @@
       "runs-on": "ubuntu-latest",
       "steps": [
         {
-          "name": "Remove unused toolkits",
-          "run": "sudo rm -rf $AGENT_TOOLSDIRECTORY\nsudo rm -rf /usr/local/.ghcup\nsudo rm -rf /usr/local/share/powershell\nsudo rm -rf /usr/local/share/chromium\nsudo rm -rf /usr/local/lib/node_modules\nsudo rm -rf /usr/local/lib/heroku\nsudo rm -rf /var/lib/docker/overlay2\nsudo rm -rf /home/linuxbrew\nsudo rm -rf /home/runner/.rustup\nsudo rm -rf /etc/ssh/sshd_config.d/50-cloud-init.conf\n"
+          "uses": "wimpysworld/nothing-but-nix@main",
+          "with": {
+            "hatchet-protocol": "rampage"
+          }
         },
         {
           "uses": "actions/checkout@v4",
@@ -38,7 +40,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 1 \\\n       --eval-workers 1 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
         }
       ],
       "strategy": {
@@ -48,7 +50,59 @@
         },
         "max-parallel": 5
       },
-      "timeout-minutes": 350
+      "timeout-minutes": 180
+    },
+    "check-aarch64": {
+      "continue-on-error": true,
+      "needs": "get-check-names",
+      "runs-on": "ubuntu-24.04-arm",
+      "steps": [
+        {
+          "uses": "wimpysworld/nothing-but-nix@main",
+          "with": {
+            "hatchet-protocol": "rampage"
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "submodules": true
+          }
+        },
+        {
+          "name": "Create attic netrc",
+          "run": "sudo mkdir -p /etc/nix /etc/determinate\necho \"machine attic-cache.fly.dev login automated password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\necho '{\"authentication\":{\"additionalNetrcSources\":[\"/etc/nix/netrc\"]}}' | sudo tee /etc/determinate/config.json > /dev/null\ngit config --global url.\"https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n"
+        },
+        {
+          "uses": "DeterminateSystems/nix-installer-action@v22",
+          "with": {
+            "extra-conf": "fallback = true\nhttp-connections = 25\nmax-substitution-jobs = 16\nconnect-timeout = 15\nstalled-download-timeout = 15\ndownload-attempts = 100\naccept-flake-config = true\nnetrc-file = /etc/nix/netrc\nsubstituters = https://yazi.cachix.org https://helix.cachix.org https://cache.nixos.org https://attic-cache.fly.dev/system?priority=50 https://nix-community.cachix.org https://cache.garnix.io https://hyprland.cachix.org https://anyrun.cachix.org https://prismlauncher.cachix.org https://nix-gaming.cachix.org\ntrusted-public-keys = yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k= helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= system:qjMAtak3MMVYM2B3EoLvNG9duRTrjdNS65RTagsr+y4= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s= prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c= nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=\n",
+            "flakehub": false
+          }
+        },
+        {
+          "name": "Install SSH key",
+          "uses": "webfactory/ssh-agent@v0.9.0",
+          "with": {
+            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
+          }
+        },
+        {
+          "name": "Login to attic",
+          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+        },
+        {
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.aarch64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.aarch64-linux.\"${{ matrix.checks }}\"'; }\n"
+        }
+      ],
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "checks": "${{ fromJson(needs.get-check-names.outputs.checks-aarch64) }}"
+        },
+        "max-parallel": 5
+      },
+      "timeout-minutes": 180
     },
     "check-nixos": {
       "continue-on-error": true,
@@ -59,8 +113,10 @@
       "runs-on": "ubuntu-latest",
       "steps": [
         {
-          "name": "Remove unused toolkits",
-          "run": "sudo rm -rf $AGENT_TOOLSDIRECTORY\nsudo rm -rf /usr/local/.ghcup\nsudo rm -rf /usr/local/share/powershell\nsudo rm -rf /usr/local/share/chromium\nsudo rm -rf /usr/local/lib/node_modules\nsudo rm -rf /usr/local/lib/heroku\nsudo rm -rf /var/lib/docker/overlay2\nsudo rm -rf /home/linuxbrew\nsudo rm -rf /home/runner/.rustup\nsudo rm -rf /etc/ssh/sshd_config.d/50-cloud-init.conf\n"
+          "uses": "wimpysworld/nothing-but-nix@main",
+          "with": {
+            "hatchet-protocol": "rampage"
+          }
         },
         {
           "uses": "actions/checkout@v4",
@@ -91,7 +147,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 1 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 1 \\\n       --eval-workers 1 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
         }
       ],
       "strategy": {
@@ -101,11 +157,12 @@
         },
         "max-parallel": 5
       },
-      "timeout-minutes": 350
+      "timeout-minutes": 180
     },
     "get-check-names": {
       "outputs": {
         "checks": "${{ steps.get-check-names.outputs.checks }}",
+        "checks-aarch64": "${{ steps.get-check-names.outputs.checks-aarch64 }}",
         "checks-nixos": "${{ steps.get-check-names.outputs.checks-nixos }}"
       },
       "runs-on": "ubuntu-latest",
@@ -144,7 +201,7 @@
         },
         {
           "id": "get-check-names",
-          "run": "all_checks=\"$(nix --accept-flake-config --allow-import-from-derivation eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\" >> $GITHUB_OUTPUT\n"
+          "run": "all_checks=\"$(nix --accept-flake-config --allow-import-from-derivation eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\" >> $GITHUB_OUTPUT\naarch64_checks=\"$(nix --accept-flake-config --allow-import-from-derivation eval --json .#checks.aarch64-linux --apply builtins.attrNames)\"\necho \"checks-aarch64=$aarch64_checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }

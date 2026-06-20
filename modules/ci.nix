@@ -36,13 +36,16 @@ let
       getCheckNames = "get-check-names";
       check = "check";
       checkNixos = "check-nixos";
+      checkAarch64 = "check-aarch64";
     };
     steps.getCheckNames = "get-check-names";
     outputs = {
       jobs.getCheckNames = "checks";
       jobs.getCheckNamesNixos = "checks-nixos";
+      jobs.getCheckNamesAarch64 = "checks-aarch64";
       steps.getCheckNames = "checks";
       steps.getCheckNamesNixos = "checks-nixos";
+      steps.getCheckNamesAarch64 = "checks-aarch64";
     };
   };
 
@@ -53,6 +56,13 @@ let
   runner = {
     name = "ubuntu-latest";
     system = "x86_64-linux";
+  };
+
+  # Native ARM runner (free on public repos). aarch64 has no host toplevels —
+  # the check set is the portable package subset (see modules/package-checks.nix).
+  aarch64Runner = {
+    name = "ubuntu-24.04-arm";
+    system = "aarch64-linux";
   };
 
   steps = {
@@ -72,9 +82,15 @@ let
       '';
     };
     nothingButNix = {
+      # Reclaims ~20-60 GB of runner disk for the Nix store. Must run BEFORE the
+      # Nix installer (it asserts /nix does not yet exist). "rampage" is the most
+      # aggressive protocol (removes preinstalled language toolchains + Docker/Snap
+      # /APT cruft); safe here because every CI step runs through Nix. Only wired
+      # into the heavy build jobs — the get-check-names eval jobs still use `jq`
+      # and don't need the space.
       uses = "wimpysworld/nothing-but-nix@main";
       "with" = {
-        hatchet-protocol = "holster";
+        hatchet-protocol = "rampage";
       };
     };
     checkout = {
@@ -116,6 +132,33 @@ let
       '';
     };
   };
+
+  # Shared nix-fast-build invocation for a check matrix entry on a given flake
+  # system. Tries the attic-cached path first, then retries without attic if the
+  # cache upload fails. Parametrised by system so the same recipe serves the
+  # x86_64 and aarch64 build jobs.
+  mkNixFastBuild = flakeSystem: ''
+    nix run github:Mic92/nix-fast-build -- \
+      --skip-cached \
+      --no-nom \
+      --attic-cache system \
+      -j 2 \
+      --eval-workers 2 \
+      --eval-max-memory-size 2048 \
+      --retries 2 \
+      --no-link \
+      --flake '.#checks.${flakeSystem}."''${{ matrix.${matrixParam} }}"' \
+    || { echo "::warning::Attic upload failed, retrying without attic cache"; \
+         nix run github:Mic92/nix-fast-build -- \
+           --skip-cached \
+           --no-nom \
+           -j 2 \
+           --eval-workers 2 \
+           --eval-max-memory-size 2048 \
+           --retries 2 \
+           --no-link \
+           --flake '.#checks.${flakeSystem}."''${{ matrix.${matrixParam} }}"'; }
+  '';
 
   ciFilename = "ci.yml";
   ciFilePath = ".github/workflows/${ciFilename}";
@@ -222,6 +265,8 @@ in
                       "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
                     ${ids.outputs.jobs.getCheckNamesNixos} =
                       "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
+                    ${ids.outputs.jobs.getCheckNamesAarch64} =
+                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesAarch64} }}";
                   };
                   steps = [
                     steps.removeUnusedSoftware
@@ -236,6 +281,8 @@ in
                         all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
                         echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
                         echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
+                        aarch64_checks="$(nix ${nixArgs} eval --json .#checks.${aarch64Runner.system} --apply builtins.attrNames)"
+                        echo "${ids.outputs.steps.getCheckNamesAarch64}=$aarch64_checks" >> $GITHUB_OUTPUT
                       '';
                     }
                   ];
@@ -245,7 +292,7 @@ in
                   continue-on-error = true;
                   needs = ids.jobs.getCheckNames;
                   runs-on = runner.name;
-                  timeout-minutes = 350;
+                  timeout-minutes = 180;
                   strategy = {
                     fail-fast = false;
                     max-parallel = 5;
@@ -253,35 +300,14 @@ in
                       "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
                   };
                   steps = [
-                    steps.removeUnusedSoftware
+                    steps.nothingButNix
                     steps.checkout
                     steps.createAtticNetrc
                     steps.nixInstaller
                     steps.installSshKey
                     steps.loginToAttic
                     {
-                      run = ''
-                        nix run github:Mic92/nix-fast-build -- \
-                          --skip-cached \
-                          --no-nom \
-                          --attic-cache system \
-                          -j 1 \
-                          --eval-workers 1 \
-                          --eval-max-memory-size 2048 \
-                          --retries 2 \
-                          --no-link \
-                          --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
-                        || { echo "::warning::Attic upload failed, retrying without attic cache"; \
-                             nix run github:Mic92/nix-fast-build -- \
-                               --skip-cached \
-                               --no-nom \
-                               -j 1 \
-                               --eval-workers 1 \
-                               --eval-max-memory-size 2048 \
-                               --retries 2 \
-                               --no-link \
-                               --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
-                      '';
+                      run = mkNixFastBuild runner.system;
                     }
                   ];
                 };
@@ -293,7 +319,7 @@ in
                     ids.jobs.check
                   ];
                   runs-on = runner.name;
-                  timeout-minutes = 350;
+                  timeout-minutes = 180;
                   strategy = {
                     fail-fast = false;
                     max-parallel = 5;
@@ -301,35 +327,38 @@ in
                       "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
                   };
                   steps = [
-                    steps.removeUnusedSoftware
+                    steps.nothingButNix
                     steps.checkout
                     steps.createAtticNetrc
                     steps.nixInstaller
                     steps.installSshKey
                     steps.loginToAttic
                     {
-                      run = ''
-                        nix run github:Mic92/nix-fast-build -- \
-                          --skip-cached \
-                          --no-nom \
-                          --attic-cache system \
-                          -j 1 \
-                          --eval-workers 1 \
-                          --eval-max-memory-size 2048 \
-                          --retries 2 \
-                          --no-link \
-                          --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"' \
-                        || { echo "::warning::Attic upload failed, retrying without attic cache"; \
-                             nix run github:Mic92/nix-fast-build -- \
-                               --skip-cached \
-                               --no-nom \
-                               -j 1 \
-                               --eval-workers 1 \
-                               --eval-max-memory-size 2048 \
-                               --retries 2 \
-                               --no-link \
-                               --flake '.#checks.${runner.system}."''${{ matrix.${matrixParam} }}"'; }
-                      '';
+                      run = mkNixFastBuild runner.system;
+                    }
+                  ];
+                };
+
+                ${ids.jobs.checkAarch64} = {
+                  continue-on-error = true;
+                  needs = ids.jobs.getCheckNames;
+                  runs-on = aarch64Runner.name;
+                  timeout-minutes = 180;
+                  strategy = {
+                    fail-fast = false;
+                    max-parallel = 5;
+                    matrix.${matrixParam} =
+                      "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesAarch64}) }}";
+                  };
+                  steps = [
+                    steps.nothingButNix
+                    steps.checkout
+                    steps.createAtticNetrc
+                    steps.nixInstaller
+                    steps.installSshKey
+                    steps.loginToAttic
+                    {
+                      run = mkNixFastBuild aarch64Runner.system;
                     }
                   ];
                 };

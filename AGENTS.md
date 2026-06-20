@@ -1,6 +1,8 @@
 # Multipixelone/infra
 
-NixOS + home-manager infra via flake-parts. Single system: `x86_64-linux`.
+NixOS + home-manager infra via flake-parts. Systems: `x86_64-linux` (all hosts) +
+`aarch64-linux` (portable packages/wrappers only — built best-effort in CI on ARM
+runners; no hosts are aarch64). Declared in `modules/systems.nix`.
 
 ## Build Commands
 

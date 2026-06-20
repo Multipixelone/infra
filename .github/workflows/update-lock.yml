@@ -10,9 +10,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install Nix
-        uses: cachix/install-nix-action@v27
+        uses: DeterminateSystems/nix-installer-action@v22
         with:
-          extra_nix_config: |
+          extra-conf: |
+            accept-flake-config = true
             auto-optimise-store = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - name: Install SSH Key
@@ -20,10 +21,23 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@v23
+        run: nix flake update
+      # Mirror `just update`: keep the pinned Firefox addons in lockstep with the
+      # flake bump so the automated PR doesn't drift from a manual update.
+      - name: Update Firefox addons
+        run: |
+          nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
+            --option allow-import-from-derivation true \
+            -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
         with:
-          pr-title: "chore: update flake.lock"
-          commit-msg: "⚙️ bump flake.lock"
-          pr-assignees: Multipixelone
-          pr-labels: automated
           token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
+          branch: update_flake_lock_action
+          title: "chore: update flake.lock"
+          commit-message: "⚙️ bump flake.lock"
+          assignees: Multipixelone
+          labels: automated
+          add-paths: |
+            flake.lock
+            pkgs/firefox-addons/generated.nix
