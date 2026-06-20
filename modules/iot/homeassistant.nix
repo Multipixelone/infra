@@ -1025,6 +1025,78 @@
             ];
           }
 
+          # ── ChoreOps: litter chore — assign turn to lower-points person ──────
+          # "Take out Cat Poop Bag & Reline" rotates between Finn and Ciara via
+          # rotation_smart (which picks by this chore's own completion count).
+          # The household instead wants the next turn to go to whoever has
+          # fewer ChoreOps points overall, so this overrides the engine's pick
+          # whenever either person's point total changes (i.e. right after one
+          # of them gets a chore approved). Ties are left alone — rotation_smart's
+          # own pick stands.
+          {
+            alias = "ChoreOps: Litter chore — assign turn to lower-points person";
+            id = "choreops_litter_turn_by_points";
+            trigger = [
+              {
+                platform = "state";
+                entity_id = [
+                  "sensor.finn_choreops_points"
+                  "sensor.ciara_choreops_points"
+                ];
+              }
+              {
+                platform = "time_pattern";
+                minutes = "/30";
+              }
+            ];
+            condition = [
+              {
+                condition = "template";
+                value_template = "{{ states('sensor.finn_choreops_points') not in ['unavailable', 'unknown', ''] and states('sensor.ciara_choreops_points') not in ['unavailable', 'unknown', ''] }}";
+              }
+            ];
+            action = [
+              {
+                choose = [
+                  {
+                    conditions = [
+                      {
+                        condition = "template";
+                        value_template = "{{ states('sensor.finn_choreops_points') | float(0) < states('sensor.ciara_choreops_points') | float(0) }}";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "choreops.set_rotation_turn";
+                        data = {
+                          chore_name = "Take out Cat Poop Bag & Reline";
+                          user_name = "Finn";
+                        };
+                      }
+                    ];
+                  }
+                  {
+                    conditions = [
+                      {
+                        condition = "template";
+                        value_template = "{{ states('sensor.ciara_choreops_points') | float(0) < states('sensor.finn_choreops_points') | float(0) }}";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "choreops.set_rotation_turn";
+                        data = {
+                          chore_name = "Take out Cat Poop Bag & Reline";
+                          user_name = "Ciara";
+                        };
+                      }
+                    ];
+                  }
+                ];
+              }
+            ];
+          }
+
           # ── Phone: low-battery calendar reminder ───────────────────────────
           # Notifies 3 hours before a calendar event starts if battery is
           # below 30% and the phone is not already charging.
