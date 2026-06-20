@@ -99,6 +99,15 @@ in
         };
       };
 
+      # Publish the unit's non-secret env (baseEnv) as a dotenv file so the
+      # roomieorder dev shell / a terminal `roomieorder` can mirror exactly what
+      # the service runs with — same catalog, Chrome, caps, host/port and state
+      # paths — instead of re-deriving them. The repo's .envrc dotenvs this plus
+      # /run/agenix/roomieorder (the secrets). Single source: the module's
+      # baseEnv. Holds no secrets, so /etc exposure matches the unit's
+      # world-readable Environment=.
+      environment.etc."roomieorder/env".source = config.services.roomieorder.envFile;
+
       # Intake port for HA on iot. The LAN is trusted (every other link service
       # opens its port the same way); to scope it to iot only, switch to an
       # nftables `extraInputRules` rule keyed on ${iotLanIp}.
