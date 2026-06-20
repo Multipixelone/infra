@@ -31,16 +31,34 @@ apart by where they're defined (see the table below), not by looking at them.
 | Dashboard       | Sidebar title | Mode           | Where it's defined                                           | Touch it how                                         |
 | --------------- | ------------- | -------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
 | `main-home`     | **Main Home** | **storage**    | HA `.storage`, **not in this repo**                          | UI editor or ha-mcp; back up first                   |
+| `nixos-home`    | **Home**      | **YAML / Nix** | `modules/iot/dashboard-home.nix`                             | edit the Nix, then rebuild                           |
 | `nixos-reorder` | **Reorder**   | **YAML / Nix** | `modules/iot/roomieorder.nix`, generated from `catalog.json` | edit `catalog.json` (or the generator), then rebuild |
+| `cod-chores`    | **Chores**    | **storage**    | **auto-managed by the ChoreOps integration**, not in repo    | don't edit — the integration regenerates it          |
 
 - **`main-home`** is the iPad wall kiosk. View 0 is the fridge dashboard. It is
   storage mode _on purpose_ — it's hand-tuned in the UI and we don't want Nix
   fighting the household's tweaks. It is **not** version-controlled here; the
   only backups are JSON exports in `~/ha-dashboard-backups/`. **Never** point a
   Nix `dashboards.*` block at it.
+- **`nixos-home`** is the declarative kiosk the iPad actually points at
+  (`/nixos-home/home?kiosk`). After the **Today** section it carries a
+  **Household** section: a ChoreOps points leaderboard (each card taps to that
+  person's `cod-chores` page) above a "needs doing" strip whose chips
+  **complete the chore inline on tap** — they press the chore's own per-owner
+  ChoreOps button (`button.<user>_choreops_approve_chore_<slug>`, the same
+  `button.press` cod-chores fires), behind a confirmation dialog. The eids are
+  resolved server-side in the chip's `auto-entities` template from each
+  `sensor.<user>_choreops_chore_status_<slug>`'s `claim_button_eid` /
+  `approve_button_eid` attribute.
 - **`nixos-reorder`** is the opposite philosophy: a single sidebar entry whose
   entire contents are derived from `catalog.json` and rebuilt on every
   `nixos-rebuild`. Editing it live is pointless — the next rebuild overwrites it.
+- **`cod-chores`** is generated and kept in sync by the ChoreOps integration
+  (per-person views, claim/approve via `custom:button-card` + `custom:auto-entities`,
+  both already in `customLovelaceModules` so it renders under our yaml resource
+  mode). `nixos-home` links to it **without** `?kiosk` so HA's chrome (sidebar +
+  per-person tabs) gives a way back and a way to switch roommates. **Don't**
+  hand-edit it (e.g. to add a back chip) — the integration will overwrite it.
 
 ---
 
