@@ -36,11 +36,11 @@
         },
         {
           "name": "Login to attic",
-          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+          "run": "ulimit -Sn 1024\nnix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
           "id": "get-check-names",
-          "run": "checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
+          "run": "ulimit -Sn 1024\nchecks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }

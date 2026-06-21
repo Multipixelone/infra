@@ -53,6 +53,14 @@ let
 
   nixArgs = "--accept-flake-config";
 
+  # GitHub runners set RLIMIT_NOFILE absurdly high (~1e9). libgit2/libcurl inside
+  # Nix's flake fetcher still fall back to select(), whose fd_set aborts the
+  # process (SIGABRT, exit 134) the instant an fd number reaches FD_SETSIZE
+  # (1024) — "*** bit out of range 0 - FD_SETSIZE on fd_set ***: terminated".
+  # Capping the soft limit to 1024 makes such an fd impossible. Must be set in
+  # the same shell as each nix call — ulimit does not persist across steps.
+  fdLimitCap = "ulimit -Sn 1024";
+
   runner = {
     name = "ubuntu-latest";
     system = "x86_64-linux";
@@ -121,6 +129,7 @@ let
     loginToAttic = {
       name = "Login to attic";
       run = ''
+        ${fdLimitCap}
         nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ''${{ secrets.ATTIC_KEY }}
       '';
     };
@@ -128,6 +137,7 @@ let
       name = "Push to attic";
       continue-on-error = true;
       run = ''
+        ${fdLimitCap}
         nix run nixpkgs#attic-client push system result -j 3
       '';
     };
@@ -138,6 +148,7 @@ let
   # cache upload fails. Parametrised by system so the same recipe serves the
   # x86_64 and aarch64 build jobs.
   mkNixFastBuild = flakeSystem: ''
+    ${fdLimitCap}
     nix run github:Mic92/nix-fast-build -- \
       --skip-cached \
       --no-nom \
@@ -244,6 +255,7 @@ in
                   {
                     id = ids.steps.getCheckNames;
                     run = ''
+                      ${fdLimitCap}
                       checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
                       echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
                     '';
@@ -278,6 +290,7 @@ in
                     {
                       id = ids.steps.getCheckNames;
                       run = ''
+                        ${fdLimitCap}
                         all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
                         echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
                         echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
