@@ -8,7 +8,8 @@
         {
           "uses": "wimpysworld/nothing-but-nix@main",
           "with": {
-            "hatchet-protocol": "rampage"
+            "hatchet-protocol": "rampage",
+            "nix-permission-edict": true
           }
         },
         {
@@ -59,7 +60,8 @@
         {
           "uses": "wimpysworld/nothing-but-nix@main",
           "with": {
-            "hatchet-protocol": "rampage"
+            "hatchet-protocol": "rampage",
+            "nix-permission-edict": true
           }
         },
         {
@@ -113,7 +115,8 @@
         {
           "uses": "wimpysworld/nothing-but-nix@main",
           "with": {
-            "hatchet-protocol": "rampage"
+            "hatchet-protocol": "rampage",
+            "nix-permission-edict": true
           }
         },
         {

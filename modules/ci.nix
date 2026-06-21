@@ -91,6 +91,10 @@ let
       uses = "wimpysworld/nothing-but-nix@main";
       "with" = {
         hatchet-protocol = "rampage";
+        # nix-quick-install-action sets up /nix without sudo, so it needs the
+        # mount owned by the runner user. (Determinate used sudo, hence the old
+        # quick->deter switch; this edict is what lets us go back to quick.)
+        nix-permission-edict = true;
       };
     };
     checkout = {
