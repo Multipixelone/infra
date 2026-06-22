@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anki-tools"
+version = "0.1.0"
+description = "Build .apkg decks and push cards to a running Anki from a shared cards.json schema"
+requires-python = ">=3.11"
+dependencies = ["genanki"]
+
+[project.scripts]
+anki-build-deck = "anki_tools.build_deck:main"
+anki-parse-deck = "anki_tools.parse_deck:main"
+anki-add-notes = "anki_tools.add_notes:main"
+anki-connect = "anki_tools.connect:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
