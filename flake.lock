@@ -3705,11 +3705,11 @@
         "nixpkgs": "nixpkgs_26"
       },
       "locked": {
-        "lastModified": 1782160431,
-        "narHash": "sha256-k+o+zE7lsL0YvDQi7PTu4HY1zC9qXmCHnAEP357fwMg=",
+        "lastModified": 1782194237,
+        "narHash": "sha256-tys3mEnvJvWLSDTCHjKlHSLZz7nrys2D1GWW5HV0hY8=",
         "owner": "Multipixelone",
         "repo": "roomieorder",
-        "rev": "4614b8bfc5762646237728445a076a9007dde930",
+        "rev": "09dba903676412b5b62c3bd8d81bab8ae0d38be1",
         "type": "github"
       },
       "original": {

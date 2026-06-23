@@ -24,7 +24,12 @@ in
   };
 
   configurations.nixos.link.module =
-    { config, pkgs, ... }:
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
     let
       # Same openclaw wrapper commutecompass.nix uses: tunnel's npm-global binary
       # with nodejs on PATH for its `#!/usr/bin/env node` shebang.
@@ -33,6 +38,44 @@ in
         runtimeInputs = [ pkgs.nodejs ];
         text = ''
           exec /home/tunnel/.npm-global/bin/openclaw "$@"
+        '';
+      };
+
+      # --- Session-check idle signal (Wayland/Hyprland) --------------------
+      # The session probe pops a *headed* Chrome window on the live desktop, so
+      # busy_gate waits until the operator is away before firing. Hyprland has
+      # no "current idle seconds" query, so we run a tiny swayidle daemon
+      # (ext-idle-notify) that timestamps when the seat goes idle into a marker
+      # under $XDG_RUNTIME_DIR and clears it on the first input. idleCmd then
+      # reports `now − marker (+ the 4s detection offset)`, or 0 when active.
+      # Both run as tunnel user services, so they share one $XDG_RUNTIME_DIR.
+      # A missing/zero reading makes busy_gate defer (fail-closed) — the
+      # operator never gets a window in their face mid-work.
+      idleTracker = pkgs.writeShellApplication {
+        name = "roomieorder-idle-tracker";
+        runtimeInputs = [
+          pkgs.swayidle
+          pkgs.coreutils
+        ];
+        text = ''
+          marker="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/roomieorder.idle-since"
+          # Double quotes → this shell expands $marker into the swayidle arg
+          # before swayidle re-runs it via `sh -c` (where $marker is unset).
+          exec swayidle -w \
+            timeout 4 "date +%s > $marker" \
+            resume "rm -f $marker"
+        '';
+      };
+      idleCmd = pkgs.writeShellApplication {
+        name = "roomieorder-idle-seconds";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          marker="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/roomieorder.idle-since"
+          if [ -f "$marker" ]; then
+            echo $(( $(date +%s) - $(cat "$marker") + 4 ))
+          else
+            echo 0
+          fi
         '';
       };
     in
@@ -87,6 +130,17 @@ in
           ROOMIEORDER_HOST = linkLanIp;
           ROOMIEORDER_PORT = "8723";
           ROOMIEORDER_DAILY_CAP = "150.00";
+          # Session probe waits for the operator to be away before popping the
+          # headed Chrome review window. Require 5 min of idle (tune freely);
+          # idle seconds come from the swayidle marker daemon below. To also
+          # gate by clock, set ROOMIEORDER_SESSION_CHECK_WINDOW = "03:00-08:00".
+          ROOMIEORDER_SESSION_CHECK_IDLE_MINUTES = "5";
+          ROOMIEORDER_SESSION_CHECK_IDLE_CMD = lib.getExe idleCmd;
+          # gamemoded isn't on the service PATH, so point the gamemode-skip at
+          # an absolute binary — otherwise the default `gamemoded -s` fails and
+          # is read as "not gaming" (the probe wouldn't pause for a game).
+          ROOMIEORDER_SESSION_CHECK_GAMEMODE_CMD = "${lib.getExe' pkgs.gamemode "gamemoded"} -s";
+
           # Review-page screenshots are sent to Telegram via openclaw, whose
           # gateway only reads local media from a fixed allowlist of roots
           # (system tmp, <configDir>/media, <stateDir>/media|canvas|…). Write
@@ -107,6 +161,24 @@ in
       # baseEnv. Holds no secrets, so /etc exposure matches the unit's
       # world-readable Environment=.
       environment.etc."roomieorder/env".source = config.services.roomieorder.envFile;
+
+      # Idle tracker feeding ROOMIEORDER_SESSION_CHECK_IDLE_CMD. Bound to the
+      # graphical session exactly like the roomieorder unit so it shares the
+      # same Wayland seat and $XDG_RUNTIME_DIR (where the marker lives). hypridle
+      # (link's main idle daemon is zelda-only and laptop-specific) is left
+      # untouched — this is a dedicated, side-effect-free marker writer.
+      systemd.user.services.roomieorder-idle = {
+        description = "roomieorder idle tracker (swayidle marker for session-check)";
+        wantedBy = [ "graphical-session.target" ];
+        partOf = [ "graphical-session.target" ];
+        after = [ "graphical-session.target" ];
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = lib.getExe idleTracker;
+          Restart = "on-failure";
+          RestartSec = "10s";
+        };
+      };
 
       # Intake port for HA on iot. The LAN is trusted (every other link service
       # opens its port the same way); to scope it to iot only, switch to an
