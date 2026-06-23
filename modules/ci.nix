@@ -3,6 +3,12 @@ let
   inherit (config.flake.meta) repo;
   inherit (config) caches;
 
+  # Heavy check-nixos closures (crane, tree-sitter-grammars, etc.) were
+  # driving runner disk usage to ~99% full, which kills the GitHub-hosted
+  # runner agent itself ("runner has received a shutdown signal", exit
+  # 143) rather than failing the build cleanly. min-free/max-free make
+  # the daemon GC unreferenced store paths as disk fills up instead of
+  # running it to 0 bytes.
   mkNixConf =
     let
       substituters = lib.concatStringsSep " " (map (c: c.url) caches);
@@ -19,12 +25,6 @@ let
       netrc-file = /etc/nix/netrc
       substituters = ${substituters}
       trusted-public-keys = ${trustedKeys}
-      # Heavy check-nixos closures (crane, tree-sitter-grammars, etc.) were
-      # driving runner disk usage to ~99% full, which kills the GitHub-hosted
-      # runner agent itself ("runner has received a shutdown signal", exit
-      # 143) rather than failing the build cleanly. min-free/max-free make
-      # the daemon GC unreferenced store paths as disk fills up instead of
-      # running it to 0 bytes.
       min-free = 5368709120
       max-free = 16106127360
     '';
