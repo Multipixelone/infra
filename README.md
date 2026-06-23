@@ -85,8 +85,9 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (34)</summary>
+<summary>Packages exposed by this flake (35)</summary>
 
+- [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
 - [`beets-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#beets-lossyflac`
 - [`beets-plugins`](https://github.com/Multipixelone/infra/blob/main/modules/media/beets.nix) — Music tagger and library organizer · `nix run github:Multipixelone/infra#beets-plugins`

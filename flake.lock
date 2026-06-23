@@ -3705,11 +3705,11 @@
         "nixpkgs": "nixpkgs_26"
       },
       "locked": {
-        "lastModified": 1781928820,
-        "narHash": "sha256-Hlh4hKw5M/7R4bCpypKXYeDY80kkHuJi6MSu+Luix8Q=",
+        "lastModified": 1782160431,
+        "narHash": "sha256-k+o+zE7lsL0YvDQi7PTu4HY1zC9qXmCHnAEP357fwMg=",
         "owner": "Multipixelone",
         "repo": "roomieorder",
-        "rev": "a281e8d02d269f483f253208cac1929c4368338f",
+        "rev": "4614b8bfc5762646237728445a076a9007dde930",
         "type": "github"
       },
       "original": {
@@ -3951,11 +3951,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1781663622,
-        "narHash": "sha256-kWmkkzUU5QjT11e8V8CEX5u7/188iEt+JirPlZB17Ow=",
+        "lastModified": 1782116921,
+        "narHash": "sha256-sips+HBI3iHwGczM0jPYj3ocwVWSy+rlnz49VRQpuRw=",
         "ref": "refs/heads/main",
-        "rev": "0f6175eab7f604e70c80fc2c91462c290709be69",
-        "revCount": 112,
+        "rev": "fbb2ff26c094073f4d1a292a36a81d274f02f659",
+        "revCount": 116,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },

@@ -31,9 +31,23 @@
 # The storage `main-home` dashboard is left intact as a fallback.
 _: {
   configurations.nixos.iot.module =
-    { pkgs, ... }:
+    # roomieorderButtons is shared from modules/iot/roomieorder.nix via
+    # _module.args — the catalog-derived HA grids. We splice Finn's personal
+    # reorder grid (dashboardCardsByOwner."Finn") into his existing view below.
+    {
+      pkgs,
+      lib,
+      roomieorderButtons,
+      ...
+    }:
     let
       yamlFormat = pkgs.formats.yaml { };
+
+      # Finn's personal reorder grid (owner-tagged catalog items, kept OFF the
+      # shared Reorder dashboard). `or null` so this evaluates safely before any
+      # Finn-owned item exists in the (secrets) catalog — no Finn items → no
+      # Reorder section appended to finnView below.
+      finnReorderGrid = roomieorderButtons.dashboardCardsByOwner.Finn or null;
 
       # Per-person "today" agenda. Swaps the kiosk's unpackaged `custom:today-card`
       # for atomic-calendar-revive (in nixpkgs) limited to a single day, so the
@@ -1571,7 +1585,23 @@ _: {
               }
             ];
           }
-        ];
+        ]
+        # ── Reorder: Finn's personal one-tap buy buttons (owner-tagged) ───────
+        # Folded into this existing dashboard rather than standing up a separate
+        # one. Hidden entirely until a catalog item carries "owner": "Finn".
+        ++ lib.optional (finnReorderGrid != null) {
+          type = "grid";
+          column_span = 2;
+          cards = [
+            {
+              type = "heading";
+              heading = "Reorder";
+              heading_style = "title";
+              icon = "mdi:cart";
+            }
+            finnReorderGrid
+          ];
+        };
       };
 
       homeDashboard = yamlFormat.generate "lovelace-home.yaml" {

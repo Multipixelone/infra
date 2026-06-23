@@ -11,9 +11,16 @@
 # `.scriptsAttrs`. rest_command + rest are plain config and need no include-split.
 #
 # The visible buttons live on a dedicated, Nix-managed "Reorder" Lovelace
-# dashboard (YAML mode) — generated here from buttons.dashboardCardDynamic — so
-# they regenerate on every rebuild with no manual ha-mcp push. The iPad kiosk
+# dashboard (YAML mode) — generated here from buttons.dashboardCardHousehold (the
+# SHARED grid, with any owner-tagged personal items filtered out) — so they
+# regenerate on every rebuild with no manual ha-mcp push. The iPad kiosk
 # (main-home, storage mode / UI-managed) is left untouched.
+#
+# A catalog item with an `owner` (e.g. "owner": "Finn") is a roommate's personal
+# buy: it drops off the shared Reorder grid and onto that owner's own dashboard.
+# This module exposes the generated grids as `_module.args.roomieorderButtons`;
+# Finn's personal grid (buttons.dashboardCardsByOwner."Finn") is then folded into
+# his EXISTING dashboard in dashboard-home.nix rather than a new one here.
 { inputs, config, ... }:
 let
   buttons = inputs.roomieorder.lib.haButtons {
@@ -69,13 +76,22 @@ in
                   }
                 ];
               }
-              buttons.dashboardCardDynamic
+              # The SHARED grid: every staple EXCEPT owner-tagged personal items.
+              # Each owner's personal items render on their own dashboard instead
+              # — Finn's are folded into his existing dashboard (dashboard-home.nix),
+              # which reads buttons.dashboardCardsByOwner via _module.args below.
+              buttons.dashboardCardHousehold
             ];
           }
         ];
       };
     in
     {
+      # Share the generated grids with the other iot dashboard modules (so
+      # dashboard-home.nix can splice the per-owner grid into Finn's existing
+      # dashboard rather than this module standing up a second one).
+      _module.args.roomieorderButtons = buttons;
+
       services.home-assistant.config = {
         rest_command = buttons.restCommand;
         # Per-item status sensors (one GET /items poll, one sensor per item) that
@@ -92,7 +108,8 @@ in
           # customLovelaceModules) still loads the mushroom resource, so the
           # dynamic cards render here.
           # The generated, self-updating Reorder dashboard. A separate sidebar
-          # entry; does not touch the kiosk.
+          # entry; does not touch the kiosk. (Finn's personal items live on his
+          # existing dashboard, not here — see dashboard-home.nix.)
           dashboards.nixos-reorder = {
             mode = "yaml";
             filename = "${reorderDashboard}";
