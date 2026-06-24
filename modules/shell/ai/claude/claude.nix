@@ -49,6 +49,9 @@
         pkgs.semgrep
         pkgs.fastmod
       ];
+      programs.fish.shellAbbrs = {
+        co = "claude --model opus --permission-mode auto";
+      };
       programs.claude-code = {
         inherit (aiConfig) agentsDir context;
         skills = aiConfig.skillsDir;
