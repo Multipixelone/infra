@@ -602,11 +602,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1781832332,
-        "narHash": "sha256-9g+st16fqUSnedrn0mv6jACvBqwntTYKbY1Allw5VN4=",
+        "lastModified": 1782227792,
+        "narHash": "sha256-qs6dvMN+NFfGZCieJtklM/ilXqwnW2mIgDgmZ6SMW7c=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "b9d4bf5fa01453bbb6092ec0fd6b0761b720f0fa",
+        "rev": "3b0d34fa2490ff7ab927539c5096eeaeceb50f13",
         "type": "github"
       },
       "original": {
@@ -3951,11 +3951,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1782195610,
-        "narHash": "sha256-TioA2m/7EEM5qoX+KYAr1b6Hg4lXsOtobjhp8s+jxac=",
+        "lastModified": 1782197097,
+        "narHash": "sha256-KlaLhz8gqmpAo4NVzEBW22R2DRJxHWmGbpFwW8ogYDI=",
         "ref": "refs/heads/main",
-        "rev": "14c83d33c3971164edf0c264af301cff7eefee70",
-        "revCount": 117,
+        "rev": "316fa61347cba33ce9fce2a6ac8e690885b0d6fd",
+        "revCount": 118,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },
