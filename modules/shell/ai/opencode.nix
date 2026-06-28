@@ -65,14 +65,13 @@
           nemotron-3-super-free = "opencode/nemotron-3-super-free";
           big-pickle = "opencode/big-pickle";
           # opencode go
-          kimi = "opencode-go/kimi-k2.6";
+          kimi = "opencode-go/kimi-k2.7-code";
           deepseek-pro = "opencode-go/deepseek-v4-pro";
           deepseek = "opencode-go/deepseek-v4-flash";
-          glm = "opencode-go/glm-5.1";
-          mimo-pro = "opencode-go/mimo-v2.5-pro";
+          glm = "opencode-go/glm-5.2";
           mimo-omni = "opencode-go/mimo-v2-omni";
-          minimax = "opencode-go/minimax-m2.7";
-          qwen = "opencode-go/qwen3.6-plus";
+          minimax = "opencode-go/minimax-m3";
+          qwen = "opencode-go/qwen3.7-plus";
         };
 
         # Role definitions: skills, mcps, and optional variant per role.
@@ -110,7 +109,7 @@
             mcps = [ ];
           };
           designer = {
-            variant = "high";
+            variant = "thinking";
             skills = [ "agent-browser" ];
             mcps = [ ];
           };
@@ -121,6 +120,13 @@
           };
           observer = {
             variant = "low";
+            skills = [ ];
+            mcps = [ ];
+          };
+          # Council agent synthesizes councillor outputs directly (no
+          # separate council-master since oh-my-opencode-slim 2026-04).
+          council = {
+            variant = "high";
             skills = [ ];
             mcps = [ ];
           };
@@ -137,92 +143,101 @@
         # ── Preset definitions ──────────────────────────────────────────
 
         # Copilot + Opencode-Go only (alternate profile)
-        specialistsCustom = {
-          oracle = "gpt-5-4";
-          librarian = "kimi";
-          explorer = "kimi";
-          designer = "gemini-pro";
-          fixer = "minimax";
-          observer = "mimo-omni";
-        };
 
         # opencode-go only (if I hit Copilot limits)
         specialistsGo = {
-          oracle = "deepseek-pro";
-          librarian = "deepseek";
-          explorer = "deepseek-free";
-          designer = "mimo-pro";
-          fixer = "minimax";
+          oracle = "qwen";
+          librarian = "minimax"; # deepseek usually
+          explorer = "big-pickle";
+          designer = "minimax";
+          fixer = "minimax"; # minimax is 3x rn, kimi usually
           observer = "mimo-omni";
+          # qwen3.7-max intermittently returns empty streams (AI_APICallError:
+          # <none>), which silently stalls council synthesis. kimi is stable.
+          council = "kimi";
         };
 
         # Copilot + Opencode-Go specialist assignment (default preset).
-        specialistsCopilot = {
-          oracle = "gpt-5-4";
-          designer = "gemini-pro";
-          fixer = "minimax";
-          librarian = "deepseek";
-          explorer = "deepseek-free";
-          observer = "mimo-omni";
-        };
-
-        presetCustom = mkPreset (specialistsCustom // { orchestrator = "gpt-5-4"; });
-        presetGo = mkPreset (specialistsGo // { orchestrator = "opus"; });
-        presetCopilot = mkPreset (specialistsCopilot // { orchestrator = "gpt-codex"; });
+        presetGo = mkPreset (specialistsGo // { orchestrator = "glm"; });
 
         # ── Shared config sections ──────────────────────────────────────
 
+        # oh-my-opencode-slim ≥ 2026-04 removed the separate council-master
+        # agent; the Council agent now synthesizes councillor outputs
+        # directly. `master`/`master_fallback` are deprecated/ignored — the
+        # synthesizer model is set via a `council` agent entry in the active
+        # preset (see specialistsGo/specialistsCustom/specialistsCopilot).
+        # Renamed: `councillors_timeout` → `timeout`. New: `councillor_execution_mode`,
+        # `councillor_retries`.
         councilConfig = {
-          master.model = models.gpt-codex;
-          master_fallback = [
-            models.gpt-codex
-            models.gemini-pro
-            models.qwen
-          ];
+          default_preset = "default";
+          # 180s was too tight — transient gateway flakiness on
+          # opencode-go left beta/gamma re-streaming silently until the
+          # wall clock expired. 300s gives councillors room to recover.
+          timeout = 300000;
+          councillor_execution_mode = "parallel";
+          councillor_retries = 3;
           presets.default = {
-            alpha.model = models.gemini-pro;
-            beta.model = models.claude-sonnet-copilot;
-            gamma.model = models.glm;
+            alpha.model = models.qwen;
+            beta.model = models.deepseek-pro;
+            gamma.model = models.minimax;
           };
         };
 
         fallbackConfig = {
           enabled = true;
           timeoutMs = 15000;
-          chains = {
-            orchestrator = [
+        };
+
+        agentFallbacks = {
+          orchestrator = {
+            model = [
+              models.glm
               models.gpt-codex
               models.big-pickle
               models.gpt-5-4
               models.gpt-5-2
               models.kimi
             ];
-            oracle = [
+          };
+          oracle = {
+            model = [
+              models.glm
+              models.deepseek-pro
               models.claude-sonnet-copilot
               models.gpt-5-4
-              models.deepseek-pro
               models.kimi
               models.glm
             ];
-            librarian = [
+          };
+          librarian = {
+            model = [
+              models.minimax
               models.kimi
               models.qwen
               models.grok-fast
               models.claude-haiku-copilot
             ];
-            explorer = [
+          };
+          explorer = {
+            model = [
+              models.big-pickle
               models.kimi
               models.qwen
               models.glm
             ];
-            designer = [
+          };
+          designer = {
+            model = [
+              models.kimi
               models.gemini-pro
               models.claude-sonnet-copilot
-              models.mimo-pro
               models.glm
             ];
-            fixer = [
-              models.mimo-pro
+          };
+          fixer = {
+            model = [
+              models.minimax
               models.kimi
               models.glm
             ];
@@ -425,6 +440,7 @@
           websearch.provider = "tavily";
           council = councilConfig;
           fallback = fallbackConfig;
+          agents = agentFallbacks;
           todoContinuation = {
             autoEnable = true;
             autoEnableThreshold = 4;
@@ -435,13 +451,20 @@
           disabled_agents = [ ];
           lsp = lspServers;
           presets = {
-            custom = presetCustom;
+            # custom = presetCustom;
             go = presetGo;
-            copilot = presetCopilot;
+            # copilot = presetCopilot;
           };
         };
       in
       {
+
+        programs.fish.interactiveShellInit = lib.concatStringsSep "\n\n" [
+          # fish
+          ''
+            set -Ux OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS true
+          ''
+        ];
         programs.opencode = {
           enable = true;
           package = opencodePkg;
@@ -459,7 +482,7 @@
               "opencode-history-search"
               "openrtk"
             ];
-            model = "github-copilot/gpt-5.3-codex";
+            model = "opencode-go/glm-5.2";
             autoupdate = false;
             agent.build.permission.task = {
               "*" = "allow";
