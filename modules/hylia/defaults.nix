@@ -1,5 +1,5 @@
 {
-  configurations.darwin.fi.module = {
+  configurations.darwin.hylia.module = {
     # Declarative macOS preferences (`defaults write` equivalents).
     system.defaults = {
       dock = {

@@ -6,7 +6,7 @@
   # own declarative surface under `determinateNix.*`, which writes
   # /etc/nix/nix.custom.conf and /etc/determinate/config.json. This keeps the
   # store intact (no reinstall) while everything below stays in the flake.
-  configurations.darwin.fi.module = {
+  configurations.darwin.hylia.module = {
     imports = [ inputs.determinate.darwinModules.default ];
 
     determinateNix = {

@@ -1,5 +1,5 @@
 {
-  configurations.darwin.fi.module = {
+  configurations.darwin.hylia.module = {
     # NixOS-as-QEMU micro-VM so the Mac natively builds the repo's Linux
     # packages/wrappers (aarch64-linux via HVF fast; x86_64-linux via TCG slow)
     # instead of relying on ARM CI runners. Routes via an ssh-ng build-machine

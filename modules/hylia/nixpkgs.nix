@@ -4,7 +4,7 @@
   # flake-parts perSystem pkgs (modules/nixpkgs/instance.nix). Reuse the
   # repo's aggregated allow-lists so unfree/insecure packages stay declarative
   # and in sync with the NixOS hosts.
-  configurations.darwin.fi.module = {
+  configurations.darwin.hylia.module = {
     nixpkgs.config = {
       allowUnfreePredicate =
         pkg: builtins.elem (lib.getName pkg) config.nixpkgs.config.allowUnfreePackages;

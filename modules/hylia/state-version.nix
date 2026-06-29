@@ -1,5 +1,5 @@
 {
-  configurations.darwin.fi.module = {
+  configurations.darwin.hylia.module = {
     # nix-darwin state version (integer, monotonic — NEVER decrement).
     system.stateVersion = 6;
   };

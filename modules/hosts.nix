@@ -147,7 +147,7 @@ in
       desktopWindowManager = "None";
       notes = "Audio + home services";
     };
-    fi = {
+    hylia = {
       isDarwin = true;
       roles = [ "laptop" ];
       description = "Apple Silicon MacBook (nix-darwin)";
