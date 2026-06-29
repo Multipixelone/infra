@@ -99,6 +99,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     commutecompass.url = "github:Multipixelone/commutecompass";
+    determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
     euphony = {
       url = "github:Multipixelone/euphony/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";
