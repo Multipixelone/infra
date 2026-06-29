@@ -16,8 +16,12 @@
       }:
       let
         inherit (lib) getExe getExe';
-        cliphist = getExe pkgs.cliphist;
-        wl-copy = getExe' pkgs.wl-clipboard "wl-copy";
+        # Wayland clipboard-history (cliphist + wl-clipboard) is Linux-only;
+        # macOS has no equivalent clipboard manager, so the `clip` alias is
+        # simply absent there.
+        clipboardAliases = lib.optionalAttrs pkgs.stdenv.isLinux {
+          clip = "${getExe pkgs.cliphist} list | fzf | ${getExe pkgs.cliphist} decode | ${getExe' pkgs.wl-clipboard "wl-copy"}";
+        };
         fzf-config = ''
           set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'"
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
@@ -104,7 +108,6 @@
             fzf = "fzf --preview 'bat --color=always --style=numbers --line-range=:500 {}'";
             mkdir = "mkdir -pv";
             tree = "eza -s type -a -T -I '.git|node_modules|.next'";
-            clip = "${cliphist} list | fzf | ${cliphist} decode | ${wl-copy}";
             ping = getExe pkgs.prettyping;
             public-ip = getExe' pkgs.dnsutils "dig" + " +short myip.opendns.com @resolver1.opendns.com";
 
@@ -113,7 +116,8 @@
             rm = getExe pkgs.gomi;
             mv = "mv --interactive";
             ln = "ln --interactive";
-          };
+          }
+          // clipboardAliases;
           shellInit = fish-config;
           interactiveShellInit = ''
             # set $EDITOR in fish

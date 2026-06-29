@@ -1,16 +1,24 @@
 { withSystem, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
       packages.upload-script = pkgs.writeShellApplication {
         name = "0x0";
-        runtimeInputs = with pkgs; [
-          curl
-          coreutils
-          wl-clipboard
-          libnotify
-        ];
+        runtimeInputs =
+          (with pkgs; [
+            curl
+            coreutils
+          ])
+          # Wayland clipboard + libnotify only exist on Linux; macOS uses the
+          # built-in pbcopy.
+          ++ lib.optionals pkgs.stdenv.isLinux (
+            with pkgs;
+            [
+              wl-clipboard
+              libnotify
+            ]
+          );
         text = ''
           TEMP_UPLOAD=0
           LITTER_TIME="72h"
@@ -65,10 +73,19 @@
             fi
 
             printf '%s\n' "''${url}"
-            if [ -n "''${WAYLAND_DISPLAY+x}" ]; then
-              wl-copy "''${url}"
-              notify-send "''${file} uploaded" "''${url}"
-            fi
+            ${
+              if pkgs.stdenv.isDarwin then
+                ''
+                  printf '%s' "''${url}" | pbcopy
+                ''
+              else
+                ''
+                  if [ -n "''${WAYLAND_DISPLAY+x}" ]; then
+                    wl-copy "''${url}"
+                    notify-send "''${file} uploaded" "''${url}"
+                  fi
+                ''
+            }
             printf '\n%s\n\t%s\n\t\t%s\n' "$(date)" "''${file}" "''${url}" >> ~/.config/0x0.history
           }
 

@@ -473,13 +473,15 @@
           export GITHUB_COPILOT_TOKEN=$(cat ${hmArgs.config.age.secrets."copilot".path})
           ${lib.getExe pkgs.copilot-language-server} "$@"
         '';
-        packages = with pkgs; [
-          gpt-wrapped
-          marksman
-          prettier
-          wl-clipboard
-          markdown-oxide
-        ];
+        packages =
+          (with pkgs; [
+            gpt-wrapped
+            marksman
+            prettier
+            markdown-oxide
+          ])
+          # helix uses wl-clipboard on Wayland; on macOS it uses pbcopy/pbpaste.
+          ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.wl-clipboard ];
       in
       {
         home.packages = packages;
