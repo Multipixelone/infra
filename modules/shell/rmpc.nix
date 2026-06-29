@@ -62,13 +62,17 @@
         song-change
         pkgs.cava
       ];
-      xdg.desktopEntries."rmpc" = {
-        name = "rmpc";
-        comment = "rmpc music player";
-        exec = "uwsm app -- foot -a foot-music rmpc";
-        terminal = false;
-        type = "Application";
-        icon = "apple-music";
+      # xdg.desktopEntries is a Linux-only HM module (and this entry is
+      # Hyprland/foot specific) — skip on darwin.
+      xdg.desktopEntries = lib.mkIf pkgs.stdenv.isLinux {
+        "rmpc" = {
+          name = "rmpc";
+          comment = "rmpc music player";
+          exec = "uwsm app -- foot -a foot-music rmpc";
+          terminal = false;
+          type = "Application";
+          icon = "apple-music";
+        };
       };
       xdg.configFile = {
         "rmpc/themes/cat.ron".text = ''

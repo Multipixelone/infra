@@ -1,16 +1,23 @@
 {
   flake.modules.nixos.base.programs.bandwhich.enable = true;
   flake.modules.homeManager.base =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
-      home.packages = with pkgs; [
-        bind # for dig
-        curl
-        ethtool
-        gping
-        inetutils
-        socat
-        wifite2
-      ];
+      home.packages =
+        (with pkgs; [
+          bind # for dig
+          curl
+          gping
+          inetutils
+          socat
+        ])
+        # Linux-only network tooling.
+        ++ lib.optionals pkgs.stdenv.isLinux (
+          with pkgs;
+          [
+            ethtool
+            wifite2
+          ]
+        );
     };
 }

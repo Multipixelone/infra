@@ -20,17 +20,21 @@
       packages.gentest = nh-notify "gentest" "test";
     };
   flake.modules.homeManager.base =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
-      home.packages = withSystem pkgs.stdenv.hostPlatform.system (
-        { config, ... }:
-        let
-          ps = config.packages;
-        in
-        [
-          ps.genswitch
-          ps.gentest
-        ]
+      # `nh os switch/test` wrappers (with a Linux icon-theme notify icon) are
+      # NixOS rebuild helpers — Linux-only.
+      home.packages = lib.optionals pkgs.stdenv.isLinux (
+        withSystem pkgs.stdenv.hostPlatform.system (
+          { config, ... }:
+          let
+            ps = config.packages;
+          in
+          [
+            ps.genswitch
+            ps.gentest
+          ]
+        )
       );
     };
 }

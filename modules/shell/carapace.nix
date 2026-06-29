@@ -23,7 +23,8 @@
           # carapace _carapace | source
         ''
       ];
-      systemd.user.services.update-programs-sqlite = {
+      # systemd user units are inert on darwin (no systemd) — Linux-only.
+      systemd.user.services.update-programs-sqlite = lib.mkIf pkgs.stdenv.isLinux {
         Unit = {
           Description = "Update programs.sqlite for Carapace tab completion";
         };
@@ -44,7 +45,7 @@
           '';
         };
       };
-      systemd.user.timers.update-programs-sqlite = {
+      systemd.user.timers.update-programs-sqlite = lib.mkIf pkgs.stdenv.isLinux {
         Unit = {
           Description = "Weekly update of programs.sqlite";
         };

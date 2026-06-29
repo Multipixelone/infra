@@ -11,9 +11,10 @@
     };
 
     homeManager.base =
-      { pkgs, ... }:
+      { pkgs, lib, ... }:
       {
-        home.packages = with pkgs; [ nixos-facter ];
+        # nixos-facter is Linux-only.
+        home.packages = lib.optionals pkgs.stdenv.isLinux [ pkgs.nixos-facter ];
       };
   };
 }

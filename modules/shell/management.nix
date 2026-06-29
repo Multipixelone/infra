@@ -1,18 +1,25 @@
 {
   flake.modules.homeManager.base =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
-      home.packages = with pkgs; [
-        kubectl
-        flyctl
-        sysstat
-        just
-        i2c-tools
-        lm_sensors
-        ethtool
-        pciutils
-        usbutils
-        devenv
-      ];
+      home.packages =
+        (with pkgs; [
+          kubectl
+          flyctl
+          just
+          devenv
+        ])
+        # Linux-only hardware/perf tooling.
+        ++ lib.optionals pkgs.stdenv.isLinux (
+          with pkgs;
+          [
+            sysstat
+            i2c-tools
+            lm_sensors
+            ethtool
+            pciutils
+            usbutils
+          ]
+        );
     };
 }

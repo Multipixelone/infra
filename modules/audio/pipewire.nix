@@ -56,12 +56,16 @@
       ];
     };
     homeManager.base =
-      { pkgs, ... }:
+      { pkgs, lib, ... }:
       {
-        home.packages = with pkgs; [
-          wiremix
-          alsa-utils
-        ];
+        # ALSA/pipewire CLI tooling is Linux-only.
+        home.packages = lib.optionals pkgs.stdenv.isLinux (
+          with pkgs;
+          [
+            wiremix
+            alsa-utils
+          ]
+        );
       };
     homeManager.gui =
       { pkgs, ... }:
