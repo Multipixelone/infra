@@ -26,6 +26,7 @@
         "signal"
         "discord"
         "slack"
+        "notion"
         "zoom"
 
         # Media
@@ -50,7 +51,18 @@
         # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
         # "amneziavpn"
       ];
-      masApps = { };
+      # Mac App Store apps (ids from `mas list`). Pages and Keynote are
+      # intentionally omitted — they ship preinstalled and are not managed here.
+      masApps = {
+        "Fantastical" = 975937182;
+        "Final Cut Pro" = 424389933;
+        "forScore" = 363738376;
+        "GarageBand" = 682658836;
+        "iMovie" = 408981434;
+        "Logic Pro" = 634148309;
+        "Numbers" = 361304891;
+        "Todoist" = 585829637;
+      };
     };
   };
 }

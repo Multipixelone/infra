@@ -8,6 +8,20 @@
         mru-spaces = false;
         tilesize = 48;
         wvous-br-corner = 14; # bottom-right hot corner → Quick Note
+        # Declaratively pin the Dock contents (order = left→right). Any app not
+        # listed here is removed from the Dock on activation.
+        persistent-apps = [
+          "/Applications/Firefox.app"
+          "/System/Applications/Messages.app"
+          "/Applications/Fluso.app"
+          "/Applications/Fantastical.app"
+          "/Applications/Todoist.app"
+          # NOTE: Adobe versions the path by year — bump on major upgrades.
+          "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app"
+          "/Applications/Ghostty.app"
+          "/Applications/Slack.app"
+          "/Applications/Notion.app"
+        ];
       };
       finder = {
         AppleShowAllExtensions = true;

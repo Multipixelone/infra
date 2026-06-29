@@ -182,6 +182,10 @@
       url = "github:nix-community/lanzaboote/v1.0.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    mac-app-util = {
+      url = "github:hraban/mac-app-util";
+      inputs.flake-utils.follows = "flake-utils";
+    };
     make-shell = {
       url = "github:nicknovitski/make-shell";
       inputs.flake-compat.follows = "flake-compat";
