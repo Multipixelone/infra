@@ -24,7 +24,12 @@
       # Register fish in /etc/shells so it can be set as the login shell
       # (macOS rejects `chsh` to a shell not listed here). HM installs/configures
       # fish; setting it as the actual login shell is a one-time `chsh -s`.
+      #
+      # `environment.shells` whitelists `/run/current-system/sw/bin/fish`, which
+      # only exists if fish is in the *system* profile — HM installs into the
+      # per-user profile, so we add it here too to make that path resolve.
       environment.shells = [ pkgs.fish ];
+      environment.systemPackages = [ pkgs.fish ];
 
       # Touch ID for sudo (survives across `darwin-rebuild` via sudo_local).
       security.pam.services.sudo_local.touchIdAuth = true;

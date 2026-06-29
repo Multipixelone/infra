@@ -8,6 +8,12 @@
         programs.command-not-found.enable = false;
         users.defaultUserShell = pkgs.fish;
       };
+    # nix-darwin's fish module generates /etc/fish/ which sources the nix-daemon
+    # profile and puts the system + per-user nix profiles on PATH. Without it, a
+    # fish login shell can't find HM-installed tools (zellij, atuin, fzf, grc, …).
+    darwin.base = {
+      programs.fish.enable = true;
+    };
     homeManager.base =
       {
         pkgs,
