@@ -24,6 +24,15 @@
           "L /var/lib/AccountsService/icons/${config.flake.meta.owner.username} - - - - ${./Finn.jpg}"
         ];
       };
+
+      darwin.base =
+        { pkgs, ... }:
+        {
+          users.users.${config.flake.meta.owner.username} = {
+            home = "/Users/${config.flake.meta.owner.username}";
+            shell = pkgs.zsh;
+          };
+        };
     };
   };
 }
