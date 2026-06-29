@@ -12,8 +12,7 @@
       taps = [ ];
       brews = [ ];
       casks = [
-        # Terminal
-        "ghostty"
+        # Terminal — ghostty cask is declared in modules/shell/terminal/ghostty.nix
 
         # Browsers
         "firefox"
