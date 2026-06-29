@@ -14,7 +14,11 @@
     inputs = {
       nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
-      systems.url = "github:nix-systems/default-linux";
+      # All four systems (incl. aarch64-darwin) so flake-utils-based inputs that
+      # `follows = "systems"` (e.g. agenix) expose darwin packages. NOTE: this is
+      # the *input*; the flake-parts perSystem list (modules/systems.nix) stays
+      # Linux-only so our own perSystem outputs don't eval on darwin.
+      systems.url = "github:nix-systems/default";
 
       flake-compat.url = "github:edolstra/flake-compat";
 

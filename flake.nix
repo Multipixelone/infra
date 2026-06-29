@@ -199,6 +199,10 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+    nix-darwin = {
+      url = "github:nix-darwin/nix-darwin/master";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-gaming = {
       url = "github:fufexan/nix-gaming";
       inputs = {
@@ -279,7 +283,7 @@
         tinted-schemes.follows = "tinted-schemes";
       };
     };
-    systems.url = "github:nix-systems/default-linux";
+    systems.url = "github:nix-systems/default";
     tinted-schemes = {
       url = "github:tinted-theming/schemes";
       flake = false;
