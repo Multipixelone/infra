@@ -26,7 +26,7 @@ in
 
       # Font — foot: "PragmataPro Mono Liga:size=11"
       font-family = PragmataPro Mono Liga
-      font-size = 11
+      font-size = 14
 
       # Colors — Catppuccin Mocha (foot: catppuccin-mocha.ini)
       theme = Catppuccin Mocha
