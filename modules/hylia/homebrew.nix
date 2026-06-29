@@ -46,8 +46,8 @@
         "1password"
         "vlc"
 
-        # VPN (AmneziaWG protocol)
-        "amneziavpn"
+        # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
+        # "amneziavpn"
       ];
       masApps = { };
     };
