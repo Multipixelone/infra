@@ -1,13 +1,14 @@
 {
   flake.modules.homeManager.base =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
-      home.packages = with pkgs; [
-        lsof
-        procs
-        psmisc
-        watchexec
-      ];
+      home.packages =
+        (with pkgs; [
+          lsof
+          procs
+          watchexec
+        ])
+        ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.psmisc ];
 
       programs.bottom = {
         enable = true;

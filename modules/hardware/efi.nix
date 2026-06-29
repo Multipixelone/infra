@@ -6,9 +6,10 @@
     };
 
     homeManager.base =
-      { pkgs, ... }:
+      { pkgs, lib, ... }:
       {
-        home.packages = [
+        # EFI tooling is Linux-only.
+        home.packages = lib.optionals pkgs.stdenv.isLinux [
           pkgs.efivar
           pkgs.efibootmgr
         ];
