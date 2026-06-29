@@ -49,6 +49,15 @@ hm-deploy host remote_nix_bindir="/nix/var/nix/profiles/default/bin":
 iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
 
+# Activate a nix-darwin host. Run on the Mac itself.
+darwin-switch host=`hostname -s`:
+  sudo darwin-rebuild switch --flake .#{{host}}
+
+# First-time activation on a fresh Mac, before nix-darwin's darwin-rebuild
+# exists on PATH. Run on the Mac itself.
+darwin-bootstrap host=`hostname -s`:
+  sudo nix run nix-darwin -- switch --flake .#{{host}}
+
 debug:
 	genswitch -v -- --show-trace
 
