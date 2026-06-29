@@ -29,6 +29,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 | Hostname | Description | Manufacturer | Model | Role | Desktop/WM | Notes |
 |----------|-------------|--------------|-------|------|------------|-------|
 | `link` | My desktop | Custom | Gaming PC | Desktop | Hyprland | - |
+| `fi` | Apple Silicon MacBook (nix-darwin) | Apple | MacBook Neo | Laptop | macOS | nix-darwin host |
 | `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
 | `alexandria` | Synology NAS (home-manager only, non-NixOS) | Synology | DS920+ | NAS | None | DSM host managed via standalone home-manager |
 | `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
