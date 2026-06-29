@@ -30,6 +30,11 @@ let
           default = false;
           description = "Whether this host is managed as a NixOS configuration.";
         };
+        isDarwin = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether this host is managed as a nix-darwin configuration.";
+        };
         roles = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
@@ -141,6 +146,16 @@ in
       readmeRole = "Server";
       desktopWindowManager = "None";
       notes = "Audio + home services";
+    };
+    fi = {
+      isDarwin = true;
+      roles = [ "laptop" ];
+      description = "Apple Silicon MacBook (nix-darwin)";
+      manufacturer = "Apple";
+      model = "MacBook Neo";
+      readmeRole = "Laptop";
+      desktopWindowManager = "macOS";
+      notes = "nix-darwin host";
     };
     minish = {
       isNixOS = true;
