@@ -7,18 +7,10 @@
     system.primaryUser = config.flake.meta.owner.username;
     system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
 
-    nix.enable = true;
-    nix.settings = {
-      experimental-features = [
-        "nix-command"
-        "flakes"
-        "pipe-operators"
-      ];
-      trusted-users = [
-        "@admin"
-        config.flake.meta.owner.username
-      ];
-    };
+    # Nix itself (experimental-features, trusted-users, substituters) is managed
+    # by Determinate Nix via `determinateNix.*` in ./determinate.nix — the
+    # determinate module forces `nix.enable = false`, so nix-darwin's `nix.*`
+    # settings would be inert here.
 
     # /etc/zsh* managed by nix-darwin (PATH in non-interactive shells); HM's
     # ~/.zshrc is sourced from the system /etc/zshrc.
