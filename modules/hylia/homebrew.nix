@@ -35,6 +35,7 @@
         # Dev tooling
         "visual-studio-code"
         "docker-desktop"
+        "claude"
 
         # Creative
         "adobe-creative-cloud"
