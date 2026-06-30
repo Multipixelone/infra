@@ -52,6 +52,20 @@ iso:
 # Activate a nix-darwin host. Run on the Mac itself.
 darwin-switch host=`hostname -s`:
   sudo darwin-rebuild switch --flake .#{{host}}
+  # Config-only edits to skhdrc don't bump the launchd plist, so the agent keeps
+  # running the old config. Kick it so changes take effect.
+  -skhd --restart-service
+
+# (Re)grant macOS Accessibility + Input Monitoring to the hotkey daemon, then
+# restart it. skhd runs straight from the nix store; its store path — and thus
+# the TCC grant keyed on it — is stable across normal `darwin-switch`es and only
+# changes when skhd itself is updated. So this is a one-time step, repeated only
+# after such a version bump. Toggle skhd on in the pane that opens, then the
+# restart picks it up.
+darwin-perms:
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+  -skhd --restart-service
 
 # First-time activation on a fresh Mac, before nix-darwin's darwin-rebuild
 # exists on PATH. Run on the Mac itself.
