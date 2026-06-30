@@ -133,6 +133,12 @@
             set -gx NIXPKGS_ALLOW_INSECURE 1
             # OpenClaw is installed via npm --prefix "$HOME/.npm-global".
             fish_add_path --global --move $HOME/.npm-global/bin
+            ${lib.optionalString pkgs.stdenv.isDarwin ''
+              # Homebrew's python@3.13 is keg-only: it only links the versioned
+              # `python3.13` onto PATH, not bare `python`/`python3`/`pip`. Its
+              # libexec/bin holds those unversioned symlinks, so add it here.
+              fish_add_path --global /opt/homebrew/opt/python@3.13/libexec/bin
+            ''}
 
             if test "$TERM" != "dumb"
               ${getExe pkgs.zellij} setup --generate-completion fish | source
