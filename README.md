@@ -64,6 +64,8 @@ Task execution is managed via `just`.
 | `just hm-build` | See Justfile recipe. |
 | `just hm-deploy` | See Justfile recipe. |
 | `just iso` | Build an installer ISO. |
+| `just darwin-switch` | See Justfile recipe. |
+| `just darwin-bootstrap` | See Justfile recipe. |
 | `just debug` | Run rebuild with `--show-trace` for debugging. |
 | `just update` | Update flake lockfile and Firefox addons. |
 | `just update-flake` | Update flake lockfile inputs. |

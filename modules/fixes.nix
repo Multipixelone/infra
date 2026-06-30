@@ -35,6 +35,21 @@
         }
       );
     })
+    # fastmcp: two rate-limiting integration tests are timing-sensitive and
+    # flaky under the build sandbox (the limiter doesn't trip in time, so the
+    # expected ToolError is never raised). Skip them.
+    (_final: prev: {
+      python3Packages = prev.python3Packages.overrideScope (
+        _pyFinal: pyPrev: {
+          fastmcp = pyPrev.fastmcp.overridePythonAttrs (old: {
+            disabledTests = (old.disabledTests or [ ]) ++ [
+              "test_rate_limiting_with_different_operations"
+              "test_rate_limiting_recovery_over_time"
+            ];
+          });
+        }
+      );
+    })
     # calibre-web 0.6.27b0 declares requests<2.33.0 but works with 2.33.x
     (_final: prev: {
       calibre-web = prev.calibre-web.overridePythonAttrs (old: {

@@ -82,6 +82,10 @@ in
         unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
         exec ${pyEnvStdlib}/bin/python3 ${./nudge_time.py} "$@"
       '';
+
+      # --- Notion CLI --------------------------------------------------------
+
+      ntn = pkgs.callPackage "${rootPath}/pkgs/ntn" { };
     in
     {
 
@@ -132,6 +136,9 @@ in
 
           # Morning nudge time calculator (stdlib only, no secrets needed)
           nudgeTime
+
+          # Notion CLI — for Kestrel's Obsidian→Notion bridge
+          ntn
         ];
 
         systemd.user.services.openclaw-gateway = {
