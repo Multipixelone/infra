@@ -12,15 +12,19 @@
         # listed here is removed from the Dock on activation.
         persistent-apps = [
           "/Applications/Firefox.app"
+          { spacer = { small = true; }; }
           "/System/Applications/Messages.app"
-          "/Applications/Fluso.app"
+          "/Applications/Slack.app"
+          { spacer = { small = true; }; }
           "/Applications/Fantastical.app"
           "/Applications/Todoist.app"
+          { spacer = { small = true; }; }
+          "/Applications/Fluso.app"
+          "/Applications/Notion.app"
           # NOTE: Adobe versions the path by year — bump on major upgrades.
           "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app"
+          { spacer = { small = true; }; }
           "/Applications/Ghostty.app"
-          "/Applications/Slack.app"
-          "/Applications/Notion.app"
         ];
       };
       finder = {
@@ -55,8 +59,12 @@
         location = "~/Pictures/Screenshots";
         type = "png";
       };
-      loginwindow.GuestEnabled = false;
+      loginwindow = {
+        GuestEnabled = false;
+      };
       trackpad.Clicking = true;
+      # No typed nix-darwin option exists for TALLogoutSavesState.
+      CustomUserPreferences."com.apple.loginwindow".TALLogoutSavesState = false; # don't reopen apps/windows on next login
     };
   };
 }
