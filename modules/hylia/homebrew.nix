@@ -10,12 +10,18 @@
         cleanup = "zap";
       };
       taps = [ ];
-      brews = [ ];
+      brews = [
+        # Newer Python than the macOS system one
+        "python@3.13"
+        # Apple Intelligence from the CLI, with OpenAI-compatible API server
+        "apfel"
+      ];
       casks = [
         # Terminal — ghostty cask is declared in modules/shell/terminal/ghostty.nix
 
         # Browsers
         "firefox"
+        "google-chrome"
 
         # Notes & knowledge / study
         "obsidian"
@@ -24,6 +30,7 @@
 
         # Communication
         "signal"
+        "telegram"
         "discord"
         "slack"
         "notion"
@@ -32,6 +39,7 @@
         # Media
         "spotify"
         "plexamp"
+        "moonlight" # Game streaming client (NVIDIA GameStream / Sunshine)
 
         # Dev tooling
         "visual-studio-code"

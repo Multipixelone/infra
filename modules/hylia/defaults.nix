@@ -63,8 +63,13 @@
         GuestEnabled = false;
       };
       trackpad.Clicking = true;
-      # No typed nix-darwin option exists for TALLogoutSavesState.
-      CustomUserPreferences."com.apple.loginwindow".TALLogoutSavesState = false; # don't reopen apps/windows on next login
+      # Neither key below has a typed nix-darwin option, so they go through
+      # CustomUserPreferences (raw `defaults write`).
+      CustomUserPreferences = {
+        "com.apple.loginwindow".TALLogoutSavesState = false; # don't reopen apps/windows on next login
+        # Disable Text Replacement substitution (e.g. emoticon → emoji).
+        NSGlobalDomain.NSAutomaticTextReplacementEnabled = false;
+      };
     };
   };
 }
