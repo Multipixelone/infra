@@ -6,7 +6,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
-  perSystem.wrappers.packages.noctalia-shell = true;
+  perSystem =
+    { system, lib, ... }:
+    lib.optionalAttrs (lib.hasSuffix "-linux" system) {
+      wrappers.packages.noctalia-shell = true;
+    };
   flake.wrappers.noctalia-shell =
     { pkgs, wlib, ... }:
     {

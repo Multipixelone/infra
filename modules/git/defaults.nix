@@ -8,7 +8,7 @@
       };
       user = {
         email = config.flake.meta.owner.email;
-        name = config.flake.meta.owner.name;
+        name = config.flake.meta.accounts.github.username;
       };
       init.defaultBranch = "main";
       push.default = "current";

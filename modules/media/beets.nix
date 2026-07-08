@@ -7,7 +7,7 @@
 {
   perSystem =
     { system, ... }:
-    {
+    lib.optionalAttrs (lib.hasSuffix "-linux" system) {
       packages.beets-plugins = inputs.beets-plugins.packages.${system}.default;
     };
   flake-file.inputs = {

@@ -134,6 +134,10 @@
             # OpenClaw is installed via npm --prefix "$HOME/.npm-global".
             fish_add_path --global --move $HOME/.npm-global/bin
             ${lib.optionalString pkgs.stdenv.isDarwin ''
+              # macOS exposes /opt/homebrew/bin via /etc/paths.d + path_helper,
+              # but fish doesn't run path_helper, so brew CLIs are invisible
+              # here. Add it once — covers every (non-keg-only) brew formula.
+              fish_add_path --global /opt/homebrew/bin /opt/homebrew/sbin
               # Homebrew's python@3.13 is keg-only: it only links the versioned
               # `python3.13` onto PATH, not bare `python`/`python3`/`pip`. Its
               # libexec/bin holds those unversioned symlinks, so add it here.

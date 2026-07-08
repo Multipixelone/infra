@@ -9,7 +9,10 @@
         upgrade = true;
         cleanup = "zap";
       };
-      taps = [ ];
+      taps = [
+        "f/textream"
+        "traycerai/traycer"
+      ];
       brews = [
         # Newer Python than the macOS system one
         "python@3.13"
@@ -30,6 +33,7 @@
 
         # Communication
         "signal"
+        "whatsapp"
         "telegram"
         "discord"
         "slack"
@@ -45,6 +49,8 @@
         "visual-studio-code"
         "docker-desktop"
         "claude"
+        # AI agent orchestration (from the traycerai/traycer tap)
+        "traycerai/traycer/traycer-desktop"
 
         # Creative
         "adobe-creative-cloud"
@@ -58,10 +64,14 @@
 
         # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
         # "amneziavpn"
+
+        # textream (from the f/textream tap)
+        "f/textream/textream"
       ];
       # Mac App Store apps (ids from `mas list`). Pages and Keynote are
       # intentionally omitted — they ship preinstalled and are not managed here.
       masApps = {
+        "DaVinci Resolve" = 571213070;
         "Fantastical" = 975937182;
         "Final Cut Pro" = 424389933;
         "forScore" = 363738376;
@@ -70,6 +80,7 @@
         "Logic Pro" = 634148309;
         "Numbers" = 361304891;
         "Todoist" = 585829637;
+        "Xcode" = 497799835;
       };
     };
   };

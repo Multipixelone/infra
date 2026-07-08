@@ -6,8 +6,8 @@
 }:
 {
   perSystem =
-    { pkgs, ... }:
-    {
+    { pkgs, system, ... }:
+    lib.optionalAttrs (lib.hasSuffix "-linux" system) {
       checks =
         {
           base = with config.flake.modules.homeManager; [ base ];
