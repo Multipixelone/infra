@@ -62,6 +62,7 @@
         "1password"
         "vlc"
         "fluidvoice"
+        "auto-subs"
 
         # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
         # "amneziavpn"
