@@ -61,6 +61,7 @@
         "itsycal"
         "1password"
         "vlc"
+        "fluidvoice"
 
         # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
         # "amneziavpn"
