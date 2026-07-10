@@ -71,14 +71,17 @@
       # Mac App Store apps (ids from `mas list`). Pages and Keynote are
       # intentionally omitted — they ship preinstalled and are not managed here.
       masApps = {
+        "BloonsTD6+" = 1584423325;
         "DaVinci Resolve" = 571213070;
         "Fantastical" = 975937182;
         "Final Cut Pro" = 424389933;
         "forScore" = 363738376;
         "GarageBand" = 682658836;
         "iMovie" = 408981434;
+        "Mini Motorways" = 1456188526;
         "Logic Pro" = 634148309;
         "Numbers" = 361304891;
+        "RCT Classic+" = 6702028686;
         "Todoist" = 585829637;
         "Xcode" = 497799835;
       };
