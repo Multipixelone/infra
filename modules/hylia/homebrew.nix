@@ -47,6 +47,7 @@
 
         # Dev tooling
         "visual-studio-code"
+        "cursor"
         "docker-desktop"
         "claude"
         # AI agent orchestration (from the traycerai/traycer tap)
