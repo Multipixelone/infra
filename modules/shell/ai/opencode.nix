@@ -464,6 +464,20 @@
           ''
             set -Ux OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS true
           ''
+          # fish
+          ''
+            # oh-my-opencode-slim's tavily provider reads TAVILY_API_KEY from the
+            # process env at plugin init and FATALs without it, killing the whole
+            # plugin. Export it session-wide so every opencode launch inherits it
+            # (oc, ocd, bare `opencode`), not just ones wrapped by `ocd`.
+            # `set -gx`, never `-Ux`: universal variables persist to
+            # fish_variables on disk — don't leak the secret there.
+            set -l tavily_env ${hmArgs.config.age.secrets.tavily.path}
+            if test -r $tavily_env
+              set -l key (string match -rg '^TAVILY_API_KEY=(.+)$' < $tavily_env)
+              test -n "$key"; and set -gx TAVILY_API_KEY $key
+            end
+          ''
         ];
         programs.opencode = {
           enable = true;
