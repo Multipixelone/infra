@@ -54,7 +54,7 @@ darwin-switch host=`hostname -s`:
   sudo darwin-rebuild switch --flake .#{{host}}
   # Config-only edits to skhdrc don't bump the launchd plist, so the agent keeps
   # running the old config. Kick it so changes take effect.
-  -skhd --restart-service
+  -launchctl kickstart -k gui/$(id -u)/org.nixos.skhd
 
 # (Re)grant macOS Accessibility + Input Monitoring to the hotkey daemon, then
 # restart it. skhd runs straight from the nix store; its store path — and thus
@@ -65,7 +65,7 @@ darwin-switch host=`hostname -s`:
 darwin-perms:
   open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
   open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-  -skhd --restart-service
+  -launchctl kickstart -k gui/$(id -u)/org.nixos.skhd
 
 # First-time activation on a fresh Mac, before nix-darwin's darwin-rebuild
 # exists on PATH. Run on the Mac itself.
