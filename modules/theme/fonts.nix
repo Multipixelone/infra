@@ -29,13 +29,19 @@
     { pkgs, ... }:
     let
       pragmata = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.pragmata);
-      appleEmoji = pkgs.callPackage "${inputs.apple-emoji}/default.nix" {
-        src = inputs.apple-emoji;
-        ttc = pkgs.fetchurl {
-          url = "https://blusky.s3.us-west-2.amazonaws.com/apple-emoji.ttc";
-          sha256 = "0qpzsw0a1823g3igmgadpkz33k3k0ij3ibfxi7h73mi6bfvy0pj3";
-        };
-      };
+      appleEmoji =
+        (pkgs.callPackage "${inputs.apple-emoji}/default.nix" {
+          src = inputs.apple-emoji;
+          ttc = pkgs.fetchurl {
+            url = "https://blusky.s3.us-west-2.amazonaws.com/apple-emoji.ttc";
+            sha256 = "0qpzsw0a1823g3igmgadpkz33k3k0ij3ibfxi7h73mi6bfvy0pj3";
+          };
+        }).overrideAttrs
+          (old: {
+            # Newer fontTools rejects duplicate (platformID, platEncID, language)
+            # cmap subtables that the windows target's cmap juggling produces.
+            patches = (old.patches or [ ]) ++ [ (rootPath + /pkgs/apple-emoji/dedupe-cmap.patch) ];
+          });
     in
     {
       fonts = {

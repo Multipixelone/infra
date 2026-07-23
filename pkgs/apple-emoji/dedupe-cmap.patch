@@ -1,0 +1,33 @@
+Dedupe cmap subtables before saving.
+
+For the Windows target, add_cmap_platform_3_encoding_10() appends a (3,10)
+format-12 subtable, then ensure_windows_cmap() converts the existing (3,4)
+subtable in place to another (3,10) format-12 subtable. That leaves two
+subtables sharing (platformID, platEncID, language) == (3, 10, 0), which
+newer fontTools rejects at compile time:
+
+  ValueError: cmap subtables have duplicate (platformID, platEncID,
+  language) entries, which the OpenType spec does not allow: {(3, 10, 0)}
+
+Drop duplicate (platformID, platEncID, language) subtables, keeping the
+first, right before the font is written.
+
+--- a/convert.py
++++ b/convert.py
+@@ -104,6 +104,15 @@ def main() -> int:
+     add_cmap_platform_3_encoding_10(font)
+     if is_windows:
+         apply_windows_compat(font)
+
++    _seen = set()
++    _kept = []
++    for _t in font["cmap"].tables:
++        _key = (_t.platformID, _t.platEncID, _t.language)
++        if _key in _seen:
++            continue
++        _seen.add(_key)
++        _kept.append(_t)
++    font["cmap"].tables = _kept
+     args.output.parent.mkdir(parents=True, exist_ok=True)
+     font.save(args.output)
+     LOG.info("Wrote %s", args.output)
