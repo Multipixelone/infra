@@ -48,6 +48,7 @@
         # to ~/prem-tweet on link and periodically commit/push its learnings.md
         # appends so the repo stays canonical (BUILD.md, Deployment).
         docsDir = "/home/tunnel/Documents/Git/prem-tweet/docs";
+        brandKitDir = "/home/tunnel/Documents/Git/brand-kit";
 
         # No @Flusoai X API access yet: at each slot the bot texts Finn the due
         # tweet on Telegram (tap-to-copy + ✅ Posted button) instead of posting
