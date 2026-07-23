@@ -35,9 +35,11 @@
         }
       );
     })
-    # fastmcp: two rate-limiting integration tests are timing-sensitive and
-    # flaky under the build sandbox (the limiter doesn't trip in time, so the
-    # expected ToolError is never raised). Skip them.
+    # fastmcp: skip integration tests that don't survive the build sandbox.
+    # The rate-limiting tests are timing-sensitive and flaky (the limiter
+    # doesn't trip in time, so the expected ToolError is never raised). The
+    # Supabase provider test spins up a live HTTP server that never binds
+    # under the sealed sandbox ("Server failed to start after 30 attempts").
     (_final: prev: {
       python3Packages = prev.python3Packages.overrideScope (
         _pyFinal: pyPrev: {
@@ -45,6 +47,7 @@
             disabledTests = (old.disabledTests or [ ]) ++ [
               "test_rate_limiting_with_different_operations"
               "test_rate_limiting_recovery_over_time"
+              "test_unauthorized_access"
             ];
           });
         }
