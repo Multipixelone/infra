@@ -63,13 +63,14 @@
 
       # ---- EDIT HERE: folders to expose to the phone (name -> absolute path) --
       # Names become the session label prefix shown in the Claude app and the
-      # `claude-rc-<name>` unit name. Paths follow the repo's `$PROJECTS_DIR`
-      # convention (~/Documents/Git, see ../git/_clone-self.nix).
+      # `claude-rc-<name>` unit name. Repo checkouts follow the repo's
+      # `$PROJECTS_DIR` convention (~/Documents/Git, see ../git/_clone-self.nix);
+      # OpenClaw is rooted at its state dir instead so the session can read the
+      # config files alongside the workspace.
       folders = {
-        # NOTE: confirm the real OpenClaw workspace path — its dev folder is not
-        # referenced elsewhere in this repo; ~/Documents/Git/openclaw is a guess
-        # based on the projects-dir convention.
-        openclaw = "${home}/Documents/Git/openclaw";
+        # OPENCLAW_STATE_DIR — same root `openclaw-gateway` runs in
+        # (see ./openclaw.nix), holding both the config files and workspace/.
+        openclaw = "${home}/.openclaw";
         infra = "${home}/Documents/Git/infra";
       };
       # ------------------------------------------------------------------------
