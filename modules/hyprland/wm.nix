@@ -155,7 +155,7 @@
                 noise = 0.02;
                 contrast = 1;
                 passes = 4;
-                size = 7;
+                size = 10;
                 ignore_opacity = true;
                 popups = true;
                 popups_ignorealpha = 0.6;

@@ -56,8 +56,12 @@ in
           beam-thickness = 1;
         };
         colors-dark = catppuccinColors // {
-          alpha = "0.85";
-          alpha-mode = "all";
+          alpha = "0.72";
+          # only the default background is transparent (text/UI stay opaque) so
+          # Hyprland's blur reads as frosted glass instead of a washed-out,
+          # see-through surface. "all" made every cell alpha. The lower the
+          # alpha, the more of Hyprland's (heavy, size=10) blur shows through.
+          alpha-mode = "default";
         };
       };
     };
