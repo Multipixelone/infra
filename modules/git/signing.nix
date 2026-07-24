@@ -1,19 +1,23 @@
 { inputs, ... }:
 {
-  # Commit signing (GPG) — scaffolded but OFF.
+  # Commit signing (GPG) — live.
   #
-  # `commit.gpgSign` stays false until the key is in place. To turn it on:
-  #   1. Generate a key:  gpg --full-generate-key   (ed25519 recommended)
-  #   2. Add the *secret* key to the nix-secrets repo, encrypted with agenix:
-  #        gpg --armor --export-secret-keys <KEY-ID> \
-  #          | agenix -e gpg/signing-key.age   (in Multipixelone/nix-secrets)
-  #   3. Set `signingKey` below to the key's long ID / fingerprint.
+  # The secret key lives in the nix-secrets repo as `gpg/signing-key.age`,
+  # encrypted to every host in `systems`, and is imported into the keyring by
+  # the activation script below (guarded by pathExists, so a host without the
+  # secrets input still evaluates).
+  #
+  # To rotate the key:
+  #   1. gpg --full-generate-key   (ed25519)
+  #   2. gpg --armor --export-secret-keys <KEY-ID> \
+  #        | agenix -e gpg/signing-key.age   (in Multipixelone/nix-secrets)
+  #   3. Update `signingKey` below to the new long ID / fingerprint.
   #   4. Add the *public* key to GitHub as a signing key (Verified badge).
-  #   5. Flip `commit.gpgSign` / `tag.gpgSign` to true and rebuild.
   #
-  # Once `gpg/signing-key.age` exists in the secrets repo, the agenix secret and
-  # the keyring import below activate automatically (guarded by pathExists), so
-  # steps 3 + 5 are the only edits left here.
+  # The imported key is kept passphrase-less on Linux hosts so that commits made
+  # from headless contexts (ssh, openclaw-driven sessions) can sign without a
+  # prompt; it is protected by disk permissions and FDE instead. pinentry-curses
+  # is still wired up so `gpg --change-passphrase` and friends have a UI.
   flake.modules.homeManager.base =
     {
       config,
@@ -22,16 +26,26 @@
       ...
     }:
     let
-      signingKey = "59BF38D05371C5E9"; # TODO: GPG key ID, once generated
+      signingKey = "59BF38D05371C5E9";
       secretFile = "${inputs.secrets}/gpg/signing-key.age";
       hasSecret = builtins.pathExists secretFile;
     in
     {
       programs.gpg.enable = true;
 
+      # Without an agent there is no pinentry at all, and every signature fails
+      # with "gpg: signing failed: No pinentry". macOS keeps its own agent
+      # setup, so this is Linux-only.
+      services.gpg-agent = lib.mkIf pkgs.stdenv.isLinux {
+        enable = true;
+        pinentry.package = pkgs.pinentry-curses;
+        defaultCacheTtl = 86400;
+        maxCacheTtl = 86400;
+      };
+
       programs.git.settings = {
         gpg.format = "openpgp";
-        commit.gpgSign = true; # flip to true once the key is registered on GitHub
+        commit.gpgSign = true;
         tag.gpgSign = true;
       }
       // lib.optionalAttrs (signingKey != "") {
