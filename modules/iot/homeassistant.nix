@@ -1322,6 +1322,96 @@
             ];
           }
 
+          # ── Living room signage: sleep time off ──────────────────────────
+          # 00:30: both living room novelty lights off. Natty Light (bright
+          # neon sign) is skipped when guests are over — guest mode owns the
+          # lights then. Plasma Lamp is decorative/dim, so it cycles either
+          # way. Paired with `living_room_signage_morning_on`.
+          {
+            alias = "Living room signage: sleep time off";
+            id = "living_room_signage_sleep_off";
+            mode = "single";
+            trigger = [
+              {
+                platform = "time";
+                at = "00:30:00";
+              }
+            ];
+            action = [
+              {
+                service = "switch.turn_off";
+                target = {
+                  entity_id = "switch.plasma_lamp";
+                };
+              }
+              {
+                choose = [
+                  {
+                    conditions = [
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.guest_mode";
+                        state = "off";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "switch.turn_off";
+                        target = {
+                          entity_id = "switch.natty_light";
+                        };
+                      }
+                    ];
+                  }
+                ];
+              }
+            ];
+          }
+
+          # ── Living room signage: morning on ──────────────────────────────
+          # 07:30 counterpart to `living_room_signage_sleep_off`; same guest
+          # mode carve-out for Natty Light.
+          {
+            alias = "Living room signage: morning on";
+            id = "living_room_signage_morning_on";
+            mode = "single";
+            trigger = [
+              {
+                platform = "time";
+                at = "07:30:00";
+              }
+            ];
+            action = [
+              {
+                service = "switch.turn_on";
+                target = {
+                  entity_id = "switch.plasma_lamp";
+                };
+              }
+              {
+                choose = [
+                  {
+                    conditions = [
+                      {
+                        condition = "state";
+                        entity_id = "input_boolean.guest_mode";
+                        state = "off";
+                      }
+                    ];
+                    sequence = [
+                      {
+                        service = "switch.turn_on";
+                        target = {
+                          entity_id = "switch.natty_light";
+                        };
+                      }
+                    ];
+                  }
+                ];
+              }
+            ];
+          }
+
           # ── Welcome home lights ──────────────────────────────────────────
           # When someone arrives home (zone.home transitions from empty to
           # occupied), turn on lights appropriate to the time of day.
