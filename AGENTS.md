@@ -86,7 +86,7 @@ iotHass.nixAutomations = [{
 }];
 ```
 
-Use `triggers`/`actions`/`conditions` (HA 2024.10+ keys), not legacy `trigger`/`action`. `!secret foo` works — the YAML generator un-quotes tag strings (`homeassistant.nix:113`). Nix conventions: `''…''` for multi-line templates, triple-quoted `''' '''` inside Jinja to escape single quotes (see CTA train sensors at `homeassistant.nix:1379`).
+Use `triggers`/`actions`/`conditions` (HA 2024.10+ keys), not legacy `trigger`/`action`. `!secret foo` works — the YAML generator un-quotes tag strings (`homeassistant.nix:113`). Nix conventions: `''…''` for multi-line templates, triple-quoted `''' '''` inside Jinja to escape single quotes (see the Apple TV media templates at `homeassistant.nix:1892`). A long single-line Jinja template reads better as a `lib.concatStrings` of per-statement strings — one `"…"` string per `{% … %}` — which sidesteps the escaping entirely and still emits one YAML scalar (see `uticaRows` at `homeassistant.nix:92`).
 
 **HA secrets** — token-based integrations use the existing `homeassistant-token` LLAT (`modules/iot/foodtown-sort.nix:44`, owner=hass, mode=0400). Shell commands that call the HA REST API follow the `writeShellApplication` wrapper pattern in `foodtown-sort.nix`: read the token from `config.age.secrets."homeassistant-token".path` at runtime, never bake into the store.
 

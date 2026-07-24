@@ -1,10 +1,11 @@
 # nixos-home — a declarative, Nix-generated home dashboard.
 #
-# This is the single-source-of-truth counterpart to the storage-mode iPad kiosk
-# (`main-home`, UI-managed, NOT in this repo). It reproduces the kiosk's first
-# ("Fridge") view — people locations, per-person calendars, the subway board,
-# weather, cleaning status and light scenes — as a YAML-mode dashboard generated
-# from Nix, so it regenerates on every rebuild with no manual ha-mcp push.
+# This IS the iPad kiosk, and the single source of truth for it: people
+# locations, per-person calendars, the shopping list, the subway board, weather,
+# cleaning status and light scenes, as a YAML-mode dashboard generated from Nix,
+# so it regenerates on every rebuild with no manual ha-mcp push. It supersedes
+# the old storage-mode `main-home` dashboard, which was UI-managed (never in
+# this repo) and has since been deleted.
 #
 # It also owns the FULL set of custom Lovelace modules for this host (the single
 # `customLovelaceModules` list): emitting any `lovelace.resources` flips HA to
@@ -28,7 +29,6 @@
 # chrome (sidebar + per-person view tabs) stays available on cod-chores: it is
 # integration-managed, so we never edit it to add our own back/nav chrome.
 # `?kiosk` chrome (hidden header/sidebar) is the kiosk-mode plugin, declared below.
-# The storage `main-home` dashboard is left intact as a fallback.
 _: {
   configurations.nixos.iot.module =
     # roomieorderButtons is shared from modules/iot/roomieorder.nix via
@@ -48,6 +48,70 @@ _: {
       # Finn-owned item exists in the (secrets) catalog — no Finn items → no
       # Reorder section appended to finnView below.
       finnReorderGrid = roomieorderButtons.dashboardCardsByOwner.Finn or null;
+
+      # ── Subway board (Utica Av northbound → Manhattan) ──────────────────
+      # `sensor.utica_av_northbound` (modules/iot/homeassistant.nix) merges the
+      # A and the C, drops every train too close to walk to, and exposes what's
+      # left as a `trains` list of {route, mins}. The station is ~10 minutes
+      # away, so the first entry is always a train you can actually make.
+      subwaySensor = "sensor.utica_av_northbound";
+      subwayWalkMinutes = 10;
+      # At the walk time the choice is "leave now", not "soon" — colour it that
+      # way for the couple of minutes of slack you actually have.
+      subwayLeaveNowMinutes = subwayWalkMinutes + 2;
+      subwayTrains = "{% set trains = state_attr('${subwaySensor}', 'trains') or [] %}";
+
+      subwayBadge = {
+        type = "custom:mushroom-template-badge";
+        content = "${subwayTrains}{{ (trains[0].route ~ ' ' ~ trains[0].mins ~ 'm') if trains else '—' }}";
+        icon = "mdi:subway-variant";
+        color = "${subwayTrains}{% if trains and trains[0].mins <= ${toString subwayLeaveNowMinutes} %}orange{% else %}primary{% endif %}";
+      };
+
+      subwayCard = {
+        type = "markdown";
+        content = ''
+          ${subwayTrains}
+          ### ↑ Manhattan · ${toString subwayWalkMinutes} min walk
+
+          # {% if trains %}{% for t in trains %}<span><span>{{ t.route }}</span>{{ t.mins }}{% if loop.first %}<small> min</small>{% endif %}</span> {% endfor %}{% else %}—{% endif %}'';
+        # The markdown card sanitises its HTML: `<span>` survives, `class=` does
+        # not, so the structure has to carry the styling. Each train is its own
+        # outer span (one row item) wrapping a bullet span.
+        card_mod.style."ha-markdown$" = ''
+          /* One train: kept whole, so a narrow column wraps between trains
+             rather than between a bullet and the time it labels. */
+          h1 > span {
+            display: inline-block;
+            white-space: nowrap;
+            margin-right: 0.35em;
+          }
+          /* The MTA bullet. The A and the C are both IND Eighth Av blue, so the
+             letter — never the colour — is what tells them apart. Sized off the
+             number it labels so it stays subordinate to the time. */
+          h1 > span > span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5em;
+            height: 1.5em;
+            border-radius: 50%;
+            background-color: #0039A6;
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.5em;
+            vertical-align: middle;
+            margin-right: 0.25em;
+          }
+          h1 {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+          }
+          h3 {
+            opacity: 0.65;
+          }
+        '';
+      };
 
       # Per-person "today" agenda. Swaps the kiosk's unpackaged `custom:today-card`
       # for atomic-calendar-revive (in nixpkgs) limited to a single day, so the
@@ -552,12 +616,7 @@ _: {
             show_name = true;
             show_icon = true;
           }
-          {
-            type = "custom:mushroom-template-badge";
-            content = "{{ ((states('sensor.kingston_throop_n_next_arrival') | as_datetime - now()).total_seconds() / 60) | round(0, 'floor') | int }}m";
-            icon = "mdi:subway-variant";
-            color = "{% set m = ((states('sensor.kingston_throop_n_next_arrival') | as_datetime - now()).total_seconds() / 60) | round(0, 'floor') | int %}{% if m < 5 %}orange{% else %}primary{% endif %}";
-          }
+          subwayBadge
           {
             type = "entity";
             entity = "sensor.openweathermap_peak_rain_chance_12h";
@@ -687,6 +746,24 @@ _: {
                   }
                 ];
               }
+
+              # ── Shopping list ──────────────────────────────────────────────
+              # Lives in the left column rather than the Home column so it sits
+              # next to the day's agenda — it's a "what do we need today" item,
+              # not a house control.
+              {
+                type = "heading";
+                heading = "Shopping list";
+                heading_style = "subtitle";
+                icon = "mdi:cart-outline";
+              }
+              {
+                display_order = "none";
+                type = "todo-list";
+                entity = "todo.foodtown";
+                hide_completed = true;
+                hide_section_headers = true;
+              }
             ];
           }
 
@@ -766,19 +843,6 @@ _: {
                 ];
               }
               {
-                type = "heading";
-                heading = "Shopping list";
-                heading_style = "subtitle";
-                icon = "mdi:cart-outline";
-              }
-              {
-                display_order = "none";
-                type = "todo-list";
-                entity = "todo.foodtown";
-                hide_completed = true;
-                hide_section_headers = true;
-              }
-              {
                 type = "media-control";
                 entity = "media_player.living_room";
                 grid_options = {
@@ -800,40 +864,7 @@ _: {
                 type = "custom:clock-weather-card";
                 entity = "weather.openweathermap";
               }
-              {
-                type = "markdown";
-                content = ''
-                  {% set next = states('sensor.kingston_throop_n_next_arrival') | as_datetime %}
-                  {% set second = states('sensor.kingston_throop_n_second_arrival') | as_datetime %}
-                  {% set third = states('sensor.kingston_throop_n_third_arrival') | as_datetime %}
-                  {% set n = ((next - now()).total_seconds() / 60) | round(0, 'floor') | int if next else '--' %}
-                  {% set s = ((second - now()).total_seconds() / 60) | round(0, 'floor') | int if second else '--' %}
-                  {% set t = ((third - now()).total_seconds() / 60) | round(0, 'floor') | int if third else '--' %}
-
-                  ### <span>C</span> ↑ Manhattan
-
-                  # **{{ n }}**<small> min</small> &nbsp;·&nbsp; **{{ s }}** &nbsp;·&nbsp; **{{ t }}**'';
-                card_mod.style."ha-markdown$" = ''
-                  h3 span {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 1.6em;
-                    height: 1.6em;
-                    border-radius: 50%;
-                    background-color: #0039A6;
-                    color: #fff;
-                    font-weight: 700;
-                    font-size: 0.85em;
-                    vertical-align: middle;
-                    margin-right: 6px;
-                  }
-                  h1 {
-                    font-variant-numeric: tabular-nums;
-                    letter-spacing: -0.02em;
-                  }
-                '';
-              }
+              subwayCard
               {
                 type = "tile";
                 entity = "vacuum.vaccum";

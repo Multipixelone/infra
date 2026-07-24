@@ -5,8 +5,8 @@ _: {
       ports = [ "5900:5900" ]; # LAN only — iot is not WAN-exposed
       environment = {
         VNC_PASSWORD = "ipad";
-        # Declarative kiosk (modules/iot/dashboard-home.nix). Replaces the old
-        # storage-mode main-home dashboard, which stays as a manual fallback.
+        # Declarative kiosk (modules/iot/dashboard-home.nix). Replaced the old
+        # storage-mode main-home dashboard, since deleted.
         STARTING_WEBSITE_URL = "http://192.168.8.111:8123/nixos-home/home?kiosk";
         VNC_RESOLUTION = "1536x1152"; # 4:3, midpoint between 1024x768 and iPad Air native 2048x1536
       };

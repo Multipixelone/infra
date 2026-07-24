@@ -20,7 +20,7 @@ Home Assistant Lovelace dashboards come in two mutually exclusive modes:
 | Edited via              | the **UI** (three-dot → Edit dashboard) or the ha-mcp `ha_config_*_dashboard` tools | edit the **file**, then reload                                                                    |
 | Survives a Nix rebuild? | yes — Nix never touches `.storage`                                                  | the file is regenerated; **hand edits to the live config are wiped**                              |
 | Survives a UI "Edit"?   | yes                                                                                 | **no — YAML-mode dashboards aren't editable in the UI at all** (the editor is read-only / hidden) |
-| Our example             | `main-home` (the iPad kiosk)                                                        | `nixos-reorder` (the Reorder grid)                                                                |
+| Our example             | `cod-chores` (ChoreOps-managed)                                                     | `nixos-home` (the iPad kiosk), `nixos-reorder` (the Reorder grid)                                 |
 
 The trap is that **both modes look identical in the sidebar and render the same
 card types.** Nothing in the UI shouts "this one is declarative." You tell them
@@ -30,17 +30,11 @@ apart by where they're defined (see the table below), not by looking at them.
 
 | Dashboard       | Sidebar title | Mode           | Where it's defined                                           | Touch it how                                         |
 | --------------- | ------------- | -------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
-| `main-home`     | **Main Home** | **storage**    | HA `.storage`, **not in this repo**                          | UI editor or ha-mcp; back up first                   |
 | `nixos-home`    | **Home**      | **YAML / Nix** | `modules/iot/dashboard-home.nix`                             | edit the Nix, then rebuild                           |
 | `nixos-reorder` | **Reorder**   | **YAML / Nix** | `modules/iot/roomieorder.nix`, generated from `catalog.json` | edit `catalog.json` (or the generator), then rebuild |
 | `cod-chores`    | **Chores**    | **storage**    | **auto-managed by the ChoreOps integration**, not in repo    | don't edit — the integration regenerates it          |
 
-- **`main-home`** is the iPad wall kiosk. View 0 is the fridge dashboard. It is
-  storage mode _on purpose_ — it's hand-tuned in the UI and we don't want Nix
-  fighting the household's tweaks. It is **not** version-controlled here; the
-  only backups are JSON exports in `~/ha-dashboard-backups/`. **Never** point a
-  Nix `dashboards.*` block at it.
-- **`nixos-home`** is the declarative kiosk the iPad actually points at
+- **`nixos-home`** is the iPad wall kiosk, and the only source of truth for it
   (`/nixos-home/home?kiosk`). After the **Today** section it carries a
   **Household** section: a ChoreOps points leaderboard (each card taps to that
   person's `cod-chores` page) above a "needs doing" strip whose chips
@@ -124,7 +118,8 @@ systemd.services.home-assistant.reloadTriggers = [ reorderDashboard ];
 
 A catalog change changes the derivation, which trips `reloadTriggers`, so the
 dashboard reloads on rebuild with **no** manual ha-mcp push. The iPad kiosk
-(`main-home`, storage mode) is left untouched.
+(`nixos-home`) is a separate dashboard and is left untouched; it only links here
+via a Reorder chip.
 
 ## The card it generates (the validated card vocabulary)
 
@@ -187,7 +182,7 @@ services.home-assistant.customLovelaceModules = [ pkgs.home-assistant-custom-lov
 `customLovelaceModules` entry (a) is served at
 `/local/nixos-lovelace-modules/mushroom.js`, (b) flips `lovelace.resource_mode`
 to `"yaml"`, and (c) emits the `lovelace.resources` entry that actually loads the
-JS. So the Mushroom cards render even though `main-home` is still storage mode.
+JS. So the Mushroom cards render on every dashboard, storage or YAML.
 
 ## Knobs
 
@@ -237,25 +232,25 @@ template`.** HA's card editor flags template conditions as **"Conditions are
 
 ---
 
-# Editing the storage-mode kiosk (`main-home`)
+# Editing a storage-mode dashboard
 
-Different rules entirely, because there's no Nix source — `.storage` _is_ the
-source of truth.
+We no longer own one — the kiosk is `nixos-home` (Nix), and the only storage
+dashboard left is `cod-chores`, which the ChoreOps integration regenerates and
+we don't hand-edit. Kept here for when one does turn up (a new integration's
+dashboard, or a scratch one made in the UI):
 
-- **Back up first.** Export the dashboard JSON to `~/ha-dashboard-backups/`
-  before any non-trivial change (that's the only version history this dashboard
-  has).
+- **Back up first.** Export the dashboard JSON to `~/ha-dashboard-backups/` —
+  for a storage dashboard that's the only version history there is.
 - **Via the UI:** open the dashboard, three-dot → Edit dashboard.
-- **Programmatically (ha-mcp):** it's storage mode, so use
-  `ha_config_set_dashboard` with a `python_transform`. Always pass the current
-  `config_hash` from `ha_config_get_dashboard` for optimistic locking; it
-  changes after every write. Sandbox limits: no `import`, no
-  f-strings/`.format()`, no `.replace()` — build strings with `+` concatenation.
-- **Don't try to "Nix-ify" it by pointing a `lovelace.dashboards.*` block at it.**
-  That would put it in YAML mode and make the household's UI edits impossible.
-  If you ever _do_ want it declarative, that's a migration (export → translate to
-  YAML → switch mode), not a config tweak. See **Migrating `main-home` to Nix**
-  below.
+- **Programmatically (ha-mcp):** use `ha_config_set_dashboard` with a
+  `python_transform`. Always pass the current `config_hash` from
+  `ha_config_get_dashboard` for optimistic locking; it changes after every
+  write. Sandbox limits: no `import`, no f-strings/`.format()`, no `.replace()`
+  — build strings with `+` concatenation.
+- **Don't "Nix-ify" one by pointing a `lovelace.dashboards.*` block at it.** That
+  flips it to YAML mode and makes UI edits impossible. Going declarative is a
+  migration (export → translate to YAML → switch mode), not a config tweak — see
+  the `main-home` migration below for how that went.
 
 ---
 
@@ -270,17 +265,17 @@ installed_only=True, category="lovelace")`.
 > declares. The "Loads now?" column reflects reality on HA 2026.6.3, verified on
 > the box — not what's installed.
 
-| Card                                               | What it's for                                                     | In nixpkgs?                 | Loads now?  | Used on live `main_home` |
-| -------------------------------------------------- | ----------------------------------------------------------------- | --------------------------- | ----------- | ------------------------ |
-| **Mushroom** (`custom:mushroom-*`)                 | the workhorse — clean tiles/chips/template cards; the house look  | ✅ `mushroom`               | ✅ (Nix)    | yes (42+ cards)          |
-| **card-mod**                                       | CSS into (almost) any card — rounding, colors, fonts, hiding bits | ✅ `card-mod`               | ❌ orphaned | yes (styling)            |
-| **auto-entities**                                  | auto-populate a card's entity list from a filter                  | ✅ `auto-entities`          | ❌ orphaned | yes                      |
-| **mini-graph-card**                                | minimalist history graphs/sparklines                              | ✅ `mini-graph-card`        | ❌ orphaned | yes                      |
-| **Clock Weather Card**                             | iOS-style date/time + multi-day forecast                          | ✅ `clock-weather-card`     | ❌ orphaned | (recently)               |
-| **Atomic Calendar Revive**                         | advanced calendar/agenda card                                     | ✅ `atomic-calendar-revive` | ❌ orphaned | yes                      |
-| **Today Card**                                     | today's calendar schedule                                         | ❌ **not packaged**         | ❌ orphaned | yes (4 cards)            |
-| Kiosk Mode                                         | hides header/sidebar for wall tablets                             | ✅ `kiosk-mode`             | ❌ orphaned | kiosk chrome             |
-| Calendar Card Pro / Week / Daylight / Week-planner | various calendar layouts                                          | ❌ not packaged             | ❌ orphaned | no (dropped)             |
+| Card                                               | What it's for                                                     | In nixpkgs?                 | Loads now?  | Used on the kiosk |
+| -------------------------------------------------- | ----------------------------------------------------------------- | --------------------------- | ----------- | ----------------- |
+| **Mushroom** (`custom:mushroom-*`)                 | the workhorse — clean tiles/chips/template cards; the house look  | ✅ `mushroom`               | ✅ (Nix)    | yes (42+ cards)   |
+| **card-mod**                                       | CSS into (almost) any card — rounding, colors, fonts, hiding bits | ✅ `card-mod`               | ❌ orphaned | yes (styling)     |
+| **auto-entities**                                  | auto-populate a card's entity list from a filter                  | ✅ `auto-entities`          | ❌ orphaned | yes               |
+| **mini-graph-card**                                | minimalist history graphs/sparklines                              | ✅ `mini-graph-card`        | ❌ orphaned | yes               |
+| **Clock Weather Card**                             | iOS-style date/time + multi-day forecast                          | ✅ `clock-weather-card`     | ❌ orphaned | (recently)        |
+| **Atomic Calendar Revive**                         | advanced calendar/agenda card                                     | ✅ `atomic-calendar-revive` | ❌ orphaned | yes               |
+| **Today Card**                                     | today's calendar schedule                                         | ❌ **not packaged**         | ❌ orphaned | yes (4 cards)     |
+| Kiosk Mode                                         | hides header/sidebar for wall tablets                             | ✅ `kiosk-mode`             | ❌ orphaned | kiosk chrome      |
+| Calendar Card Pro / Week / Daylight / Week-planner | various calendar layouts                                          | ❌ not packaged             | ❌ orphaned | no (dropped)      |
 
 So of the cards the live kiosk **uses**, everything except **Today Card** is
 already in nixpkgs — making them load is mostly wiring (see the plan below).
@@ -303,7 +298,7 @@ the rules to bake into any dashboard work here.
 - **Prefer the Sections view** (`type: sections`) over masonry/stacks. It's a
   responsive grid: it re-flows columns to the screen width while keeping each
   section's internal column count fixed, so card positions (muscle memory) stay
-  put across phone/tablet/kiosk. This is what `main-home` already uses.
+  put across phone/tablet/kiosk. This is what `nixos-home` uses.
 - **Group, don't sprawl.** Group related controls into one section with a
   heading rather than scattering individual entity cards. A `heading` card per
   section beats a wall of titled tiles.
@@ -355,7 +350,7 @@ since Mushroom was wired into Nix. Verified on `colmena.iot`, HA 2026.6.3:
   `/hacsfiles/...`, now dead.
 - The served index injects only HACS's `iconset.js` as an `extra_module_url`, not
   the plugin cards — so there's no second load path saving them.
-- Net: the live `main_home` references `card-mod`, `auto-entities`,
+- Net: the kiosk references `card-mod`, `auto-entities`,
   `mini-graph-card`, `clock-weather-card`, `atomic-calendar-revive`, and
   `today-card`, and **all of them render as "Custom element doesn't exist."**
   Only the 50+ Mushroom cards work.
@@ -373,7 +368,7 @@ is to declare **every** frontend module in Nix so they all land in the YAML
 single source of truth for dashboard resources — no HACS deviation.
 
 This is **independent of, and a prerequisite for, migrating the dashboard config
-itself** (next section). Fixing resources does _not_ require touching `main_home`'s
+itself** (next section). Fixing resources did _not_ require touching the kiosk's
 storage-mode layout — the existing cards start rendering as soon as their modules
 load.
 
@@ -381,7 +376,7 @@ load.
 
 Add every used module to `services.home-assistant.customLovelaceModules` in
 `modules/iot/roomieorder.nix` (or a dedicated `modules/iot/lovelace-modules.nix`).
-nixpkgs status of the cards `main_home` actually uses, verified:
+nixpkgs status of the cards the kiosk actually uses, verified:
 
 | Module                         | nixpkgs `home-assistant-custom-lovelace-modules.*` |
 | ------------------------------ | -------------------------------------------------- |
@@ -429,26 +424,28 @@ bump, not a surprise.
 
 ---
 
-# Migrating the `main_home` dashboard config to Nix (the larger goal)
+# The `main_home` → Nix migration (done)
 
-With resources fixed (above), the dashboard _layout_ can also move from storage
-mode to a Nix-generated YAML dashboard — the full single-source-of-truth end state.
+The kiosk used to be a storage-mode dashboard called `main-home`, hand-tuned in
+the UI and not version-controlled. It has been fully replaced by `nixos-home`
+(`modules/iot/dashboard-home.nix`) and **deleted** from HA. The iPad points at
+`/nixos-home/home?kiosk` (`modules/iot/vnc-ipad.nix`). Final pre-delete export:
+`~/ha-dashboard-backups/main-home-2026-07-24.json`.
 
-1. **Export** the live `main_home` JSON (start from `~/ha-dashboard-backups/`;
-   the live one is newer — pull it via the ha-mcp dashboard tools or off the box).
+The shape of that migration, if another storage dashboard ever needs it:
+
+1. **Export** the live JSON to `~/ha-dashboard-backups/` before touching
+   anything — for a storage dashboard that's the only version history.
 2. **Translate** to a `sections`-view YAML structure and generate it with
    `pkgs.formats.yaml`, exactly like `reorderDashboard` in
    `modules/iot/roomieorder.nix`.
-3. **Register** it as a YAML dashboard (`lovelace.dashboards.nixos-home = { mode
-= "yaml"; filename = ...; }`) and add it to `reloadTriggers`. Decide whether it
-   _replaces_ storage `main-home` (repoint the kiosk URL) or coexists during cutover.
+3. **Register** it as a YAML dashboard (`lovelace.dashboards.<name> = { mode =
+"yaml"; filename = ...; }`) and add it to `reloadTriggers`. Run it alongside
+   the storage one during cutover, then repoint the kiosk URL and delete.
 4. **Trade-off:** once YAML-managed, the household can't tweak it from the UI —
    every change is a repo edit + `just colmena-apply-tag iot`. That's the point
    (version control, reproducibility), but it's a real change for a shared wall
-   tablet. Migrate the stable parts; leave genuinely fiddly bits in storage if needed.
-
-**Back up first**, always: export `main_home` JSON to `~/ha-dashboard-backups/`
-before cutover so you can restore the storage version.
+   tablet.
 
 ---
 
@@ -458,7 +455,7 @@ This repo is set up so an AI can do dashboard work safely. Give it these
 guardrails in the prompt and the output will land first try:
 
 1. **State the target and its mode up front.** "Revise the YAML/Nix-generated
-   `nixos-reorder` dashboard" vs "revise the storage-mode `main-home` kiosk" lead
+   `nixos-reorder` dashboard" vs "revise the storage-mode `cod-chores` dashboard" lead
    to completely different workflows (edit `catalog.json` + rebuild, vs ha-mcp
    `python_transform` + `config_hash`). The #1 failure is an AI hand-editing a
    YAML-mode dashboard live (silently overwritten) or trying to `python_transform`

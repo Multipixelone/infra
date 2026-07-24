@@ -14,7 +14,7 @@
 # dashboard (YAML mode) — generated here from buttons.dashboardCardHousehold (the
 # SHARED grid, with any owner-tagged personal items filtered out) — so they
 # regenerate on every rebuild with no manual ha-mcp push. The iPad kiosk
-# (main-home, storage mode / UI-managed) is left untouched.
+# (nixos-home, dashboard-home.nix) reaches it via a Reorder chip.
 #
 # A catalog item with an `owner` (e.g. "owner": "Finn") is a roommate's personal
 # buy: it drops off the shared Reorder grid and onto that owner's own dashboard.
@@ -102,14 +102,14 @@ in
         rest = buttons.sensors;
 
         lovelace = {
-          # Default dashboard (main-home, the iPad kiosk) stays storage mode /
-          # UI-managed — that's HA's default, so `lovelace.mode` is left unset
-          # (the module deprecated it). resource_mode = "yaml" (auto, from
-          # customLovelaceModules) still loads the mushroom resource, so the
-          # dynamic cards render here.
+          # `lovelace.mode` is left unset (the module deprecated it), so the
+          # default dashboard stays HA's own storage-mode one. resource_mode =
+          # "yaml" (auto, from customLovelaceModules) still loads the mushroom
+          # resource, so the dynamic cards render here.
           # The generated, self-updating Reorder dashboard. A separate sidebar
-          # entry; does not touch the kiosk. (Finn's personal items live on his
-          # existing dashboard, not here — see dashboard-home.nix.)
+          # entry; the kiosk (nixos-home) links to it via a chip. (Finn's
+          # personal items live on his own dashboard, not here — see
+          # dashboard-home.nix.)
           dashboards.nixos-reorder = {
             mode = "yaml";
             filename = "${reorderDashboard}";

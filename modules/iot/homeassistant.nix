@@ -90,6 +90,54 @@
       # timestamp 1 minute ahead — the chore shows as due/overdue immediately.
       choreDueSoon = "{{ (now() + timedelta(minutes=1)).isoformat() }}";
 
+      # ── Subway board (Utica Av northbound → Manhattan) ──────────────────
+      # Utica Av (GTFS stop A48N) is served by both the A and the C, so the
+      # board has two feeds to merge rather than one to fall back on. It is a
+      # ~10 minute walk from the door, which means a train arriving sooner than
+      # that is not a train anyone can catch — showing it is worse than showing
+      # nothing, so the filtering lives here in the sensor rather than in each
+      # card that reads it.
+      #
+      # `uticaRows` is a fragment, not a whole template: it leaves `rows` bound
+      # to a [{route, mins}] list — both lines' three arrival slots, everything
+      # inside the walk time dropped, sorted by arrival — for the caller to
+      # render. Written as a concatenated list so it stays readable here but
+      # still serialises to a single-line YAML scalar.
+      #
+      # The C does not run overnight — it reaches Utica northbound roughly
+      # 06:00–22:35 on weekdays and not until 07:24 on Sundays — so its six
+      # sensors sit at `unknown` for seven to nine hours every night. That is
+      # normal, not a fault: hence the guard before `as_datetime`.
+      uticaWalkMinutes = 10;
+      uticaRows = lib.concatStrings [
+        "{% set walk = ${toString uticaWalkMinutes} %}"
+        # One `now()` for the whole merge, so the six arrivals are all measured
+        # against the same instant and sort against each other consistently.
+        "{% set tnow = now() %}"
+        "{% set ns = namespace(rows=[]) %}"
+        "{% for line in ['a','c'] %}"
+        "{% for slot in ['next','second','third'] %}"
+        "{% set eid = 'sensor.' ~ line ~ '_utica_av_n_direction_' ~ slot ~ '_arrival' %}"
+        "{% set v = states(eid) %}"
+        "{% if v not in ['','unknown','unavailable','none','None'] %}"
+        "{% set t = v | as_datetime %}"
+        "{% if t is not none %}"
+        "{% set mins = ((t - tnow).total_seconds() / 60) | round(0, 'floor') | int %}"
+        # Strictly greater, not `>=`. `mins` is floored and this only re-renders
+        # once a minute, so a row showing exactly `walk` would have decayed to
+        # `walk - 1` before the next refresh — i.e. a train you can no longer
+        # make, which is the one thing this board must never show.
+        "{% if mins > walk %}"
+        # The route sensor is the arrival's actual line, which beats assuming it
+        # matches the subentry it came from when the MTA reroutes a train.
+        "{% set r = states(eid ~ '_route') %}"
+        "{% set route = (r if r not in ['','unknown','unavailable','none','None'] else line) | upper %}"
+        "{% set ns.rows = ns.rows + [{'route': route, 'mins': mins}] %}"
+        "{% endif %}{% endif %}{% endif %}"
+        "{% endfor %}{% endfor %}"
+        "{% set rows = ns.rows | sort(attribute='mins') %}"
+      ];
+
       # ── YAML generation ─────────────────────────────────────────────────
       yamlFormat = pkgs.formats.yaml { };
 
@@ -2644,27 +2692,25 @@
                 initial = "2020-01-01 00:00:00";
               };
             };
-            # ── CTA train sensors (fall back C → A when C unavailable) ───────────
+            # ── MTA train sensor (A + C merged at Utica Av northbound) ──────────
+            # State is the minutes to the next *catchable* train; `trains` carries
+            # the next three as [{route, mins}] so cards can label each one A or C.
+            # Unavailable when nothing is far enough out to walk to — the cards
+            # read that as "—" rather than showing a train you'd miss.
             template = [
               {
                 sensor = [
                   {
-                    name = "Kingston-Throop N Next Arrival";
-                    unique_id = "kingston_throop_n_next_arrival";
-                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_next_arrival') if states('sensor.c_kingston_throop_avs_n_direction_next_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_next_arrival') }}";
-                    device_class = "timestamp";
-                  }
-                  {
-                    name = "Kingston-Throop N Second Arrival";
-                    unique_id = "kingston_throop_n_second_arrival";
-                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_second_arrival') if states('sensor.c_kingston_throop_avs_n_direction_second_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_second_arrival') }}";
-                    device_class = "timestamp";
-                  }
-                  {
-                    name = "Kingston-Throop N Third Arrival";
-                    unique_id = "kingston_throop_n_third_arrival";
-                    state = "{{ states('sensor.c_kingston_throop_avs_n_direction_third_arrival') if states('sensor.c_kingston_throop_avs_n_direction_third_arrival') not in ['','unknown','unavailable','None'] else states('sensor.a_kingston_throop_avs_n_direction_third_arrival') }}";
-                    device_class = "timestamp";
+                    name = "Utica Av Northbound";
+                    unique_id = "utica_av_northbound";
+                    icon = "mdi:subway-variant";
+                    unit_of_measurement = "min";
+                    availability = "${uticaRows}{{ rows | count > 0 }}";
+                    state = "${uticaRows}{{ rows[0].mins }}";
+                    attributes = {
+                      trains = "${uticaRows}{{ rows[:3] }}";
+                      walk_minutes = toString uticaWalkMinutes;
+                    };
                   }
                 ];
               }
