@@ -96,6 +96,7 @@
           pkgs.ripgrep
           pkgs.coreutils
           pkgs.util-linux
+          pkgs.fish
         ];
         text = ''
           name="$1"
@@ -106,13 +107,26 @@
           fi
           export CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX="$name"
 
-          if claude --help 2>/dev/null | grep -qE '^[[:space:]]+remote-control([[:space:]]|$)'; then
+          # Run Claude inside a fish *login* shell (tunnel's default shell) so the
+          # session inherits the same environment an interactive `co` gets: the
+          # per-user Nix profile on PATH (rtk, ast-grep, …), HM session vars, etc.
+          # Without this the process only sees the bare systemd `Environment=PATH`
+          # below, so PATH-dependent Bash hooks — notably rtk-rewrite, which
+          # rewrites commands to `rtk …` — die with exit 127. Only the environment
+          # comes from fish; `claude` is pinned to the exact build this module
+          # installs. fish's greeting is disabled in shellInit, so no banner leaks
+          # into the session. A *non-interactive* login shell is deliberate: daemon
+          # mode has no PTY, and interactiveShellInit's zellij/onefetch hooks would
+          # otherwise spew into the transcript.
+          claude='${claudePkg}/bin/claude'
+
+          if "$claude" --help 2>/dev/null | grep -qE '^[[:space:]]+remote-control([[:space:]]|$)'; then
             # Server/daemon-style mode. If sessions spawn in the wrong place add
             # `--spawn same-dir` (verify flags with `claude remote-control --help`).
-            exec claude remote-control
+            exec fish --login --command "exec $claude remote-control"
           fi
 
-          exec script -qec "claude --remote-control $name" /dev/null
+          exec script -qec "fish --login --command 'exec $claude --remote-control $name'" /dev/null
         '';
       };
 
