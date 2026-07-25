@@ -54,6 +54,29 @@
         pipewire = {
           socketActivation = false;
           pulse.enable = true;
+          wireplumber.extraConfig = {
+            # Snapweb's in-browser "listen" client plays back through
+            # whatever PipeWire picks as the default sink. Pin that to the
+            # onboard analog line-out so it never drifts to GPU HDMI/DP
+            # audio or another device that happens to appear.
+            "line-out-priority" = {
+              "monitor.alsa.rules" = [
+                {
+                  matches = [
+                    {
+                      "node.name" = "alsa_output.pci-0000_0e_00.4.analog-stereo";
+                    }
+                  ];
+                  actions = {
+                    update-props = {
+                      "priority.session" = 2000;
+                      "priority.driver" = 2000;
+                    };
+                  };
+                }
+              ];
+            };
+          };
         };
         avahi = {
           nssmdns4 = true;
@@ -95,6 +118,9 @@
               "pipe:///run/snapserver/shairport-fifo?name=Airplay&sampleformat=44100:16:2"
               "pipe:///run/snapserver/mpd-fifo?name=MPD&sampleformat=44100:16:2"
               "librespot://${lib.getExe pkgs.librespot}?name=Spotify&devicename=Speakers"
+              # Auto-switches to whichever of Airplay/MPD/Spotify is actively
+              # playing, so clients can pick one stream instead of toggling.
+              "meta:///Airplay/MPD/Spotify?name=Combined"
             ];
           };
         };
