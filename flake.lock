@@ -312,11 +312,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1782607993,
-        "narHash": "sha256-jGo5IiMvzvVnZ6ccDOHB7yBiK8pBr3SvNGUklg2nyq8=",
+        "lastModified": 1785131156,
+        "narHash": "sha256-wOzQQBMSTtZsEOWpAvxma7tWQwuMJfoaEtvjSMX8d1A=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "fe57f9b5ba9b979ba18a0028b94c2e070fecd585",
+        "rev": "0b0ba479cd73e45c991072fc49eb39e05961d112",
         "type": "github"
       },
       "original": {
@@ -328,11 +328,11 @@
     "beets-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1782558996,
-        "narHash": "sha256-ZN4ez2SxRVsbvOlkWVbU4RC9RyVybpDUaCM1sfpRPlY=",
+        "lastModified": 1785035995,
+        "narHash": "sha256-PArXJdNm158fB9OcqLwcg//FThHxvBm8QTBGhD7RH54=",
         "owner": "beetbox",
         "repo": "beets",
-        "rev": "37e2a8b38a82ae037750ccc39aedfa9420115b9f",
+        "rev": "e2889d19f929b3dab4450fae9d8a28964d6a31e4",
         "type": "github"
       },
       "original": {
@@ -563,11 +563,11 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1784665457,
-        "narHash": "sha256-ST6ToH2MQR9Pdm5VoGw5MBJd7VcP56atkvnb5RaDxbw=",
+        "lastModified": 1785117517,
+        "narHash": "sha256-O/CfoHSY6zyyrM53mHFhEzgJpikE9vEqLQAsQGRZGSo=",
         "owner": "ryoppippi",
         "repo": "nix-claude-code",
-        "rev": "995fa854b109b9e82f01f9c4abd78b2b2dc201ae",
+        "rev": "41739a8e4ebfd824676528327dd7ce6741bd19fa",
         "type": "github"
       },
       "original": {
@@ -579,11 +579,11 @@
     "claude-code-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1784669704,
-        "narHash": "sha256-RD7k5ll455wvi4nJaXNIFglObqJWwrBrbPiXfG1EeDU=",
+        "lastModified": 1784943347,
+        "narHash": "sha256-E18pPkdErB133CIShgLBhdHBiyPALuRl30uOqhy21v0=",
         "owner": "anthropics",
         "repo": "claude-code",
-        "rev": "ac062f33ab0ca7c62b9df648d0f2027fa9b969f0",
+        "rev": "7ef6eec9d9ba84ea6f233f26c45f1df5c5991843",
         "type": "github"
       },
       "original": {
@@ -3565,11 +3565,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1782467914,
-        "narHash": "sha256-pGvFkM8N0xEkIIXDe5YYfbEAvHrk4IxBrjB/x8OomhE=",
+        "lastModified": 1785090369,
+        "narHash": "sha256-m0pDuRJG7EDo9ri+4Ksu83VsI+PlxNC9lNBfydejce4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e73de5be04e0eff4190a1432b946d469c794e7b4",
+        "rev": "624af665418d3c65d544145b4d34ad696439570e",
         "type": "github"
       },
       "original": {
@@ -3737,11 +3737,11 @@
     },
     "nixpkgs_6": {
       "locked": {
-        "lastModified": 1783776592,
-        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
+        "lastModified": 1784796856,
+        "narHash": "sha256-wWFrV5/Qbm+lyt5x20E/bSbfJiGKMo4RCxZV8cl/WZI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3",
+        "rev": "e2587caef70cea85dd97d7daab492899902dbf5d",
         "type": "github"
       },
       "original": {
@@ -3986,11 +3986,11 @@
         "nixpkgs": "nixpkgs_30"
       },
       "locked": {
-        "lastModified": 1784690960,
-        "narHash": "sha256-Yq2boy2Weeix7BYZ6KVmsRbKo8qAANYGTkJeVeoqiX0=",
+        "lastModified": 1785201637,
+        "narHash": "sha256-fSCzzrzh0zEulHA1wqSrr1r/U0pEUFPTPL0bZVvzimQ=",
         "owner": "Multipixelone",
         "repo": "prem-tweet",
-        "rev": "0e3b16131ccd3f84ebfbe183633e68fc537c289a",
+        "rev": "2f277ad768f13dc25e4e7d7d29f7bbfb6f7f8f69",
         "type": "github"
       },
       "original": {
@@ -4085,11 +4085,11 @@
         "nixpkgs": "nixpkgs_34"
       },
       "locked": {
-        "lastModified": 1784680275,
-        "narHash": "sha256-K04XEDIHw5i/KQ9e1RlaHIJiNt1infyjZa6iZpnV+nw=",
+        "lastModified": 1784870676,
+        "narHash": "sha256-c4IN6zeHjRCwjeVHi7uyWudTQ2EP+7FwDKG8hOQc4B8=",
         "owner": "Multipixelone",
         "repo": "roomieorder",
-        "rev": "d1cc541fe65356d54e156b96217697733ae72bff",
+        "rev": "afddd17e13ceb4150e11c251f8814fdf76f069fa",
         "type": "github"
       },
       "original": {
