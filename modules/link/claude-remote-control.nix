@@ -72,6 +72,7 @@
         # (see ./openclaw.nix), holding both the config files and workspace/.
         openclaw = "${home}/.openclaw";
         infra = "${home}/Documents/Git/infra";
+        obsidian = "${home}/Documents/Finn";
       };
       # ------------------------------------------------------------------------
 
