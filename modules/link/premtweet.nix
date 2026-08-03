@@ -1,7 +1,7 @@
-# prem-tweet — @Flusoai drafts → Telegram approval → X API v2, with a learning
-# loop. A standalone Python daemon on `link` (Telegram long-poll + Anthropic +
-# X API v2 + SQLite); the v2 replacement for the old OpenClaw+Notion tweet crons
-# (PLAN.md, prem-tweet/BUILD.md).
+# prem-tweet — drafts → Telegram approval → X API v2, with a learning loop.
+# A standalone Python daemon on `link` (Telegram long-poll + Anthropic + X API v2
+# + SQLite); the v2 replacement for the old OpenClaw+Notion tweet crons (PLAN.md,
+# prem-tweet/BUILD.md).
 #
 # Mirrors modules/link/commutecompass.nix and modules/link/roomieorder.nix: the
 # app ships its own nixosModule + package from its repo, and this file is the
@@ -25,7 +25,7 @@
     {
       imports = [ inputs.prem-tweet.nixosModules.default ];
 
-      # Telegram bot token + chat id, Anthropic key, and the X OAuth2
+      # Telegram bot token + chat id, Anthropic key, and the per-account X OAuth2
       # user-context tokens — injected via EnvironmentFile=, never the nix store.
       # Owner tunnel / 0400 so the tunnel user service can read it (mirrors
       # deadman.nix / roomieorder.nix). See prem-tweet/prem-tweet.env.example for
@@ -41,31 +41,72 @@
       services.prem-tweet = {
         enable = true;
 
+        # Both posting identities. `finn` is @multipixelone — Finn's personal
+        # account, which upstream ships as a second registered account with its
+        # own doc stack (docs/finn/), its own looser voice, two batches a day
+        # seven days a week and ≤5 posts/day (prem-tweet/premtweet/accounts.py).
+        #
+        # Enabling it is deliberate: upstream defaults to the brand account
+        # alone so that no deploy quietly starts drafting for a second identity.
+        # The approval gate is unchanged for both — every tweet is a human
+        # Approve tap, and the posted bytes are the approve-time snapshot.
+        accounts = [
+          "fluso"
+          "finn"
+        ];
+
         # MUTABLE checkout of prem-tweet's docs/ (facts/voice/engagement/
-        # learnings). prompts.py reads it at runtime and learn.py appends
-        # distilled lessons to learnings.md, so it must be a writable git working
-        # tree — NOT the read-only nix-store copy in the package. Clone the repo
-        # to ~/prem-tweet on link and periodically commit/push its learnings.md
+        # learnings, plus finn/ for the personal account). prompts.py reads it at
+        # runtime and learn.py appends distilled lessons to EACH account's own
+        # learnings file, so it must be a writable git working tree — NOT the
+        # read-only nix-store copy in the package. Periodically commit/push its
         # appends so the repo stays canonical (BUILD.md, Deployment).
         docsDir = "/home/tunnel/Documents/Git/prem-tweet/docs";
         brandKitDir = "/home/tunnel/Documents/Git/brand-kit";
 
-        # No @Flusoai X API access yet: at each slot the bot texts Finn the due
-        # tweet on Telegram (tap-to-copy + ✅ Posted button) instead of posting
-        # via the API. Also engages automatically while the X_* creds are
-        # missing from the secret — set here to make the intent explicit. Flip
-        # to false (or drop) once API access lands and the secret carries the
-        # full X_* set.
-        manualPost = true;
+        # @multipixelone posts through the API; @Flusoai stays copy-paste.
+        #
+        # The secret carries exactly one X credential set and it is the personal
+        # account's, re-keyed to the X_FINN_* prefix — the bare X_* names only
+        # feed `fluso` (config.py: the legacy fallback is DEFAULT_KEY-only), so
+        # leaving them bare would have posted Finn's drafts from the brand grant.
+        # With no X_FLUSO_*/bare set left, `fluso` would fall back to manual on
+        # its own; naming it here makes that the declared intent rather than an
+        # accident of which credentials happen to be present. Drop "fluso" from
+        # this list once the brand account has its own API grant.
+        manualPost = [ "fluso" ];
+
+        # ---- personal-account drafting sources (read-only, all best-effort) ---
+
+        # Finn's Obsidian vault — the same tree claude-remote-control.nix exposes
+        # as the `obsidian` folder. Opt-in per note: vault.py only surfaces notes
+        # marked `tweetable: true` / `share: true` / #tweetable / #tweet-idea,
+        # and the exclusion markers (private/#nda/#confidential/#personal) win
+        # over an include marker on the same note. obsidianScanAll is left off on
+        # purpose — it would widen this to every recently-touched note, vetted or
+        # not, which is exactly the guardrail worth keeping.
+        obsidianDir = "/home/tunnel/Documents/Finn";
+
+        # Build-in-public material from the public events API. No GITHUB_TOKEN is
+        # set, so this is the unauthenticated 60/hour path — far above the few
+        # generation runs a day — and githubIncludePrivate stays off: private
+        # activity is unreleased work, which facts.md forbids asserting anyway.
+        githubUser = "Multipixelone";
+
+        # blogDirs/blogBaseUrl stay unset: that source reads published posts from
+        # folders INSIDE the vault, and the blog is its own Zola repo
+        # (Multipixelone/blog, ~/Documents/Git/blog/content) rather than a vault
+        # folder. Wiring it would mean getting those posts into the vault first.
 
         environmentFile = config.age.secrets."premtweet".path;
       };
 
-      # Publish the unit's non-secret env (baseEnv: PREMTWEET_DB, DOCS_DIR, TZ)
-      # as a dotenv file so a terminal `prem-tweet` / `prem-tweet-generate`
-      # mirrors exactly what the service runs with — same DB, docs and state.
-      # Holds no secrets; source environmentFile alongside it for those. Matches
-      # roomieorder.nix's environment.etc."roomieorder/env" idiom.
+      # Publish the unit's non-secret env (baseEnv: PREMTWEET_DB,
+      # PREMTWEET_ACCOUNTS, DOCS_DIR, …) as a dotenv file so a terminal
+      # `prem-tweet` / `prem-tweet-generate` mirrors exactly what the service
+      # runs with — same DB, docs and state. Holds no secrets; source
+      # environmentFile alongside it for those. Matches roomieorder.nix's
+      # environment.etc."roomieorder/env" idiom.
       environment.etc."prem-tweet/env".source = config.services.prem-tweet.envFile;
     };
 }
