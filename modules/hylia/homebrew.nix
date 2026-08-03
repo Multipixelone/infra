@@ -18,6 +18,10 @@
         "python@3.13"
         # Apple Intelligence from the CLI, with OpenAI-compatible API server
         "apfel"
+        # Moonshot Kimi K3 native coding agent. Best-fidelity harness for K3:
+        # preserves its reasoning-state "harness contract" that generic
+        # agents degrade by truncating chain-of-thought.
+        "kimi-code"
       ];
       casks = [
         # Terminal — ghostty cask is declared in modules/shell/terminal/ghostty.nix
@@ -50,8 +54,17 @@
         "cursor"
         "docker-desktop"
         "claude"
+        # Google Antigravity — agentic IDE + its terminal agent
+        "antigravity-ide"
+        "antigravity-cli"
+        # Google Gemini desktop assistant (home of Gemini Omni media gen)
+        "google-gemini"
         # AI agent orchestration (from the traycerai/traycer tap)
         "traycerai/traycer/traycer-desktop"
+        # theo app
+        "t3-app"
+        # codex
+        "chatgpt"
 
         # Creative
         "adobe-creative-cloud"
