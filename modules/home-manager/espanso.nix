@@ -11,7 +11,7 @@
     # espanso in System Settings → Privacy & Security (Apple gates these behind a
     # GUI prompt; nothing can declare them).
     services.espanso = {
-      enable = true;
+      enable = false;
       matches.emoji.matches = [
         # The two you asked for: graph arrows trending up / down.
         {

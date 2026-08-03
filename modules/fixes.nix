@@ -98,6 +98,30 @@
     #     buildInputs = prev.anki.buildInputs ++ [ prev.qt6.qtwebengine ];
     #   };
     # })
+    # espanso 2.3.0 fails to link on aarch64-darwin: buildRustPackage's default
+    # cargo-auditable pass injects an undefined `_AUDITABLE_VERSION_INFO` symbol
+    # plus an espanso_audit_data.o, and the cctools `ld` crashes (Trace/BPT trap,
+    # exit 133) while linking them — which also takes down the espanso-*-fish-
+    # completions drv. Disable auditable for espanso on darwin so that SBOM object
+    # is never emitted. `auditable` is a buildRustPackage arg (not an espanso
+    # package.nix arg and not reachable via overrideAttrs, since it's consumed in
+    # extendDrvArgs before mkDerivation), so wrap buildRustPackage to force it off.
+    # Linux links fine, so leave it untouched there to avoid needless rebuilds.
+    (_final: prev:
+      prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+        espanso = prev.espanso.override {
+          rustPlatform = prev.rustPlatform // {
+            buildRustPackage =
+              args:
+              prev.rustPlatform.buildRustPackage (
+                if builtins.isFunction args then
+                  finalAttrs: (args finalAttrs) // { auditable = false; }
+                else
+                  args // { auditable = false; }
+              );
+          };
+        };
+      })
     # amneziawg 1.0.20260611 doesn't build against linux-zen >= 7.1: the kernel
     # dropped the `ipv6_stub` indirection that socket.c relies on. Patch the one
     # call site to use the still-exported ip6_dst_lookup_flow() directly.
