@@ -56,12 +56,18 @@ in
           beam-thickness = 1;
         };
         colors-dark = catppuccinColors // {
-          alpha = "0.72";
-          # only the default background is transparent (text/UI stay opaque) so
-          # Hyprland's blur reads as frosted glass instead of a washed-out,
-          # see-through surface. "all" made every cell alpha. The lower the
-          # alpha, the more of Hyprland's (heavy, size=10) blur shows through.
-          alpha-mode = "default";
+          alpha = "0.85";
+          # only cells at (or explicitly painted with) the default background
+          # color are transparent - text/UI stay opaque so Hyprland's blur
+          # reads as frosted glass instead of a washed-out, see-through
+          # surface. "all" made every cell alpha. "matching" (not "default")
+          # is required because zellij always paints an explicit background
+          # per cell rather than leaving it unset, so it needs the exact-hex
+          # match case; its theme bg (modules/shell/zellij.nix) must stay
+          # pinned to this same background hex or its panes go fully opaque
+          # again. The lower the alpha, the more of Hyprland's blur shows
+          # through.
+          alpha-mode = "matching";
         };
       };
     };

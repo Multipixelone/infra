@@ -31,7 +31,7 @@ in
       # Colors — Catppuccin Mocha (foot: catppuccin-mocha.ini)
       theme = Catppuccin Mocha
 
-      # Transparency — foot: alpha = 0.85, alpha-mode = all
+      # Transparency — foot: alpha = 0.85, alpha-mode = matching
       background-opacity = 0.85
 
       # Native macOS background blur behind the translucent window

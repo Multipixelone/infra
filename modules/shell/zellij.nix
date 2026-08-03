@@ -93,7 +93,27 @@
       };
       xdg.configFile = {
         "zellij/config.kdl".text = ''
-          theme "default"
+          themes {
+            catppuccin_mocha {
+              fg "#${colors.base05}"
+              bg "#${colors.base00}"
+              black "#${colors.base00}"
+              red "#${colors.base08}"
+              green "#${colors.base0B}"
+              yellow "#${colors.base0A}"
+              blue "#${colors.base0D}"
+              magenta "#${colors.base0E}"
+              orange "#${colors.base09}"
+              cyan "#${colors.base0C}"
+              white "#${colors.base05}"
+            }
+          }
+          // bg above must stay pinned to the exact hex foot uses as its
+          // default background (modules/shell/terminal/foot.nix) - zellij
+          // always paints an explicit per-cell background rather than
+          // leaving cells unset, so foot's alpha-mode="matching" only sees
+          // through it when the two hex values are identical.
+          theme "catppuccin_mocha"
           default_shell "${pkgs.fish}/bin/fish"
           default_layout "zjstatus"
           pane_frames false
