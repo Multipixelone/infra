@@ -51,7 +51,7 @@
         # The approval gate is unchanged for both — every tweet is a human
         # Approve tap, and the posted bytes are the approve-time snapshot.
         accounts = [
-          # "fluso"
+          "fluso"
           "finn"
         ];
 
