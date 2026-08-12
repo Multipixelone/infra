@@ -3,13 +3,6 @@ let
   agentmail-scripts = ./agentmail-scripts;
 in
 {
-  caches = [
-    {
-      url = "https://cache.garnix.io";
-      key = "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g=";
-    }
-  ];
-
   configurations.nixos.link.module =
     {
       config,
