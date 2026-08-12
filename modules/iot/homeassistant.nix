@@ -219,10 +219,15 @@
           config.services.home-assistant.finalPackage
         ];
 
-        # HomeKit bridge accessory port. services.home-assistant.openFirewall only
-        # opens 8123 (HTTP); the bridge configured via UI listens on 21064 and
-        # needs an explicit allow so iOS can reach it to pair.
-        networking.firewall.allowedTCPPorts = [ 21064 ];
+        # 8123: HA frontend. services.home-assistant.openFirewall was removed
+        # upstream (the frontend port is no longer known at eval time), so the
+        # default port is opened explicitly here.
+        # 21064: HomeKit bridge accessory port — the bridge configured via UI
+        # listens there and needs an explicit allow so iOS can reach it to pair.
+        networking.firewall.allowedTCPPorts = [
+          8123
+          21064
+        ];
         networking.firewall.allowedUDPPorts = [ 5353 ]; # mDNS multicast
 
         # Shared agenix secrets for HA-adjacent shell_command scripts
@@ -2536,7 +2541,6 @@
 
         services.home-assistant = {
           enable = true;
-          openFirewall = true;
           extraComponents = [
             "mobile_app"
             "webhook"
