@@ -56,14 +56,14 @@
         inherit (aiConfig) agentsDir context;
         skills = aiConfig.skillsDir;
         enableMcpIntegration = true;
-        plugins = [
-          # "${ralph-wiggum-plugin}"
-          "${inputs.caveman}/plugins/caveman"
-          "${inputs.claude-code-src}/plugins/commit-commands"
-          # "${inputs.claude-code-src}/plugins/feature-dev"
-          # "${inputs.claude-code-src}/plugins/pr-review-toolkit"
-          # "${inputs.claude-code-src}/plugins/security-guidance"
-        ];
+        plugins = {
+          # ralph-wiggum = "${ralph-wiggum-plugin}";
+          caveman = "${inputs.caveman}/plugins/caveman";
+          commit-commands = "${inputs.claude-code-src}/plugins/commit-commands";
+          # feature-dev = "${inputs.claude-code-src}/plugins/feature-dev";
+          # pr-review-toolkit = "${inputs.claude-code-src}/plugins/pr-review-toolkit";
+          # security-guidance = "${inputs.claude-code-src}/plugins/security-guidance";
+        };
         enable = true;
         package = inputs.claude-code-pkg.packages.${pkgs.stdenv.hostPlatform.system}.claude;
         settings = {
