@@ -22,7 +22,12 @@ in
                 connection = {
                   id = "cjnfrw-iot";
                   type = "wifi";
-                  interface-name = "wlp5s0";
+                  # No interface-name pin: iwd ships 80-iwd.link with
+                  # `NamePolicy=keep kernel`, so the Intel 3165 comes up as
+                  # wlan0, not the predictable wlp5s0. Pinning the predictable
+                  # name made this profile permanently unactivatable, which cut
+                  # iot off the 192.168.5.0/24 IoT VLAN (Kasa/TP-Link devices).
+                  # The profile is matched by type + SSID instead.
                   autoconnect = true;
                 };
                 wifi = {
