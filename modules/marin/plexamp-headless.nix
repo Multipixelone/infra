@@ -1,22 +1,24 @@
 {
+  inputs,
   withSystem,
   rootPath,
   ...
 }:
 {
+  flake-file.inputs.nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
+
   nixpkgs.config.allowUnfreePackages = [ "plexamp-headless" ];
-  # plexamp-headless bundles nodejs_20 (now EOL), which nixpkgs flags as insecure.
-  # It pulls in both the full and slim Node derivations (getName "nodejs" and
-  # "nodejs-slim"), so both names must be permitted.
-  nixpkgs.config.permittedInsecurePackages = [
-    "nodejs"
-    "nodejs-slim"
-  ];
 
   perSystem =
-    { pkgs, ... }:
+    { system, pkgs, ... }:
     {
-      packages.plexamp-headless = pkgs.callPackage "${rootPath}/pkgs/plexamp-headless" { };
+      # The bundled treble.node is a non-N-API addon built against Node ABI
+      # v115, i.e. Node 20 only (still true as of headless 4.13.1). Unstable
+      # removed nodejs_20 outright at its 2026-04-30 EOL, so it comes from
+      # nixpkgs-stable, which still ships it.
+      packages.plexamp-headless = pkgs.callPackage "${rootPath}/pkgs/plexamp-headless" {
+        nodejs_20 = inputs.nixpkgs-stable.legacyPackages.${system}.nodejs_20;
+      };
     };
 
   configurations.nixos.marin.module =
