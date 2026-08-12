@@ -107,7 +107,8 @@
     # package.nix arg and not reachable via overrideAttrs, since it's consumed in
     # extendDrvArgs before mkDerivation), so wrap buildRustPackage to force it off.
     # Linux links fine, so leave it untouched there to avoid needless rebuilds.
-    (_final: prev:
+    (
+      _final: prev:
       prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
         espanso = prev.espanso.override {
           rustPlatform = prev.rustPlatform // {
@@ -121,18 +122,7 @@
               );
           };
         };
-      })
-    # amneziawg 1.0.20260611 doesn't build against linux-zen >= 7.1: the kernel
-    # dropped the `ipv6_stub` indirection that socket.c relies on. Patch the one
-    # call site to use the still-exported ip6_dst_lookup_flow() directly.
-    (_final: prev: {
-      linuxPackages_zen = prev.linuxPackages_zen.extend (
-        _lpself: lpsuper: {
-          amneziawg = lpsuper.amneziawg.overrideAttrs (old: {
-            patches = (old.patches or [ ]) ++ [ ./amnezia.patch ];
-          });
-        }
-      );
-    })
+      }
+    )
   ];
 }
