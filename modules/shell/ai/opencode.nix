@@ -44,8 +44,12 @@
         # mkPreset: merges a model assignment onto the matching role config.
 
         models = {
-          # anthropic
-          opus = "anthropic/claude-opus-4-7";
+          # anthropic — direct, billed against the Max subscription via the
+          # opencode-claude-auth plugin (not Copilot-routed, so 200k window
+          # and no per-request accounting). Subject to Max rate limits, so
+          # every role using these needs a non-anthropic fallback chain.
+          opus = "anthropic/claude-opus-5";
+          sonnet = "anthropic/claude-sonnet-5";
           # copilot
           gemini-pro = "github-copilot/gemini-3.1-pro-preview";
           claude-haiku-copilot = "github-copilot/claude-haiku-4.5";
@@ -57,21 +61,28 @@
           gpt-mini = "github-copilot/gpt-5.4-mini";
           gpt-5-2 = "github-copilot/gpt-5.2";
           # opencode free
-          gpt-5-nano = "opencode/gpt-5-nano";
-          hy3-preview-free = "opencode/hy3-preview-free";
-          ling-26-flash-free = "opencode/ling-2.6-flash-free";
-          minimax-m25-free = "opencode/minimax-m2.5-free";
+          hy3-free = "opencode/hy3-free";
+          laguna-free = "opencode/laguna-s-2.1-free";
+          mimo-free = "opencode/mimo-v2.5-free";
           deepseek-free = "opencode/deepseek-v4-flash-free";
-          nemotron-3-super-free = "opencode/nemotron-3-super-free";
+          nemotron-ultra-free = "opencode/nemotron-3-ultra-free";
+          nemotron-lightning-free = "opencode/nemotron-3.5-lightning-free";
           big-pickle = "opencode/big-pickle";
           # opencode go
-          kimi = "opencode-go/kimi-k2.7-code";
+          kimi = "opencode-go/kimi-k3";
+          kimi-code = "opencode-go/kimi-k2.7-code";
           deepseek-pro = "opencode-go/deepseek-v4-pro";
           deepseek = "opencode-go/deepseek-v4-flash";
           glm = "opencode-go/glm-5.2";
-          mimo-omni = "opencode-go/mimo-v2-omni";
+          mimo = "opencode-go/mimo-v2.5";
+          mimo-pro = "opencode-go/mimo-v2.5-pro";
           minimax = "opencode-go/minimax-m3";
-          qwen = "opencode-go/qwen3.7-plus";
+          # qwen3.8-max is the current flagship; qwen3.7-plus is the stable
+          # workhorse tier kept for councillors/fallbacks (the *-max tier is
+          # the one that historically dropped streams — see council below).
+          qwen = "opencode-go/qwen3.8-max";
+          qwen-plus = "opencode-go/qwen3.7-plus";
+          grok = "opencode-go/grok-4.5";
         };
 
         # Role definitions: skills, mcps, and optional variant per role.
@@ -146,19 +157,23 @@
 
         # opencode-go only (if I hit Copilot limits)
         specialistsGo = {
-          oracle = "qwen";
+          oracle = "opus";
           librarian = "minimax"; # deepseek usually
           explorer = "big-pickle";
           designer = "minimax";
-          fixer = "minimax"; # minimax is 3x rn, kimi usually
-          observer = "mimo-omni";
-          # qwen3.7-max intermittently returns empty streams (AI_APICallError:
-          # <none>), which silently stalls council synthesis. kimi is stable.
+          fixer = "kimi-code"; # code-tuned k2.7; minimax when k2.7 is throttled
+          observer = "mimo";
+          # Deliberately NOT opus: oh-my-opencode-slim has no per-agent
+          # fallback slot for `council`, so a Max rate-limit here stalls
+          # synthesis for the full 300s timeout with nothing to fail over
+          # to. kimi-k3 is the strongest *always-available* synthesizer.
+          # (The qwen *-max tier is out for the same reason — it
+          # intermittently returns empty streams, AI_APICallError: <none>.)
           council = "kimi";
         };
 
         # Copilot + Opencode-Go specialist assignment (default preset).
-        presetGo = mkPreset (specialistsGo // { orchestrator = "glm"; });
+        presetGo = mkPreset (specialistsGo // { orchestrator = "opus"; });
 
         # ── Shared config sections ──────────────────────────────────────
 
@@ -177,8 +192,11 @@
           timeout = 300000;
           councillor_execution_mode = "parallel";
           councillor_retries = 3;
+          # Three different families so the councillors actually disagree;
+          # alpha stays on the qwen *-plus tier because the *-max tier drops
+          # streams and a dead councillor costs a full timeout window.
           presets.default = {
-            alpha.model = models.qwen;
+            alpha.model = models.qwen-plus;
             beta.model = models.deepseek-pro;
             gamma.model = models.minimax;
           };
@@ -190,31 +208,36 @@
         };
 
         agentFallbacks = {
+          # Both anthropic-primary roles degrade off the Max subscription in
+          # one hop (sonnet is the same quota — it only helps when the opus
+          # -specific limit trips first), then off anthropic entirely.
           orchestrator = {
             model = [
+              models.opus
+              models.sonnet
+              models.kimi
               models.glm
               models.gpt-codex
-              models.big-pickle
               models.gpt-5-4
               models.gpt-5-2
-              models.kimi
             ];
           };
           oracle = {
             model = [
-              models.glm
+              models.opus
+              models.sonnet
+              models.qwen
               models.deepseek-pro
               models.claude-sonnet-copilot
               models.gpt-5-4
               models.kimi
-              models.glm
             ];
           };
           librarian = {
             model = [
               models.minimax
               models.kimi
-              models.qwen
+              models.qwen-plus
               models.grok-fast
               models.claude-haiku-copilot
             ];
@@ -223,7 +246,7 @@
             model = [
               models.big-pickle
               models.kimi
-              models.qwen
+              models.qwen-plus
               models.glm
             ];
           };
@@ -237,9 +260,19 @@
           };
           fixer = {
             model = [
+              models.kimi-code
               models.minimax
               models.kimi
               models.glm
+            ];
+          };
+          # mimo-v2.5 is the vision-capable tier on go; mimo-v2.5-pro is the
+          # only other one, so fall through to copilot for screenshots.
+          observer = {
+            model = [
+              models.mimo-pro
+              models.gemini-pro
+              models.gpt-mini
             ];
           };
         };
@@ -374,9 +407,13 @@
 
         # ── Dynamic context pruning ─────────────────────────────────────
         #
-        # Tuned for Copilot's request-based billing: cache invalidation is
-        # free, so we compress aggressively. Per-model overrides bump the
-        # threshold for opencode-go models with windows >128k.
+        # The old tuning assumed Copilot's request-based billing, where cache
+        # invalidation is free and compressing early costs nothing. That only
+        # ever held for the Copilot-routed models: anthropic-direct and
+        # opencode-go are token-billed, so each compaction throws away a warm
+        # prompt cache and the next request pays a full cache write. Rare and
+        # large beats frequent and small there, so the nudges are soft and the
+        # per-model floors sit high — the ceilings still guard overflow.
         dcpConfig = builtins.toJSON {
           "$schema" =
             "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json";
@@ -393,27 +430,53 @@
             showCompression = false;
             summaryBuffer = true;
             # 128k Copilot cap minus headroom for system prompt + next reply.
+            # The ceiling is a hard fit constraint, so it stays; the floor is
+            # pure aggression tuning and moves up.
             maxContextLimit = 96000;
-            minContextLimit = 48000;
-            # Models with windows >128k. Anthropic Opus is 200k direct
-            # (not Copilot-routed), opencode-go models are 256k.
+            minContextLimit = 64000;
+            # Models with windows >128k. Anthropic opus/sonnet are 1M direct
+            # on Max (not Copilot-routed), opencode-go models are 256k.
             # grok-fast is Copilot-routed, so the Copilot cap dominates.
+            # Anthropic thresholds keep the same 75% / 37.5%-of-window ratio
+            # as the rest, but unlike Copilot a rewrite here costs real
+            # cache-write tokens against the Max quota — so pruning stays
+            # rare and large rather than frequent and small.
             modelMaxLimits = {
-              ${models.opus} = 150000;
+              ${models.opus} = 750000;
+              ${models.sonnet} = 750000;
               ${models.kimi} = 192000;
+              ${models.kimi-code} = 192000;
               ${models.minimax} = 192000;
               ${models.qwen} = 192000;
+              ${models.qwen-plus} = 192000;
+              ${models.glm} = 192000;
+              ${models.deepseek-pro} = 192000;
+              ${models.deepseek} = 192000;
+              ${models.mimo} = 192000;
+              ${models.mimo-pro} = 192000;
+              ${models.grok} = 192000;
             };
             modelMinLimits = {
-              ${models.opus} = 75000;
-              ${models.kimi} = 96000;
-              ${models.minimax} = 96000;
-              ${models.qwen} = 96000;
+              ${models.opus} = 375000;
+              ${models.sonnet} = 375000;
+              ${models.kimi} = 128000;
+              ${models.kimi-code} = 128000;
+              ${models.minimax} = 128000;
+              ${models.qwen} = 128000;
+              ${models.qwen-plus} = 128000;
+              ${models.glm} = 128000;
+              ${models.deepseek-pro} = 128000;
+              ${models.deepseek} = 128000;
+              ${models.mimo} = 128000;
+              ${models.mimo-pro} = 128000;
+              ${models.grok} = 128000;
             };
-            # Free cache invalidation on Copilot — compress earlier and harder.
-            nudgeFrequency = 3;
-            iterationNudgeThreshold = 15;
-            nudgeForce = "strong";
+            # nudgeFrequency counts fetches between nudges above the ceiling,
+            # so higher = quieter. nudgeForce "soft" (the upstream default)
+            # makes post-user-message compression less likely than "strong".
+            nudgeFrequency = 8;
+            iterationNudgeThreshold = 25;
+            nudgeForce = "soft";
             protectedTools = [
               "task"
               "skill"
@@ -447,7 +510,7 @@
             maxContinuations = 5;
           };
           # Enable observer agent (disabled by default upstream).
-          # gpt-5.4-mini is vision-capable, so the block below activates.
+          # mimo-v2.5 is vision-capable, so the block below activates.
           disabled_agents = [ ];
           lsp = lspServers;
           presets = {
