@@ -64,14 +64,14 @@
 
         ## gaming rules
         # moonlight / gamescope rules
-        "match:class ^(moonlight-qt)$, workspace 7 silent"
+        "match:class ^(moonlight-qt)$, workspace name:gaming silent"
         "match:class ^(moonlight-qt)$, fullscreen on"
         "match:class ^(moonlight-qt)$, immediate on"
         "match:class ^(gamescope)$, fullscreen on"
         "match:class ^(gamescope)$, immediate on"
 
         # steam rules
-        "match:class ^(steam)$, workspace 7 silent"
+        "match:class ^(steam)$, workspace name:gaming silent"
         "match:title ^(Steam Big Picture Mode)$, fullscreen on"
         "match:title ^(Steam Big Picture Mode)$, idle_inhibit always"
         "match:class ^(steam)$, idle_inhibit focus"
@@ -81,7 +81,7 @@
         "match:class ^(steam)$, match:title ^(Steam Settings)$, float on"
 
         # steam game rules
-        "match:class ^(steam_app_.*)$, workspace 7 silent"
+        "match:class ^(steam_app_.*)$, workspace name:gaming silent"
         "match:class ^(steam_app_)(.*)$, immediate on"
         "match:class ^(steam_app_)(.*)$, fullscreen on"
         "match:class ^(cs2)$, immediate on"
@@ -89,16 +89,16 @@
         "match:class ^(steam_app_.*)$, idle_inhibit always"
 
         # minecraft
-        "match:class ^(org.prismlauncher.*)$, workspace 7 silent"
-        "match:class ^(Minecraft)$, workspace 7 silent"
+        "match:class ^(org.prismlauncher.*)$, workspace name:gaming silent"
+        "match:class ^(Minecraft)$, workspace name:gaming silent"
 
         # looking-glass-client
-        "match:class looking-glass-client, workspace 7"
+        "match:class looking-glass-client, workspace name:gaming"
         "match:class looking-glass-client, fullscreen on"
 
         # gw2
-        "match:title ^(Guild Wars 2( Launcher)?)$, workspace 7 silent"
-        "match:class ^(.+exe)$, match:title ^(Guild Wars 2( Launcher)?)(.*)$, workspace 7 silent"
+        "match:title ^(Guild Wars 2( Launcher)?)$, workspace name:gaming silent"
+        "match:class ^(.+exe)$, match:title ^(Guild Wars 2( Launcher)?)(.*)$, workspace name:gaming silent"
         "match:title ^(Guild Wars 2)$, border_size 0"
         "match:title ^(Guild Wars 2)$, opaque on"
         "match:title ^(Guild Wars 2)$, no_blur on"

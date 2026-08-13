@@ -123,6 +123,13 @@
                 # special workspace
                 "$mod SHIFT, grave, movetoworkspace, special"
                 "$mod, grave, togglespecialworkspace, DP-1"
+                # gaming / streamed workspace. Named rather than numbered so it
+                # sits outside the $mod+{1..10} range below and stray windows
+                # can't drift onto it — it is what Sunshine moves onto the
+                # headless SUNSHINE output, so anything parked here is shown to
+                # the Moonlight client. See modules/link/gamestream.nix.
+                "$mod, G, workspace, name:gaming"
+                "$mod SHIFT, G, movetoworkspacesilent, name:gaming"
                 # move workspaces between monitors
                 "$mod SHIFT ALT, bracketleft, movecurrentworkspacetomonitor, l"
                 "$mod SHIFT ALT, bracketright, movecurrentworkspacetomonitor, r"

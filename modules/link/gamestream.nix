@@ -12,8 +12,21 @@
         psArgs: psArgs.config.packages.hyprctl-instance
       );
       sh = lib.getExe pkgs.bash;
+      # Dedicated workspace for everything that gets streamed. Deliberately NAMED
+      # rather than numbered: `$mod + <n>` only binds 1-10, so a numbered
+      # workspace is one keystroke away and stray windows drift onto it — an
+      # Obsidian window living on old workspace 7 was being dragged onto the
+      # headless output and shown to the Moonlight client. A named workspace is
+      # reachable only from the explicit `$mod + G` bind.
+      #
+      # Named workspaces get negative internal ids, so anything matching on them
+      # must compare `.workspace.name`, never `.workspace.id`. Keep in sync with
+      # the `workspace name:gaming silent` rules in
+      # modules/hyprland/conf/windowrules.nix and the bind in conf/binds.nix.
+      stream-ws = "gaming";
       hypr-dispatch =
-        lib.getExe' config.programs.hyprland.package "hyprctl" + " dispatch exec [workspace 7]";
+        lib.getExe' config.programs.hyprland.package "hyprctl"
+        + " dispatch exec [workspace name:${stream-ws}]";
       steam = lib.getExe config.programs.steam.package + " --";
       # HDR re-enable: set `stream-monitor = "DP-1";` and reference it below in
       # place of the literal "SUNSHINE" headless output to capture the physical
@@ -145,6 +158,7 @@
             pkgs.coreutils
             pkgs.procps
             pkgs.curl
+            pkgs.jq
             config.programs.hyprland.package
           ];
           do-command = pkgs.writeShellApplication {
@@ -165,11 +179,18 @@
               mon_string="SUNSHINE,''${width}x''${height}@''${refresh_rate},0x1920,1"
               # Unlock PC (so I don't have to type password on Steam Deck)
               # pkill -USR1 hyprlock || true
-              hyprctl output create headless SUNSHINE
+
+              # Idempotent: if a previous session's undo-cmd never ran (client
+              # dropped, Hyprland restarted), SUNSHINE already exists and a second
+              # create would either fail or spawn a differently-named output that
+              # output_name would then never match.
+              if ! hyprctl monitors all -j | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; then
+                hyprctl output create headless SUNSHINE
+              fi
 
               # Wait for the headless output to appear (up to ~10s)
               timeout=20
-              while ! hyprctl monitors all 2>/dev/null | grep -q 'SUNSHINE'; do
+              while ! hyprctl monitors all -j 2>/dev/null | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; do
                 if (( --timeout == 0 )); then
                   echo "Timed out waiting for SUNSHINE output to appear" >&2
                   exit 1
@@ -179,8 +200,8 @@
 
               hyprctl keyword monitor "$mon_string"
               sleep 1
-              hyprctl dispatch moveworkspacetomonitor 7 SUNSHINE
-              hyprctl dispatch workspace 7
+              hyprctl dispatch moveworkspacetomonitor name:${stream-ws} SUNSHINE
+              hyprctl dispatch workspace name:${stream-ws}
             '';
           };
           undo-command = pkgs.writeShellApplication {
@@ -190,8 +211,14 @@
             text = ''
               HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
               export HYPRLAND_INSTANCE_SIGNATURE
-              hyprctl dispatch moveworkspacetomonitor 7 0
-              hyprctl output remove SUNSHINE
+              # Tolerant teardown: this runs on every disconnect, including ones
+              # where prep never completed. Leaving a stale SUNSHINE output behind
+              # is the one state that breaks the *next* launch, so neither step
+              # may abort the other under `set -e`.
+              # Park the workspace on a real monitor by NAME. The old `0` was a
+              # monitor id, which depends on connector assignment order.
+              hyprctl dispatch moveworkspacetomonitor name:${stream-ws} DP-1 || true
+              hyprctl output remove SUNSHINE || true
             '';
           };
         in
@@ -205,7 +232,19 @@
             name = "steam-kill";
             runtimeInputs = [ pkgs.procps ];
             text = ''
-              pkill steam
+              # `|| true`: pkill exits 1 when nothing matched, which under `set -e`
+              # aborts the script and makes Sunshine log "Return code [1]" on every
+              # teardown where Steam was already gone.
+              pkill steam || true
+
+              # pkill only sends SIGTERM; Steam takes seconds to actually exit.
+              # Without this wait, reconnecting straight away launches a second
+              # gamescope+Steam against the still-dying instance, which lands you
+              # in "Steam is already running" contention and a black stream.
+              for _ in $(seq 1 40); do
+                pgrep -x steam >/dev/null || break
+                sleep 0.25
+              done
             '';
           };
         in
@@ -238,20 +277,43 @@
             HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
             export HYPRLAND_INSTANCE_SIGNATURE
 
-            hyprctl dispatch exec "[workspace 7]" "${steam-gamescope}"
+            hyprctl dispatch exec "[workspace name:${stream-ws}]" "${steam-gamescope}"
 
-            for _ in $(seq 1 80); do
-              line=$(hyprctl -j clients \
-                | jq -r 'first(.[] | select(.class == "gamescope")) // empty | "\(.address) \(.fullscreen)"')
-              if [ -n "$line" ]; then
-                if [ "''${line##* }" = "0" ]; then
-                  hyprctl dispatch focuswindow "address:''${line%% *}"
-                  hyprctl dispatch fullscreen 0
+            # Detach the poll. Sunshine only treats a launcher that exits as a
+            # detached command if it exits within 5s ("App exited gracefully
+            # within 5 seconds of launch."); gamescope's window takes ~12s to
+            # map, so polling in the foreground made Sunshine read the app as
+            # finished, end the session, and fire the steam-kill undo cmd —
+            # killing Steam mid-startup before it ever drew a frame.
+            (
+              for _ in $(seq 1 80); do
+                # Scope the match to the stream workspace. A bare class match can
+                # pick up a gamescope window stranded by a previous session and
+                # fullscreen that instead of ours. Matched on `.workspace.name`
+                # because named workspaces have negative, unstable ids.
+                addr=$(hyprctl -j clients \
+                  | jq -r --arg ws ${stream-ws} 'first(.[] | select(.class == "gamescope" and .workspace.name == $ws)) // empty | .address')
+                [ -n "$addr" ] || { sleep 0.25; continue; }
+
+                # gamescope also fullscreens itself via -f. Let that land first so
+                # we only act if it genuinely did not take.
+                sleep 0.5
+                fs=$(hyprctl -j clients \
+                  | jq -r --arg a "$addr" 'first(.[] | select(.address == $a)) // empty | .fullscreen')
+
+                if [ "$fs" = "0" ]; then
+                  # One IPC round-trip, and an explicit state rather than a
+                  # toggle. `dispatch fullscreen` toggles whatever is focused, so
+                  # the old focuswindow-then-fullscreen pair could fullscreen an
+                  # unrelated window if focus moved in between, or toggle
+                  # gamescope back *out* of fullscreen if it self-fullscreened in
+                  # the gap. `fullscreenstate 2 -1` sets internal fullscreen and
+                  # leaves the client state alone, so re-running is a no-op.
+                  hyprctl --batch "dispatch focuswindow address:$addr ; dispatch fullscreenstate 2 -1"
                 fi
                 break
-              fi
-              sleep 0.25
-            done
+              done
+            ) &
           '';
         };
     in
@@ -261,18 +323,44 @@
       ];
       # allow emulating ds5 controller
       boot.kernelModules = [ "uhid" ];
-      services.udev.extraRules = ''
-        KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess"
+      # These MUST land before systemd's 73-seat-late.rules, which is what
+      # actually runs the `uaccess` builtin that grants the seat user an ACL
+      # (73-seat-late.rules:16 — `TAG=="uaccess" ... RUN{builtin}+="uaccess"`).
+      # `services.udev.extraRules` writes to 99-local.rules, i.e. *after* 73, so
+      # the tag was recorded and then silently never acted on: /dev/uhid stayed
+      # 0600 root:root and the DS5 pad was dead in every single session
+      # ("Gamepad ds5 is disabled due to Permission denied"). /dev/uinput
+      # appeared to work only because Steam's own 60-steam-input.rules tags it
+      # independently at priority 60. Shipping these as a package puts them at
+      # 70, before the uaccess pass.
+      services.udev.packages = [
+        (pkgs.writeTextFile {
+          name = "sunshine-input-udev-rules";
+          destination = "/lib/udev/rules.d/70-sunshine-input.rules";
+          text = ''
+            KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess"
 
-        # Allows Sunshine to access /dev/uhid
-        KERNEL=="uhid", TAG+="uaccess"
+            # Allows Sunshine to access /dev/uhid
+            KERNEL=="uhid", TAG+="uaccess"
 
-        # Joypads
-        KERNEL=="hidraw*" ATTRS{name}=="Sunshine PS5 (virtual) pad" MODE="0660", TAG+="uaccess"
-        SUBSYSTEMS=="input", ATTRS{name}=="Sunshine X-Box One (virtual) pad", MODE="0660", TAG+="uaccess"
-        SUBSYSTEMS=="input", ATTRS{name}=="Sunshine gamepad (virtual) motion sensors", MODE="0660", TAG+="uaccess"
-        SUBSYSTEMS=="input", ATTRS{name}=="Sunshine Nintendo (virtual) pad", MODE="0660", TAG+="uaccess"
-      '';
+            # Joypads. Match keys are comma-separated; the PS5 line previously
+            # separated KERNEL/ATTRS/MODE with bare spaces.
+            KERNEL=="hidraw*", ATTRS{name}=="Sunshine PS5 (virtual) pad", MODE="0660", TAG+="uaccess"
+            SUBSYSTEMS=="input", ATTRS{name}=="Sunshine X-Box One (virtual) pad", MODE="0660", TAG+="uaccess"
+            SUBSYSTEMS=="input", ATTRS{name}=="Sunshine gamepad (virtual) motion sensors", MODE="0660", TAG+="uaccess"
+            SUBSYSTEMS=="input", ATTRS{name}=="Sunshine Nintendo (virtual) pad", MODE="0660", TAG+="uaccess"
+          '';
+        })
+      ];
+      # nixpkgs' sunshine module only exposes `capSysAdmin`, so CAP_SYS_NICE has
+      # to be bolted onto the wrapper it already defines. Without it, every
+      # capture init logs "EGL: context priority set to HIGH but CAP_SYS_NICE
+      # capability is missing" and the encoder falls back to default GPU
+      # priority — it then contends with the game for the GPU exactly when the
+      # game is saturating it, which is felt as stream stutter under load.
+      # (Worth an upstream option: `capSysNice`, or folding it into capSysAdmin.)
+      security.wrappers.sunshine.capabilities = lib.mkForce "cap_sys_admin,cap_sys_nice+p";
+
       services.sunshine = {
         enable = true;
         package = pkgs.sunshine.override {
@@ -283,9 +371,19 @@
         settings = {
           channels = 2;
           # HDR re-enable: target physical DP-1 instead of the headless SUNSHINE
-          # output by setting `output_name = 1;` and `capture = "kms";` (KMS is
-          # required to capture HDR metadata; wlr loses it).
-          output_name = 2;
+          # output by setting `output_name = "DP-1";` and `capture = "kms";` (KMS
+          # is required to capture HDR metadata; wlr loses it).
+          #
+          # MUST be the output NAME, not an index. Selection happens in
+          # video.cpp's refresh_displays(), which matches this string against the
+          # display-name list; on a miss it silently leaves the index at 0 and
+          # streams the first output. wlgrab itself does have a numeric-index
+          # fallback, but it never sees this value — it is handed an
+          # already-resolved name — so an index here can never reach it. A number
+          # therefore streams DP-1 (your desktop) while the game launches unseen
+          # on the headless output: you hear Steam, but the client shows the
+          # desktop, with no warning logged anywhere.
+          output_name = "SUNSHINE";
           gamepad = "ds5";
           capture = "wlr";
           # allow guide press with back button after 2000 milliseconds
