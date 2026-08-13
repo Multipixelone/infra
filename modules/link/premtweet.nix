@@ -93,10 +93,19 @@
         # activity is unreleased work, which facts.md forbids asserting anyway.
         githubUser = "Multipixelone";
 
-        # blogDirs/blogBaseUrl stay unset: that source reads published posts from
-        # folders INSIDE the vault, and the blog is its own Zola repo
-        # (Multipixelone/blog, ~/Documents/Git/blog/content) rather than a vault
-        # folder. Wiring it would mean getting those posts into the vault first.
+        # The published tier. The blog is still its own Zola repo
+        # (Multipixelone/blog, ~/Documents/Git/blog/content) — what changed is that
+        # the vault now reaches it: Spaces/Writing/Blog is a symlink to that
+        # content dir, so the posts ARE in the vault as far as this source is
+        # concerned. Matching is by whole path component, so "Blog" is the folder
+        # name rather than the path to it, and vault.py follows the link only for
+        # the blog walk (the notes walk deliberately does not).
+        #
+        # Section indexes (_index.md) are skipped as the static-site furniture they
+        # are; the five real posts carry YAML frontmatter with a slug, which is what
+        # blogBaseUrl turns into a canonical link.
+        blogDirs = [ "Blog" ];
+        blogBaseUrl = "https://blog.finnrut.is/";
 
         environmentFile = config.age.secrets."premtweet".path;
       };
