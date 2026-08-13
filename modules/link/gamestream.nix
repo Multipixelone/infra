@@ -349,7 +349,10 @@
               # cmd = "${self.packages.${pkgs.stdenv.hostPlatform.system}.moondeck}/bin/MoonDeckStream";
               prep-cmd = [ prep ];
               image-path = mk-icon { icon-name = "moonlight"; };
-              auto-detatch = false;
+              # Sunshine's key is `auto-detach`; the old `auto-detatch` spelling
+              # was silently ignored, so MoonDeckStream was still being treated as
+              # detachable.
+              auto-detach = false;
             }
           ];
         };
