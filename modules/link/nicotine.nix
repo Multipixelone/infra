@@ -1,5 +1,6 @@
 {
   configurations.nixos.link.module = {
+    infra.backup.srvPaths = [ "/srv/slskd" ];
     systemd.tmpfiles.rules = [
       "d /srv/slskd 0770 tunnel users -"
     ];

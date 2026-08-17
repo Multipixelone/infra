@@ -1,5 +1,6 @@
 {
   configurations.nixos.link.module = {
+    infra.backup.srvPaths = [ "/srv/jdownloader" ];
     systemd.tmpfiles.rules = [
       "d /srv/jdownloader 0770 tunnel users -"
       "d /srv/deluge 0770 tunnel users -"

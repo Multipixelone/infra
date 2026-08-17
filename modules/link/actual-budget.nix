@@ -1,5 +1,6 @@
 {
   configurations.nixos.link.module = {
+    infra.backup.srvPaths = [ "/srv/actual" ];
     networking.firewall.allowedTCPPorts = [ 5006 ];
     systemd = {
       tmpfiles.rules = [

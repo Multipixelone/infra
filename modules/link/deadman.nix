@@ -1,4 +1,3 @@
-{ inputs, ... }:
 {
   # I1 — Dead-man's switch (Kestrel out-of-band backstop).
   #
@@ -69,16 +68,9 @@
       };
     in
     {
-      # Dedicated secret for the out-of-band path: an env file with
-      # TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID. Kept separate from openclaw's
-      # own telegram config on purpose — the backstop must not depend on the
-      # thing it backs up. Owner tunnel / 0400, injected via EnvironmentFile.
-      age.secrets."telegram-deadman" = {
-        file = "${inputs.secrets}/ai/telegram-deadman.age";
-        owner = "tunnel";
-        group = "users";
-        mode = "0400";
-      };
+      # The telegram-deadman env-file secret is declared in modules/notify.nix
+      # (pc role) so the notify-telegram@ template can share it; this unit
+      # keeps consuming it by name.
 
       # Runs as a tunnel user unit (like openclaw-gateway), but as an
       # independent systemd timer — fired by systemd, not by the gateway/cron,

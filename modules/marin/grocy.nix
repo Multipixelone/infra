@@ -6,6 +6,8 @@
   configurations.nixos.marin.module =
     { config, ... }:
     {
+      # TODO: grocy data on marin has no backup — marin lacks the pc/backup
+      # role, and link's old /srv/grocy backup was dropped when grocy moved.
       age.secrets."grocy".file = "${inputs.secrets}/grocy.age";
       virtualisation.oci-containers.containers.barcode-buddy = {
         autoStart = false;

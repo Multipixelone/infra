@@ -17,6 +17,10 @@
     lib.optionalAttrs (lib.hasSuffix "-linux" system) (
       let
         rclone-base-opts = [
+          # local-only sync: explicitly ignore any real rclone config so a
+          # user-level rclone.conf (rclone is on PATH now) is never picked up
+          "--config"
+          "/dev/null"
           "--progress"
           "--stats=10s"
           "--stats-one-line"
@@ -38,8 +42,6 @@
       {
         packages.ipod-sync-inner = pkgs.writers.writeFishBin "ipod-sync-inner" ''
           set -l rclone_args ${lib.concatStringsSep " " rclone-base-opts}
-          # ignore inherited RCLONE_CONFIG (e.g. restic's agenix-protected one)
-          set -lx RCLONE_CONFIG /dev/null
 
           function notify
             if set -q DISPLAY; or set -q WAYLAND_DISPLAY
