@@ -83,6 +83,10 @@ in
       # --- Notion CLI --------------------------------------------------------
 
       ntn = pkgs.callPackage "${rootPath}/pkgs/ntn" { };
+
+      # --- fli-mcp (Google Flights) ------------------------------------------
+      # Local stdio MCP server for real flight-pricing lookups. No key/auth.
+      fli-mcp = pkgs.python3Packages.callPackage "${rootPath}/pkgs/fli" { };
     in
     {
 
@@ -136,6 +140,12 @@ in
 
           # Notion CLI — for Kestrel's Obsidian→Notion bridge
           ntn
+
+          # fli-mcp — on PATH so the gateway can spawn it by bare name. The
+          # mcp-servers entry below resolves a store path, which is GC-eligible
+          # and would break on the next fli-affecting rebuild; the profile entry
+          # is the durable half.
+          fli-mcp
         ];
 
         systemd.user.services.openclaw-gateway = {
@@ -177,6 +187,12 @@ in
         mcp-servers.settings.servers.ha-mcp = {
           type = "http";
           url = "http://192.168.8.111:8086/mcp";
+        };
+
+        # fli-mcp — Google Flights lookups over local stdio (pkgs/fli). No auth.
+        # Tools: search_flights (single date) and search_dates (cheapest-date range).
+        mcp-servers.settings.servers.fli = {
+          command = pkgs.lib.getExe' fli-mcp "fli-mcp";
         };
       };
     };
