@@ -22,9 +22,9 @@
     # All three only ever failed on `python312Packages`, a side set Hydra
     # barely builds — so the whole closure compiled locally and every flaky
     # suite in it got a chance to bite. modules/link/openclaw.nix now
-    # instantiates pkgs/fli and pkgs/agentmail on the default (3.14) set, where
-    # aioboto3, py-key-value-aio, pydocket, fastmcp, cyclopts and syrupy all
-    # substitute straight from cache.nixos.org.
+    # instantiates pkgs/agentmail on the default (3.14) set, where aioboto3,
+    # py-key-value-aio, pydocket, fastmcp, cyclopts and syrupy all substitute
+    # straight from cache.nixos.org.
     #
     # Re-adding any of them is worse than useless: an override forks the
     # derivation, so the cache hit is lost and the package must be built —
