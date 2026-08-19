@@ -17,42 +17,21 @@
           }
         );
       })
-    # aioboto3 dynamo tests fail on werkzeug 3.1 (Duplicate 'Server' header)
-    (_final: prev: {
-      python3Packages = prev.python3Packages.overrideScope (
-        _pyFinal: pyPrev: {
-          aioboto3 = pyPrev.aioboto3.overridePythonAttrs (old: {
-            disabledTests = (old.disabledTests or [ ]) ++ [
-              "test_dynamo_resource_query"
-              "test_dynamo_resource_put"
-              "test_dynamo_resource_batch_write_flush_on_exit_context"
-              "test_dynamo_resource_batch_write_flush_amount"
-              "test_flush_doesnt_reset_item_buffer"
-              "test_dynamo_resource_property"
-              "test_dynamo_resource_waiter"
-            ];
-          });
-        }
-      );
-    })
-    # fastmcp: skip integration tests that don't survive the build sandbox.
-    # The rate-limiting tests are timing-sensitive and flaky (the limiter
-    # doesn't trip in time, so the expected ToolError is never raised). The
-    # Supabase provider test spins up a live HTTP server that never binds
-    # under the sealed sandbox ("Server failed to start after 30 attempts").
-    (_final: prev: {
-      python3Packages = prev.python3Packages.overrideScope (
-        _pyFinal: pyPrev: {
-          fastmcp = pyPrev.fastmcp.overridePythonAttrs (old: {
-            disabledTests = (old.disabledTests or [ ]) ++ [
-              "test_rate_limiting_with_different_operations"
-              "test_rate_limiting_recovery_over_time"
-              "test_unauthorized_access"
-            ];
-          });
-        }
-      );
-    })
+    # No aioboto3 / fastmcp / syrupy overrides here, on purpose.
+    #
+    # All three only ever failed on `python312Packages`, a side set Hydra
+    # barely builds — so the whole closure compiled locally and every flaky
+    # suite in it got a chance to bite. modules/link/openclaw.nix now
+    # instantiates pkgs/fli and pkgs/agentmail on the default (3.14) set, where
+    # aioboto3, py-key-value-aio, pydocket, fastmcp, cyclopts and syrupy all
+    # substitute straight from cache.nixos.org.
+    #
+    # Re-adding any of them is worse than useless: an override forks the
+    # derivation, so the cache hit is lost and the package must be built —
+    # which is the only way its tests ever run. The aioboto3 one was the
+    # sharpest case: nothing here uses aioboto3 directly, but overriding it
+    # rewrote py-key-value-aio -> pydocket -> fastmcp, forcing a local fastmcp
+    # build whose Supabase integration test then failed in the sandbox.
     # calibre-web 0.6.27b0 declares requests<2.33.0 but works with 2.33.x
     (_final: prev: {
       calibre-web = prev.calibre-web.overridePythonAttrs (old: {

@@ -12,11 +12,15 @@ in
     let
       # --- Python environments ------------------------------------------------
 
-      # python3 defaults to 3.14 which has broken pydantic-core. Pin 3.12
-      # and scrub PYTHON* env that HA's systemd service leaks.
-      agentmail-pkg = pkgs.python312Packages.callPackage "${rootPath}/pkgs/agentmail" { };
+      # Use the default set. `python3` is 3.14 at this pin, which is what Hydra
+      # actually builds — `python312Packages` is a side set that is largely
+      # uncached, so pinning to it means compiling the whole scientific closure
+      # from source (and tripping over flaky test suites like syrupy's on the
+      # way). Every dep here substitutes on 3.14. The wrappers below still scrub
+      # the PYTHON* env that HA's systemd service leaks.
+      agentmail-pkg = pkgs.python3Packages.callPackage "${rootPath}/pkgs/agentmail" { };
 
-      pyEnv = pkgs.python312.withPackages (_ps: [ agentmail-pkg ]);
+      pyEnv = pkgs.python3.withPackages (_ps: [ agentmail-pkg ]);
 
       pyEnvStdlib = pkgs.python312;
 
