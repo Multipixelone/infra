@@ -1,3 +1,4 @@
+{ lib, ... }:
 {
   flake.modules = {
     nixos.pc = {
@@ -28,8 +29,18 @@
           hpd = "${bd}";
         };
         wayland.windowManager.hyprland.settings.bind = [
-          "Control_L, XF86AudioRaiseVolume, exec, ${bc}"
-          "Control_L, XF86AudioLowerVolume, exec, ${bd}"
+          {
+            _args = [
+              "CTRL + XF86AudioRaiseVolume"
+              (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${bc}")'')
+            ];
+          }
+          {
+            _args = [
+              "CTRL + XF86AudioLowerVolume"
+              (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${bd}")'')
+            ];
+          }
         ];
       };
   };

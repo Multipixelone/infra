@@ -3,6 +3,7 @@
   flake.modules = {
     homeManager.gui =
       {
+        lib,
         pkgs,
         ...
       }:
@@ -129,7 +130,12 @@
         wayland.windowManager.hyprland = {
           settings = {
             bind = [
-              "SUPER, L, exec, loginctl lock-session"
+              {
+                _args = [
+                  "SUPER + L"
+                  (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("loginctl lock-session")'')
+                ];
+              }
             ];
           };
         };

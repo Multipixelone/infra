@@ -24,9 +24,12 @@
       # the `workspace name:gaming silent` rules in
       # modules/hyprland/conf/windowrules.nix and the bind in conf/binds.nix.
       stream-ws = "gaming";
-      hypr-dispatch =
-        lib.getExe' config.programs.hyprland.package "hyprctl"
-        + " dispatch exec [workspace name:${stream-ws}]";
+      # `dispatch exec [rules] cmd` is gone: dispatch now takes a lua
+      # expression, and the bracketed rule prefix is exec_cmd's second argument.
+      hypr-exec =
+        cmd:
+        "${lib.getExe' config.programs.hyprland.package "hyprctl"} dispatch "
+        + "\"hl.dsp.exec_cmd('${cmd}', { workspace = 'name:${stream-ws}' })\"";
       steam = lib.getExe config.programs.steam.package + " --";
       # HDR re-enable: set `stream-monitor = "DP-1";` and reference it below in
       # place of the literal "SUNSHINE" headless output to capture the physical
@@ -200,8 +203,8 @@
 
               hyprctl keyword monitor "$mon_string"
               sleep 1
-              hyprctl dispatch moveworkspacetomonitor name:${stream-ws} SUNSHINE
-              hyprctl dispatch workspace name:${stream-ws}
+              hyprctl dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "SUNSHINE" })'
+              hyprctl dispatch 'hl.dsp.focus({ workspace = "name:${stream-ws}" })'
             '';
           };
           undo-command = pkgs.writeShellApplication {
@@ -217,7 +220,7 @@
               # may abort the other under `set -e`.
               # Park the workspace on a real monitor by NAME. The old `0` was a
               # monitor id, which depends on connector assignment order.
-              hyprctl dispatch moveworkspacetomonitor name:${stream-ws} DP-1 || true
+              hyprctl dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "DP-1" })' || true
               hyprctl output remove SUNSHINE || true
             '';
           };
@@ -277,7 +280,7 @@
             HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
             export HYPRLAND_INSTANCE_SIGNATURE
 
-            hyprctl dispatch exec "[workspace name:${stream-ws}]" "${steam-gamescope}"
+            hyprctl dispatch 'hl.dsp.exec_cmd("${steam-gamescope}", { workspace = "name:${stream-ws}" })'
 
             # Detach the poll. Sunshine only treats a launcher that exits as a
             # detached command if it exits within 5s ("App exited gracefully
@@ -309,7 +312,7 @@
                   # gamescope back *out* of fullscreen if it self-fullscreened in
                   # the gap. `fullscreenstate 2 -1` sets internal fullscreen and
                   # leaves the client state alone, so re-running is a no-op.
-                  hyprctl --batch "dispatch focuswindow address:$addr ; dispatch fullscreenstate 2 -1"
+                  hyprctl --batch "dispatch hl.dsp.focus({ window = \"address:$addr\" }) ; dispatch hl.dsp.window.fullscreen_state({ internal = 2, client = -1 })"
                 fi
                 break
               done
@@ -406,14 +409,14 @@
             {
               name = "Prism Launcher";
               prep-cmd = [ prep ];
-              cmd = "${hypr-dispatch} \"prismlauncher\"";
+              cmd = hypr-exec "prismlauncher";
               image-path = pkgs.runCommand "prismlauncher.png" { } ''
                 ${pkgs.imagemagick}/bin/convert -density 1200 -resize 500x -background none ${pkgs.prismlauncher}/share/icons/hicolor/scalable/apps/org.prismlauncher.PrismLauncher.svg -gravity center -extent 600x800 $out
               '';
             }
             {
               name = "Steam (Big Picture Fallback)";
-              cmd = "${hypr-dispatch} \"${steam} -gamepadui\"";
+              cmd = hypr-exec "${steam} -gamepadui";
               prep-cmd = [
                 prep
                 steam-kill
@@ -422,7 +425,7 @@
             }
             {
               name = "Steam (Regular UI)";
-              cmd = "${hypr-dispatch} \"${steam}\"";
+              cmd = hypr-exec "${steam}";
               prep-cmd = [
                 prep
                 steam-kill

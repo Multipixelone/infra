@@ -1,3 +1,4 @@
+{ lib, ... }:
 {
   flake.modules = {
     homeManager.gui =
@@ -25,8 +26,18 @@
           };
         };
         wayland.windowManager.hyprland.settings.bind = [
-          "Control_L, XF86MonBrightnessUp, exec, ${sysctluser} stop gammastep"
-          "Control_L, XF86MonBrightnessDown, exec, ${sysctluser} start gammastep"
+          {
+            _args = [
+              "CTRL + XF86MonBrightnessUp"
+              (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${sysctluser} stop gammastep")'')
+            ];
+          }
+          {
+            _args = [
+              "CTRL + XF86MonBrightnessDown"
+              (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${sysctluser} start gammastep")'')
+            ];
+          }
         ];
       };
   };
