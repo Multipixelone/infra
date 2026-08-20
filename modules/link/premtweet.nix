@@ -107,6 +107,34 @@
         blogDirs = [ "Blog" ];
         blogBaseUrl = "https://blog.finnrut.is/";
 
+        # ---- the weekly engagement-graph refresh (SPENDS MONEY) ---------------
+        #
+        # Upstream ships this off by default because it is the outer of two gates:
+        # GRAPH_PLAN.md holds the first paid crawl until Finn has approved
+        # docs/graph/seeds.md and the budget numbers. Both cleared — the 60-seed
+        # list is approved and the initial 2-hop crawl ran on 2026-08-15 (4,570
+        # nodes, 15,478 edges, $44 of the one-time allowance). Turning this on is
+        # the deploy-time act that records the gate as cleared.
+        #
+        # The cost ceiling is upstream's, not this file's: the crawl reads its own
+        # ledger and REFUSES before the first request if a run's worst case would
+        # carry the month over monthlyPostBudget (4000 posts = $20/mo, the default,
+        # left alone). Once the one-time initialPostBudget is consumed by lifetime
+        # spend, $20/mo is the whole bill, forever. No enrichment runs here — the
+        # unit is the crawl alone, so the $0.010/user lookups never fire from a
+        # timer.
+        #
+        # maxResults is left at its default of 10 deliberately. It is what makes a
+        # weekly timer actually weekly: without it the sweep sizes itself against
+        # the whole remaining month, so the first Monday spends most of the budget
+        # and the last two are refused by the gate. A refused week is a permanent
+        # hole — search/recent cannot reach back to fill it in — while a thinner
+        # week is fewer posts out of the same seven days.
+        graphRefresh = {
+          enable = true;
+          monthlyPostBudget = 6000;
+        };
+
         environmentFile = config.age.secrets."premtweet".path;
       };
 

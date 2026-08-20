@@ -3968,11 +3968,11 @@
         "nixpkgs": "nixpkgs_30"
       },
       "locked": {
-        "lastModified": 1786594947,
-        "narHash": "sha256-uF4UubTCqrkDfWbl+BYB90HgHje3GjELJynbMvLzDQk=",
+        "lastModified": 1786936271,
+        "narHash": "sha256-6gk9uoYH7BcLCi9UG0W6TD0HBaWfbdiPkmMfdlL1Nws=",
         "owner": "Multipixelone",
         "repo": "prem-tweet",
-        "rev": "11d35e73d6dcf881f6c11ece92803a40096bd075",
+        "rev": "2b948cbf808824ebb5f42b440bc257b698bac55d",
         "type": "github"
       },
       "original": {
