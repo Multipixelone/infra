@@ -83,6 +83,20 @@ in
       # --- Notion CLI --------------------------------------------------------
 
       ntn = pkgs.callPackage "${rootPath}/pkgs/ntn" { };
+
+      # --- OpenClaw release channel -------------------------------------------
+      # npm spec for the gateway's self-heal bootstrap (ExecStartPre below).
+      # MUST carry an explicit dist-tag or version: a bare `openclaw` resolves
+      # to `latest` (stable), so one failed `--version` check would silently
+      # reinstall stable over the beta. That breaks the `@openclaw/acpx`
+      # plugin, which pins `openclaw.compat.pluginApi` to its own version and
+      # is refused on an older host.
+      #
+      # Tracking `beta` because Opus 5 in the ACP runtime needs the beta's
+      # vendored claude-agent-sdk (>= 0.3.219 = Claude Code 2.1.219); stable
+      # 2026.7.1 vendors 2.1.198, which has no `claude-opus-5`.
+      # Set a concrete version (e.g. "openclaw@2026.8.1-beta.2") to freeze.
+      openclawNpmSpec = "openclaw@beta";
     in
     {
 
@@ -150,7 +164,7 @@ in
             # runtime-expanded environment, and treats `%h` literally —
             # which makes its service-config and PATH validations fail.
             ExecStartPre = ''
-              ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; NEED_INSTALL=0; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then NEED_INSTALL=1; elif ! "$HOME/.npm-global/bin/openclaw" --version >/dev/null 2>&1; then NEED_INSTALL=1; fi; if [ "$NEED_INSTALL" = "1" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g openclaw; fi'
+              ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; NEED_INSTALL=0; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then NEED_INSTALL=1; elif ! "$HOME/.npm-global/bin/openclaw" --version >/dev/null 2>&1; then NEED_INSTALL=1; fi; if [ "$NEED_INSTALL" = "1" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g ${openclawNpmSpec}; fi'
             '';
             ExecStart = "/home/tunnel/.npm-global/bin/openclaw gateway --port 18789";
             WorkingDirectory = "/home/tunnel/.openclaw";
