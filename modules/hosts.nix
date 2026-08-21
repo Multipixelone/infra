@@ -156,6 +156,10 @@ in
       readmeRole = "Laptop";
       desktopWindowManager = "macOS";
       notes = "nix-darwin host";
+      wireguard = {
+        ipv4Address = "10.100.0.3";
+        publicKey = "CdJg4znt9L9e/vnDNDuu0wMnRcXMKZeMSeOPEr+4HCk=";
+      };
     };
     minish = {
       isNixOS = true;

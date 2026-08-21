@@ -1,5 +1,22 @@
 {
+  config,
+  inputs,
+  lib,
+  ...
+}:
+let
+  user = config.flake.meta.owner.username;
+  encryptedProfile = "${inputs.secrets}/wireguard/hylia.age";
+in
+{
   configurations.darwin.hylia.module = {
+    # The complete importable profile contains hylia's private key. Keep it in
+    # the private secrets input and decrypt it into the user's secrets directory.
+    # The guard lets infra and the secrets input be rolled forward independently.
+    home-manager.users.${user}.age.secrets = lib.mkIf (builtins.pathExists encryptedProfile) {
+      "wireguard/hylia-home-vpn.conf".file = encryptedProfile;
+    };
+
     # Declarative Brewfile via `brew bundle` on activation. Homebrew itself must
     # be installed once manually (https://brew.sh) before the first switch.
     homebrew = {
@@ -78,15 +95,13 @@
         "fluidvoice"
         "auto-subs"
 
-        # VPN (AmneziaWG protocol) (BUILT FOR INTEL ONLY)
-        # "amneziavpn"
-
         # textream (from the f/textream tap)
         "f/textream/textream"
       ];
       # Mac App Store apps (ids from `mas list`). Pages and Keynote are
       # intentionally omitted — they ship preinstalled and are not managed here.
       masApps = {
+        "AmneziaWG" = 6478942365;
         "BloonsTD6+" = 1584423325;
         "DaVinci Resolve" = 571213070;
         "Fantastical" = 975937182;
