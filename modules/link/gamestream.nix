@@ -174,12 +174,15 @@
               width=''${1:-3840}
               height=''${2:-2160}
               refresh_rate=''${3:-60}
-              # HDR re-enable: append ",cm,hdr" to enable color-managed HDR on the
-              # headless output. Currently SDR — committing an HDR/color-managed
+              if [[ ! "$width" =~ ^[0-9]+$ || ! "$height" =~ ^[0-9]+$ || ! "$refresh_rate" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                echo "Invalid stream mode: ''${width}x''${height}@''${refresh_rate}" >&2
+                exit 1
+              fi
+              # HDR re-enable: add `cm = "hdr"` to the `hl.monitor` table below.
+              # Currently SDR — committing an HDR/color-managed
               # virtual output segfaults Hyprland 0.55's aquamarine backend
               # (CHeadlessOutput::commit), which crashed the whole session and
               # made Sunshine app launches fail.
-              mon_string="SUNSHINE,''${width}x''${height}@''${refresh_rate},0x1920,1"
               # Unlock PC (so I don't have to type password on Steam Deck)
               # pkill -USR1 hyprlock || true
 
@@ -201,8 +204,33 @@
                 sleep 0.5
               done
 
-              hyprctl keyword monitor "$mon_string"
-              sleep 1
+              # `hyprctl keyword` only targets the legacy config provider. This
+              # setup uses the Lua provider, whose runtime API is `eval` plus the
+              # same `hl.monitor` table used by the declarative config.
+              hyprctl eval "hl.monitor({
+                output = \"SUNSHINE\",
+                mode = \"''${width}x''${height}@''${refresh_rate}\",
+                position = \"0x1920\",
+                scale = 1,
+              })"
+
+              # Monitor application is asynchronous. Do not let Sunshine start
+              # against the headless output's default 2x scale (which presents a
+              # 1920x1080 mode as a 960x540 logical desktop).
+              timeout=20
+              while ! hyprctl monitors all -j 2>/dev/null | jq -e \
+                --argjson width "$width" \
+                --argjson height "$height" \
+                '.[] | select(.name == "SUNSHINE" and .width == $width and .height == $height and .scale == 1)' \
+                >/dev/null; do
+                if (( --timeout == 0 )); then
+                  echo "Timed out applying SUNSHINE mode ''${width}x''${height}@''${refresh_rate} at scale 1" >&2
+                  hyprctl monitors all >&2 || true
+                  exit 1
+                fi
+                sleep 0.25
+              done
+
               hyprctl dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "SUNSHINE" })'
               hyprctl dispatch 'hl.dsp.focus({ workspace = "name:${stream-ws}" })'
             '';
