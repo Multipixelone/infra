@@ -2,28 +2,63 @@
 let
   inherit (config) observability;
   inherit (config.flake.meta.owner) email username;
+  serviceInventory = config.flake.servicePublicationInventory;
+  localCutover = config.servicePublication.rollout.enableLocalCutover;
+  grafanaCanonical = serviceInventory.applications.grafana.canonical;
+  homepageCanonical = serviceInventory.applications.homepage.canonical;
+  publicationSite =
+    config.servicePublication.sites.${config.servicePublication.applications.grafana.site};
+  effectiveTrustedCidrs =
+    if localCutover then
+      publicationSite.routedLanCidrs ++ publicationSite.vpnClientCidrs
+    else
+      observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
   probedEndpoints = builtins.filter (endpoint: endpoint.probe != null) endpointList;
-  internalProbes = map (endpoint: {
-    targets = [
-      "http://${endpoint.backendAddress}:${toString endpoint.port}${endpoint.probe.internalPath}"
-    ];
-    labels = {
-      endpoint = endpoint.dnsName;
-      scope = "internal";
-      slo_class = endpoint.probe.sloClass;
-    };
-  }) probedEndpoints;
-  privateProbes = map (endpoint: {
-    targets = [ "https://${endpoint.dnsName}${endpoint.probe.privatePath}" ];
-    labels = {
-      endpoint = endpoint.dnsName;
-      scope = "private";
-      slo_class = endpoint.probe.sloClass;
-    };
-  }) (builtins.filter (endpoint: endpoint.probe.privatePath != null) probedEndpoints);
+  internalProbes =
+    if localCutover then
+      map (route: {
+        targets = [
+          "${route.backend.scheme}://${route.backendAddress}:${toString route.backend.port}${route.health.path}"
+        ];
+        labels = {
+          endpoint = route.canonical;
+          scope = "internal";
+          slo_class = "internal";
+        };
+      }) (builtins.attrValues serviceInventory.routes)
+    else
+      map (endpoint: {
+        targets = [
+          "http://${endpoint.backendAddress}:${toString endpoint.port}${endpoint.probe.internalPath}"
+        ];
+        labels = {
+          endpoint = endpoint.dnsName;
+          scope = "internal";
+          slo_class = endpoint.probe.sloClass;
+        };
+      }) probedEndpoints;
+  privateProbes =
+    if localCutover then
+      map (probe: {
+        targets = [ "https://${probe.canonical}${probe.path}" ];
+        labels = {
+          endpoint = probe.canonical;
+          scope = "private";
+          slo_class = "internal";
+        };
+      }) serviceInventory.internalProbes
+    else
+      map (endpoint: {
+        targets = [ "https://${endpoint.dnsName}${endpoint.probe.privatePath}" ];
+        labels = {
+          endpoint = endpoint.dnsName;
+          scope = "private";
+          slo_class = endpoint.probe.sloClass;
+        };
+      }) (builtins.filter (endpoint: endpoint.probe.privatePath != null) probedEndpoints);
 
   cloudflareSecret = "${inputs.secrets}/cloudflare/acme-dns01.age";
   grafanaSecret = "${inputs.secrets}/grafana/admin.age";
@@ -601,8 +636,7 @@ in
         '';
       };
 
-      nginxAcl =
-        lib.concatMapStrings (cidr: "allow ${cidr};\n") observability.trustedClientCidrs + "deny all;";
+      nginxAcl = lib.concatMapStrings (cidr: "allow ${cidr};\n") effectiveTrustedCidrs + "deny all;";
       nginxListen = [
         {
           addr = hub.homeAddress;
@@ -616,12 +650,12 @@ in
         }
       ];
 
-      protectedTcpPorts = [ 53 ] ++ lib.optionals activationReady [ 443 ];
+      protectedTcpPorts = [ 53 ] ++ lib.optionals (activationReady && !localCutover) [ 443 ];
       firewallPortList = lib.concatMapStringsSep "," toString protectedTcpPorts;
       firewallLoopbackAccept = "iptables -w -A nixos-observability -i lo -s 127.0.0.0/8 -j nixos-fw-accept";
       firewallClientAccepts = lib.concatMapStringsSep "\n" (
         cidr: "iptables -w -A nixos-observability -s ${cidr} -j nixos-fw-accept"
-      ) observability.trustedClientCidrs;
+      ) effectiveTrustedCidrs;
 
       telegramContactRouted = false;
       mcpArgs = [
@@ -636,8 +670,12 @@ in
           message = "Phase 1 is Link-only and Link must be the explicit observability hub.";
         }
         {
-          assertion = observability.trustedClientCidrs == expectedCidrs;
-          message = "DNS, firewall, and nginx must share only the three approved CIDRs.";
+          assertion =
+            if localCutover then
+              effectiveTrustedCidrs == publicationSite.routedLanCidrs ++ publicationSite.vpnClientCidrs
+            else
+              observability.trustedClientCidrs == expectedCidrs;
+          message = "DNS, firewall, and nginx must share the active registry's exact client CIDRs.";
         }
         {
           assertion = lib.hasInfix ''
@@ -650,10 +688,6 @@ in
         {
           assertion = lib.all (endpoint: endpoint.backendAddress == "127.0.0.1") endpointList;
           message = "All Phase 1 application backends must be IPv4 loopback-only.";
-        }
-        {
-          assertion = !observability.enablePublicDns && !observability.enableTunnel;
-          message = "Public DNS, Cloudflare Tunnel, and public ingress are forbidden for Phase 1.";
         }
         {
           assertion = !telegramContactRouted;
@@ -749,7 +783,7 @@ in
         })
       ];
 
-      security.acme = {
+      security.acme = lib.mkIf (!localCutover) {
         acceptTerms = true;
         defaults.email = email;
         certs."grafana.home.finnrut.is" = {
@@ -761,7 +795,7 @@ in
         };
       };
 
-      services.nginx = {
+      services.nginx = lib.mkIf (!localCutover) {
         enable = true;
         recommendedGzipSettings = true;
         recommendedOptimisation = true;
@@ -798,8 +832,8 @@ in
           server = {
             http_addr = grafana.backendAddress;
             http_port = grafana.port;
-            domain = grafana.dnsName;
-            root_url = "https://${grafana.dnsName}/";
+            domain = if localCutover then grafanaCanonical else grafana.dnsName;
+            root_url = "https://${if localCutover then grafanaCanonical else grafana.dnsName}/";
             enforce_domain = true;
           };
           analytics = {
@@ -1030,8 +1064,8 @@ in
         openFirewall = false;
         listenPort = homepage.port;
         allowedHosts = lib.concatStringsSep "," [
-          "${homepage.dnsName}"
-          "${homepage.dnsName}:443"
+          (if localCutover then homepageCanonical else homepage.dnsName)
+          "${if localCutover then homepageCanonical else homepage.dnsName}:443"
           "localhost:${toString homepage.port}"
           "127.0.0.1:${toString homepage.port}"
         ];
@@ -1047,7 +1081,11 @@ in
               map
                 (endpoint: {
                   "${endpoint.description}" = {
-                    href = "https://${endpoint.dnsName}";
+                    href =
+                      if localCutover && endpoint == grafana then
+                        "https://${grafanaCanonical}"
+                      else
+                        "https://${endpoint.dnsName}";
                     inherit (endpoint) description;
                   };
                 })
@@ -1081,8 +1119,9 @@ in
       # Generated configuration stays in the closure and is evaluated before
       # secrets exist, but runtime activation is an AND gate on both agenix
       # paths. No unit below can start early.
-      systemd.services."acme-grafana.home.finnrut.is".unitConfig.ConditionPathExists =
-        requiredRuntimeSecrets;
+      systemd.services."acme-grafana.home.finnrut.is".unitConfig.ConditionPathExists = lib.mkIf (
+        !localCutover
+      ) requiredRuntimeSecrets;
       systemd.services.alloy.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.grafana.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.homepage-dashboard.unitConfig.ConditionPathExists = requiredRuntimeSecrets;

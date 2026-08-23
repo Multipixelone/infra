@@ -77,14 +77,6 @@ in
     privateZone = lib.mkOption {
       type = lib.types.str;
     };
-    enablePublicDns = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-    };
-    enableTunnel = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-    };
     retention = {
       prometheusTime = lib.mkOption { type = lib.types.str; };
       prometheusSize = lib.mkOption { type = lib.types.str; };
@@ -117,8 +109,6 @@ in
         "10.100.0.0/24"
       ];
       privateZone = "home.finnrut.is";
-      enablePublicDns = false;
-      enableTunnel = false;
       retention = {
         prometheusTime = "30d";
         prometheusSize = "2GB";
@@ -200,10 +190,6 @@ in
       {
         assertion = config.hosts.link.roles == [ "desktop" ];
         message = "Link remains a desktop; observabilityHub must not reclassify it as a server.";
-      }
-      {
-        assertion = !config.observability.enablePublicDns && !config.observability.enableTunnel;
-        message = "Phase 1 forbids public DNS and tunnel exposure.";
       }
       {
         assertion = lib.all (

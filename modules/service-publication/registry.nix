@@ -1,0 +1,347 @@
+{
+  config,
+  lib,
+  ...
+}:
+let
+  inherit (lib) mkOption types;
+  publicationLib = import ../../lib/service-publication.nix { inherit lib; };
+
+  capabilitiesType = types.submodule {
+    options = {
+      reverseProxy = mkOption {
+        type = types.bool;
+        default = false;
+      };
+      publicConnector = mkOption {
+        type = types.bool;
+        default = false;
+      };
+      internalDns = mkOption {
+        type = types.bool;
+        default = false;
+      };
+    };
+  };
+
+  accessType = types.submodule {
+    options = {
+      policy = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Access policy key. Public routes must resolve to an import-ready policy.";
+      };
+      serviceTokens = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = "Non-secret Cloudflare Access service-token identifiers.";
+      };
+      bypassAccess = mkOption {
+        type = types.bool;
+        default = false;
+      };
+      bypassJustification = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+      };
+    };
+  };
+
+  healthType = types.submodule {
+    options = {
+      path = mkOption {
+        type = types.strMatching "/.*";
+        description = "Backend health path.";
+      };
+      expectedStatuses = mkOption {
+        type = types.nonEmptyListOf (types.ints.between 100 599);
+      };
+      timeoutSeconds = mkOption {
+        type = types.ints.positive;
+      };
+    };
+  };
+
+  routeType = types.submodule {
+    options = {
+      match.pathPrefix = mkOption {
+        type = types.strMatching "/.*";
+        default = "/";
+      };
+      backend = {
+        host = mkOption { type = types.str; };
+        scheme = mkOption {
+          type = types.enum [
+            "http"
+            "https"
+          ];
+          default = "http";
+        };
+        port = mkOption { type = types.port; };
+      };
+      proxy.host = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+      };
+      public = mkOption {
+        type = types.nullOr types.bool;
+        default = null;
+        description = "Null inherits the application setting; false may narrow a public application.";
+      };
+      access = mkOption {
+        type = accessType;
+        default = { };
+      };
+      health = mkOption {
+        type = healthType;
+        description = "Mandatory route health contract.";
+      };
+    };
+  };
+
+  applicationType = types.submodule (
+    { name, ... }:
+    {
+      options = {
+        site = mkOption { type = types.str; };
+        public = mkOption {
+          type = types.bool;
+          default = false;
+        };
+        publicHostname = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+        };
+        access = mkOption {
+          type = accessType;
+          default = { };
+        };
+        routes = mkOption {
+          type = types.attrsOf routeType;
+          description = "Routes keyed by stable route identity for ${name}.";
+        };
+      };
+    }
+  );
+
+  siteType = types.submodule {
+    options = {
+      internalZone = mkOption {
+        type = types.str;
+      };
+      routedLanCidrs = mkOption {
+        type = types.listOf (types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+");
+        default = [ ];
+        description = "Confirmed LAN networks routed to VPN clients; empty until discovery is signed off.";
+      };
+      vpnClientCidrs = mkOption {
+        type = types.listOf (types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+");
+        default = [ ];
+        description = "VPN client source networks accepted by generated DNS and proxy policy.";
+      };
+      networkInventoryConfirmed = mkOption {
+        type = types.bool;
+        default = false;
+      };
+      publicIngressHost = mkOption { type = types.str; };
+      defaultProxyHosts = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+      };
+    };
+  };
+
+  publicationHostType = types.submodule {
+    options = {
+      site = mkOption { type = types.str; };
+      addresses.lan = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+      };
+      managedByNixOS = mkOption {
+        type = types.bool;
+        default = false;
+      };
+      capabilities = mkOption {
+        type = capabilitiesType;
+        default = { };
+      };
+      reachableFromProxyHosts = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = "Proxy hosts explicitly able to reach this host's declared LAN backends.";
+      };
+    };
+  };
+
+  accessPolicyType = types.submodule {
+    options = {
+      cloudflareImportKey = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Bootstrap-only existing resource ID. Null keeps the policy unavailable for publication.";
+      };
+      decision = mkOption {
+        type = types.enum [
+          "allow"
+          "deny"
+          "non_identity"
+          "bypass"
+        ];
+        default = "allow";
+      };
+      include = mkOption {
+        type = types.listOf types.attrs;
+        default = [ ];
+        description = "Reviewed, non-secret Cloudflare policy include rules discovered during adoption.";
+      };
+      exclude = mkOption {
+        type = types.listOf types.attrs;
+        default = [ ];
+      };
+      require = mkOption {
+        type = types.listOf types.attrs;
+        default = [ ];
+      };
+      sessionDuration = mkOption {
+        type = types.str;
+        default = "24h";
+      };
+    };
+  };
+
+  registry = config.servicePublication;
+  inventory = publicationLib.resolve registry;
+  rolloutErrors =
+    lib.optional (
+      registry.rollout.enableLocalCutover
+      && !lib.all (site: site.networkInventoryConfirmed) (lib.attrValues registry.sites)
+    ) "service publication: local cutover requires a confirmed network inventory for every site"
+    ++
+      lib.optional (registry.rollout.enableConnector && !registry.rollout.cloudflareBootstrapComplete)
+        "service publication: connector enablement requires completed Cloudflare adoption and remote-state bootstrap";
+  checkedInventory =
+    assert lib.assertMsg (inventory.errors ++ rolloutErrors == [ ]) (
+      lib.concatStringsSep "\n" (inventory.errors ++ rolloutErrors)
+    );
+    inventory;
+in
+{
+  options.servicePublication = {
+    rollout = {
+      enableLocalCutover = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Enable generated Blocky/nginx/ACME/firewall/probe configuration after network discovery.";
+      };
+      enableConnector = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Enable the movable managed-Tunnel connector after adoption.";
+      };
+      cloudflareBootstrapComplete = mkOption {
+        type = types.bool;
+        default = false;
+        description = "True only after remote-state locking and a reviewed adoption/no-op plan are proven.";
+      };
+    };
+    sites = mkOption {
+      type = types.attrsOf siteType;
+      default = { };
+    };
+    hosts = mkOption {
+      type = types.attrsOf publicationHostType;
+      default = { };
+    };
+    accessPolicies = mkOption {
+      type = types.attrsOf accessPolicyType;
+      default = { };
+    };
+    applications = mkOption {
+      type = types.attrsOf applicationType;
+      default = { };
+    };
+  };
+
+  config = {
+    servicePublication = {
+      # These are target identities, not permission to deploy. The site CIDRs
+      # and policy definitions intentionally remain empty until Finn confirms
+      # discovery and adoption inputs documented in the runbook.
+      sites.nyc = {
+        internalZone = "nyc.finnrut.is";
+        routedLanCidrs = [ ];
+        vpnClientCidrs = [ ];
+        networkInventoryConfirmed = false;
+        publicIngressHost = "link";
+        defaultProxyHosts = [ "link" ];
+      };
+
+      hosts = {
+        link = {
+          site = "nyc";
+          addresses.lan = config.hosts.link.homeAddress;
+          managedByNixOS = true;
+          capabilities = {
+            reverseProxy = true;
+            publicConnector = true;
+            internalDns = true;
+          };
+        };
+        iot = {
+          site = "nyc";
+          addresses.lan = config.hosts.iot.homeAddress;
+          managedByNixOS = true;
+        };
+        marin = {
+          site = "nyc";
+          addresses.lan = config.hosts.marin.homeAddress;
+          managedByNixOS = true;
+        };
+        alexandria = {
+          site = "nyc";
+          addresses.lan = config.hosts.alexandria.homeAddress;
+          managedByNixOS = false;
+        };
+      };
+
+      accessPolicies = {
+        finn-only = { };
+        family = { };
+      };
+
+      applications = {
+        grafana = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "link";
+              port = config.observability.endpoints.grafana.port;
+            };
+            health = {
+              path = "/api/health";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        homepage = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "link";
+              port = config.observability.endpoints.homepage.port;
+            };
+            health = {
+              path = "/";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+      };
+    };
+
+    flake.servicePublicationInventory = checkedInventory;
+  };
+}
