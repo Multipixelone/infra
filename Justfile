@@ -19,13 +19,13 @@ colmena-apply-tag tag:
 
 # Fail-closed split-DNS/service publication deployment. Modes: apply, plan-only.
 deploy-services mode="apply" routes="":
-  scripts/service-publication/deploy.sh "{{mode}}" "{{routes}}"
+  nix run .#service-publication-deploy -- "{{mode}}" "{{routes}}"
 
 services-smoke context="lan" routes="":
-  scripts/service-publication/smoke.sh "{{context}}" "{{routes}}"
+  nix run .#service-publication-smoke -- "{{context}}" "{{routes}}"
 
 services-tofu action="plan":
-  scripts/service-publication/tofu.sh "{{action}}"
+  nix run .#service-publication-tofu -- "{{action}}"
 
 minishb:
   # nix build .#nixosConfigurations.minish.config.system.build.toplevel

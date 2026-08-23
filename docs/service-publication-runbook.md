@@ -71,6 +71,10 @@ the private secrets input:
 | `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                          |
 | `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them     |
 
+The five operator runtime files declared in
+`modules/service-publication/runtime.nix` are owned by the repository operator
+and installed with mode `0400`.
+
 The ACME DNS-01 credential remains the existing, separate
 `cloudflare/acme-dns01.age`. A cloudflared connector token and ACME token must
 never be reused as the OpenTofu API credential.
@@ -123,10 +127,10 @@ unchecked above.
    [OpenTofu S3 backend documentation](https://opentofu.org/docs/language/settings/backends/s3/).
 4. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
    progress. The configuration check blocks plans and applies.
-5. Initialize only through `scripts/service-publication/tofu.sh`; it rejects an
-   unreadable runtime file, missing runtime variables, or a backend without the
-   lock flag. It never falls back to local state or an ambient AWS credential
-   chain.
+5. Initialize only through
+   `nix run .#service-publication-tofu -- ...`; it rejects an unreadable runtime
+   file, missing runtime variables, or a backend without the lock flag. It never
+   falls back to local state or an ambient AWS credential chain.
 
 ## Adoption without replacement
 
@@ -136,19 +140,19 @@ actual UUID remains runtime-only. Regenerate `registry.json`, then import every
 matching live resource using placeholders resolved during inventory:
 
 ```bash
-scripts/service-publication/tofu.sh import \
+nix run .#service-publication-tofu -- import \
   'cloudflare_zero_trust_access_policy.managed["<policy-key>"]'
 
-scripts/service-publication/tofu.sh import \
+nix run .#service-publication-tofu -- import \
   'cloudflare_zero_trust_access_application.managed["<application-key>"]'
 
-scripts/service-publication/tofu.sh import \
+nix run .#service-publication-tofu -- import \
   cloudflare_zero_trust_tunnel_cloudflared.managed
 
-scripts/service-publication/tofu.sh import \
+nix run .#service-publication-tofu -- import \
   cloudflare_zero_trust_tunnel_cloudflared_config.managed
 
-scripts/service-publication/tofu.sh import \
+nix run .#service-publication-tofu -- import \
   'cloudflare_dns_record.public["<application-key>"]'
 ```
 

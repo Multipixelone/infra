@@ -1,3 +1,4 @@
+{ rootPath, ... }:
 {
   # Surfaces Finn's assigned ChoreOps chores (HA custom integration) into Todoist
   # and writes completions back. A deterministic bash reconcile loop on a 15-min
@@ -16,15 +17,7 @@
       ...
     }:
     let
-      sync = pkgs.writeShellApplication {
-        name = "choreops-todoist-sync";
-        runtimeInputs = with pkgs; [
-          curl
-          jq
-          coreutils
-        ];
-        text = builtins.readFile ./choreops-todoist-sync.sh;
-      };
+      sync = pkgs.callPackage "${rootPath}/pkgs/choreops-todoist-sync" { };
     in
     {
       systemd.services.choreops-todoist-sync = {
