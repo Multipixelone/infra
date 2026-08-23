@@ -62,13 +62,14 @@ no compatibility aliases are generated.
 The Link NixOS configuration conditionally references these encrypted files in
 the private secrets input:
 
-| Encrypted source                                   | Runtime path                                     | Contract                                                                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api` | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                       |
-| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`      | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete`     |
-| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`  | raw existing Tunnel secret; never echo it                                                                                                    |
-| `cloudflare/service-publication-backend.age`       | `/run/agenix/service-publication-backend`        | partial S3 backend HCL with the accepted non-secret settings; AWS authentication is supplied separately through the runtime credential chain |
-| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`   | raw connector token, readable only by `cloudflared`                                                                                          |
+| Encrypted source                                   | Runtime path                                        | Contract                                                                                                                                     |
+| -------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                       |
+| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`         | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete`     |
+| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`     | raw existing Tunnel secret; never echo it                                                                                                    |
+| `cloudflare/service-publication-backend.age`       | `/run/agenix/service-publication-backend`           | partial S3 backend HCL with the accepted non-secret settings; AWS authentication is supplied separately through the runtime credential chain |
+| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                          |
+| `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them     |
 
 The ACME DNS-01 credential remains the existing, separate
 `cloudflare/acme-dns01.age`. A cloudflared connector token and ACME token must
@@ -106,8 +107,9 @@ unchecked above.
 2. Copy the exact payload from
    `infra/service-publication/backend.hcl.example` into
    `cloudflare/service-publication-backend.age` in the private secrets input.
-   Keep AWS credentials out of both files and supply authentication separately
-   at execution time through the standard AWS credential chain.
+   Keep AWS credentials out of both backend files. Store them only in
+   `aws/service-publication-state-credentials.age`; the wrapper requires its
+   runtime path and exports both AWS variables before initializing OpenTofu.
 
    ```bash
    cd /home/tunnel/Documents/Git/nix-secrets
@@ -122,8 +124,9 @@ unchecked above.
 4. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
    progress. The configuration check blocks plans and applies.
 5. Initialize only through `scripts/service-publication/tofu.sh`; it rejects an
-   unreadable backend, missing runtime variables, or a backend without the lock
-   flag. It never falls back to local state.
+   unreadable runtime file, missing runtime variables, or a backend without the
+   lock flag. It never falls back to local state or an ambient AWS credential
+   chain.
 
 ## Adoption without replacement
 

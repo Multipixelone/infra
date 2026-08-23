@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
 tofu_root="$repo_root/infra/service-publication"
 backend_file=${SERVICE_PUBLICATION_BACKEND_FILE:-/run/agenix/service-publication-backend}
+aws_credentials_env=${SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV:-/run/agenix/service-publication-state-credentials}
 cloudflare_api_env=${SERVICE_PUBLICATION_CLOUDFLARE_API_ENV:-/run/agenix/service-publication-cloudflare-api}
 bootstrap_env=${SERVICE_PUBLICATION_BOOTSTRAP_ENV:-/run/agenix/service-publication-bootstrap}
 tunnel_secret_file=${SERVICE_PUBLICATION_TUNNEL_SECRET_FILE:-/run/agenix/service-publication-tunnel-secret}
@@ -17,7 +18,7 @@ plan | apply | output | import) ;;
   ;;
 esac
 
-for runtime_file in "$backend_file" "$cloudflare_api_env" "$bootstrap_env" "$tunnel_secret_file"; do
+for runtime_file in "$backend_file" "$aws_credentials_env" "$cloudflare_api_env" "$bootstrap_env" "$tunnel_secret_file"; do
   if [[ ! -r $runtime_file ]]; then
     echo "service publication bootstrap blocker: unreadable runtime file $runtime_file" >&2
     exit 1
@@ -29,7 +30,12 @@ if ! grep -Eq '^[[:space:]]*use_lockfile[[:space:]]*=[[:space:]]*true([[:space:]
   exit 1
 fi
 
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+# Never trace assignments loaded from runtime credential files.
+set +x
 set -a
+# shellcheck disable=SC1090
+source "$aws_credentials_env"
 # shellcheck disable=SC1090
 source "$cloudflare_api_env"
 # shellcheck disable=SC1090
@@ -39,6 +45,8 @@ export TF_VAR_tunnel_secret
 TF_VAR_tunnel_secret=$(<"$tunnel_secret_file")
 
 required_vars=(
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
   CLOUDFLARE_API_TOKEN
   TF_VAR_bootstrap_complete
   TF_VAR_cloudflare_account_id
