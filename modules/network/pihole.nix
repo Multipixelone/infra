@@ -101,6 +101,7 @@ in
         settings = {
           ports.dns = [
             "127.0.0.1:53"
+            "[::1]:53"
           ]
           ++ lib.optionals isObservabilityHub [
             "${hub.homeAddress}:53"
@@ -121,11 +122,11 @@ in
             "[::1]:${toString unboundPort}"
           ];
 
-          # Don't exit if the upstream chain (unbound→dnscrypt) isn't ready at
-          # start — on first boot dnscrypt is still fetching its resolver list,
-          # so the initial probe fails. blocky stays up and serves once the
-          # chain comes online.
-          startVerifyUpstream = false;
+          # Start serving immediately if the upstream chain
+          # (unbound→dnscrypt) isn't ready yet. On first boot dnscrypt may still
+          # be fetching its resolver list; Blocky enables the upstreams once
+          # the chain comes online.
+          upstreams.init.strategy = "fast";
 
           # Resolve blocklist URLs (raw.githubusercontent.com, …) via unbound
           # directly instead of the system resolver, which is blocky itself —
