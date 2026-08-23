@@ -17,6 +17,16 @@ colmena-apply:
 colmena-apply-tag tag:
   colmena apply --on @{{tag}}
 
+# Fail-closed split-DNS/service publication deployment. Modes: apply, plan-only.
+deploy-services mode="apply" routes="":
+  scripts/service-publication/deploy.sh "{{mode}}" "{{routes}}"
+
+services-smoke context="lan" routes="":
+  scripts/service-publication/smoke.sh "{{context}}" "{{routes}}"
+
+services-tofu action="plan":
+  scripts/service-publication/tofu.sh "{{action}}"
+
 minishb:
   # nix build .#nixosConfigurations.minish.config.system.build.toplevel
   # attic push system result -j 3

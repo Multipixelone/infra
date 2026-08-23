@@ -1,6 +1,10 @@
 # Split DNS and service publication design
 
-Status: accepted design; implementation has not started
+Status: accepted design; implementation foundation exists, rollout is bootstrap-gated
+
+Implementation and bootstrap status is tracked in
+[`service-publication-runbook.md`](service-publication-runbook.md). The rollout
+gates remain disabled until its discovery and adoption requirements are met.
 
 This document is the implementation contract for publishing services from the
 New York City site. It records the accepted target state, the decisions it

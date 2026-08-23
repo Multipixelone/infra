@@ -59,6 +59,9 @@ Task execution is managed via `just`.
 | `just deploy` | Rebuild and push closures to the Attic binary cache. |
 | `just colmena-apply` | Deploy configurations to remote hosts via Colmena. |
 | `just colmena-apply-tag <tag>` | Deploy configurations to a specific Colmena tag. |
+| `just deploy-services` | See Justfile recipe. |
+| `just services-smoke` | See Justfile recipe. |
+| `just services-tofu` | See Justfile recipe. |
 | `just minishb` | Build selected hosts and push resulting closures. |
 | `just fastb` | Fast build with `nix-fast-build` and Attic cache upload. |
 | `just hm-build` | See Justfile recipe. |
@@ -154,5 +157,7 @@ using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 - `.github/workflows/build.yaml`
 - `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
+- `.github/workflows/service-publication.yaml`
 - `.gitignore`
 - `README.md`
+- `infra/service-publication/registry.json`
