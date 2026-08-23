@@ -265,14 +265,19 @@ in
 
   config = {
     servicePublication = {
-      # These are target identities, not permission to deploy. The site CIDRs
-      # and policy definitions intentionally remain empty until Finn confirms
-      # discovery and adoption inputs documented in the runbook.
+      # These are target identities, not permission to deploy. Policy
+      # definitions intentionally remain empty until Finn confirms the
+      # adoption inputs documented in the runbook.
       sites.nyc = {
         internalZone = "nyc.finnrut.is";
-        routedLanCidrs = [ ];
-        vpnClientCidrs = [ ];
-        networkInventoryConfirmed = false;
+        routedLanCidrs = [
+          "192.168.5.0/24"
+          "192.168.6.0/24"
+          "192.168.7.0/24"
+          "192.168.8.0/24"
+        ];
+        vpnClientCidrs = [ "10.100.0.0/24" ];
+        networkInventoryConfirmed = true;
         publicIngressHost = "link";
         defaultProxyHosts = [ "link" ];
       };
