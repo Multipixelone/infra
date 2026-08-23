@@ -1,10 +1,11 @@
-# Copy to a runtime-only file outside the repository (the NixOS deployment uses
-# /run/agenix/service-publication-backend). Do not put credentials here.
-bucket       = "<bootstrap>"
+# Accepted non-secret backend settings. Copy this payload into the encrypted
+# agenix source for /run/agenix/service-publication-backend. Supply AWS
+# authentication separately at runtime; never add credentials to this file.
+bucket       = "finntf-557459769096-us-east-1-an"
 key          = "service-publication/cloudflare.tfstate"
-region       = "<bootstrap>"
+region       = "us-east-1"
 encrypt      = true
 use_lockfile = true
 
-# For a compatible non-AWS S3 service, set endpoints.s3 and the documented
-# skip_* compatibility flags only after proving conditional-write locking.
+# S3 Object Lock is a bucket retention feature, not OpenTofu state locking.
+# use_lockfile relies on conditional writes and still needs a contention test.

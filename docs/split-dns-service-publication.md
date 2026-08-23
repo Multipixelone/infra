@@ -421,12 +421,14 @@ token or the ACME DNS credential. Scope the token only to the zone/account
 resources the generated configuration manages, and document the final scopes
 after provider requirements are verified.
 
-State is encrypted at rest in a remote S3-compatible backend with locking.
-Whether Cloudflare R2 is suitable remains undecided until its locking semantics
-with the selected OpenTofu backend are demonstrated. Use R2 only if locking is
-sufficient; otherwise use an S3 service that provides the required lock
-behavior. Backend bootstrap credentials are secrets and stay in agenix/runtime
-configuration.
+State uses the accepted AWS S3 bucket
+`finntf-557459769096-us-east-1-an` in `us-east-1`, with backend key
+`service-publication/cloudflare.tfstate`, `encrypt = true`, and
+`use_lockfile = true`. Bucket versioning and S3 Object Lock are enabled. Object
+Lock provides object-version retention, not OpenTofu writer coordination;
+OpenTofu's separate conditional-write lock behavior still requires contention
+and recovery testing. Backend authentication remains runtime-only and outside
+the repository.
 
 The repository must add OpenTofu-aware ignore rules, formatting, and checks when
 implementation begins. At minimum, ignore state, state backups, crash logs,

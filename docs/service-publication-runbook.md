@@ -3,9 +3,10 @@
 This runbook implements the accepted contract in
 [`split-dns-service-publication.md`](split-dns-service-publication.md). The Nix
 registry and all non-secret projections exist, but rollout remains deliberately
-disabled until the unresolved discovery and Cloudflare adoption inputs below
-are supplied by Finn. No command in this runbook has been run against a live
-host or Cloudflare account as part of the implementation.
+disabled until the remaining discovery and Cloudflare adoption inputs below
+are supplied by Finn. The accepted remote-state bucket is recorded below. No
+command in this runbook has been run against a live host, AWS account, or
+Cloudflare account as part of the implementation.
 
 ## Source and generated boundaries
 
@@ -44,9 +45,10 @@ Do not enable either rollout gate until this list is reviewed:
    an operator's temporary shell, never in this repository.
 5. Select the first public application and policy explicitly. The current
    registry makes Grafana and Homepage private; neither is implicitly a pilot.
-6. Choose an S3-compatible backend only after demonstrating conditional-write
-   locking with OpenTofu's `use_lockfile = true`. R2 remains unselected until
-   that behavior is proven. Enable bucket versioning and encryption.
+6. Use the accepted AWS S3 backend recorded under **Remote state bootstrap**.
+   Its storage features are confirmed, but OpenTofu lock contention and stale
+   lock recovery are not yet tested. Complete those tests before treating the
+   backend bootstrap as operationally verified.
 
 Fill `sites.nyc.routedLanCidrs`, `vpnClientCidrs`, and
 `networkInventoryConfirmed = true` only after item 1. Evaluate and deploy the
@@ -60,13 +62,13 @@ no compatibility aliases are generated.
 The Link NixOS configuration conditionally references these encrypted files in
 the private secrets input:
 
-| Encrypted source                                   | Runtime path                                     | Contract                                                                                                                                 |
-| -------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api` | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                   |
-| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`      | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete` |
-| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`  | raw existing Tunnel secret; never echo it                                                                                                |
-| `cloudflare/service-publication-backend.age`       | `/run/agenix/service-publication-backend`        | partial S3 backend HCL plus runtime backend credentials through the provider-supported environment                                       |
-| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`   | raw connector token, readable only by `cloudflared`                                                                                      |
+| Encrypted source                                   | Runtime path                                     | Contract                                                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api` | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                       |
+| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`      | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete`     |
+| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`  | raw existing Tunnel secret; never echo it                                                                                                    |
+| `cloudflare/service-publication-backend.age`       | `/run/agenix/service-publication-backend`        | partial S3 backend HCL with the accepted non-secret settings; AWS authentication is supplied separately through the runtime credential chain |
+| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`   | raw connector token, readable only by `cloudflared`                                                                                          |
 
 The ACME DNS-01 credential remains the existing, separate
 `cloudflare/acme-dns01.age`. A cloudflared connector token and ACME token must
@@ -80,16 +82,46 @@ and the exact resources in the reviewed plan before minting it.
 
 ## Remote state bootstrap
 
-1. Create a versioned, encrypted S3-compatible bucket outside this OpenTofu
-   state. Prove that two simultaneous test plans contend on the same lock object
-   and that a failed lock holder can be recovered without `-lock=false`.
-2. Start from `infra/service-publication/backend.hcl.example`. Keep the real
-   backend configuration in agenix. OpenTofu recommends native S3 locking with
-   `use_lockfile = true`; see the
+Current checklist (checked items are confirmed inputs, not evidence of a live
+OpenTofu initialization):
+
+- [x] AWS S3 bucket `finntf-557459769096-us-east-1-an` accepted in
+      `us-east-1` (`arn:aws:s3:::finntf-557459769096-us-east-1-an`).
+- [x] Bucket versioning enabled.
+- [x] S3 Object Lock enabled.
+- [x] Backend template selects key
+      `service-publication/cloudflare.tfstate`, `encrypt = true`, and
+      `use_lockfile = true`.
+- [ ] Conditional-write lock contention tested with two OpenTofu processes.
+- [ ] Failed/stale OpenTofu lock recovery tested without `-lock=false`.
+
+S3 Object Lock and OpenTofu locking solve different problems. Object Lock is an
+S3 retention/WORM feature for object versions; it does not coordinate OpenTofu
+writers. With `use_lockfile = true`, OpenTofu coordinates writers through a
+separate lock object and conditional S3 writes. The enabled Object Lock setting
+therefore does not prove that lock contention works, and those tests remain
+unchecked above.
+
+1. Do not recreate or reconfigure the accepted bucket from this OpenTofu state.
+2. Copy the exact payload from
+   `infra/service-publication/backend.hcl.example` into
+   `cloudflare/service-publication-backend.age` in the private secrets input.
+   Keep AWS credentials out of both files and supply authentication separately
+   at execution time through the standard AWS credential chain.
+
+   ```bash
+   cd /home/tunnel/Documents/Git/nix-secrets
+   agenix -e cloudflare/service-publication-backend.age -i /home/tunnel/.ssh/agenix
+   ```
+
+3. Before the backend is operationally accepted, prove that two simultaneous
+   test operations contend on the same lock object and that a failed lock holder
+   can be recovered without `-lock=false`. OpenTofu recommends native S3
+   locking with `use_lockfile = true`; see the
    [OpenTofu S3 backend documentation](https://opentofu.org/docs/language/settings/backends/s3/).
-3. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
+4. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
    progress. The configuration check blocks plans and applies.
-4. Initialize only through `scripts/service-publication/tofu.sh`; it rejects an
+5. Initialize only through `scripts/service-publication/tofu.sh`; it rejects an
    unreadable backend, missing runtime variables, or a backend without the lock
    flag. It never falls back to local state.
 
