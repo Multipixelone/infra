@@ -1,3 +1,12 @@
+{ lib, config, ... }:
+let
+  inherit (config) observability;
+  hub = config.hosts.${observability.hubHost};
+  privateDnsRecords =
+    observability.endpoints
+    |> lib.filterAttrs (_: endpoint: endpoint.dnsName != null && endpoint.exposure == "private")
+    |> lib.mapAttrs' (_: endpoint: lib.nameValuePair endpoint.dnsName hub.homeAddress);
+in
 {
   flake-file.inputs.blocklist = {
     url = "github:StevenBlack/hosts";
@@ -9,6 +18,7 @@
     let
       dnscryptPort = 6000;
       unboundPort = 5335;
+      isObservabilityHub = config.networking.hostName == observability.hubHost;
     in
     {
       # Disable systemd-resolved to allow blocky to bind to port 53
@@ -92,7 +102,19 @@
           ports.dns = [
             "127.0.0.1:53"
           ]
-          ++ lib.optionals (config.networking.hostName == "link") [ "10.100.0.1:53" ];
+          ++ lib.optionals isObservabilityHub [
+            "${hub.homeAddress}:53"
+            "${hub.wireguard.ipv4Address}:53"
+          ];
+
+          ports.http = lib.mkIf isObservabilityHub "127.0.0.1:${toString observability.endpoints.blocky.port}";
+
+          customDNS = lib.mkIf isObservabilityHub {
+            customTTL = "5m";
+            mapping = privateDnsRecords;
+          };
+
+          prometheus.enable = isObservabilityHub;
 
           upstreams.groups.default = [
             "127.0.0.1:${toString unboundPort}"
@@ -154,9 +176,9 @@
         # On link, prefer to start after wg0 so 10.100.0.1 is normally present.
         # `wants` (not `requires`) + ip_nonlocal_bind means a wg0 failure
         # degrades gracefully instead of taking blocky down.
-        ++ lib.optionals (config.networking.hostName == "link") [ "wireguard-wg0.service" ];
+        ++ lib.optionals isObservabilityHub [ "wireguard-wg0.service" ];
         requires = [ "unbound.service" ];
-        wants = lib.optionals (config.networking.hostName == "link") [ "wireguard-wg0.service" ];
+        wants = lib.optionals isObservabilityHub [ "wireguard-wg0.service" ];
       };
     };
 }

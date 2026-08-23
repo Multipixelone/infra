@@ -40,6 +40,11 @@ let
           default = [ ];
           description = "Roles or tags describing this host (e.g. desktop, laptop, server, mobile).";
         };
+        observabilityHub = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether this host is the explicitly designated observability hub.";
+        };
         description = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
           default = null;
@@ -102,6 +107,7 @@ in
     link = {
       isNixOS = true;
       roles = [ "desktop" ];
+      observabilityHub = true;
       description = "My desktop";
       manufacturer = "Custom";
       model = "Gaming PC";
