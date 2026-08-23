@@ -1,0 +1,42 @@
+{
+  "jobs": {
+    "validate": {
+      "permissions": {
+        "contents": "read"
+      },
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "uses": "opentofu/setup-opentofu@v1",
+          "with": {
+            "tofu_version": "1.12.5"
+          }
+        },
+        {
+          "name": "Format and validate without a backend",
+          "run": "tofu -chdir=infra/service-publication fmt -check -diff\ntofu -chdir=infra/service-publication init -backend=false\ntofu -chdir=infra/service-publication validate\n"
+        }
+      ]
+    }
+  },
+  "name": "Service publication",
+  "on": {
+    "pull_request": {
+      "paths": [
+        "infra/service-publication/**",
+        "lib/service-publication.nix",
+        "modules/service-publication/**"
+      ]
+    },
+    "push": {
+      "paths": [
+        "infra/service-publication/**",
+        "lib/service-publication.nix",
+        "modules/service-publication/**"
+      ]
+    }
+  }
+}

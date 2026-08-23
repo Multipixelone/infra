@@ -117,8 +117,25 @@ result-*
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
 # User Provided
+**/.terraform/*
+**/.tofu/*
+*.auto.tfvars
+*.auto.tfvars.json
+*.plan
+*.tfplan
+*.tfstate
+*.tfstate.*
+*_override.tf
+*_override.tf.json
+.terraformrc
 /.claude/settings.local.json
 /.pre-commit-config.yaml
 /result
 /result.*
+backend.hcl
+crash.*.log
+crash.log
+override.tf
+override.tf.json
+terraform.rc
 

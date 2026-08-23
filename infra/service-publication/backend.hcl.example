@@ -1,0 +1,10 @@
+# Copy to a runtime-only file outside the repository (the NixOS deployment uses
+# /run/agenix/service-publication-backend). Do not put credentials here.
+bucket       = "<bootstrap>"
+key          = "service-publication/cloudflare.tfstate"
+region       = "<bootstrap>"
+encrypt      = true
+use_lockfile = true
+
+# For a compatible non-AWS S3 service, set endpoints.s3 and the documented
+# skip_* compatibility flags only after proving conditional-write locking.
