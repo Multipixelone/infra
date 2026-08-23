@@ -520,13 +520,16 @@ in
         }
       '';
 
+      openclawMetricsRuntimeInputs = [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.systemd
+        pkgs.util-linux
+      ];
+
       openclawMetrics = pkgs.writeShellApplication {
         name = "openclaw-service-metrics";
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.systemd
-          pkgs.util-linux
-        ];
+        runtimeInputs = openclawMetricsRuntimeInputs;
         text = ''
           metrics_dir=/var/lib/prometheus-node-exporter-text-files
           metrics_tmp="$metrics_dir/openclaw.prom.tmp"
@@ -585,6 +588,7 @@ in
             echo "mcp-grafana is gated until ${runtimeGrafanaSecret} exists" >&2
             exit 1
           fi
+          # shellcheck disable=SC1091
           source ${runtimeGrafanaSecret}
           set +a
           export GRAFANA_URL="http://${grafana.backendAddress}:${toString grafana.port}"
@@ -614,8 +618,9 @@ in
 
       protectedTcpPorts = [ 53 ] ++ lib.optionals activationReady [ 443 ];
       firewallPortList = lib.concatMapStringsSep "," toString protectedTcpPorts;
-      firewallAccepts = lib.concatMapStrings (
-        cidr: "iptables -w -A nixos-observability -s ${cidr} -j nixos-fw-accept\n"
+      firewallLoopbackAccept = "iptables -w -A nixos-observability -i lo -s 127.0.0.0/8 -j nixos-fw-accept";
+      firewallClientAccepts = lib.concatMapStringsSep "\n" (
+        cidr: "iptables -w -A nixos-observability -s ${cidr} -j nixos-fw-accept"
       ) observability.trustedClientCidrs;
 
       telegramContactRouted = false;
@@ -633,6 +638,14 @@ in
         {
           assertion = observability.trustedClientCidrs == expectedCidrs;
           message = "DNS, firewall, and nginx must share only the three approved CIDRs.";
+        }
+        {
+          assertion = lib.hasInfix ''
+            ${firewallLoopbackAccept}
+            ${firewallClientAccepts}
+            iptables -w -A nixos-observability -j nixos-fw-refuse
+          '' config.networking.firewall.extraCommands;
+          message = "The observability firewall must accept IPv4 loopback before the exact trusted client CIDRs and refusal.";
         }
         {
           assertion = lib.all (endpoint: endpoint.backendAddress == "127.0.0.1") endpointList;
@@ -690,12 +703,21 @@ in
             && config.services.homepage-dashboard.openFirewall == false;
           message = "Prometheus, Loki, and Homepage must not expose their application ports.";
         }
+        {
+          assertion =
+            lib.elem pkgs.gawk openclawMetricsRuntimeInputs
+            &&
+              config.systemd.services.openclaw-service-metrics.serviceConfig.ExecStart
+              == lib.getExe openclawMetrics;
+          message = "The OpenClaw metrics unit must execute the generated script with gawk available at runtime.";
+        }
       ];
 
       networking.firewall = {
         extraCommands = ''
           iptables -w -N nixos-observability 2>/dev/null || iptables -w -F nixos-observability
-          ${firewallAccepts}
+          ${firewallLoopbackAccept}
+          ${firewallClientAccepts}
           iptables -w -A nixos-observability -j nixos-fw-refuse
           iptables -w -I nixos-fw 1 -p tcp -m multiport --dports ${firewallPortList} -j nixos-observability
           iptables -w -I nixos-fw 1 -p udp --dport 53 -j nixos-observability
