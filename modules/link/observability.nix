@@ -869,8 +869,10 @@ in
                     uid = "telegram-disabled-review";
                     type = "telegram";
                     disableResolveMessage = true;
-                    settings.chatid = "$TELEGRAM_CHAT_ID";
-                    secureSettings.bottoken = "$TELEGRAM_BOT_TOKEN";
+                    settings = {
+                      bottoken = "$TELEGRAM_BOT_TOKEN";
+                      chatid = "$TELEGRAM_CHAT_ID";
+                    };
                   }
                 ];
               }
