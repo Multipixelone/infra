@@ -45,6 +45,17 @@ let
       isProxy =
         hostName:
         ((hosts.${hostName} or { capabilities.reverseProxy = false; }).capabilities.reverseProxy or false);
+      internalDnsHosts =
+        siteName:
+        filter (
+          hostName: hostSite hostName == siteName && (hosts.${hostName}.capabilities.internalDns or false)
+        ) (attrNames hosts);
+      internalDnsAddress =
+        siteName:
+        let
+          candidates = internalDnsHosts siteName;
+        in
+        if length candidates == 1 then hostLan (head candidates) else null;
 
       canonicalFor =
         applicationName: application:
@@ -295,6 +306,7 @@ let
         scope = "internal";
         hostname = route.canonical;
         inherit (route) canonical alias;
+        resolverAddress = internalDnsAddress route.site;
         proxyAddress = route.proxy.lanAddress;
         path = route.health.path;
         expectedStatuses = route.health.expectedStatuses;
@@ -442,6 +454,9 @@ let
         ++ optional (
           length fallbacks != 1
         ) "site ${siteName}: exactly one capable default proxy is required"
+        ++ optional (
+          length (internalDnsHosts siteName) != 1
+        ) "site ${siteName}: exactly one internal DNS host is required"
       ) (attrNames sites);
 
       hostErrors = concatMap (

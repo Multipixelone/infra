@@ -18,7 +18,7 @@ writeShellApplication {
     registry_file=''${SERVICE_PUBLICATION_REGISTRY:-$repo_root/infra/service-publication/registry.json}
     context=''${1:-lan}
     route_filter=''${2:-}
-    blocky_address=''${SERVICE_PUBLICATION_BLOCKY_ADDRESS:-}
+    blocky_address_override=''${SERVICE_PUBLICATION_BLOCKY_ADDRESS:-}
 
     case "$context" in
     lan | vpn | external) ;;
@@ -42,10 +42,6 @@ writeShellApplication {
     if [[ $context == external ]]; then
       mapfile -t routes < <(jq -c --arg route "$route_filter" ".externalProbes[] | $select_filter" "$registry_file")
     else
-      if [[ -z $blocky_address ]]; then
-        echo "SERVICE_PUBLICATION_BLOCKY_ADDRESS is required for $context probes" >&2
-        exit 1
-      fi
       mapfile -t routes < <(jq -c --arg route "$route_filter" ".internalProbes[] | $select_filter" "$registry_file")
     fi
 
@@ -82,6 +78,12 @@ writeShellApplication {
         fi
       else
         proxy=$(jq -r .proxyAddress <<<"$route")
+        resolver=$(jq -r .resolverAddress <<<"$route")
+        blocky_address=''${blocky_address_override:-$resolver}
+        if [[ -z $blocky_address || $blocky_address == null ]]; then
+          echo "$key: generated internal probe has no Blocky resolver address" >&2
+          exit 1
+        fi
         answer=$(dig "@$blocky_address" +short "$hostname" A | tail -n 1)
         [[ $answer == "$proxy" ]] || {
           echo "$key: $context DNS returned '$answer', expected '$proxy'" >&2

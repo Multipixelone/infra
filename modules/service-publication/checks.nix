@@ -143,6 +143,7 @@ in
               .metadata.containsSecrets == false and
               .errors == [] and
               (.blockyRecords["grafana.nyc.finnrut.is"] == "192.168.6.6") and
+              ([.internalProbes[].resolverAddress] | unique == ["192.168.6.6"]) and
               (.cloudflare.dnsRecords == {}) and
               ([paths(strings) as $p | getpath($p) | select(endswith(".home.finnrut.is"))] | length == 0)
             ' registry.json >/dev/null

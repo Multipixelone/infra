@@ -126,6 +126,26 @@ args@{
         servicePublicationTofu = servicePublicationTofuTool;
         servicePublicationValidate = servicePublicationValidateTool;
       };
+      servicePublicationPlanOnlyTestTool =
+        pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy"
+          {
+            colmena = colmenaPackage;
+            servicePublicationSmoke = pkgs.writeShellApplication {
+              name = "service-publication-smoke";
+              text = ''
+                echo "plan-only invoked smoke probes" >&2
+                exit 1
+              '';
+            };
+            servicePublicationTofu = pkgs.writeShellApplication {
+              name = "service-publication-tofu";
+              text = "exit 0";
+            };
+            servicePublicationValidate = pkgs.writeShellApplication {
+              name = "service-publication-validate";
+              text = "exit 0";
+            };
+          };
     in
     {
       make-shells.default.packages = [ pkgs.opentofu ];
@@ -274,6 +294,21 @@ args@{
               path = servicePublicationValidateTool;
             }
           ];
+
+      checks.service-publication-plan-only =
+        pkgs.runCommand "service-publication-plan-only-check"
+          {
+            deploy = servicePublicationPlanOnlyTestTool;
+            nativeBuildInputs = [ pkgs.gitMinimal ];
+          }
+          ''
+            set -euo pipefail
+            mkdir source
+            cd source
+            git init --quiet
+            env -u SERVICE_PUBLICATION_BLOCKY_ADDRESS "$deploy/bin/service-publication-deploy" plan-only
+            touch "$out"
+          '';
 
       # Building writeShellApplication runs its generated-script shellcheck.
       checks.shell-applications = pkgs.linkFarm "shell-applications-check" [
@@ -661,6 +696,7 @@ args@{
             "service-publication-formatting"
             "service-publication-tofu"
             "service-publication-shell-applications"
+            "service-publication-plan-only"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
             "service-publication-tunnel-adoption"

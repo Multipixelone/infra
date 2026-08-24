@@ -236,9 +236,10 @@ probe the local origin before the locked OpenTofu plan is applied. Removals
 withdraw Cloudflare reachability first. Mixed add/remove changes are rejected
 so the ordering cannot be ambiguous.
 
-Required runtime probe inputs are:
+Runtime probe inputs are:
 
-- `SERVICE_PUBLICATION_BLOCKY_ADDRESS` for LAN probes;
+- `SERVICE_PUBLICATION_BLOCKY_ADDRESS` optionally overrides the declarative
+  internal-DNS host address for diagnostic LAN probes;
 - `SERVICE_PUBLICATION_VPN_PROBE_COMMAND`, executed on a genuine VPN client and
   expected to run the generated inventory's VPN checks; and
 - `SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND` for public routes, executed
