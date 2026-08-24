@@ -270,6 +270,7 @@ in
           type ? "timeseries",
           datasource ? "prometheus",
           legend ? "{{instance}}",
+          unit ? null,
           x ? 0,
           y ? 0,
           w ? 12,
@@ -293,7 +294,7 @@ in
               legendFormat = legend;
             }
           ];
-          fieldConfig.defaults = { };
+          fieldConfig.defaults = lib.optionalAttrs (unit != null) { inherit unit; };
           options = { };
         };
 
@@ -360,6 +361,7 @@ in
               id = 4;
               title = "Memory used";
               expr = "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes";
+              unit = "gbytes";
               y = 8;
               x = 12;
             })
@@ -367,6 +369,7 @@ in
               id = 5;
               title = "Root filesystem free";
               expr = ''node_filesystem_avail_bytes{mountpoint="/"}'';
+              unit = "gbytes";
               y = 16;
               w = 24;
             })
