@@ -298,6 +298,7 @@ in
       cloudflare = {
         accountId = "4b74fb7e0a35c9c1148bf0434d7fdffa";
         zoneId = "d8bb324032c2738ff17efde63e9a7988";
+        tunnelName = "link";
         adoptionComplete = false;
       };
 
