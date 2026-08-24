@@ -64,14 +64,13 @@ no compatibility aliases are generated.
 The Link NixOS configuration conditionally references these encrypted files in
 the private secrets input:
 
-| Encrypted source                                   | Runtime path                                        | Contract                                                                                                                                 |
-| -------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                   |
-| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`     | raw existing Tunnel secret; never echo it                                                                                                |
-| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                      |
-| `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
+| Encrypted source                                  | Runtime path                                        | Contract                                                                                                                                 |
+| ------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare/service-publication-api.age`          | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                   |
+| `cloudflare/service-publication-tunnel-token.age` | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                      |
+| `aws/service-publication-state-credentials.age`   | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
 
-The three OpenTofu runtime files declared in
+The two OpenTofu runtime files declared in
 `modules/service-publication/runtime.nix` are owned by the repository operator
 and installed with mode `0400`. The separately managed connector token is
 declared by `modules/service-publication/nixos.nix` and remains readable only
@@ -80,18 +79,26 @@ by `cloudflared`.
 The non-secret OpenTofu values have one source of truth in
 `servicePublication.cloudflare` in `modules/service-publication/registry.nix`:
 
-| Nix option                                       | Current value | Required value                                      |
-| ------------------------------------------------ | ------------- | --------------------------------------------------- |
-| `servicePublication.cloudflare.accountId`        | `null`        | the existing Cloudflare account ID                  |
-| `servicePublication.cloudflare.zoneId`           | `null`        | the existing `finnrut.is` zone ID                   |
-| `servicePublication.cloudflare.tunnelName`       | `null`        | the exact name of the existing Tunnel being adopted |
-| `servicePublication.cloudflare.adoptionComplete` | `false`       | `true` only after the reviewed adoption plan below  |
+| Nix option                                       | Current value                      | Required value                                      |
+| ------------------------------------------------ | ---------------------------------- | --------------------------------------------------- |
+| `servicePublication.cloudflare.accountId`        | `4b74fb7e0a35c9c1148bf0434d7fdffa` | the existing Cloudflare account ID                  |
+| `servicePublication.cloudflare.zoneId`           | `null`                             | the existing `finnrut.is` zone ID                   |
+| `servicePublication.cloudflare.tunnelName`       | `null`                             | the exact name of the existing Tunnel being adopted |
+| `servicePublication.cloudflare.adoptionComplete` | `false`                            | `true` only after the reviewed adoption plan below  |
 
 The wrapper receives these values from a generated Nix-store file. It refuses
 to initialize OpenTofu when any identifier is still `null`. Enabling
 `adoptionComplete` also makes Nix evaluation assert that all three identifiers
-are declared. Credentials and the raw Tunnel secret never enter that file or
-the Nix store.
+are declared. Credentials never enter that file or the Nix store.
+
+The provider lock selects Cloudflare provider v5.23.0. Its
+[Tunnel resource schema](https://registry.terraform.io/providers/cloudflare/cloudflare/5.23.0/docs/resources/zero_trust_tunnel_cloudflared)
+makes `tunnel_secret` optional and defines it as the password for a locally
+managed Tunnel. The adopted Link Tunnel is remotely managed
+(`config_src = "cloudflare"`), so the OpenTofu configuration intentionally
+omits `tunnel_secret` and does not provision a corresponding agenix secret. The
+dashboard-created connector token is a different credential: it is consumed
+only by `cloudflared` and must not be supplied as `tunnel_secret`.
 
 The ACME DNS-01 credential remains the existing, separate
 `cloudflare/acme-dns01.age`. A cloudflared connector token and ACME token must
@@ -183,9 +190,13 @@ validation only for that non-apply operation; normal plans and applies remain
 blocked until `servicePublication.cloudflare.adoptionComplete` is `true`.
 
 Provider import formats can change; confirm them against the pinned provider's
-resource documentation immediately before use. Application-scoped Access
-policies in Cloudflare provider v5 are inline on the Access application. Follow
-the provider's
+resource documentation immediately before use. For v5.23.0, the Tunnel import
+format is `<account_id>/<tunnel_uuid>`. The imported Tunnel retains
+`config_src = "cloudflare"`; its lifecycle has `prevent_destroy = true`, and the
+wrapper rejects every plan containing a replacement. Treat any proposed Tunnel
+replacement as an adoption blocker rather than applying it. Application-scoped
+Access policies in Cloudflare provider v5 are inline on the Access application.
+Follow the provider's
 [v5 migration guidance](https://github.com/cloudflare/terraform-provider-cloudflare/blob/main/docs/guides/version-5-migration.md)
 and never apply an intermediate plan that detaches policies.
 

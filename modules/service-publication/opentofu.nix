@@ -236,7 +236,6 @@
             printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare-api.env"
             printf '%s\n' "IGNORED=value" > "$tmpdir/cloudflare-api-missing.env"
             printf '%s\n' "CLOUDFLARE_API_TOKEN=" > "$tmpdir/cloudflare-api-empty.env"
-            printf '%s\n' "tunnel-secret" > "$tmpdir/tunnel.secret"
             printf '%s\n' "AWS_SECRET_ACCESS_KEY=secret" > "$tmpdir/aws-missing.env"
             printf '%s\n' "AWS_ACCESS_KEY_ID=" > "$tmpdir/aws-empty.env"
             printf '%s\n' "AWS_SECRET_ACCESS_KEY=" >> "$tmpdir/aws-empty.env"
@@ -253,7 +252,6 @@
               SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/$aws_file" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-                SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
                 "$tofu" plan >"$capture_file" 2>&1
               status=$?
               set -e
@@ -281,7 +279,6 @@
             SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
               SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-absent.env" \
               SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-              SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
               "$tofu" plan >"$absent_capture" 2>&1
             absent_status=$?
             set -e
@@ -308,7 +305,6 @@
                 SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/$cloudflare_file" \
-                SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
                 "$tofu" plan >"$capture_file" 2>&1
               status=$?
               set -e
@@ -335,7 +331,6 @@
             SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
               SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
               SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-              SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
               bash -x "$tofu" plan >"$trace_capture" 2>&1
             trace_status=$?
             set -e
@@ -348,12 +343,17 @@
               echo "traced credential test reached tofu init" >&2
               exit 1
             fi
-            for secret_value in trace-access-key trace-secret-key example-token tunnel-secret; do
+            for secret_value in trace-access-key trace-secret-key example-token; do
               if grep -Fq "$secret_value" "$trace_capture"; then
                 echo "traced credential test exposed a runtime secret" >&2
                 exit 1
               fi
             done
+
+            if grep -Eq 'SERVICE_PUBLICATION_TUNNEL_SECRET_FILE|TF_VAR_tunnel_secret|service-publication-tunnel-secret' "$tofu"; then
+              echo "service-publication-tofu still depends on an unnecessary Tunnel secret" >&2
+              exit 1
+            fi
 
             touch "$out"
           '';
@@ -375,7 +375,6 @@
               "AWS_ACCESS_KEY_ID=example-access-key" \
               "AWS_SECRET_ACCESS_KEY=example-secret-key" > "$tmpdir/aws.env"
             printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare.env"
-            printf '%s\n' "example-tunnel-secret" > "$tmpdir/tunnel.secret"
 
             run_wrapper() {
               wrapper=$1
@@ -383,7 +382,6 @@
               SERVICE_PUBLICATION_REPO_ROOT="$tmpdir" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws.env" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare.env" \
-                SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
                 SERVICE_PUBLICATION_TEST_TOFU_LOG="$tmpdir/tofu.log" \
                 "$wrapper" "$@"
             }
@@ -421,10 +419,23 @@
               exit 1
             fi
 
-            SERVICE_PUBLICATION_IMPORT_ID=example-import-id \
+            set +e
+            SERVICE_PUBLICATION_IMPORT_ID=wrong-account/example-tunnel-uuid \
+              run_wrapper "$gateTofu" import cloudflare_zero_trust_tunnel_cloudflared.managed \
+              > "$tmpdir/tunnel-import-shape.out" 2>&1
+            tunnel_import_shape_status=$?
+            set -e
+            if [ "$tunnel_import_shape_status" -eq 0 ] \
+              || ! grep -Fq "Tunnel import ID must be <account_id>/<tunnel_uuid>" "$tmpdir/tunnel-import-shape.out"; then
+              echo "Tunnel import accepted an ID outside <account_id>/<tunnel_uuid>" >&2
+              cat "$tmpdir/tunnel-import-shape.out" >&2
+              exit 1
+            fi
+
+            SERVICE_PUBLICATION_IMPORT_ID=example-account-id/example-tunnel-uuid \
               run_wrapper "$gateTofu" import 'cloudflare_zero_trust_tunnel_cloudflared.managed'
             grep -Fq 'init -reconfigure -backend-config=' "$tmpdir/tofu.log"
-            grep -Fq 'import -lock=true -var=bootstrap_complete=true cloudflare_zero_trust_tunnel_cloudflared.managed example-import-id' "$tmpdir/tofu.log"
+            grep -Fq 'import -lock=true -var=bootstrap_complete=true cloudflare_zero_trust_tunnel_cloudflared.managed example-account-id/example-tunnel-uuid' "$tmpdir/tofu.log"
 
             if grep -Fq '/run/agenix/service-publication-bootstrap' "$tofu"; then
               echo "service-publication-tofu still depends on the obsolete agenix bootstrap file" >&2
@@ -432,6 +443,36 @@
             fi
             if grep -Fq 'SERVICE_PUBLICATION_BOOTSTRAP_ENV' "$tofu"; then
               echo "service-publication-tofu still accepts an out-of-band bootstrap override" >&2
+              exit 1
+            fi
+
+            touch "$out"
+          '';
+
+      checks.service-publication-tunnel-adoption =
+        pkgs.runCommand "service-publication-tunnel-adoption"
+          {
+            src = ../..;
+            nativeBuildInputs = [ pkgs.ripgrep ];
+          }
+          ''
+            set -euo pipefail
+            cp -r "$src" source
+
+            main=source/infra/service-publication/main.tf
+            wrapper=source/pkgs/service-publication-tofu/default.nix
+
+            rg -F 'resource "cloudflare_zero_trust_tunnel_cloudflared" "managed"' "$main"
+            rg -F 'config_src = "cloudflare"' "$main"
+            rg -F 'prevent_destroy = true' "$main"
+            rg -F 'replacement_count' "$wrapper"
+            rg -F 'Tunnel import ID must be <account_id>/<tunnel_uuid>' "$wrapper"
+
+            if rg -n 'tunnel_secret|service-publication-tunnel-secret|SERVICE_PUBLICATION_TUNNEL_SECRET_FILE' \
+              source/infra/service-publication \
+              source/modules/service-publication/runtime.nix \
+              source/pkgs/service-publication-tofu; then
+              echo "remotely managed Tunnel adoption still requires a locally managed Tunnel secret" >&2
               exit 1
             fi
 

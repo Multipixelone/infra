@@ -24,7 +24,6 @@ writeShellApplication {
     variables_file=${variablesConfig}
     aws_credentials_env=''${SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV:-/run/agenix/service-publication-state-credentials}
     cloudflare_api_env=''${SERVICE_PUBLICATION_CLOUDFLARE_API_ENV:-/run/agenix/service-publication-cloudflare-api}
-    tunnel_secret_file=''${SERVICE_PUBLICATION_TUNNEL_SECRET_FILE:-/run/agenix/service-publication-tunnel-secret}
     action=''${1:-plan}
 
     case "$action" in
@@ -35,7 +34,7 @@ writeShellApplication {
       ;;
     esac
 
-    for runtime_file in "$aws_credentials_env" "$cloudflare_api_env" "$tunnel_secret_file"; do
+    for runtime_file in "$aws_credentials_env" "$cloudflare_api_env"; do
       if [[ ! -r $runtime_file ]]; then
         echo "service publication bootstrap blocker: unreadable runtime file $runtime_file" >&2
         exit 1
@@ -70,14 +69,11 @@ writeShellApplication {
     # shellcheck disable=SC1090
     source "$cloudflare_api_env"
     set +a
-    export TF_VAR_tunnel_secret
-    TF_VAR_tunnel_secret=$(<"$tunnel_secret_file")
 
     required_vars=(
       AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY
       CLOUDFLARE_API_TOKEN
-      TF_VAR_tunnel_secret
     )
     for variable in "''${required_vars[@]}"; do
       if [[ -z ''${!variable:-} ]]; then
@@ -149,6 +145,12 @@ writeShellApplication {
         echo "import ID is empty" >&2
         exit 1
       }
+      declarative_account_id=''${TF_VAR_cloudflare_account_id:-}
+      if [[ $1 == cloudflare_zero_trust_tunnel_cloudflared.managed \
+        && $SERVICE_PUBLICATION_IMPORT_ID != "$declarative_account_id/"?* ]]; then
+        echo "Tunnel import ID must be <account_id>/<tunnel_uuid> for the declarative Cloudflare account" >&2
+        exit 1
+      fi
       tofu -chdir="$tofu_root" import -lock=true -var=bootstrap_complete=true "$1" "$SERVICE_PUBLICATION_IMPORT_ID"
       unset SERVICE_PUBLICATION_IMPORT_ID
       ;;

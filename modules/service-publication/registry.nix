@@ -295,6 +295,11 @@ in
       # These are target identities, not permission to deploy. Policy
       # definitions intentionally remain empty until Finn confirms the
       # adoption inputs documented in the runbook.
+      cloudflare = {
+        accountId = "4b74fb7e0a35c9c1148bf0434d7fdffa";
+        adoptionComplete = false;
+      };
+
       sites.nyc = {
         internalZone = "nyc.finnrut.is";
         routedLanCidrs = [

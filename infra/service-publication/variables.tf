@@ -13,12 +13,6 @@ variable "tunnel_name" {
   description = "Name of the existing adopted service-publication Tunnel."
 }
 
-variable "tunnel_secret" {
-  type        = string
-  sensitive   = true
-  description = "Existing Tunnel secret supplied at runtime; remote encrypted state will contain a sensitive value."
-}
-
 variable "bootstrap_complete" {
   type        = bool
   description = "Declarative adoption gate; true only after remote locking and imports are proven."

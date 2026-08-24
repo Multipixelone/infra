@@ -87,10 +87,9 @@ resource "cloudflare_zero_trust_access_application" "managed" {
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "managed" {
-  account_id    = var.cloudflare_account_id
-  name          = var.tunnel_name
-  config_src    = "cloudflare"
-  tunnel_secret = var.tunnel_secret
+  account_id = var.cloudflare_account_id
+  name       = var.tunnel_name
+  config_src = "cloudflare"
 
   lifecycle {
     prevent_destroy = true
