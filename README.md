@@ -92,7 +92,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (35)</summary>
+<summary>Packages exposed by this flake (38)</summary>
 
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
@@ -123,6 +123,9 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`rtk-rewrite`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/rtk-rewrite.nix) · `nix run github:Multipixelone/infra#rtk-rewrite`
 - [`screenshot-area`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area`
 - [`screenshot-area-ocr`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area-ocr`
+- [`service-publication-deploy`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run the full service publication deploy flow · `nix run github:Multipixelone/infra#service-publication-deploy`
+- [`service-publication-smoke`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run service publication smoke probes · `nix run github:Multipixelone/infra#service-publication-smoke`
+- [`service-publication-tofu`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run OpenTofu operations for service publication · `nix run github:Multipixelone/infra#service-publication-tofu`
 - [`system`](https://github.com/Multipixelone/infra/blob/main/modules/nix/utils.nix) · `nix run github:Multipixelone/infra#system`
 - [`transparent-cursor-theme`](https://github.com/Multipixelone/infra/blob/main/modules/marin/greetd.nix) — Transparent cursor theme for Cage/Wayland sessions · `nix run github:Multipixelone/infra#transparent-cursor-theme`
 - [`upload-script`](https://github.com/Multipixelone/infra/blob/main/modules/shell/0x0.nix) · `nix run github:Multipixelone/infra#upload-script`
