@@ -176,6 +176,8 @@
             trap 'rm -rf "$tmpdir"' EXIT
 
             printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare-api.env"
+            printf '%s\n' "IGNORED=value" > "$tmpdir/cloudflare-api-missing.env"
+            printf '%s\n' "CLOUDFLARE_API_TOKEN=" > "$tmpdir/cloudflare-api-empty.env"
             printf '%s\n' \
               "TF_VAR_bootstrap_complete=true" \
               "TF_VAR_cloudflare_account_id=example-account-id" \
@@ -244,6 +246,36 @@
 
             run_case missing "aws-missing.env"
             run_case empty "aws-empty.env"
+
+            run_cloudflare_case() {
+              label=$1
+              cloudflare_file=$2
+              capture_file="$tmpdir/cloudflare-$label.out"
+
+              set +e
+              CLOUDFLARE_API_TOKEN=ambient-token \
+                SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
+                SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
+                SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/$cloudflare_file" \
+                SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
+                SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
+                "$tofu" plan >"$capture_file" 2>&1
+              status=$?
+              set -e
+
+              if [ "$status" -eq 0 ] || ! grep -Fq "CLOUDFLARE_API_TOKEN is unset" "$capture_file"; then
+                echo "$label Cloudflare credential unexpectedly passed validation" >&2
+                cat "$capture_file" >&2
+                exit 1
+              fi
+              if [ -e infra/service-publication/.terraform ]; then
+                echo "$label Cloudflare credential reached tofu init" >&2
+                exit 1
+              fi
+            }
+
+            run_cloudflare_case missing "cloudflare-api-missing.env"
+            run_cloudflare_case empty "cloudflare-api-empty.env"
 
             # Even an explicitly traced invocation must stop tracing before it
             # sources any runtime file. Keep bootstrap false so this proof also
