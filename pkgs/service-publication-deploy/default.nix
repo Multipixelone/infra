@@ -3,11 +3,10 @@
   colmena,
   coreutils,
   gitMinimal,
-  gitleaks,
   jq,
-  nix,
   servicePublicationSmoke,
   servicePublicationTofu,
+  servicePublicationValidate,
   sudo,
   writeShellApplication,
 }:
@@ -18,11 +17,10 @@ writeShellApplication {
     colmena
     coreutils
     gitMinimal
-    gitleaks
     jq
-    nix
     servicePublicationSmoke
     servicePublicationTofu
+    servicePublicationValidate
     sudo
   ];
   text = ''
@@ -45,12 +43,7 @@ writeShellApplication {
 
     stage() { printf '\n==> %s\n' "$1"; }
 
-    stage "validate registry, generated files, formatting, OpenTofu, and secrets"
-    nix run .#generate-files
-    git diff --exit-code -- .gitignore flake.nix "$registry" .github README.md .envrc
-    nix fmt -- --ci
-    gitleaks git --redact --verbose
-    nix flake check
+    service-publication-validate
 
     if [[ $mode == plan-only ]]; then
       stage "review Cloudflare plan (no host deployment or apply)"

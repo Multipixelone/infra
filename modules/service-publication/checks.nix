@@ -148,5 +148,18 @@ in
             ' registry.json >/dev/null
             touch "$out"
           '';
+
+      checks.service-publication-registry-generated =
+        pkgs.runCommand "service-publication-registry-generated-check"
+          {
+            src = ../..;
+            registry = builtins.toJSON checkedInventory + "\n";
+          }
+          ''
+            set -euo pipefail
+            printf '%s' "$registry" > expected-registry.json
+            cmp expected-registry.json "$src/infra/service-publication/registry.json"
+            touch "$out"
+          '';
     };
 }

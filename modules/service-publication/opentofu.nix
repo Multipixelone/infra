@@ -1,4 +1,4 @@
-{
+args@{
   config,
   inputs,
   lib,
@@ -27,7 +27,12 @@
   ];
 
   perSystem =
-    { pkgs, ... }:
+    {
+      config,
+      pkgs,
+      self',
+      ...
+    }:
     let
       tofuRoot = "infra/service-publication";
       tofu = lib.getExe pkgs.opentofu;
@@ -65,7 +70,7 @@
           variablesConfig = mkServicePublicationVariables "service-publication-variables.env" cloudflare;
         };
       servicePublicationTofuTool = mkServicePublicationTofuTool {
-        cloudflare = config.servicePublication.cloudflare;
+        cloudflare = args.config.servicePublication.cloudflare;
       };
       servicePublicationTestCloudflare = {
         accountId = "example-account-id";
@@ -112,10 +117,14 @@
         )
       );
       servicePublicationSmokeTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-smoke" { };
+      servicePublicationValidateTool =
+        pkgs.callPackage "${rootPath}/pkgs/service-publication-validate"
+          { };
       servicePublicationDeployTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy" {
         colmena = colmenaPackage;
         servicePublicationSmoke = servicePublicationSmokeTool;
         servicePublicationTofu = servicePublicationTofuTool;
+        servicePublicationValidate = servicePublicationValidateTool;
       };
     in
     {
@@ -124,6 +133,7 @@
       packages = {
         service-publication-tofu = servicePublicationTofuTool;
         service-publication-smoke = servicePublicationSmokeTool;
+        service-publication-validate = servicePublicationValidateTool;
         service-publication-deploy = servicePublicationDeployTool;
       };
 
@@ -135,6 +145,10 @@
         service-publication-smoke = {
           program = servicePublicationSmokeTool;
           meta.description = "Run service publication smoke probes";
+        };
+        service-publication-validate = {
+          program = servicePublicationValidateTool;
+          meta.description = "Run focused, provider-safe service publication validation";
         };
         service-publication-deploy = {
           program = servicePublicationDeployTool;
@@ -203,6 +217,63 @@
             # and deployment wrapper; Nix builds are deliberately networkless.
             touch "$out"
           '';
+
+      checks.service-publication-workflow-generated =
+        pkgs.runCommand "service-publication-workflow-generated-check"
+          {
+            src = ../..;
+            workflow = config.files.file.${workflowPath}.source;
+          }
+          ''
+            set -euo pipefail
+            cmp "$workflow" "$src/${workflowPath}"
+            touch "$out"
+          '';
+
+      checks.service-publication-formatting =
+        pkgs.runCommand "service-publication-formatting-check"
+          {
+            src = ../..;
+            nativeBuildInputs = [ self'.formatter ];
+          }
+          ''
+            set -euo pipefail
+            cp -r "$src" source
+            chmod -R u+w source
+            cd source
+            treefmt --ci \
+              docs/service-publication-runbook.md \
+              docs/split-dns-service-publication.md \
+              infra/service-publication \
+              lib/service-publication.nix \
+              modules/service-publication \
+              pkgs/service-publication-deploy \
+              pkgs/service-publication-smoke \
+              pkgs/service-publication-tofu \
+              pkgs/service-publication-validate
+            touch "$out"
+          '';
+
+      checks.service-publication-shell-applications =
+        pkgs.linkFarm "service-publication-shell-applications-check"
+          [
+            {
+              name = "service-publication-deploy";
+              path = servicePublicationDeployTool;
+            }
+            {
+              name = "service-publication-smoke";
+              path = servicePublicationSmokeTool;
+            }
+            {
+              name = "service-publication-tofu";
+              path = servicePublicationTofuTool;
+            }
+            {
+              name = "service-publication-validate";
+              path = servicePublicationValidateTool;
+            }
+          ];
 
       # Building writeShellApplication runs its generated-script shellcheck.
       checks.shell-applications = pkgs.linkFarm "shell-applications-check" [
@@ -576,6 +647,26 @@
 
             touch "$out"
           '';
+
+      checks.service-publication-validation = pkgs.linkFarm "service-publication-validation-check" (
+        map
+          (name: {
+            inherit name;
+            path = self'.checks.${name};
+          })
+          [
+            "service-publication-registry"
+            "service-publication-registry-generated"
+            "service-publication-workflow-generated"
+            "service-publication-formatting"
+            "service-publication-tofu"
+            "service-publication-shell-applications"
+            "service-publication-tofu-credentials"
+            "service-publication-tofu-declarative-config"
+            "service-publication-tunnel-adoption"
+            "service-publication-tofu-backend"
+          ]
+      );
 
       checks.no-raw-shell-scripts =
         pkgs.runCommand "no-raw-shell-scripts"
