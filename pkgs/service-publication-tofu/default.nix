@@ -1,4 +1,5 @@
 {
+  backendConfig,
   coreutils,
   gitMinimal,
   gnugrep,
@@ -18,7 +19,7 @@ writeShellApplication {
   text = ''
     repo_root=''${SERVICE_PUBLICATION_REPO_ROOT:-$(git rev-parse --show-toplevel)}
     tofu_root="$repo_root/infra/service-publication"
-    backend_file=''${SERVICE_PUBLICATION_BACKEND_FILE:-/run/agenix/service-publication-backend}
+    backend_file=${backendConfig}
     aws_credentials_env=''${SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV:-/run/agenix/service-publication-state-credentials}
     cloudflare_api_env=''${SERVICE_PUBLICATION_CLOUDFLARE_API_ENV:-/run/agenix/service-publication-cloudflare-api}
     bootstrap_env=''${SERVICE_PUBLICATION_BOOTSTRAP_ENV:-/run/agenix/service-publication-bootstrap}
@@ -33,7 +34,7 @@ writeShellApplication {
       ;;
     esac
 
-    for runtime_file in "$backend_file" "$aws_credentials_env" "$cloudflare_api_env" "$bootstrap_env" "$tunnel_secret_file"; do
+    for runtime_file in "$aws_credentials_env" "$cloudflare_api_env" "$bootstrap_env" "$tunnel_secret_file"; do
       if [[ ! -r $runtime_file ]]; then
         echo "service publication bootstrap blocker: unreadable runtime file $runtime_file" >&2
         exit 1

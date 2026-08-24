@@ -34,7 +34,16 @@
       workflowPath = ".github/workflows/service-publication.yaml";
       colmenaPackage = inputs.colmena.packages.${pkgs.stdenv.hostPlatform.system}.colmena;
       choreopsTodoistSyncTool = pkgs.callPackage "${rootPath}/pkgs/choreops-todoist-sync" { };
-      servicePublicationTofuTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-tofu" { };
+      servicePublicationBackendConfig = pkgs.writeText "service-publication-backend.hcl" ''
+        bucket       = "finntf-557459769096-us-east-1-an"
+        key          = "service-publication/cloudflare.tfstate"
+        region       = "us-east-1"
+        encrypt      = true
+        use_lockfile = true
+      '';
+      servicePublicationTofuTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-tofu" {
+        backendConfig = servicePublicationBackendConfig;
+      };
       servicePublicationSmokeTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-smoke" { };
       servicePublicationDeployTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy" {
         colmena = colmenaPackage;
@@ -74,7 +83,6 @@
       treefmt.settings.global.excludes = [
         workflowPath
         "${tofuRoot}/.terraform.lock.hcl"
-        "${tofuRoot}/backend.hcl.example"
         "${tofuRoot}/registry.json"
       ];
 
@@ -167,7 +175,6 @@
             tmpdir="$(mktemp -d)"
             trap 'rm -rf "$tmpdir"' EXIT
 
-            printf '%s\n' "use_lockfile = true" > "$tmpdir/backend.hcl"
             printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare-api.env"
             printf '%s\n' \
               "TF_VAR_bootstrap_complete=true" \
@@ -188,8 +195,7 @@
               capture_file="$tmpdir/credential-$label.out"
 
               set +e
-              SERVICE_PUBLICATION_BACKEND_FILE="$tmpdir/backend.hcl" \
-                SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
+              SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/$aws_file" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
                 SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
@@ -209,7 +215,32 @@
                 cat "$capture_file" >&2
                 exit 1
               fi
+
+              if [ -e infra/service-publication/.terraform ]; then
+                echo "$label reached tofu init before credential validation" >&2
+                exit 1
+              fi
             }
+
+            absent_capture="$tmpdir/credential-absent.out"
+            set +e
+            SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
+              SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-absent.env" \
+              SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
+              SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
+              SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
+              "$tofu" plan >"$absent_capture" 2>&1
+            absent_status=$?
+            set -e
+            if [ "$absent_status" -eq 0 ] || ! grep -Fq "unreadable runtime file $tmpdir/aws-absent.env" "$absent_capture"; then
+              echo "absent AWS credential file did not fail at the readability gate" >&2
+              cat "$absent_capture" >&2
+              exit 1
+            fi
+            if [ -e infra/service-publication/.terraform ]; then
+              echo "absent AWS credential file reached tofu init" >&2
+              exit 1
+            fi
 
             run_case missing "aws-missing.env"
             run_case empty "aws-empty.env"
@@ -220,8 +251,7 @@
             sed -i 's/TF_VAR_bootstrap_complete=true/TF_VAR_bootstrap_complete=false/' "$tmpdir/bootstrap.env"
             trace_capture="$tmpdir/credential-trace.out"
             set +e
-            SERVICE_PUBLICATION_BACKEND_FILE="$tmpdir/backend.hcl" \
-              SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
+            SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
               SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
               SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
               SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
@@ -234,12 +264,46 @@
               echo "traced credential test did not fail at the pre-init adoption gate" >&2
               exit 1
             fi
+            if [ -e infra/service-publication/.terraform ]; then
+              echo "traced credential test reached tofu init" >&2
+              exit 1
+            fi
             for secret_value in trace-access-key trace-secret-key example-token tunnel-secret; do
               if grep -Fq "$secret_value" "$trace_capture"; then
                 echo "traced credential test exposed a runtime secret" >&2
                 exit 1
               fi
             done
+
+            touch "$out"
+          '';
+
+      checks.service-publication-tofu-backend =
+        pkgs.runCommand "service-publication-tofu-backend"
+          {
+            backendConfig = servicePublicationBackendConfig;
+            tofu = lib.getExe servicePublicationTofuTool;
+          }
+          ''
+            set -euo pipefail
+
+            grep -Eq '^[[:space:]]*use_lockfile[[:space:]]*=[[:space:]]*true([[:space:]]|$)' "$backendConfig"
+            if ! grep -Fq "backend_file=$backendConfig" "$tofu"; then
+              echo "service-publication-tofu does not use the packaged backend config" >&2
+              exit 1
+            fi
+            if ! grep -Fq 'init -reconfigure -backend-config="$backend_file"' "$tofu"; then
+              echo "service-publication-tofu does not pass the packaged config to tofu init" >&2
+              exit 1
+            fi
+            if grep -Fq '/run/agenix/service-publication-backend' "$tofu"; then
+              echo "service-publication-tofu still requires the obsolete agenix backend file" >&2
+              exit 1
+            fi
+            if grep -Fq 'SERVICE_PUBLICATION_BACKEND_FILE' "$tofu"; then
+              echo "service-publication-tofu still accepts an out-of-band backend source" >&2
+              exit 1
+            fi
 
             touch "$out"
           '';

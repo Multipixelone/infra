@@ -62,16 +62,15 @@ no compatibility aliases are generated.
 The Link NixOS configuration conditionally references these encrypted files in
 the private secrets input:
 
-| Encrypted source                                   | Runtime path                                        | Contract                                                                                                                                     |
-| -------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                       |
-| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`         | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete`     |
-| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`     | raw existing Tunnel secret; never echo it                                                                                                    |
-| `cloudflare/service-publication-backend.age`       | `/run/agenix/service-publication-backend`           | partial S3 backend HCL with the accepted non-secret settings; AWS authentication is supplied separately through the runtime credential chain |
-| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                          |
-| `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them     |
+| Encrypted source                                   | Runtime path                                        | Contract                                                                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                   |
+| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`         | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete` |
+| `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`     | raw existing Tunnel secret; never echo it                                                                                                |
+| `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                      |
+| `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
 
-The five operator runtime files declared in
+The four operator runtime files declared in
 `modules/service-publication/runtime.nix` are owned by the repository operator
 and installed with mode `0400`.
 
@@ -94,7 +93,7 @@ OpenTofu initialization):
       `us-east-1` (`arn:aws:s3:::finntf-557459769096-us-east-1-an`).
 - [x] Bucket versioning enabled.
 - [x] S3 Object Lock enabled.
-- [x] Backend template selects key
+- [x] The Nix-generated backend config selects key
       `service-publication/cloudflare.tfstate`, `encrypt = true`, and
       `use_lockfile = true`.
 - [ ] Conditional-write lock contention tested with two OpenTofu processes.
@@ -108,16 +107,15 @@ therefore does not prove that lock contention works, and those tests remain
 unchecked above.
 
 1. Do not recreate or reconfigure the accepted bucket from this OpenTofu state.
-2. Copy the exact payload from
-   `infra/service-publication/backend.hcl.example` into
-   `cloudflare/service-publication-backend.age` in the private secrets input.
-   Keep AWS credentials out of both backend files. Store them only in
+2. The wrapper package carries the accepted non-secret backend settings in a
+   Nix-store file and passes that file to `tofu init -backend-config`. Store
+   backend authentication only in
    `aws/service-publication-state-credentials.age`; the wrapper requires its
    runtime path and exports both AWS variables before initializing OpenTofu.
 
    ```bash
    cd /home/tunnel/Documents/Git/nix-secrets
-   agenix -e cloudflare/service-publication-backend.age -i /home/tunnel/.ssh/agenix
+   agenix -e aws/service-publication-state-credentials.age -i /home/tunnel/.ssh/agenix
    ```
 
 3. Before the backend is operationally accepted, prove that two simultaneous
@@ -128,9 +126,9 @@ unchecked above.
 4. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
    progress. The configuration check blocks plans and applies.
 5. Initialize only through
-   `nix run .#service-publication-tofu -- ...`; it rejects an unreadable runtime
-   file, missing runtime variables, or a backend without the lock flag. It never
-   falls back to local state or an ambient AWS credential chain.
+   `nix run .#service-publication-tofu -- ...`; it rejects unreadable secret
+   files, missing runtime variables, or a packaged backend without the lock
+   flag. It never falls back to local state or an ambient AWS credential chain.
 
 ## Adoption without replacement
 
