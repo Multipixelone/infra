@@ -5,6 +5,7 @@
   gnugrep,
   jq,
   opentofu,
+  variablesConfig,
   writeShellApplication,
 }:
 writeShellApplication {
@@ -20,9 +21,9 @@ writeShellApplication {
     repo_root=''${SERVICE_PUBLICATION_REPO_ROOT:-$(git rev-parse --show-toplevel)}
     tofu_root="$repo_root/infra/service-publication"
     backend_file=${backendConfig}
+    variables_file=${variablesConfig}
     aws_credentials_env=''${SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV:-/run/agenix/service-publication-state-credentials}
     cloudflare_api_env=''${SERVICE_PUBLICATION_CLOUDFLARE_API_ENV:-/run/agenix/service-publication-cloudflare-api}
-    bootstrap_env=''${SERVICE_PUBLICATION_BOOTSTRAP_ENV:-/run/agenix/service-publication-bootstrap}
     tunnel_secret_file=''${SERVICE_PUBLICATION_TUNNEL_SECRET_FILE:-/run/agenix/service-publication-tunnel-secret}
     action=''${1:-plan}
 
@@ -34,7 +35,7 @@ writeShellApplication {
       ;;
     esac
 
-    for runtime_file in "$aws_credentials_env" "$cloudflare_api_env" "$bootstrap_env" "$tunnel_secret_file"; do
+    for runtime_file in "$aws_credentials_env" "$cloudflare_api_env" "$tunnel_secret_file"; do
       if [[ ! -r $runtime_file ]]; then
         echo "service publication bootstrap blocker: unreadable runtime file $runtime_file" >&2
         exit 1
@@ -63,11 +64,11 @@ writeShellApplication {
     set +x
     set -a
     # shellcheck disable=SC1090
+    source "$variables_file"
+    # shellcheck disable=SC1090
     source "$aws_credentials_env"
     # shellcheck disable=SC1090
     source "$cloudflare_api_env"
-    # shellcheck disable=SC1090
-    source "$bootstrap_env"
     set +a
     export TF_VAR_tunnel_secret
     TF_VAR_tunnel_secret=$(<"$tunnel_secret_file")
@@ -76,15 +77,25 @@ writeShellApplication {
       AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY
       CLOUDFLARE_API_TOKEN
-      TF_VAR_bootstrap_complete
-      TF_VAR_cloudflare_account_id
-      TF_VAR_cloudflare_zone_id
-      TF_VAR_tunnel_name
       TF_VAR_tunnel_secret
     )
     for variable in "''${required_vars[@]}"; do
       if [[ -z ''${!variable:-} ]]; then
         echo "service publication bootstrap blocker: $variable is unset" >&2
+        exit 1
+      fi
+    done
+
+    declarative_vars=(
+      "TF_VAR_cloudflare_account_id:servicePublication.cloudflare.accountId"
+      "TF_VAR_cloudflare_zone_id:servicePublication.cloudflare.zoneId"
+      "TF_VAR_tunnel_name:servicePublication.cloudflare.tunnelName"
+    )
+    for declaration in "''${declarative_vars[@]}"; do
+      variable=''${declaration%%:*}
+      option=''${declaration#*:}
+      if [[ -z ''${!variable:-} ]]; then
+        echo "service publication bootstrap blocker: declarative Nix option $option is unset" >&2
         exit 1
       fi
     done

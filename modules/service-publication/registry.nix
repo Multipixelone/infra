@@ -218,8 +218,18 @@ let
       && !lib.all (site: site.networkInventoryConfirmed) (lib.attrValues registry.sites)
     ) "service publication: local cutover requires a confirmed network inventory for every site"
     ++
-      lib.optional (registry.rollout.enableConnector && !registry.rollout.cloudflareBootstrapComplete)
-        "service publication: connector enablement requires completed Cloudflare adoption and remote-state bootstrap";
+      lib.optional (registry.rollout.enableConnector && !registry.cloudflare.adoptionComplete)
+        "service publication: connector enablement requires completed Cloudflare adoption and remote-state bootstrap"
+    ++ lib.optionals registry.cloudflare.adoptionComplete (
+      lib.optional (registry.cloudflare.accountId == null)
+        "service publication: Cloudflare adoption cannot be completed without servicePublication.cloudflare.accountId"
+      ++
+        lib.optional (registry.cloudflare.zoneId == null)
+          "service publication: Cloudflare adoption cannot be completed without servicePublication.cloudflare.zoneId"
+      ++
+        lib.optional (registry.cloudflare.tunnelName == null)
+          "service publication: Cloudflare adoption cannot be completed without servicePublication.cloudflare.tunnelName"
+    );
   checkedInventory =
     assert lib.assertMsg (inventory.errors ++ rolloutErrors == [ ]) (
       lib.concatStringsSep "\n" (inventory.errors ++ rolloutErrors)
@@ -228,6 +238,28 @@ let
 in
 {
   options.servicePublication = {
+    cloudflare = {
+      accountId = mkOption {
+        type = types.nullOr (types.strMatching ".+");
+        default = null;
+        description = "Non-secret Cloudflare account ID used by service-publication OpenTofu.";
+      };
+      zoneId = mkOption {
+        type = types.nullOr (types.strMatching ".+");
+        default = null;
+        description = "Non-secret Cloudflare zone ID for finnrut.is.";
+      };
+      tunnelName = mkOption {
+        type = types.nullOr (types.strMatching ".+");
+        default = null;
+        description = "Non-secret name of the existing adopted service-publication Tunnel.";
+      };
+      adoptionComplete = mkOption {
+        type = types.bool;
+        default = false;
+        description = "True only after remote-state locking and a reviewed non-destructive adoption plan are proven.";
+      };
+    };
     rollout = {
       enableLocalCutover = mkOption {
         type = types.bool;
@@ -238,11 +270,6 @@ in
         type = types.bool;
         default = false;
         description = "Enable the movable managed-Tunnel connector after adoption.";
-      };
-      cloudflareBootstrapComplete = mkOption {
-        type = types.bool;
-        default = false;
-        description = "True only after remote-state locking and a reviewed adoption/no-op plan are proven.";
       };
     };
     sites = mkOption {

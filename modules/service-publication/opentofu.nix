@@ -41,9 +41,67 @@
         encrypt      = true
         use_lockfile = true
       '';
-      servicePublicationTofuTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-tofu" {
-        backendConfig = servicePublicationBackendConfig;
+      valueOrEmpty = value: if value == null then "" else value;
+      mkServicePublicationVariables =
+        name: cloudflare:
+        assert lib.assertMsg (
+          !cloudflare.adoptionComplete
+          || (cloudflare.accountId != null && cloudflare.zoneId != null && cloudflare.tunnelName != null)
+        ) "service publication: the adoption gate requires all declarative Cloudflare identifiers";
+        pkgs.writeText name ''
+          TF_VAR_cloudflare_account_id=${lib.escapeShellArg (valueOrEmpty cloudflare.accountId)}
+          TF_VAR_cloudflare_zone_id=${lib.escapeShellArg (valueOrEmpty cloudflare.zoneId)}
+          TF_VAR_tunnel_name=${lib.escapeShellArg (valueOrEmpty cloudflare.tunnelName)}
+          TF_VAR_bootstrap_complete=${lib.boolToString cloudflare.adoptionComplete}
+        '';
+      mkServicePublicationTofuTool =
+        {
+          cloudflare,
+          opentofu ? pkgs.opentofu,
+        }:
+        pkgs.callPackage "${rootPath}/pkgs/service-publication-tofu" {
+          inherit opentofu;
+          backendConfig = servicePublicationBackendConfig;
+          variablesConfig = mkServicePublicationVariables "service-publication-variables.env" cloudflare;
+        };
+      servicePublicationTofuTool = mkServicePublicationTofuTool {
+        cloudflare = config.servicePublication.cloudflare;
       };
+      servicePublicationTestCloudflare = {
+        accountId = "example-account-id";
+        zoneId = "example-zone-id";
+        tunnelName = "example-tunnel";
+        adoptionComplete = false;
+      };
+      servicePublicationTofuTestTool = mkServicePublicationTofuTool {
+        cloudflare = servicePublicationTestCloudflare;
+      };
+      servicePublicationFakeTofu = pkgs.writeShellApplication {
+        name = "tofu";
+        text = ''
+          : "''${SERVICE_PUBLICATION_TEST_TOFU_LOG:?test log is required}"
+          printf '%s\n' "$*" >> "$SERVICE_PUBLICATION_TEST_TOFU_LOG"
+        '';
+      };
+      servicePublicationTofuGateTestTool = mkServicePublicationTofuTool {
+        cloudflare = servicePublicationTestCloudflare;
+        opentofu = servicePublicationFakeTofu;
+      };
+      servicePublicationTofuMissingConfigTestTool = mkServicePublicationTofuTool {
+        cloudflare = servicePublicationTestCloudflare // {
+          accountId = null;
+        };
+        opentofu = servicePublicationFakeTofu;
+      };
+      missingAdoptedConfigEvaluation = builtins.tryEval (
+        mkServicePublicationVariables "invalid-service-publication-variables.env" (
+          servicePublicationTestCloudflare
+          // {
+            accountId = null;
+            adoptionComplete = true;
+          }
+        )
+      );
       servicePublicationSmokeTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-smoke" { };
       servicePublicationDeployTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy" {
         colmena = colmenaPackage;
@@ -165,7 +223,7 @@
               pkgs.bash
               pkgs.coreutils
             ];
-            tofu = lib.getExe servicePublicationTofuTool;
+            tofu = lib.getExe servicePublicationTofuTestTool;
           }
           ''
             set -euo pipefail
@@ -178,11 +236,6 @@
             printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare-api.env"
             printf '%s\n' "IGNORED=value" > "$tmpdir/cloudflare-api-missing.env"
             printf '%s\n' "CLOUDFLARE_API_TOKEN=" > "$tmpdir/cloudflare-api-empty.env"
-            printf '%s\n' \
-              "TF_VAR_bootstrap_complete=true" \
-              "TF_VAR_cloudflare_account_id=example-account-id" \
-              "TF_VAR_cloudflare_zone_id=example-zone-id" \
-              "TF_VAR_tunnel_name=example-tunnel" > "$tmpdir/bootstrap.env"
             printf '%s\n' "tunnel-secret" > "$tmpdir/tunnel.secret"
             printf '%s\n' "AWS_SECRET_ACCESS_KEY=secret" > "$tmpdir/aws-missing.env"
             printf '%s\n' "AWS_ACCESS_KEY_ID=" > "$tmpdir/aws-empty.env"
@@ -200,7 +253,6 @@
               SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/$aws_file" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-                SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
                 SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
                 "$tofu" plan >"$capture_file" 2>&1
               status=$?
@@ -229,7 +281,6 @@
             SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
               SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-absent.env" \
               SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-              SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
               SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
               "$tofu" plan >"$absent_capture" 2>&1
             absent_status=$?
@@ -257,7 +308,6 @@
                 SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
                 SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
                 SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/$cloudflare_file" \
-                SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
                 SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
                 "$tofu" plan >"$capture_file" 2>&1
               status=$?
@@ -278,15 +328,13 @@
             run_cloudflare_case empty "cloudflare-api-empty.env"
 
             # Even an explicitly traced invocation must stop tracing before it
-            # sources any runtime file. Keep bootstrap false so this proof also
-            # stops before tofu initialization or network access.
-            sed -i 's/TF_VAR_bootstrap_complete=true/TF_VAR_bootstrap_complete=false/' "$tmpdir/bootstrap.env"
+            # sources any runtime secret. The declarative adoption gate remains
+            # false, so this proof also stops before initialization or network access.
             trace_capture="$tmpdir/credential-trace.out"
             set +e
             SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
               SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
               SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
-              SERVICE_PUBLICATION_BOOTSTRAP_ENV="$tmpdir/bootstrap.env" \
               SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
               bash -x "$tofu" plan >"$trace_capture" 2>&1
             trace_status=$?
@@ -306,6 +354,86 @@
                 exit 1
               fi
             done
+
+            touch "$out"
+          '';
+
+      checks.service-publication-tofu-declarative-config =
+        assert !missingAdoptedConfigEvaluation.success;
+        pkgs.runCommand "service-publication-tofu-declarative-config"
+          {
+            gateTofu = lib.getExe servicePublicationTofuGateTestTool;
+            missingConfigTofu = lib.getExe servicePublicationTofuMissingConfigTestTool;
+            tofu = lib.getExe servicePublicationTofuTool;
+          }
+          ''
+            set -euo pipefail
+
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+            printf '%s\n' \
+              "AWS_ACCESS_KEY_ID=example-access-key" \
+              "AWS_SECRET_ACCESS_KEY=example-secret-key" > "$tmpdir/aws.env"
+            printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare.env"
+            printf '%s\n' "example-tunnel-secret" > "$tmpdir/tunnel.secret"
+
+            run_wrapper() {
+              wrapper=$1
+              shift
+              SERVICE_PUBLICATION_REPO_ROOT="$tmpdir" \
+                SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws.env" \
+                SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare.env" \
+                SERVICE_PUBLICATION_TUNNEL_SECRET_FILE="$tmpdir/tunnel.secret" \
+                SERVICE_PUBLICATION_TEST_TOFU_LOG="$tmpdir/tofu.log" \
+                "$wrapper" "$@"
+            }
+
+            for action in plan apply; do
+              rm -f "$tmpdir/tofu.log"
+              set +e
+              run_wrapper "$gateTofu" "$action" > "$tmpdir/$action.out" 2>&1
+              status=$?
+              set -e
+              if [ "$status" -eq 0 ] || ! grep -Fq "adoption gate is not complete" "$tmpdir/$action.out"; then
+                echo "$action did not fail at the declarative adoption gate" >&2
+                cat "$tmpdir/$action.out" >&2
+                exit 1
+              fi
+              if [ -e "$tmpdir/tofu.log" ]; then
+                echo "$action reached tofu init before the adoption gate" >&2
+                exit 1
+              fi
+            done
+
+            set +e
+            run_wrapper "$missingConfigTofu" import 'cloudflare_zero_trust_tunnel_cloudflared.managed' \
+              > "$tmpdir/missing.out" 2>&1
+            missing_status=$?
+            set -e
+            if [ "$missing_status" -eq 0 ] \
+              || ! grep -Fq "declarative Nix option servicePublication.cloudflare.accountId is unset" "$tmpdir/missing.out"; then
+              echo "missing declarative account ID did not fail closed" >&2
+              cat "$tmpdir/missing.out" >&2
+              exit 1
+            fi
+            if [ -e "$tmpdir/tofu.log" ]; then
+              echo "missing declarative configuration reached tofu init" >&2
+              exit 1
+            fi
+
+            SERVICE_PUBLICATION_IMPORT_ID=example-import-id \
+              run_wrapper "$gateTofu" import 'cloudflare_zero_trust_tunnel_cloudflared.managed'
+            grep -Fq 'init -reconfigure -backend-config=' "$tmpdir/tofu.log"
+            grep -Fq 'import -lock=true -var=bootstrap_complete=true cloudflare_zero_trust_tunnel_cloudflared.managed example-import-id' "$tmpdir/tofu.log"
+
+            if grep -Fq '/run/agenix/service-publication-bootstrap' "$tofu"; then
+              echo "service-publication-tofu still depends on the obsolete agenix bootstrap file" >&2
+              exit 1
+            fi
+            if grep -Fq 'SERVICE_PUBLICATION_BOOTSTRAP_ENV' "$tofu"; then
+              echo "service-publication-tofu still accepts an out-of-band bootstrap override" >&2
+              exit 1
+            fi
 
             touch "$out"
           '';

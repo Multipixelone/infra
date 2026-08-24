@@ -1,11 +1,11 @@
 variable "cloudflare_account_id" {
   type        = string
-  description = "Cloudflare account ID supplied at runtime after inventory."
+  description = "Cloudflare account ID supplied by the declarative Nix service-publication registry."
 }
 
 variable "cloudflare_zone_id" {
   type        = string
-  description = "finnrut.is zone ID supplied at runtime after inventory."
+  description = "finnrut.is zone ID supplied by the declarative Nix service-publication registry."
 }
 
 variable "tunnel_name" {
@@ -21,7 +21,7 @@ variable "tunnel_secret" {
 
 variable "bootstrap_complete" {
   type        = bool
-  description = "Explicit adoption gate; true only after remote locking and imports are proven."
+  description = "Declarative adoption gate; true only after remote locking and imports are proven."
 
   validation {
     condition     = var.bootstrap_complete

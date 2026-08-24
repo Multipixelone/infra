@@ -6,7 +6,6 @@
 }:
 let
   secrets = {
-    service-publication-bootstrap = "${inputs.secrets}/cloudflare/service-publication-bootstrap.age";
     service-publication-cloudflare-api = "${inputs.secrets}/cloudflare/service-publication-api.age";
     service-publication-state-credentials = "${inputs.secrets}/aws/service-publication-state-credentials.age";
     service-publication-tunnel-secret = "${inputs.secrets}/cloudflare/service-publication-tunnel-secret.age";

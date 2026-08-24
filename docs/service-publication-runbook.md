@@ -19,9 +19,9 @@ Cloudflare account as part of the implementation.
 - `modules/service-publication/nixos.nix` consumes the projections on managed
   NixOS hosts. `rollout.enableLocalCutover` and `rollout.enableConnector` are
   false until their prerequisites are confirmed.
-- `infra/service-publication/*.tf` consumes only the generated JSON plus
-  runtime bootstrap variables. OpenTofu owns adopted Cloudflare resources after
-  bootstrap.
+- `infra/service-publication/*.tf` consumes the generated JSON, Nix-packaged
+  non-secret Cloudflare identifiers and adoption gate, and runtime secrets.
+  OpenTofu owns adopted Cloudflare resources after bootstrap.
 
 Application and route resources use stable `application` and
 `application/route` keys. A backend or proxy move therefore changes an origin
@@ -41,8 +41,10 @@ Do not enable either rollout gate until this list is reviewed:
    before registration.
 4. Inventory all existing public DNS records, Tunnel ingress entries,
    connectors, Access applications, reusable policies, application policies,
-   and machine caller credentials. Record IDs only in the agenix bootstrap file or
-   an operator's temporary shell, never in this repository.
+   and machine caller credentials. Record provider resource import IDs only in
+   an operator's protected temporary environment. The stable Cloudflare account
+   ID, `finnrut.is` zone ID, and existing Tunnel name belong in the typed Nix
+   registry options documented below.
 5. Select the first public application and policy explicitly. The current
    registry makes Grafana and Homepage private; neither is implicitly a pilot.
 6. Use the accepted AWS S3 backend recorded under **Remote state bootstrap**.
@@ -57,7 +59,7 @@ then set `rollout.enableLocalCutover = true`. With that flag, the legacy
 `*.home.finnrut.is` Blocky mappings, vhosts, SANs, and probe names are replaced;
 no compatibility aliases are generated.
 
-## Runtime secrets and non-committed bootstrap values
+## Runtime secrets and declarative bootstrap values
 
 The Link NixOS configuration conditionally references these encrypted files in
 the private secrets input:
@@ -65,14 +67,31 @@ the private secrets input:
 | Encrypted source                                   | Runtime path                                        | Contract                                                                                                                                 |
 | -------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `cloudflare/service-publication-api.age`           | `/run/agenix/service-publication-cloudflare-api`    | shell assignment for the separately scoped `CLOUDFLARE_API_TOKEN` only                                                                   |
-| `cloudflare/service-publication-bootstrap.age`     | `/run/agenix/service-publication-bootstrap`         | shell assignments for `TF_VAR_cloudflare_account_id`, `TF_VAR_cloudflare_zone_id`, `TF_VAR_tunnel_name`, and `TF_VAR_bootstrap_complete` |
 | `cloudflare/service-publication-tunnel-secret.age` | `/run/agenix/service-publication-tunnel-secret`     | raw existing Tunnel secret; never echo it                                                                                                |
 | `cloudflare/service-publication-tunnel-token.age`  | `/run/agenix/service-publication-tunnel-token`      | raw connector token, readable only by `cloudflared`                                                                                      |
 | `aws/service-publication-state-credentials.age`    | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
 
-The four operator runtime files declared in
+The three OpenTofu runtime files declared in
 `modules/service-publication/runtime.nix` are owned by the repository operator
-and installed with mode `0400`.
+and installed with mode `0400`. The separately managed connector token is
+declared by `modules/service-publication/nixos.nix` and remains readable only
+by `cloudflared`.
+
+The non-secret OpenTofu values have one source of truth in
+`servicePublication.cloudflare` in `modules/service-publication/registry.nix`:
+
+| Nix option                                       | Current value | Required value                                      |
+| ------------------------------------------------ | ------------- | --------------------------------------------------- |
+| `servicePublication.cloudflare.accountId`        | `null`        | the existing Cloudflare account ID                  |
+| `servicePublication.cloudflare.zoneId`           | `null`        | the existing `finnrut.is` zone ID                   |
+| `servicePublication.cloudflare.tunnelName`       | `null`        | the exact name of the existing Tunnel being adopted |
+| `servicePublication.cloudflare.adoptionComplete` | `false`       | `true` only after the reviewed adoption plan below  |
+
+The wrapper receives these values from a generated Nix-store file. It refuses
+to initialize OpenTofu when any identifier is still `null`. Enabling
+`adoptionComplete` also makes Nix evaluation assert that all three identifiers
+are declared. Credentials and the raw Tunnel secret never enter that file or
+the Nix store.
 
 The ACME DNS-01 credential remains the existing, separate
 `cloudflare/acme-dns01.age`. A cloudflared connector token and ACME token must
@@ -123,12 +142,14 @@ unchecked above.
    can be recovered without `-lock=false`. OpenTofu recommends native S3
    locking with `use_lockfile = true`; see the
    [OpenTofu S3 backend documentation](https://opentofu.org/docs/language/settings/backends/s3/).
-4. Leave `TF_VAR_bootstrap_complete=false` while inventory/import work is in
-   progress. The configuration check blocks plans and applies.
+4. Leave `servicePublication.cloudflare.adoptionComplete = false` while
+   inventory/import work is in progress. The packaged configuration blocks
+   plans and applies.
 5. Initialize only through
    `nix run .#service-publication-tofu -- ...`; it rejects unreadable secret
-   files, missing runtime variables, or a packaged backend without the lock
-   flag. It never falls back to local state or an ambient AWS credential chain.
+   files, missing declarative identifiers, missing credential variables, or a
+   packaged backend without the lock flag. It never falls back to local state
+   or an ambient AWS credential chain.
 
 ## Adoption without replacement
 
@@ -159,7 +180,7 @@ The wrapper prompts without echo for each provider import ID. Supplying
 supported; do not put real IDs in shell scripts, committed tfvars, or runbooks.
 The import subcommand overrides the hard `bootstrap_complete` variable
 validation only for that non-apply operation; normal plans and applies remain
-blocked until the runtime bootstrap file says `true`.
+blocked until `servicePublication.cloudflare.adoptionComplete` is `true`.
 
 Provider import formats can change; confirm them against the pinned provider's
 resource documentation immediately before use. Application-scoped Access
@@ -170,8 +191,9 @@ and never apply an intermediate plan that detaches policies.
 
 After all imports, run `just deploy-services plan-only`. The first plan must be
 no-op or an explicitly understood non-destructive delta. Any replacement is
-rejected by the wrapper. Set `TF_VAR_bootstrap_complete=true` only after this
-review and enable the Nix connector only after the existing and new connector
+rejected by the wrapper. Change
+`servicePublication.cloudflare.adoptionComplete` to `true` only after this
+review, then enable the Nix connector only after the existing and new connector
 instances can overlap safely.
 
 ## Deployment and verification
