@@ -81,6 +81,9 @@
         text = ''
           : "''${SERVICE_PUBLICATION_TEST_TOFU_LOG:?test log is required}"
           printf '%s\n' "$*" >> "$SERVICE_PUBLICATION_TEST_TOFU_LOG"
+          if [[ $* == *" show -json "* ]]; then
+            printf '{"resource_changes":%s}\n' "''${SERVICE_PUBLICATION_TEST_RESOURCE_CHANGES:-[]}"
+          fi
         '';
       };
       servicePublicationTofuGateTestTool = mkServicePublicationTofuTool {
@@ -90,6 +93,12 @@
       servicePublicationTofuMissingConfigTestTool = mkServicePublicationTofuTool {
         cloudflare = servicePublicationTestCloudflare // {
           accountId = null;
+        };
+        opentofu = servicePublicationFakeTofu;
+      };
+      servicePublicationTofuAdoptedTestTool = mkServicePublicationTofuTool {
+        cloudflare = servicePublicationTestCloudflare // {
+          adoptionComplete = true;
         };
         opentofu = servicePublicationFakeTofu;
       };
@@ -363,6 +372,7 @@
         pkgs.runCommand "service-publication-tofu-declarative-config"
           {
             gateTofu = lib.getExe servicePublicationTofuGateTestTool;
+            adoptedTofu = lib.getExe servicePublicationTofuAdoptedTestTool;
             missingConfigTofu = lib.getExe servicePublicationTofuMissingConfigTestTool;
             tofu = lib.getExe servicePublicationTofuTool;
           }
@@ -386,7 +396,7 @@
                 "$wrapper" "$@"
             }
 
-            for action in plan apply; do
+            for action in plan apply output; do
               rm -f "$tmpdir/tofu.log"
               set +e
               run_wrapper "$gateTofu" "$action" > "$tmpdir/$action.out" 2>&1
@@ -403,6 +413,34 @@
               fi
             done
 
+            rm -f "$tmpdir/tofu.log"
+            run_wrapper "$gateTofu" adoption-plan
+            grep -Fq 'init -reconfigure -backend-config=' "$tmpdir/tofu.log"
+            grep -Eq 'plan -lock=true -var=bootstrap_complete=true -out=' "$tmpdir/tofu.log"
+            grep -Fq 'show -json ' "$tmpdir/tofu.log"
+            if grep -Fq ' apply ' "$tmpdir/tofu.log"; then
+              echo "adoption-plan reached apply" >&2
+              exit 1
+            fi
+
+            rm -f "$tmpdir/tofu.log"
+            set +e
+            SERVICE_PUBLICATION_TEST_RESOURCE_CHANGES='[{"change":{"actions":["delete","create"]}}]' \
+              run_wrapper "$gateTofu" adoption-plan > "$tmpdir/adoption-replacement.out" 2>&1
+            adoption_replacement_status=$?
+            set -e
+            if [ "$adoption_replacement_status" -eq 0 ] \
+              || ! grep -Fq 'refusing 1 resource replacement' "$tmpdir/adoption-replacement.out"; then
+              echo "adoption-plan did not reject a replacement" >&2
+              cat "$tmpdir/adoption-replacement.out" >&2
+              exit 1
+            fi
+            if grep -Fq ' apply ' "$tmpdir/tofu.log"; then
+              echo "replacement-bearing adoption-plan reached apply" >&2
+              exit 1
+            fi
+
+            rm -f "$tmpdir/tofu.log"
             set +e
             run_wrapper "$missingConfigTofu" import 'cloudflare_zero_trust_tunnel_cloudflared.managed' \
               > "$tmpdir/missing.out" 2>&1
@@ -419,23 +457,51 @@
               exit 1
             fi
 
+            for resource in \
+              cloudflare_zero_trust_tunnel_cloudflared.managed \
+              cloudflare_zero_trust_tunnel_cloudflared_config.managed; do
+              set +e
+              SERVICE_PUBLICATION_IMPORT_ID=wrong-account/example-tunnel-id \
+                run_wrapper "$gateTofu" import "$resource" \
+                > "$tmpdir/tunnel-import-shape.out" 2>&1
+              tunnel_import_shape_status=$?
+              set -e
+              if [ "$tunnel_import_shape_status" -eq 0 ] \
+                || ! grep -Fq "must be <account_id>/<tunnel_id>" "$tmpdir/tunnel-import-shape.out"; then
+                echo "$resource accepted an import ID outside <account_id>/<tunnel_id>" >&2
+                cat "$tmpdir/tunnel-import-shape.out" >&2
+                exit 1
+              fi
+
+              SERVICE_PUBLICATION_IMPORT_ID=example-account-id/example-tunnel-id \
+                run_wrapper "$gateTofu" import "$resource"
+              grep -Fq 'init -reconfigure -backend-config=' "$tmpdir/tofu.log"
+              grep -Fq "import -lock=true -var=bootstrap_complete=true $resource example-account-id/example-tunnel-id" "$tmpdir/tofu.log"
+            done
+
+            rm -f "$tmpdir/tofu.log"
+            run_wrapper "$adoptedTofu" plan
+            grep -Eq 'plan -lock=true -out=' "$tmpdir/tofu.log"
+            run_wrapper "$adoptedTofu" output
+            grep -Eq -- '-chdir=.*/infra/service-publication output$' "$tmpdir/tofu.log"
+            SERVICE_PUBLICATION_APPROVE=APPLY run_wrapper "$adoptedTofu" apply
+            grep -Eq 'apply -lock=true .+\.tfplan$' "$tmpdir/tofu.log"
+
+            rm -f "$tmpdir/tofu.log"
             set +e
-            SERVICE_PUBLICATION_IMPORT_ID=wrong-account/example-tunnel-uuid \
-              run_wrapper "$gateTofu" import cloudflare_zero_trust_tunnel_cloudflared.managed \
-              > "$tmpdir/tunnel-import-shape.out" 2>&1
-            tunnel_import_shape_status=$?
+            run_wrapper "$adoptedTofu" adoption-plan > "$tmpdir/adopted-adoption-plan.out" 2>&1
+            adopted_adoption_plan_status=$?
             set -e
-            if [ "$tunnel_import_shape_status" -eq 0 ] \
-              || ! grep -Fq "Tunnel import ID must be <account_id>/<tunnel_uuid>" "$tmpdir/tunnel-import-shape.out"; then
-              echo "Tunnel import accepted an ID outside <account_id>/<tunnel_uuid>" >&2
-              cat "$tmpdir/tunnel-import-shape.out" >&2
+            if [ "$adopted_adoption_plan_status" -eq 0 ] \
+              || ! grep -Fq 'adoption is complete; use the normal plan command' "$tmpdir/adopted-adoption-plan.out"; then
+              echo "adoption-plan remained available after adoption" >&2
+              cat "$tmpdir/adopted-adoption-plan.out" >&2
               exit 1
             fi
-
-            SERVICE_PUBLICATION_IMPORT_ID=example-account-id/example-tunnel-uuid \
-              run_wrapper "$gateTofu" import 'cloudflare_zero_trust_tunnel_cloudflared.managed'
-            grep -Fq 'init -reconfigure -backend-config=' "$tmpdir/tofu.log"
-            grep -Fq 'import -lock=true -var=bootstrap_complete=true cloudflare_zero_trust_tunnel_cloudflared.managed example-account-id/example-tunnel-uuid' "$tmpdir/tofu.log"
+            if [ -e "$tmpdir/tofu.log" ]; then
+              echo "post-adoption adoption-plan reached tofu init" >&2
+              exit 1
+            fi
 
             if grep -Fq '/run/agenix/service-publication-bootstrap' "$tofu"; then
               echo "service-publication-tofu still depends on the obsolete agenix bootstrap file" >&2
@@ -466,7 +532,9 @@
             rg -F 'config_src = "cloudflare"' "$main"
             rg -F 'prevent_destroy = true' "$main"
             rg -F 'replacement_count' "$wrapper"
-            rg -F 'Tunnel import ID must be <account_id>/<tunnel_uuid>' "$wrapper"
+            rg -F 'Tunnel and Tunnel configuration import IDs must be <account_id>/<tunnel_id>' "$wrapper"
+            rg -F '`<account_id>/<tunnel_id>` pair' source/docs/service-publication-runbook.md
+            rg -F 'there is no separate configuration import ID.' source/docs/service-publication-runbook.md
 
             if rg -n 'tunnel_secret|service-publication-tunnel-secret|SERVICE_PUBLICATION_TUNNEL_SECRET_FILE' \
               source/infra/service-publication \

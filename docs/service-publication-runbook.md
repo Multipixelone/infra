@@ -151,7 +151,8 @@ unchecked above.
    [OpenTofu S3 backend documentation](https://opentofu.org/docs/language/settings/backends/s3/).
 4. Leave `servicePublication.cloudflare.adoptionComplete = false` while
    inventory/import work is in progress. The packaged configuration blocks
-   plans and applies.
+   normal plans, applies, and outputs; only imports and the explicit
+   `adoption-plan` review path are available.
 5. Initialize only through
    `nix run .#service-publication-tofu -- ...`; it rejects unreadable secret
    files, missing declarative identifiers, missing credential variables, or a
@@ -186,12 +187,14 @@ The wrapper prompts without echo for each provider import ID. Supplying
 `SERVICE_PUBLICATION_IMPORT_ID` from a protected operator environment is also
 supported; do not put real IDs in shell scripts, committed tfvars, or runbooks.
 The import subcommand overrides the hard `bootstrap_complete` variable
-validation only for that non-apply operation; normal plans and applies remain
-blocked until `servicePublication.cloudflare.adoptionComplete` is `true`.
+validation only for that non-apply operation. For Cloudflare provider v5.23.0,
+both the Tunnel resource and its Tunnel configuration use the same
+`<account_id>/<tunnel_id>` pair; there is no separate configuration import ID.
+Normal plans, applies, and outputs remain blocked until
+`servicePublication.cloudflare.adoptionComplete` is `true`.
 
 Provider import formats can change; confirm them against the pinned provider's
-resource documentation immediately before use. For v5.23.0, the Tunnel import
-format is `<account_id>/<tunnel_uuid>`. The imported Tunnel retains
+resource documentation immediately before use. The imported Tunnel retains
 `config_src = "cloudflare"`; its lifecycle has `prevent_destroy = true`, and the
 wrapper rejects every plan containing a replacement. Treat any proposed Tunnel
 replacement as an adoption blocker rather than applying it. Application-scoped
@@ -200,12 +203,29 @@ Follow the provider's
 [v5 migration guidance](https://github.com/cloudflare/terraform-provider-cloudflare/blob/main/docs/guides/version-5-migration.md)
 and never apply an intermediate plan that detaches policies.
 
-After all imports, run `just deploy-services plan-only`. The first plan must be
-no-op or an explicitly understood non-destructive delta. Any replacement is
-rejected by the wrapper. Change
-`servicePublication.cloudflare.adoptionComplete` to `true` only after this
-review, then enable the Nix connector only after the existing and new connector
-instances can overlap safely.
+After all imports, review the pre-adoption state through the only plan command
+allowed while the gate remains false:
+
+```bash
+nix run .#service-publication-tofu -- adoption-plan
+```
+
+This command temporarily satisfies the OpenTofu validation for that plan only;
+it has no apply path. Reconcile imports and declarative configuration, then
+repeat `adoption-plan` until the result is no-op or an explicitly understood
+non-destructive delta. Any replacement is rejected by the wrapper.
+
+The current registry emits no public Tunnel routes, so its desired ingress is
+only the terminal `http_status:404` catch-all. If an adoption plan proposes
+removing existing live ingress entries, treat that as destructive operational
+drift: reconcile the registry and do not apply the removal.
+
+Only after the adoption plan is accepted, change
+`servicePublication.cloudflare.adoptionComplete` to `true`. Then run
+`just deploy-services plan-only` for the final normal gated plan. Apply only
+through the separately authorized normal deployment flow, and enable the Nix
+connector only after the existing and new connector instances can overlap
+safely.
 
 ## Deployment and verification
 

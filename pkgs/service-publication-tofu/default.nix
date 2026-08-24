@@ -27,9 +27,9 @@ writeShellApplication {
     action=''${1:-plan}
 
     case "$action" in
-    plan | apply | output | import) ;;
+    plan | adoption-plan | apply | output | import) ;;
     *)
-      echo "usage: $0 {plan|apply|output|import} [import arguments...]" >&2
+      echo "usage: $0 {plan|adoption-plan|apply|output|import} [import arguments...]" >&2
       exit 2
       ;;
     esac
@@ -95,7 +95,11 @@ writeShellApplication {
         exit 1
       fi
     done
-    if [[ $action != import && ''${TF_VAR_bootstrap_complete:-} != true ]]; then
+    if [[ $action == adoption-plan && ''${TF_VAR_bootstrap_complete:-} == true ]]; then
+      echo "service publication adoption is complete; use the normal plan command" >&2
+      exit 1
+    fi
+    if [[ $action != import && $action != adoption-plan && ''${TF_VAR_bootstrap_complete:-} != true ]]; then
       echo "service publication adoption gate is not complete" >&2
       exit 1
     fi
@@ -103,12 +107,16 @@ writeShellApplication {
     tofu -chdir="$tofu_root" init -reconfigure -backend-config="$backend_file"
 
     case "$action" in
-    plan | apply)
+    plan | adoption-plan | apply)
       plan_file=$(mktemp --tmpdir service-publication.XXXXXX.tfplan)
       plan_json=$(mktemp --tmpdir service-publication.XXXXXX.json)
       trap 'rm -f "$plan_file" "$plan_json"' EXIT
 
-      tofu -chdir="$tofu_root" plan -lock=true -out="$plan_file"
+      plan_args=()
+      if [[ $action == adoption-plan ]]; then
+        plan_args+=( -var=bootstrap_complete=true )
+      fi
+      tofu -chdir="$tofu_root" plan -lock=true "''${plan_args[@]}" -out="$plan_file"
       tofu -chdir="$tofu_root" show -json "$plan_file" >"$plan_json"
       tofu -chdir="$tofu_root" show -no-color "$plan_file"
 
@@ -145,11 +153,18 @@ writeShellApplication {
         echo "import ID is empty" >&2
         exit 1
       }
-      declarative_account_id=''${TF_VAR_cloudflare_account_id:-}
       if [[ $1 == cloudflare_zero_trust_tunnel_cloudflared.managed \
-        && $SERVICE_PUBLICATION_IMPORT_ID != "$declarative_account_id/"?* ]]; then
-        echo "Tunnel import ID must be <account_id>/<tunnel_uuid> for the declarative Cloudflare account" >&2
-        exit 1
+        || $1 == cloudflare_zero_trust_tunnel_cloudflared_config.managed ]]; then
+        declarative_account_id=''${TF_VAR_cloudflare_account_id:-}
+        import_account=''${SERVICE_PUBLICATION_IMPORT_ID%%/*}
+        import_tunnel_id=''${SERVICE_PUBLICATION_IMPORT_ID#*/}
+        if [[ $SERVICE_PUBLICATION_IMPORT_ID != */* \
+          || $import_account != "$declarative_account_id" \
+          || -z $import_tunnel_id \
+          || $import_tunnel_id == */* ]]; then
+          echo "Tunnel and Tunnel configuration import IDs must be <account_id>/<tunnel_id> for the declarative Cloudflare account" >&2
+          exit 1
+        fi
       fi
       tofu -chdir="$tofu_root" import -lock=true -var=bootstrap_complete=true "$1" "$SERVICE_PUBLICATION_IMPORT_ID"
       unset SERVICE_PUBLICATION_IMPORT_ID
