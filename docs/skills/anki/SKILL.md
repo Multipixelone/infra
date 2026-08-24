@@ -25,7 +25,7 @@ Cards are authored as a `cards.json` file and built with the Nix-packaged
    omit the output path to default to `<deck-name>.apkg`).
 5. **Report** the card count and output path; offer to refine.
 
-## The methodology (this is the point — make cards *well*)
+## The methodology (this is the point — make cards _well_)
 
 Foundation: the **minimum information principle** — break material into the
 smallest meaningful pieces and test one per card. Non-negotiables:
@@ -43,7 +43,7 @@ The full 20-rule rationale, a bad→good gallery, and the review checklist live 
 
 ## Basic vs Cloze vs Basic+Reversed — choose deliberately
 
-- **Cloze** when the fact is most natural *inside a sentence* and you're testing a
+- **Cloze** when the fact is most natural _inside a sentence_ and you're testing a
   specific term/number/name/date in situ, or a definition where the sentence is
   the cue. This is the default for declarative facts-in-context.
   `The capital of Australia is {{c1::Canberra}}.`

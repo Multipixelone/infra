@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Send email via AgentMail API
 
@@ -16,10 +15,10 @@ Environment:
 """
 
 import argparse
-import os
-import sys
 import base64
 import mimetypes
+import os
+import sys
 from pathlib import Path
 
 try:
@@ -115,7 +114,7 @@ def main():
         print(f"   Message ID: {response.message_id}")
         print(f"   Thread ID: {response.thread_id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
         print(f"❌ Failed to send email: {e}")
         sys.exit(1)
 

@@ -23,8 +23,7 @@ in
       # github/nix.age is `access-tokens = github.com=<token>` in nix.conf
       # syntax, encrypted to the shared `tunnel` user key (same key used on
       # NixOS), so hylia's home-manager agenix can decrypt it.
-      home-manager.users.${user}.age.secrets."github/nix".file =
-        "${inputs.secrets}/github/nix.age";
+      home-manager.users.${user}.age.secrets."github/nix".file = "${inputs.secrets}/github/nix.age";
 
       # Determinate's /etc/nix/nix.conf does `!include nix.custom.conf` and does
       # NOT re-set access-tokens afterwards, so an !include appended to the

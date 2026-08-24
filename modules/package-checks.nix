@@ -14,9 +14,7 @@
       checks =
         self'.packages
         |> lib.filterAttrs (
-          _: drv:
-          lib.meta.availableOn pkgs.stdenv.hostPlatform drv
-          && (builtins.tryEval drv.drvPath).success
+          _: drv: lib.meta.availableOn pkgs.stdenv.hostPlatform drv && (builtins.tryEval drv.drvPath).success
         )
         |> lib.mapAttrs' (name: drv: lib.nameValuePair "packages/${name}" drv);
     };

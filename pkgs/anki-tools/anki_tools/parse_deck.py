@@ -73,11 +73,15 @@ def _deck_names(cur: sqlite3.Cursor) -> dict[int, str]:
     try:
         row = cur.execute("SELECT decks FROM col").fetchone()
         if row and row[0]:
-            return {int(did): d.get("name", "") for did, d in json.loads(row[0]).items()}
+            return {
+                int(did): d.get("name", "") for did, d in json.loads(row[0]).items()
+            }
     except sqlite3.OperationalError:
         pass
     try:
-        return {int(did): name for did, name in cur.execute("SELECT id, name FROM decks")}
+        return {
+            int(did): name for did, name in cur.execute("SELECT id, name FROM decks")
+        }
     except sqlite3.OperationalError:
         return {}
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Compute the sleep-adaptive morning nudge time for the morning-routine skill.
 
 Reads last night's sleep from the Apple Health bridge output and prints ONE

@@ -148,22 +148,23 @@
       };
       languages =
         let
-          dprintConfig = builtins.toFile "dprint.json" (
-            builtins.toJSON {
-              lineWidth = 80;
-              typescript = {
-                quoteStyle = "preferSingle";
-                binaryExpression.operatorPosition = "sameLine";
-              };
-              json.indentWidth = 2;
-              excludes = [ "**/*-lock.json" ];
-              plugins = [
-                "https://plugins.dprint.dev/typescript-0.93.0.wasm"
-                "https://plugins.dprint.dev/json-0.19.3.wasm"
-                "https://plugins.dprint.dev/markdown-0.17.8.wasm"
-              ];
-            }
-          );
+          prettier = {
+            command = lib.getExe pkgs.prettier;
+            args = [
+              "--stdin-filepath"
+              "%{buffer_name}"
+            ];
+          };
+          tomlFormatter = pkgs.writeShellApplication {
+            name = "helix-toml-format";
+            runtimeInputs = [
+              pkgs.taplo
+              pkgs.toml-sort
+            ];
+            text = ''
+              taplo format - | toml-sort
+            '';
+          };
         in
         {
           language-server = {
@@ -224,14 +225,6 @@
             fish-lsp = {
               command = lib.getExe pkgs.fish-lsp;
               args = [ "start" ];
-            };
-            dprint = {
-              command = lib.getExe pkgs.dprint;
-              args = [
-                "lsp"
-                "--config"
-                dprintConfig
-              ];
             };
             astro-ls = {
               command = "${pkgs.astro-language-server}/bin/astro-ls";
@@ -314,147 +307,108 @@
               };
             };
           };
-          language =
-            let
-              prettier = lang: {
-                command = lib.getExe pkgs.prettier;
-                args = [
-                  "--parser"
-                  lang
-                ];
-              };
-            in
-            [
-              {
-                name = "nix";
-                language-servers = [
-                  "nixd"
-                  "gpt"
-                ];
-                formatter.command = lib.getExe pkgs.nixfmt;
-                auto-format = true;
-              }
-              {
-                name = "yaml";
-                auto-format = true;
-                language-servers = [ "yaml-language-server" ];
-              }
-              {
-                name = "fish";
-                language-servers = [
-                  "fish-lsp"
-                  "gpt"
-                ];
-              }
-              {
-                name = "markdown";
-                language-servers = [
-                  "marksman"
-                  "markdown-oxide"
-                ];
-                formatter = {
-                  command = lib.getExe pkgs.prettier;
-                  args = [
-                    "--stdin-filepath"
-                    "%{buffer_name}"
-                  ];
-                };
-                auto-format = true;
-              }
-              {
-                name = "python";
-                auto-format = true;
-                language-servers = [
-                  "basedpyright"
-                  {
-                    name = "ruff";
-                    except-features = [ "hover" ];
-                  }
-                ];
-              }
-              {
-                name = "latex";
-                file-types = [ "tex" ];
-                language-servers = [ "texlab" ];
-                text-width = 120;
-              }
-              {
-                name = "typst";
-                formatter.command = lib.getExe pkgs.typstyle;
-                auto-format = true;
-                language-servers = [ "tinymist" ];
-              }
-              {
-                name = "toml";
-                auto-format = true;
-                formatter = {
-                  command = lib.getExe pkgs.taplo;
-                  args = [
-                    "fmt"
-                    "-"
-                  ];
-                };
-                language-servers = [ "taplo" ];
-              }
-              {
-                name = "css";
-                formatter = prettier "css";
-                auto-format = true;
-                language-servers = [
-                  "vscode-css-language-server"
-                  "uwu-colors"
-                ];
-              }
-              {
-                name = "html";
-                formatter = prettier "html";
-                language-servers = [ "vscode-html-language-server" ];
-              }
-              {
-                name = "javascript";
-                auto-format = true;
-                file-types = [
-                  "js"
-                  "jsx"
-                  "mjs"
-                ];
-                language-servers = [
-                  "dprint"
-                  "typescript-language-server"
-                ];
-                formatter = {
-                  command = lib.getExe pkgs.dprint;
-                  args = [
-                    "fmt"
-                    "--stdin"
-                    "javascript"
-                    "--config"
-                    dprintConfig
-                  ];
-                };
-              }
-              {
-                name = "json";
-                auto-format = true;
-                language-servers = [ "vscode-json-language-server" ];
-                formatter = {
-                  command = lib.getExe pkgs.dprint;
-                  args = [
-                    "fmt"
-                    "--stdin"
-                    "json"
-                    "--config"
-                    dprintConfig
-                  ];
-                };
-              }
-              {
-                name = "astro";
-                auto-format = true;
-                formatter = prettier "astro";
-                language-servers = [ "astro-ls" ];
-              }
-            ];
+          language = [
+            {
+              name = "nix";
+              language-servers = [
+                "nixd"
+                "gpt"
+              ];
+              formatter.command = lib.getExe pkgs.nixfmt;
+              auto-format = true;
+            }
+            {
+              name = "yaml";
+              auto-format = true;
+              formatter = prettier;
+              language-servers = [ "yaml-language-server" ];
+            }
+            {
+              name = "fish";
+              language-servers = [
+                "fish-lsp"
+                "gpt"
+              ];
+            }
+            {
+              name = "markdown";
+              language-servers = [
+                "marksman"
+                "markdown-oxide"
+              ];
+              formatter = prettier;
+              auto-format = true;
+            }
+            {
+              name = "python";
+              auto-format = true;
+              language-servers = [
+                "basedpyright"
+                {
+                  name = "ruff";
+                  except-features = [ "hover" ];
+                }
+              ];
+            }
+            {
+              name = "latex";
+              file-types = [ "tex" ];
+              language-servers = [ "texlab" ];
+              text-width = 120;
+            }
+            {
+              name = "typst";
+              formatter.command = lib.getExe pkgs.typstyle;
+              auto-format = true;
+              language-servers = [ "tinymist" ];
+            }
+            {
+              name = "toml";
+              auto-format = true;
+              formatter.command = lib.getExe tomlFormatter;
+              language-servers = [ "taplo" ];
+            }
+            {
+              name = "css";
+              formatter = prettier;
+              auto-format = true;
+              language-servers = [
+                "vscode-css-language-server"
+                "uwu-colors"
+              ];
+            }
+            {
+              name = "html";
+              formatter = prettier;
+              auto-format = true;
+              language-servers = [ "vscode-html-language-server" ];
+            }
+            {
+              name = "javascript";
+              auto-format = true;
+              file-types = [
+                "js"
+                "jsx"
+                "mjs"
+              ];
+              language-servers = [
+                "typescript-language-server"
+              ];
+              formatter = prettier;
+            }
+            {
+              name = "json";
+              auto-format = true;
+              language-servers = [ "vscode-json-language-server" ];
+              formatter = prettier;
+            }
+            {
+              name = "astro";
+              auto-format = true;
+              formatter = prettier;
+              language-servers = [ "astro-ls" ];
+            }
+          ];
         };
     };
   nixpkgs.config.allowUnfreePackages = [

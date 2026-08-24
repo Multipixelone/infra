@@ -69,8 +69,7 @@ CLOZE_MODEL = genanki.Model(
             "name": "Cloze",
             "qfmt": "{{cloze:Text}}",
             "afmt": (
-                "{{cloze:Text}}"
-                '{{#Extra}}<div class="extra">{{Extra}}</div>{{/Extra}}'
+                '{{cloze:Text}}{{#Extra}}<div class="extra">{{Extra}}</div>{{/Extra}}'
             ),
         }
     ],
@@ -120,7 +119,9 @@ def build(data: dict, output: Path) -> int:
         for rel in card["media"]:
             path = (data["media_root"] / rel).resolve()
             if not path.is_file():
-                print(f"warning: media file not found, skipping: {path}", file=sys.stderr)
+                print(
+                    f"warning: media file not found, skipping: {path}", file=sys.stderr
+                )
                 continue
             media_files.append(str(path))
 

@@ -14,9 +14,7 @@
   flake.modules.homeManager.gui =
     { pkgs, ... }:
     let
-      anki-tools = withSystem pkgs.stdenv.hostPlatform.system (
-        psArgs: psArgs.config.packages.anki-tools
-      );
+      anki-tools = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.anki-tools);
     in
     {
       home.packages = [ anki-tools ];

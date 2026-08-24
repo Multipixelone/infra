@@ -11,8 +11,8 @@ from pathlib import Path
 
 import genanki
 import requests
-from bs4 import BeautifulSoup
 import yt_dlp
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +128,7 @@ def download_mp4(url: str, dest: Path) -> bool:
         with requests.get(url, headers=HEADERS, timeout=60, stream=True) as resp:
             resp.raise_for_status()
             with open(dest, "wb") as f:
-                for chunk in resp.iter_content(chunk_size=65536):
-                    f.write(chunk)
+                f.writelines(resp.iter_content(chunk_size=65536))
         return True
     except requests.exceptions.RequestException as e:
         logger.error("Download failed for %s: %s", url, e)
@@ -154,7 +153,7 @@ def download_youtube(url: str, dest_dir: Path) -> Path | None:
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- third-party downloader exceptions vary.
         logger.error("yt-dlp failed for %s: %s", url, e)
         return None
 
@@ -180,10 +179,12 @@ def get_video_dimensions(path: Path) -> tuple[int, int] | None:
         str(path),
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=10, check=False
+        )
         w, h = map(int, result.stdout.strip().split("x"))
         return w, h
-    except Exception:
+    except Exception:  # noqa: BLE001 -- malformed probe output is a soft failure.
         return None
 
 
@@ -217,7 +218,9 @@ def detect_motion_crop(input_path: Path, pad_fraction: float = 0.08) -> dict | N
         "-",
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, check=False
+        )
     except subprocess.TimeoutExpired:
         logger.warning("Motion detection timed out.")
         return None
@@ -357,7 +360,7 @@ def process_video(
     except FileNotFoundError as e:
         logger.error("Tool not found — ensure ffmpeg and gifski are in PATH: %s", e)
         return False
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- processing failures are reported to the CLI.
         logger.error("Video processing error: %s", e)
         return False
 

@@ -59,7 +59,7 @@ checklist are in **`../anki/reference/card-writing.md`**.
 - `reversed` → **Basic (and reversed card)**
 - `cloze` → **Cloze**
 
-Anki's built-in *Basic* model has no Extra field, so `anki-add-notes` appends a
+Anki's built-in _Basic_ model has no Extra field, so `anki-add-notes` appends a
 note's `extra` to the Back; cloze `extra` uses the native "Back Extra" field.
 
 ## Ad-hoc AnkiConnect calls

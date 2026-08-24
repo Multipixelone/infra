@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Check AgentMail inbox for messages
 
@@ -131,7 +130,7 @@ def main():
 
                     last_message_ids = current_message_ids
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- keep monitoring after API errors.
                     print(f"❌ Error checking inbox: {e}")
 
                 time.sleep(args.monitor)
@@ -171,7 +170,7 @@ def main():
                         f"   • {att.filename or 'unnamed'} ({att.content_type or 'unknown type'})"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Error getting message: {e}")
             sys.exit(1)
 
@@ -188,7 +187,7 @@ def main():
             for thread in threads.threads:
                 print_thread_summary(thread)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Error listing threads: {e}")
             sys.exit(1)
 
@@ -207,7 +206,7 @@ def main():
             for message in messages.messages:
                 print_message_summary(message)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Error listing messages: {e}")
             sys.exit(1)
 

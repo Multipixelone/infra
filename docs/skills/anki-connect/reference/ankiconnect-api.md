@@ -4,7 +4,7 @@ AnkiConnect exposes Anki over HTTP at `http://127.0.0.1:8765` while Anki desktop
 is running. Every request is an HTTP POST with a JSON body:
 
 ```json
-{ "action": "<name>", "version": 6, "params": { } }
+{ "action": "<name>", "version": 6, "params": {} }
 ```
 
 and every response has the shape:
@@ -19,10 +19,10 @@ actions are documented here for when you need one the helper scripts don't cover
 
 ## Connection
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `version` | — | the API version (e.g. `6`). Use as a health check. |
-| `sync` | — | triggers AnkiWeb sync. |
+| Action    | Params | Result                                             |
+| --------- | ------ | -------------------------------------------------- |
+| `version` | —      | the API version (e.g. `6`). Use as a health check. |
+| `sync`    | —      | triggers AnkiWeb sync.                             |
 
 ```bash
 anki-connect version
@@ -32,19 +32,19 @@ curl -s localhost:8765 -X POST -d '{"action":"version","version":6}'
 
 ## Decks
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `deckNames` | — | list of deck names |
-| `deckNamesAndIds` | — | `{name: id}` |
-| `createDeck` | `{"deck": "A::B"}` | new deck id (no-op if it exists) |
-| `changeDeck` | `{"cards": [id…], "deck": "X"}` | moves cards |
-| `deleteDecks` | `{"decks": ["X"], "cardsToo": true}` | — |
+| Action            | Params                               | Result                           |
+| ----------------- | ------------------------------------ | -------------------------------- |
+| `deckNames`       | —                                    | list of deck names               |
+| `deckNamesAndIds` | —                                    | `{name: id}`                     |
+| `createDeck`      | `{"deck": "A::B"}`                   | new deck id (no-op if it exists) |
+| `changeDeck`      | `{"cards": [id…], "deck": "X"}`      | moves cards                      |
+| `deleteDecks`     | `{"decks": ["X"], "cardsToo": true}` | —                                |
 
 ## Note types (models)
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `modelNames` | — | list of note-type names |
+| Action            | Params                   | Result                     |
+| ----------------- | ------------------------ | -------------------------- |
+| `modelNames`      | —                        | list of note-type names    |
 | `modelFieldNames` | `{"modelName": "Basic"}` | field names for that model |
 
 Built-in models used by `anki-add-notes`: `Basic` (Front, Back),
@@ -52,16 +52,16 @@ Built-in models used by `anki-add-notes`: `Basic` (Front, Back),
 
 ## Notes
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `addNote` | `{"note": <note>}` | new note id |
-| `addNotes` | `{"notes": [<note>…]}` | list of ids (`null` per failed note) |
-| `canAddNotes` | `{"notes": [<note>…]}` | list of booleans (false = duplicate/invalid) |
-| `findNotes` | `{"query": "deck:X tag:y"}` | list of note ids |
-| `notesInfo` | `{"notes": [id…]}` | fields, tags, model per note |
-| `updateNoteFields` | `{"note": {"id": id, "fields": {…}}}` | — |
-| `deleteNotes` | `{"notes": [id…]}` | — |
-| `addTags` / `removeTags` | `{"notes": [id…], "tags": "a b"}` | — |
+| Action                   | Params                                | Result                                       |
+| ------------------------ | ------------------------------------- | -------------------------------------------- |
+| `addNote`                | `{"note": <note>}`                    | new note id                                  |
+| `addNotes`               | `{"notes": [<note>…]}`                | list of ids (`null` per failed note)         |
+| `canAddNotes`            | `{"notes": [<note>…]}`                | list of booleans (false = duplicate/invalid) |
+| `findNotes`              | `{"query": "deck:X tag:y"}`           | list of note ids                             |
+| `notesInfo`              | `{"notes": [id…]}`                    | fields, tags, model per note                 |
+| `updateNoteFields`       | `{"note": {"id": id, "fields": {…}}}` | —                                            |
+| `deleteNotes`            | `{"notes": [id…]}`                    | —                                            |
+| `addTags` / `removeTags` | `{"notes": [id…], "tags": "a b"}`     | —                                            |
 
 A **note** object:
 
@@ -90,20 +90,20 @@ curl -s localhost:8765 -X POST -d '{
 
 ## Media
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `storeMediaFile` | `{"filename": "x.png", "path": "/abs/x.png"}` or `{"filename","data": "<base64>"}` or `{"filename","url"}` | stored filename |
-| `retrieveMediaFile` | `{"filename": "x.png"}` | base64 contents |
-| `deleteMediaFile` | `{"filename": "x.png"}` | — |
+| Action              | Params                                                                                                     | Result          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | --------------- |
+| `storeMediaFile`    | `{"filename": "x.png", "path": "/abs/x.png"}` or `{"filename","data": "<base64>"}` or `{"filename","url"}` | stored filename |
+| `retrieveMediaFile` | `{"filename": "x.png"}`                                                                                    | base64 contents |
+| `deleteMediaFile`   | `{"filename": "x.png"}`                                                                                    | —               |
 
 Reference stored media in fields with `<img src="x.png">` or `[sound:x.mp3]`.
 
 ## GUI
 
-| Action | Params | Result |
-|--------|--------|--------|
-| `guiBrowse` | `{"query": "deck:X"}` | opens the Browse window, returns matching card ids |
-| `guiDeckOverview` | `{"name": "X"}` | opens a deck's overview |
+| Action            | Params                | Result                                             |
+| ----------------- | --------------------- | -------------------------------------------------- |
+| `guiBrowse`       | `{"query": "deck:X"}` | opens the Browse window, returns matching card ids |
+| `guiDeckOverview` | `{"name": "X"}`       | opens a deck's overview                            |
 
 ## Error & duplicate handling
 

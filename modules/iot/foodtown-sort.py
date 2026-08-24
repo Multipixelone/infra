@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Sort the Home Assistant Foodtown todo list in Bedstuy walking order.
 
 Reads items from the configured ``todo.*`` entity via HA's REST API,

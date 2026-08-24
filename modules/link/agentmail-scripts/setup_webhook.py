@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Set up AgentMail webhook endpoint
 
@@ -20,9 +19,9 @@ Environment:
 """
 
 import argparse
+import json
 import os
 import sys
-import json
 
 try:
     from agentmail import AgentMail
@@ -95,7 +94,7 @@ def main():
                 print(f"   Inboxes: {', '.join(webhook.inbox_ids)}")
             print(f"   Created: {webhook.created_at}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Failed to create webhook: {e}")
             sys.exit(1)
 
@@ -118,7 +117,7 @@ def main():
                 print(f"   Created: {webhook.created_at}")
                 print()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Error listing webhooks: {e}")
             sys.exit(1)
 
@@ -127,7 +126,7 @@ def main():
             client.webhooks.delete(args.delete)
             print(f"✅ Webhook {args.delete} deleted successfully")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"❌ Failed to delete webhook: {e}")
             sys.exit(1)
 
@@ -140,7 +139,7 @@ def main():
 def start_test_server():
     """Start a simple Flask webhook receiver for testing"""
     try:
-        from flask import Flask, request, Response
+        from flask import Flask, Response, request
     except ImportError:
         print("Error: flask package not found. Install with: pip install flask")
         sys.exit(1)

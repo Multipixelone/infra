@@ -1,6 +1,6 @@
 # Card-writing rulebook (canonical)
 
-This is the single source of truth for *how* to write cards, shared by the
+This is the single source of truth for _how_ to write cards, shared by the
 `anki` and `anki-connect` skills. Read it before drafting cards and run the
 **self-review checklist** at the end before building/adding anything.
 
@@ -12,8 +12,8 @@ exactly one of them. Almost every rule below is a consequence of this idea.
 
 ## The 20 rules of formulating knowledge (condensed)
 
-Adapted from Piotr Woźniak's *Twenty Rules of Formulating Knowledge*. Each is one
-line; the ones that change card *structure* are expanded later.
+Adapted from Piotr Woźniak's _Twenty Rules of Formulating Knowledge_. Each is one
+line; the ones that change card _structure_ are expanded later.
 
 1. **Understand before you memorize.** Never make cards from material you don't
    yet understand — disconnected facts are nearly impossible to retain.
@@ -43,7 +43,7 @@ line; the ones that change card *structure* are expanded later.
 16. **Context cues simplify wording** — a topic tag or short lead-in beats a long,
     over-qualified question.
 17. **Redundancy is not bad** in knowledge (as opposed to data); multiple angles on
-    one fact strengthen it — but each angle is its *own* atomic card.
+    one fact strengthen it — but each angle is its _own_ atomic card.
 18. **Provide sources** so a card can be re-verified months later.
 19. **Provide date stamping** for knowledge that changes over time.
 20. **Prioritize.** Make cards for what matters; cutting low-value cards is itself a skill.
@@ -74,8 +74,9 @@ line; the ones that change card *structure* are expanded later.
 Choose the type deliberately; the wrong type is the most common quality failure.
 
 ### Use **Cloze** when…
-- The fact is most natural *inside a sentence / context*, and you want to test a
-  specific term, number, name, or date *in situ*.
+
+- The fact is most natural _inside a sentence / context_, and you want to test a
+  specific term, number, name, or date _in situ_.
   - `The capital of Australia is {{c1::Canberra}}.`
 - A **definition** where the surrounding sentence is the cue.
 - You have **several related blanks** from one sentence that genuinely belong
@@ -83,6 +84,7 @@ Choose the type deliberately; the wrong type is the most common quality failure.
 - Default to cloze for declarative facts-in-context; it's fast to write and study.
 
 ### Use **Basic** when…
+
 - There's a genuine **question → answer** with no useful sentence context.
   - Front: `What enzyme unwinds DNA at the replication fork?` → Back: `Helicase`
 - A **term ↔ definition** where you want clean recall in **one** direction only.
@@ -91,6 +93,7 @@ Choose the type deliberately; the wrong type is the most common quality failure.
 - The answer needs explanation/working that doesn't fit a single deletion.
 
 ### Use **Basic + Reversed** when…
+
 - The association must be recalled in **both** directions **and** both directions
   are individually unambiguous: vocabulary ↔ meaning, symbol ↔ name, term ↔
   one-line definition.
@@ -100,6 +103,7 @@ Choose the type deliberately; the wrong type is the most common quality failure.
   use plain Basic.
 
 ### Cloze anti-patterns — refuse / rewrite these
+
 - **Over-clozing**: so many deletions the sentence is unreadable or the remaining
   text gives no cue. Keep to **1–3 deletions** per card.
 - **Giveaways**: grammatical agreement or blank length that betrays the answer
@@ -118,6 +122,7 @@ Choose the type deliberately; the wrong type is the most common quality failure.
 Cloze syntax: `{{c1::answer}}` or with a hint `{{c1::answer::hint}}`.
 
 **Grouping with c-numbers** controls how many cards one note generates:
+
 - **Same number** = revealed **together on one card**. Use when the blanks are a
   single unit you'd recall at once.
   - `Water is {{c1::two}} parts {{c1::hydrogen}}, one part {{c1::oxygen}}.`
@@ -131,7 +136,7 @@ genuinely different facts, prefer different c-numbers (separate cards) or separa
 notes so scheduling is independent. Share `c1` only for a tight unit.
 
 **Overlapping clozes**: to test members of a group one-at-a-time while keeping the
-rest as context, give each its own number on the *same* sentence. This is the
+rest as context, give each its own number on the _same_ sentence. This is the
 right replacement for an enumeration (see below).
 
 **Hints** (`::hint`) normalize giveaways and disambiguate: use a category word, a
@@ -142,25 +147,30 @@ first letter, or a unit — never the answer itself.
 ## Bad → good gallery
 
 **Enumeration → overlapping cloze (or atomic cards)**
+
 - ❌ Front: `List the four chambers of the heart.` Back: `LA, RA, LV, RV`
 - ✅ `The heart's upper chambers are the {{c1::atria}} and lower chambers the {{c2::ventricles}}.`
 - ✅ (atomic) `What heart chamber pumps blood to the body?` → `Left ventricle`
 
 **Paragraph dump → atomic cards**
-- ❌ Front: `Explain the French Revolution.` Back: *(three sentences)*
+
+- ❌ Front: `Explain the French Revolution.` Back: _(three sentences)_
 - ✅ `The French Revolution began in {{c1::1789}}.`
 - ✅ `What event on 14 July 1789 sparked the French Revolution?` → `The storming of the Bastille`
 
 **Ambiguous cue → precise cue**
+
 - ❌ `Einstein?` → `Relativity` (many possible answers)
 - ✅ `Which physicist published the theory of general relativity (1915)?` → `Albert Einstein`
 
 **Giveaway cloze → hinted cloze**
+
 - ❌ `Mitochondria produce {{c1::ATP}} via aerobic respiration.` (fine) but
   `The powerhouse organelle is the {{c1::mitochondrion}}.` reversed cue is weak
 - ✅ `The cell's main {{c1::ATP::molecule}}-producing organelle is the mitochondrion.`
 
 **Two facts → two cards**
+
 - ❌ `Paris is the capital of {{c1::France}}, whose currency is the {{c1::euro}}.`
 - ✅ split: `Paris is the capital of {{c1::France}}.` and
   `The currency of France is the {{c1::euro}}.`

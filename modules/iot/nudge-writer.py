@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Write 0-3 nudge lines to sensor.fridge_nudges for the kitchen-iPad fridge dashboard.
 
 Reads household state from HA's REST API (todos, calendars, weather, presence).
@@ -161,8 +160,8 @@ def slim_forecast(forecast: list[dict]) -> list[dict]:
 
 
 def gather_facts() -> dict:
-    today = date.today()
-    now = datetime.now()
+    now = datetime.now().astimezone()
+    today = now.date()
 
     raw_chores = [
         i for i in get_todo_items(CHORES_TODO) if i.get("status") == "needs_action"
@@ -312,7 +311,7 @@ def phrase_chore(summary: str) -> str:
     obj = json.loads(text)
     line = obj.get("line")
     if not isinstance(line, str):
-        raise ValueError(f"non-string line field: {text!r}")
+        raise TypeError(f"non-string line field: {text!r}")
     return line.strip()
 
 
@@ -350,7 +349,7 @@ def post_sensor(lines: list[str], valid_minutes: int) -> None:
 def main() -> int:
     try:
         facts = gather_facts()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- CLI boundary reports operational failures.
         print(f"nudge-writer: gather_facts failed: {e}", file=sys.stderr)
         return 1
 
@@ -360,7 +359,7 @@ def main() -> int:
     if picks["chore_summary"]:
         try:
             chore_line = phrase_chore(picks["chore_summary"])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- CLI boundary reports API failures.
             print(f"nudge-writer: phrase_chore failed: {e}", file=sys.stderr)
             return 1
 
@@ -368,7 +367,7 @@ def main() -> int:
 
     try:
         post_sensor(lines, VALID_MINUTES)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- CLI boundary reports operational failures.
         print(f"nudge-writer: HA POST failed: {e}", file=sys.stderr)
         return 1
 

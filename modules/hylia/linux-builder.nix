@@ -17,17 +17,15 @@
         "aarch64-linux"
         "x86_64-linux"
       ];
-      config =
-        { ... }:
-        {
-          virtualisation = {
-            cores = 6;
-            darwin-builder = {
-              diskSize = 40 * 1024;
-              memorySize = 8 * 1024;
-            };
+      config = _: {
+        virtualisation = {
+          cores = 6;
+          darwin-builder = {
+            diskSize = 40 * 1024;
+            memorySize = 8 * 1024;
           };
         };
+      };
     };
   };
 }

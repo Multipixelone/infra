@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
 
 from ._ankiconnect import DEFAULT_ENDPOINT, AnkiConnectError, invoke
 from ._common import CardError, load_cards
@@ -48,9 +47,13 @@ def _store_media(data: dict, endpoint: str) -> None:
         for rel in card["media"]:
             path = (data["media_root"] / rel).resolve()
             if not path.is_file():
-                print(f"warning: media file not found, skipping: {path}", file=sys.stderr)
+                print(
+                    f"warning: media file not found, skipping: {path}", file=sys.stderr
+                )
                 continue
-            invoke("storeMediaFile", {"filename": path.name, "path": str(path)}, endpoint)
+            invoke(
+                "storeMediaFile", {"filename": path.name, "path": str(path)}, endpoint
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,7 +97,9 @@ def main(argv: list[str] | None = None) -> int:
         addable = [n for n, ok in zip(notes, addable_flags) if ok]
         skipped = len(notes) - len(addable)
 
-        results = invoke("addNotes", {"notes": addable}, args.endpoint) if addable else []
+        results = (
+            invoke("addNotes", {"notes": addable}, args.endpoint) if addable else []
+        )
     except AnkiConnectError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

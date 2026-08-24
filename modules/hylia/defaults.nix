@@ -12,18 +12,34 @@
         # listed here is removed from the Dock on activation.
         persistent-apps = [
           "/Applications/Firefox.app"
-          { spacer = { small = true; }; }
+          {
+            spacer = {
+              small = true;
+            };
+          }
           "/System/Applications/Messages.app"
           "/Applications/Slack.app"
-          { spacer = { small = true; }; }
+          {
+            spacer = {
+              small = true;
+            };
+          }
           "/Applications/Fantastical.app"
           "/Applications/Todoist.app"
-          { spacer = { small = true; }; }
+          {
+            spacer = {
+              small = true;
+            };
+          }
           "/Applications/Fluso.app"
           "/Applications/Notion.app"
           # NOTE: Adobe versions the path by year — bump on major upgrades.
           "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app"
-          { spacer = { small = true; }; }
+          {
+            spacer = {
+              small = true;
+            };
+          }
           "/Applications/Ghostty.app"
         ];
       };
