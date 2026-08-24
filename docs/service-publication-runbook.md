@@ -2,11 +2,11 @@
 
 This runbook implements the accepted contract in
 [`split-dns-service-publication.md`](split-dns-service-publication.md). The Nix
-registry and all non-secret projections exist, but rollout remains deliberately
-disabled until the remaining discovery and Cloudflare adoption inputs below
-are supplied by Finn. The accepted remote-state bucket is recorded below. No
-command in this runbook has been run against a live host, AWS account, or
-Cloudflare account as part of the implementation.
+registry and all non-secret projections exist, and Finn has accepted the
+Cloudflare adoption plan. Rollout remains deliberately disabled until its
+separate prerequisites below are satisfied. The accepted remote-state bucket
+is recorded below. No command in this runbook has been run against a live host,
+AWS account, or Cloudflare account as part of the implementation.
 
 ## Source and generated boundaries
 
@@ -79,12 +79,12 @@ by `cloudflared`.
 The non-secret OpenTofu values have one source of truth in
 `servicePublication.cloudflare` in `modules/service-publication/registry.nix`:
 
-| Nix option                                       | Current value                      | Required value                                      |
-| ------------------------------------------------ | ---------------------------------- | --------------------------------------------------- |
-| `servicePublication.cloudflare.accountId`        | `4b74fb7e0a35c9c1148bf0434d7fdffa` | the existing Cloudflare account ID                  |
-| `servicePublication.cloudflare.zoneId`           | `null`                             | the existing `finnrut.is` zone ID                   |
-| `servicePublication.cloudflare.tunnelName`       | `null`                             | the exact name of the existing Tunnel being adopted |
-| `servicePublication.cloudflare.adoptionComplete` | `false`                            | `true` only after the reviewed adoption plan below  |
+| Nix option                                       | Current value                      | Required value                                   |
+| ------------------------------------------------ | ---------------------------------- | ------------------------------------------------ |
+| `servicePublication.cloudflare.accountId`        | `4b74fb7e0a35c9c1148bf0434d7fdffa` | the existing Cloudflare account ID               |
+| `servicePublication.cloudflare.zoneId`           | `d8bb324032c2738ff17efde63e9a7988` | the existing `finnrut.is` zone ID                |
+| `servicePublication.cloudflare.tunnelName`       | `link`                             | the exact name of the adopted Tunnel             |
+| `servicePublication.cloudflare.adoptionComplete` | `true`                             | accepted after review of the adoption plan below |
 
 The wrapper receives these values from a generated Nix-store file. It refuses
 to initialize OpenTofu when any identifier is still `null`. Enabling
