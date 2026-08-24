@@ -162,5 +162,6 @@ using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.github/workflows/service-publication.yaml`
 - `.gitignore`
+- `.gitleaks.toml`
 - `README.md`
 - `infra/service-publication/registry.json`

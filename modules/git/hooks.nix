@@ -15,6 +15,18 @@
   perSystem =
     { config, pkgs, ... }:
     {
+      files.file.".gitleaks.toml".source = (pkgs.formats.toml { }).generate "gitleaks.toml" {
+        title = "infra gitleaks configuration";
+        allowlists = [
+          {
+            description = "DNSCrypt resolver-list Minisign public verification key";
+            regexTarget = "secret";
+            regexes = [ "^RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3$" ];
+          }
+        ];
+        extend.useDefault = true;
+      };
+
       make-shells.default = {
         inputsFrom = [
           config.pre-commit.devShell
