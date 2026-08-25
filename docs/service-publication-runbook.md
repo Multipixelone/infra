@@ -240,11 +240,18 @@ Runtime probe inputs are:
 
 - `SERVICE_PUBLICATION_BLOCKY_ADDRESS` optionally overrides the declarative
   internal-DNS host address for diagnostic LAN probes;
-- `SERVICE_PUBLICATION_VPN_PROBE_COMMAND`, executed on a genuine VPN client and
-  expected to run the generated inventory's VPN checks; and
+- `SERVICE_PUBLICATION_VPN_PROBE_COMMAND`, optional, executed on a genuine VPN
+  client and expected to run the generated inventory's VPN checks. No VPN client
+  is guaranteed to be up, so leaving it unset is allowed: the deploy prints that
+  the VPN view stays unproven and continues on the LAN proof alone. Set it (for
+  example an `ssh <client>` wrapper around `service-publication-smoke vpn`) for
+  any change where the VPN path has to be verified before publication; and
 - `SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND` for public routes, executed
   outside Blocky/VPN. Access service-token values must be passed through that
-  runner's secret environment and never printed.
+  runner's secret environment and never printed. It is required only when the
+  registry publishes at least one public route, or when this deployment
+  withdraws one; a registry with no public routes skips external verification
+  and says so.
 
 Useful diagnostic forms are:
 

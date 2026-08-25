@@ -86,8 +86,8 @@ writeShellApplication {
     run_internal_smoke() {
       service-publication-smoke lan "$route_filter"
       if [[ -z ''${SERVICE_PUBLICATION_VPN_PROBE_COMMAND:-} ]]; then
-        echo "SERVICE_PUBLICATION_VPN_PROBE_COMMAND is required to prove the VPN view" >&2
-        return 1
+        echo "no SERVICE_PUBLICATION_VPN_PROBE_COMMAND set; the VPN view stays unproven for this run" >&2
+        return 0
       fi
       SERVICE_PUBLICATION_ROUTE_FILTER="$route_filter" bash -c "$SERVICE_PUBLICATION_VPN_PROBE_COMMAND"
     }
@@ -108,7 +108,7 @@ writeShellApplication {
     else
       stage "deploy generated NixOS service configuration"
       colmena apply --on @service-publication
-      stage "prove LAN and VPN origin readiness before publication"
+      stage "prove LAN origin readiness (and the VPN view when a probe is configured) before publication"
       run_internal_smoke
       stage "apply Access-protected Cloudflare publication"
       service-publication-tofu apply
@@ -116,7 +116,12 @@ writeShellApplication {
 
     stage "run complete internal and external smoke verification"
     run_internal_smoke
-    run_external_smoke
+    public_count=$(jq -n --argjson routes "$current_public" '$routes | length')
+    if ((public_count > 0 || removed > 0)); then
+      run_external_smoke
+    else
+      echo "registry publishes no public routes and none were withdrawn; skipping external smoke verification" >&2
+    fi
 
     revision=$(git rev-parse HEAD)
     sudo install -d -m 0750 "$state_dir"
