@@ -48,14 +48,28 @@ writeShellApplication {
     fi
 
     if [[ $context == external ]]; then
-      mapfile -t routes < <(jq -c --arg route "$route_filter" ".externalProbes[] | $select_filter" "$registry_file")
+      probe_list=externalProbes
     else
-      mapfile -t routes < <(jq -c --arg route "$route_filter" ".internalProbes[] | $select_filter" "$registry_file")
+      probe_list=internalProbes
     fi
 
-    if ((''${#routes[@]} == 0)) && [[ -n $route_filter ]]; then
-      echo "no generated $context probe matches $route_filter" >&2
-      exit 1
+    # Assign first so errexit sees jq's status; a process substitution would hide it.
+    routes_json=$(jq -c --arg route "$route_filter" ".''${probe_list}[] | $select_filter" "$registry_file")
+    routes=()
+    if [[ -n $routes_json ]]; then
+      mapfile -t routes <<<"$routes_json"
+    fi
+
+    if ((''${#routes[@]} == 0)); then
+      if [[ -n $route_filter ]]; then
+        echo "no generated $context probe matches $route_filter" >&2
+        exit 1
+      elif [[ $context == external ]]; then
+        echo "0 external probes - nothing validated (generated $probe_list is empty)" >&2
+      else
+        echo "generated $probe_list is empty; $context smoke validated no route" >&2
+        exit 1
+      fi
     fi
 
     for route in "''${routes[@]}"; do
