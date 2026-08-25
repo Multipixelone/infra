@@ -113,8 +113,13 @@ writeShellApplication {
 
     run_external_smoke() {
       if [[ -z ''${SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND:-} ]]; then
-        echo "SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND is required for public and private DNS verification" >&2
-        return 1
+        # The probe resolves public hostnames through the public resolver and pins
+        # curl to that address, so it reaches the real edge even from the LAN. Only
+        # the source address stays local; set the variable to a runner outside the
+        # network for changes that have to prove a foreign client path too.
+        echo "no SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND set; verifying the edge from here against the public resolver" >&2
+        service-publication-smoke external "$route_filter"
+        return
       fi
       SERVICE_PUBLICATION_ROUTE_FILTER="$route_filter" bash -c "$SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND"
     }

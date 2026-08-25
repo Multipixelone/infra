@@ -260,13 +260,22 @@ Runtime probe inputs are:
   is guaranteed to be up, so leaving it unset is allowed: the deploy prints that
   the VPN view stays unproven and continues on the LAN proof alone. Set it (for
   example an `ssh <client>` wrapper around `service-publication-smoke vpn`) for
-  any change where the VPN path has to be verified before publication; and
-- `SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND` for public routes, executed
-  outside Blocky/VPN. Access service-token values must be passed through that
-  runner's secret environment and never printed. It is required only when the
-  registry publishes at least one public route, or when this deployment
-  withdraws one; a registry with no public routes skips external verification
-  and says so.
+  any change where the VPN path has to be verified before publication;
+- `SERVICE_PUBLICATION_EXTERNAL_RESOLVER` optionally overrides the public
+  resolver (default `1.1.1.1`) that the external probe resolves published
+  hostnames through and asserts private names against; and
+- `SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND`, optional, an off-network runner
+  for the external checks. Access service-token values must be passed through
+  that runner's secret environment and never printed. Left unset, the deploy
+  runs `service-publication-smoke external` locally: the probe resolves each
+  published hostname through the public resolver and pins curl to that address,
+  so Blocky's split-horizon record cannot short-circuit it and Access is proven
+  at the real edge. The probe fails rather than passing quietly if the public
+  resolver has no answer, or answers with a private address. Only the source
+  address remains local, so set the variable for changes that must also prove a
+  foreign client path. External verification runs only when the registry
+  publishes at least one public route, or when this deployment withdraws one; a
+  registry with no public routes skips it and says so.
 
 Useful diagnostic forms are:
 

@@ -27,6 +27,7 @@ writeShellApplication {
     context=''${1:-lan}
     route_filter=''${2:-}
     blocky_address_override=''${SERVICE_PUBLICATION_BLOCKY_ADDRESS:-}
+    external_resolver=''${SERVICE_PUBLICATION_EXTERNAL_RESOLVER:-1.1.1.1}
 
     case "$context" in
     lan | vpn | external) ;;
@@ -79,8 +80,26 @@ writeShellApplication {
       timeout=$(jq -r .timeoutSeconds <<<"$route")
 
       if [[ $context == external ]]; then
+        # Resolve through the public resolver and pin curl to that address. Run from
+        # the LAN, the system resolver is Blocky, whose split-horizon record would
+        # send the probe straight at the local proxy and never reach Access at all.
+        edge=""
+        while read -r candidate; do
+          [[ $candidate =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && edge=$candidate
+        done < <(dig "@$external_resolver" +short "$hostname" A)
+        if [[ -z $edge ]]; then
+          echo "$key: $hostname has no public A record on $external_resolver" >&2
+          exit 1
+        fi
+        case "$edge" in
+        10.* | 127.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[01].*)
+          echo "$key: $external_resolver returned private address $edge for $hostname; the external probe cannot reach the edge from here" >&2
+          exit 1
+          ;;
+        esac
         if [[ -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
           challenge=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
+            --resolve "$hostname:443:$edge" \
             --write-out '%{http_code} %{redirect_url}' "https://$hostname$path")
           read -r status redirect_url <<<"$challenge"
           case "$status" in
@@ -108,6 +127,7 @@ writeShellApplication {
           status=$(printf 'header = "CF-Access-Client-Id: %s"\nheader = "CF-Access-Client-Secret: %s"\n' \
             "$access_id" "$access_secret" |
             curl --config - --silent --show-error --output /dev/null --max-time "$timeout" \
+              --resolve "$hostname:443:$edge" \
               --write-out '%{http_code}' "https://$hostname$path")
           jq -e --argjson status "$status" '.expectedStatuses | index($status) != null' <<<"$route" >/dev/null || {
             echo "$key: Access-aware external health returned $status" >&2
@@ -152,7 +172,6 @@ writeShellApplication {
     done
 
     if [[ $context == external ]]; then
-      external_resolver=''${SERVICE_PUBLICATION_EXTERNAL_RESOLVER:-1.1.1.1}
       mapfile -t private_names < <(jq -r '
         .applications | to_entries[] |
         if .value.public then .value.alias else .value.canonical end |
