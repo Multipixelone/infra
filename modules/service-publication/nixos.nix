@@ -23,6 +23,7 @@ let
       site = registry.sites.${host.site};
       trustedCidrs = site.trustedClientCidrs;
       connectorHost = registry.hosts.${site.publicIngressHost};
+      connectorIsRemote = site.publicIngressHost != hostName;
       publicOnProxy =
         proxyProjection != null
         && lib.any (
@@ -46,8 +47,16 @@ let
 
           nginxAcl = lib.concatMapStrings (cidr: "allow ${cidr};\n") trustedCidrs + "deny all;";
           nginxPublicAcl = lib.concatMapStrings (cidr: "allow ${cidr};\n") allowedProxySources + "deny all;";
+          # Keeping the connector off an internal-only route is a source-address
+          # rule, so it only means anything while the connector is a separate
+          # host. When it runs on the proxy itself it dials the vhost over the
+          # proxy's own LAN address, which is also the source address of the
+          # generated health probe and of every other local client, so the deny
+          # would 403 the probe rather than the connector. Non-public routes are
+          # already answered with http_status:404 at the tunnel ingress.
           nginxInternalOnlyAcl =
-            lib.optionalString publicOnProxy "deny ${connectorHost.addresses.lan};\n" + nginxAcl;
+            lib.optionalString (publicOnProxy && connectorIsRemote) "deny ${connectorHost.addresses.lan};\n"
+            + nginxAcl;
 
           mkLocation = route: {
             proxyPass = "${route.backend.scheme}://${route.backendAddress}:${toString route.backend.port}";
