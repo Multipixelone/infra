@@ -190,6 +190,15 @@ in
           ];
         };
       };
+      mediaHomepageOrder = {
+        plex = 0;
+        tautulli = 1;
+        seerr = 2;
+        radarr = 3;
+        sonarr = 4;
+        bazarr = 5;
+        calibre = 6;
+      };
       homepageServices =
         let
           listed = lib.filterAttrs (_: app: app.homepage.enable) serviceApplications;
@@ -201,6 +210,7 @@ in
               monitorRoute = builtins.head (if roots == [ ] then routes else roots);
             in
             {
+              serviceName = name;
               group = application.homepage.group;
               displayName =
                 if application.homepage.name != null then application.homepage.name else lib.toSentenceCase name;
@@ -222,7 +232,9 @@ in
         in
         lib.mapAttrsToList (group: items: {
           ${group} = map (item: { ${item.displayName} = item.entry; }) (
-            lib.sortOn (item: item.displayName) items
+            lib.sortOn (
+              item: if group == "Media" then mediaHomepageOrder.${item.serviceName} else item.displayName
+            ) items
           );
         }) (builtins.groupBy (item: item.group) entries);
 
