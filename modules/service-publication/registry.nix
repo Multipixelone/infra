@@ -112,6 +112,39 @@ let
           type = types.nullOr types.str;
           default = null;
         };
+        homepage = mkOption {
+          type = types.submodule {
+            options = {
+              enable = mkOption {
+                type = types.bool;
+                default = true;
+                description = "List this application on the Homepage dashboard.";
+              };
+              name = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Display name; defaults to the sentence-cased application key.";
+              };
+              group = mkOption {
+                type = types.str;
+                default = "Services";
+                description = "Homepage group the application is listed under.";
+              };
+              description = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Short blurb rendered under the link.";
+              };
+              icon = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Homepage icon name (dashboard-icons), e.g. \"radarr\".";
+              };
+            };
+          };
+          default = { };
+          description = "Presentation metadata for the Homepage dashboard. The inventory projection drops it, so it never reaches registry.json or OpenTofu.";
+        };
         access = mkOption {
           type = accessType;
           default = { };
@@ -387,6 +420,11 @@ in
       applications = {
         grafana = {
           site = "nyc";
+          homepage = {
+            group = "Observability";
+            description = "Metrics, logs, alerts, and SLO drill-down";
+            icon = "grafana";
+          };
           routes.root = {
             backend = {
               host = "link";
@@ -401,6 +439,8 @@ in
         };
         homepage = {
           site = "nyc";
+          # The dashboard does not link to itself.
+          homepage.enable = false;
           routes.root = {
             backend = {
               host = "link";
@@ -426,6 +466,11 @@ in
         # background jobs.
         radarr = {
           site = "nyc";
+          homepage = {
+            group = "Media";
+            description = "Movie collection automation";
+            icon = "radarr";
+          };
           routes.root = {
             backend = {
               host = "alexandria";
@@ -440,6 +485,11 @@ in
         };
         sonarr = {
           site = "nyc";
+          homepage = {
+            group = "Media";
+            description = "TV collection automation";
+            icon = "sonarr";
+          };
           routes.root = {
             backend = {
               host = "alexandria";
@@ -459,6 +509,13 @@ in
           site = "nyc";
           public = true;
           publicHostname = "requests.finnrut.is";
+          homepage = {
+            group = "Media";
+            description = "Movie and TV requests";
+            # dashboard-icons has no seerr entry yet; the predecessor's mark
+            # is the same app family.
+            icon = "overseerr";
+          };
           access.policy = "family";
           routes.root = {
             backend = {
@@ -474,6 +531,12 @@ in
         };
         nzbhydra2 = {
           site = "nyc";
+          homepage = {
+            group = "Downloads";
+            name = "NZBHydra2";
+            description = "Usenet meta search";
+            icon = "nzbhydra2";
+          };
           routes.root = {
             backend = {
               host = "alexandria";
@@ -490,6 +553,11 @@ in
         };
         bazarr = {
           site = "nyc";
+          homepage = {
+            group = "Media";
+            description = "Subtitle automation";
+            icon = "bazarr";
+          };
           routes.root = {
             backend = {
               host = "alexandria";
@@ -509,6 +577,12 @@ in
         # sabnzbd.ini by hand before this route can answer through the proxy.
         sabnzbd = {
           site = "nyc";
+          homepage = {
+            group = "Downloads";
+            name = "SABnzbd";
+            description = "Usenet downloader";
+            icon = "sabnzbd";
+          };
           routes.root = {
             backend = {
               host = "alexandria";
@@ -525,6 +599,11 @@ in
         };
         tautulli = {
           site = "nyc";
+          homepage = {
+            group = "Media";
+            description = "Plex activity and history";
+            icon = "tautulli";
+          };
           routes.root = {
             backend = {
               host = "alexandria";

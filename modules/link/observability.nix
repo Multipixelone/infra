@@ -1,4 +1,9 @@
-{ config, inputs, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 let
   inherit (config) observability;
   inherit (config.flake.meta.owner) email username;
@@ -6,6 +11,48 @@ let
   localCutover = config.servicePublication.rollout.enableLocalCutover;
   grafanaCanonical = serviceInventory.applications.grafana.canonical;
   homepageCanonical = serviceInventory.applications.homepage.canonical;
+  # Homepage tiles come from the service-publication registry, so every
+  # application registered there is listed automatically. Links use the
+  # canonical hostname (blocky resolves it for every trusted client); the
+  # status dot probes the backend health target directly because Homepage
+  # checks server-side from link, which must not depend on its own proxy or
+  # DNS path to report a backend down.
+  homepageServiceGroups =
+    let
+      listed = lib.filterAttrs (
+        _: application: application.homepage.enable
+      ) config.servicePublication.applications;
+      entries = lib.mapAttrsToList (
+        name: application:
+        let
+          routes = builtins.filter (route: route.application == name) (
+            builtins.attrValues serviceInventory.routes
+          );
+          rootRoutes = builtins.filter (route: route.pathPrefix == "/") routes;
+          monitorRoute = builtins.head (if rootRoutes == [ ] then routes else rootRoutes);
+        in
+        {
+          inherit (application) homepage;
+          displayName =
+            if application.homepage.name != null then application.homepage.name else lib.toSentenceCase name;
+          entry = {
+            href = "https://${serviceInventory.applications.${name}.canonical}";
+            siteMonitor = "${monitorRoute.backend.scheme}://${monitorRoute.backendAddress}:${toString monitorRoute.backend.port}${monitorRoute.health.path}";
+          }
+          // lib.optionalAttrs (application.homepage.description != null) {
+            inherit (application.homepage) description;
+          }
+          // lib.optionalAttrs (application.homepage.icon != null) {
+            inherit (application.homepage) icon;
+          };
+        }
+      ) listed;
+    in
+    lib.mapAttrsToList (group: groupEntries: {
+      ${group} = map (item: { ${item.displayName} = item.entry; }) (
+        lib.sortOn (item: item.displayName) groupEntries
+      );
+    }) (builtins.groupBy (item: item.homepage.group) entries);
   publicationSite =
     config.servicePublication.sites.${config.servicePublication.applications.grafana.site};
   effectiveTrustedCidrs =
@@ -1073,27 +1120,27 @@ in
           statusStyle = "dot";
           hideVersion = true;
         };
-        services = [
-          {
-            Observability =
-              map
-                (endpoint: {
-                  "${endpoint.description}" = {
-                    href =
-                      if localCutover && endpoint == grafana then
-                        "https://${grafanaCanonical}"
-                      else
-                        "https://${endpoint.dnsName}";
-                    inherit (endpoint) description;
-                  };
-                })
-                (
-                  builtins.filter (
-                    endpoint: endpoint.homepage && endpoint.dnsName != homepage.dnsName
-                  ) privateEndpoints
-                );
-          }
-        ];
+        services =
+          if localCutover then
+            homepageServiceGroups
+          else
+            [
+              {
+                Observability =
+                  map
+                    (endpoint: {
+                      "${endpoint.description}" = {
+                        href = "https://${endpoint.dnsName}";
+                        inherit (endpoint) description;
+                      };
+                    })
+                    (
+                      builtins.filter (
+                        endpoint: endpoint.homepage && endpoint.dnsName != homepage.dnsName
+                      ) privateEndpoints
+                    );
+              }
+            ];
         widgets = [
           {
             resources = {
