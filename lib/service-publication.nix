@@ -541,17 +541,29 @@ let
         # whose own access block never names a policy still emits a base Access
         # application. Cloudflare binds that policy as the default at the lowest
         # precedence, so every emitted application must name a real, adopted one.
+        # Import-readiness only proves a policy body was read back from
+        # Cloudflare, not that it protects anything: the last-precedence default
+        # has to actually gate identity, or the application is open to whoever
+        # reaches the Access login page.
         ++ concatMap (
           application:
           let
             policy = application.access.policy;
+            known = policy != null && builtins.hasAttr policy accessPolicies;
+            definition = if known then accessPolicies.${policy} else null;
           in
           optional (
-            policy == null || !(builtins.hasAttr policy accessPolicies)
+            !known
           ) "Access application ${application.key}: default Access policy is missing or unknown"
           ++ optional (
-            policy != null && builtins.hasAttr policy accessPolicies && !(builtins.hasAttr policy readyPolicies)
+            known && !(builtins.hasAttr policy readyPolicies)
           ) "Access application ${application.key}: default Access policy ${policy} is not import-ready"
+          ++
+            optional (known && definition.decision != "allow")
+              "Access application ${application.key}: default Access policy ${policy} decides ${definition.decision}; a default policy must decide allow"
+          ++
+            optional (known && lib.any (rule: rule ? everyone) definition.include)
+              "Access application ${application.key}: default Access policy ${policy} includes an everyone rule; a default policy must gate identity"
         ) accessApplications;
 
       errors =

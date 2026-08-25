@@ -217,7 +217,7 @@ let
       cloudflareImportKey = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = "Bootstrap-only existing resource ID. Null keeps the policy unavailable for publication.";
+        description = "Bootstrap-only existing resource ID, recorded when the policy body was read back from Cloudflare. Informational: no OpenTofu import block consumes it, it only marks the policy import-ready. Null keeps the policy unavailable for publication.";
       };
       decision = mkOption {
         type = types.enum [

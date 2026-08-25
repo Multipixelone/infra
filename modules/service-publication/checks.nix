@@ -193,6 +193,26 @@ let
     }
   );
 
+  everyoneDefaultPolicy = publicationLib.resolve (
+    registry
+    // {
+      accessPolicies = registry.accessPolicies // {
+        family = registry.accessPolicies.family // {
+          decision = "bypass";
+          include = [ { everyone = { }; } ];
+        };
+      };
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // {
+            policy = "family";
+          };
+        };
+      };
+    }
+  );
+
   # marin declares no reachableFromProxyHosts, unlike alexandria, which the
   # real registry marks reachable from link.
   unreachableBackend = publicationLib.resolve (
@@ -254,6 +274,10 @@ let
     assert lib.assertMsg
       (hasError "default Access policy is missing or unknown" unboundApplicationPolicy)
       "application-level default Access policy validation regressed";
+    assert lib.assertMsg (hasError "includes an everyone rule" everyoneDefaultPolicy)
+      "everyone-rule default Access policy validation regressed";
+    assert lib.assertMsg (hasError "decides bypass" everyoneDefaultPolicy)
+      "non-allow default Access policy validation regressed";
     assert lib.assertMsg (hasError "does not declare reachability" unreachableBackend)
       "remote backend reachability validation regressed";
     inventory;
