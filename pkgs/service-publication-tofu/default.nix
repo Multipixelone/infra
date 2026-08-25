@@ -58,7 +58,13 @@ writeShellApplication {
       AWS_SESSION_TOKEN \
       AWS_SHARED_CREDENTIALS_FILE \
       AWS_WEB_IDENTITY_TOKEN_FILE \
-      CLOUDFLARE_API_TOKEN
+      CLOUDFLARE_ACCOUNT_ID \
+      CLOUDFLARE_API_KEY \
+      CLOUDFLARE_API_TOKEN \
+      CLOUDFLARE_API_USER_SERVICE_KEY \
+      CLOUDFLARE_BASE_URL \
+      CLOUDFLARE_EMAIL \
+      CLOUDFLARE_USER_AGENT_OPERATOR_SUFFIX
     # Never trace assignments loaded from runtime credential files.
     set +x
     set -a

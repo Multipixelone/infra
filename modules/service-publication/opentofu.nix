@@ -86,6 +86,9 @@ args@{
         text = ''
           : "''${SERVICE_PUBLICATION_TEST_TOFU_LOG:?test log is required}"
           printf '%s\n' "$*" >> "$SERVICE_PUBLICATION_TEST_TOFU_LOG"
+          if [[ -n ''${SERVICE_PUBLICATION_TEST_TOFU_ENV_LOG:-} ]]; then
+            env | grep -E '^CLOUDFLARE_' >> "$SERVICE_PUBLICATION_TEST_TOFU_ENV_LOG" || true
+          fi
           if [[ $* == *" show -json "* ]]; then
             printf '{"resource_changes":%s}\n' "''${SERVICE_PUBLICATION_TEST_RESOURCE_CHANGES:-[]}"
           fi
@@ -338,6 +341,7 @@ args@{
               pkgs.bash
               pkgs.coreutils
             ];
+            adoptedTofu = lib.getExe servicePublicationTofuAdoptedTestTool;
             tofu = lib.getExe servicePublicationTofuTestTool;
           }
           ''
@@ -464,6 +468,34 @@ args@{
                 exit 1
               fi
             done
+
+            # The provider reads a whole family of Cloudflare variables, so none of
+            # them may survive from the operator's ambient environment.
+            ambient_env_log="$tmpdir/cloudflare-ambient-env.log"
+            CLOUDFLARE_ACCOUNT_ID=ambient-account \
+              CLOUDFLARE_API_KEY=ambient-global-key \
+              CLOUDFLARE_API_TOKEN=ambient-token \
+              CLOUDFLARE_API_USER_SERVICE_KEY=ambient-service-key \
+              CLOUDFLARE_BASE_URL=https://ambient.example.net \
+              CLOUDFLARE_EMAIL=ambient@example.net \
+              CLOUDFLARE_USER_AGENT_OPERATOR_SUFFIX=ambient-suffix \
+              SERVICE_PUBLICATION_REPO_ROOT="$PWD" \
+              SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws-complete.env" \
+              SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare-api.env" \
+              SERVICE_PUBLICATION_TEST_TOFU_LOG="$tmpdir/ambient-tofu.log" \
+              SERVICE_PUBLICATION_TEST_TOFU_ENV_LOG="$ambient_env_log" \
+              "$adoptedTofu" plan > "$tmpdir/cloudflare-ambient.out" 2>&1
+            if grep -Eq '^CLOUDFLARE_(ACCOUNT_ID|API_KEY|API_USER_SERVICE_KEY|BASE_URL|EMAIL|USER_AGENT_OPERATOR_SUFFIX)=' \
+              "$ambient_env_log"; then
+              echo "ambient Cloudflare provider variables survived into the OpenTofu environment" >&2
+              cat "$ambient_env_log" >&2
+              exit 1
+            fi
+            if ! grep -Fxq 'CLOUDFLARE_API_TOKEN=example-token' "$ambient_env_log"; then
+              echo "the reviewed Cloudflare token did not reach the OpenTofu environment" >&2
+              cat "$ambient_env_log" >&2
+              exit 1
+            fi
 
             if grep -Eq 'SERVICE_PUBLICATION_TUNNEL_SECRET_FILE|TF_VAR_tunnel_secret|service-publication-tunnel-secret' "$tofu"; then
               echo "service-publication-tofu still depends on an unnecessary Tunnel secret" >&2
