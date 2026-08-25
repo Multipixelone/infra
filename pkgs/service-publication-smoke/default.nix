@@ -2,6 +2,7 @@
   bind,
   coreutils,
   curl,
+  gitMinimal,
   jq,
   writeShellApplication,
 }:
@@ -11,11 +12,18 @@ writeShellApplication {
     bind
     coreutils
     curl
+    gitMinimal
     jq
   ];
   text = ''
-    repo_root=$(git rev-parse --show-toplevel)
-    registry_file=''${SERVICE_PUBLICATION_REGISTRY:-$repo_root/infra/service-publication/registry.json}
+    registry_file=''${SERVICE_PUBLICATION_REGISTRY:-}
+    if [[ -z $registry_file ]]; then
+      if ! repo_root=$(git rev-parse --show-toplevel); then
+        echo "no repository checkout to resolve the generated registry from; set SERVICE_PUBLICATION_REGISTRY" >&2
+        exit 1
+      fi
+      registry_file=$repo_root/infra/service-publication/registry.json
+    fi
     context=''${1:-lan}
     route_filter=''${2:-}
     blocky_address_override=''${SERVICE_PUBLICATION_BLOCKY_ADDRESS:-}
