@@ -99,10 +99,16 @@ writeShellApplication {
             exit 1
           fi
         else
-          status=$(curl --silent --show-error --output /dev/null --max-time "$timeout" --write-out '%{http_code}' \
-            --header "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-            --header "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            "https://$hostname$path")
+          # Feed the service token to curl through a config on stdin: header values
+          # on argv would be readable in /proc/<pid>/cmdline for the probe's lifetime.
+          access_id=''${CF_ACCESS_CLIENT_ID//\\/\\\\}
+          access_id=''${access_id//\"/\\\"}
+          access_secret=''${CF_ACCESS_CLIENT_SECRET//\\/\\\\}
+          access_secret=''${access_secret//\"/\\\"}
+          status=$(printf 'header = "CF-Access-Client-Id: %s"\nheader = "CF-Access-Client-Secret: %s"\n' \
+            "$access_id" "$access_secret" |
+            curl --config - --silent --show-error --output /dev/null --max-time "$timeout" \
+              --write-out '%{http_code}' "https://$hostname$path")
           jq -e --argjson status "$status" '.expectedStatuses | index($status) != null' <<<"$route" >/dev/null || {
             echo "$key: Access-aware external health returned $status" >&2
             exit 1
