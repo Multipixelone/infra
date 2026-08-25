@@ -220,6 +220,16 @@ only the terminal `http_status:404` catch-all. If an adoption plan proposes
 removing existing live ingress entries, treat that as destructive operational
 drift: reconcile the registry and do not apply the removal.
 
+The wrapper enforces that rule instead of trusting review. Every `plan`,
+`adoption-plan`, and `apply` compares the planned Tunnel configuration's
+`before` and `after` ingress: hostnames that disappear abort an `apply` before
+its approval prompt, and both plan paths print the same list as a warning.
+`service-publication-deploy` passes the canonical hostnames of the public
+routes it withdraws in `SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS`
+(comma- or space-separated), so a registry-modelled unpublish still applies.
+Set that variable by hand only for a reviewed removal of ingress the registry
+never modelled.
+
 Only after the adoption plan is accepted, change
 `servicePublication.cloudflare.adoptionComplete` to `true`. Then run
 `just deploy-services plan-only` for the final normal gated plan. Apply only

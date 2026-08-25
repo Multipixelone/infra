@@ -67,11 +67,13 @@ writeShellApplication {
       previous_public='[]'
       previous_origins='{}'
       previous_ingress='{}'
+      previous_canonical='{}'
     else
       previous_revision=$(<"$revision_file")
       previous_public=$(git show "$previous_revision:$registry" | jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort')
       previous_origins=$(git show "$previous_revision:$registry" | jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)')
       previous_ingress=$(git show "$previous_revision:$registry" | jq -c '.cloudflare.tunnel.ingressHost')
+      previous_canonical=$(git show "$previous_revision:$registry" | jq -c '.applications | map_values(.canonical)')
     fi
     current_public=$(jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort' "$registry")
     current_origins=$(jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)' "$registry")
@@ -83,6 +85,15 @@ writeShellApplication {
       echo "mixed publication additions/removals require separate reviewed deployments" >&2
       exit 1
     fi
+    # The tofu wrapper refuses any Tunnel ingress removal it was not told to expect;
+    # the withdrawn public routes of this deploy are exactly the reviewed exception.
+    SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS=$(jq -rn \
+      --argjson old "$previous_public" \
+      --argjson new "$current_public" \
+      --argjson canonical "$previous_canonical" '
+      [($old - $new)[] | $canonical[split("/")[0]] // empty] | unique | join(",")
+    ')
+    export SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS
     origin_moves=$(jq -n --argjson old "$previous_origins" --argjson new "$current_origins" '
       [$old | keys[] as $key | select($new[$key] != null and $new[$key] != $old[$key])] | length
     ')

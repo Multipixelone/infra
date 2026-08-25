@@ -621,6 +621,74 @@ args@{
             touch "$out"
           '';
 
+      checks.service-publication-tunnel-ingress-guard =
+        pkgs.runCommand "service-publication-tunnel-ingress-guard"
+          {
+            adoptedTofu = lib.getExe servicePublicationTofuAdoptedTestTool;
+          }
+          ''
+            set -euo pipefail
+
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+            printf '%s\n' \
+              "AWS_ACCESS_KEY_ID=example-access-key" \
+              "AWS_SECRET_ACCESS_KEY=example-secret-key" > "$tmpdir/aws.env"
+            printf '%s\n' "CLOUDFLARE_API_TOKEN=example-token" > "$tmpdir/cloudflare.env"
+
+            # One adopted hostname disappears from the Tunnel ingress while another survives.
+            dropping_plan='[{"type":"cloudflare_zero_trust_tunnel_cloudflared_config","change":{"actions":["update"],"before":{"config":{"ingress":[{"hostname":"adopted.example.net","service":"http://localhost:5030"},{"hostname":"kept.example.net","service":"http://localhost:5800"},{"service":"http_status:404"}]}},"after":{"config":{"ingress":[{"hostname":"kept.example.net","service":"http://localhost:5800"},{"service":"http_status:404"}]}}}}]'
+
+            run_wrapper() {
+              SERVICE_PUBLICATION_REPO_ROOT="$tmpdir" \
+                SERVICE_PUBLICATION_AWS_CREDENTIALS_ENV="$tmpdir/aws.env" \
+                SERVICE_PUBLICATION_CLOUDFLARE_API_ENV="$tmpdir/cloudflare.env" \
+                SERVICE_PUBLICATION_TEST_TOFU_LOG="$tmpdir/tofu.log" \
+                SERVICE_PUBLICATION_TEST_RESOURCE_CHANGES="$dropping_plan" \
+                "$adoptedTofu" "$@"
+            }
+
+            rm -f "$tmpdir/tofu.log"
+            set +e
+            SERVICE_PUBLICATION_APPROVE=APPLY \
+              run_wrapper apply > "$tmpdir/unreviewed-apply.out" 2>&1
+            unreviewed_apply_status=$?
+            set -e
+            if [ "$unreviewed_apply_status" -eq 0 ] \
+              || ! grep -Fq 'adopted.example.net' "$tmpdir/unreviewed-apply.out" \
+              || ! grep -Fq 'refusing to silently unpublish those hostnames' "$tmpdir/unreviewed-apply.out"; then
+              echo "apply did not refuse an unreviewed Tunnel ingress removal" >&2
+              cat "$tmpdir/unreviewed-apply.out" >&2
+              exit 1
+            fi
+            if grep -Fq 'kept.example.net' "$tmpdir/unreviewed-apply.out"; then
+              echo "the ingress guard reported a hostname the plan keeps" >&2
+              cat "$tmpdir/unreviewed-apply.out" >&2
+              exit 1
+            fi
+            if grep -Fq ' apply ' "$tmpdir/tofu.log"; then
+              echo "an unreviewed Tunnel ingress removal reached apply" >&2
+              exit 1
+            fi
+
+            rm -f "$tmpdir/tofu.log"
+            run_wrapper plan > "$tmpdir/plan.out" 2>&1
+            if ! grep -Fq 'WARNING: applying this plan would unpublish those hostnames' "$tmpdir/plan.out" \
+              || ! grep -Fq 'adopted.example.net' "$tmpdir/plan.out"; then
+              echo "plan did not warn about the Tunnel ingress removal" >&2
+              cat "$tmpdir/plan.out" >&2
+              exit 1
+            fi
+
+            rm -f "$tmpdir/tofu.log"
+            SERVICE_PUBLICATION_APPROVE=APPLY \
+              SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS='adopted.example.net,other.example.net' \
+              run_wrapper apply > "$tmpdir/reviewed-apply.out" 2>&1
+            grep -Eq 'apply -lock=true .+\.tfplan$' "$tmpdir/tofu.log"
+
+            touch "$out"
+          '';
+
       checks.service-publication-tunnel-adoption =
         pkgs.runCommand "service-publication-tunnel-adoption"
           {
@@ -699,6 +767,7 @@ args@{
             "service-publication-plan-only"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
+            "service-publication-tunnel-ingress-guard"
             "service-publication-tunnel-adoption"
             "service-publication-tofu-backend"
           ]

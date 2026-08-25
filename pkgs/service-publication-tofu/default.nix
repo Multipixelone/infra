@@ -125,6 +125,36 @@ writeShellApplication {
         echo "refusing $replacement_count resource replacement(s); reconcile imports or use an explicit reviewed migration" >&2
         exit 1
       fi
+
+      dropped_ingress=$(jq -r '
+        def ingress_hostnames: [ (.config.ingress? // [])[]? | .hostname? // empty ];
+        [
+          .resource_changes[]?
+          | select(.type == "cloudflare_zero_trust_tunnel_cloudflared_config")
+          | ((.change.before // {} | ingress_hostnames) - (.change.after // {} | ingress_hostnames))[]
+        ]
+        | unique[]
+      ' "$plan_json")
+      reviewed_removals=" ''${SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS:-} "
+      reviewed_removals=''${reviewed_removals//,/ }
+      unreviewed_removals=()
+      while IFS= read -r ingress_hostname; do
+        [[ -n $ingress_hostname ]] || continue
+        [[ $reviewed_removals == *" $ingress_hostname "* ]] || unreviewed_removals+=("$ingress_hostname")
+      done <<<"$dropped_ingress"
+      if ((''${#unreviewed_removals[@]} > 0)); then
+        {
+          echo "this plan removes Tunnel ingress the registry does not model:"
+          printf '  %s\n' "''${unreviewed_removals[@]}"
+          echo "name every reviewed hostname in SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS (comma- or space-separated) to allow the removal"
+        } >&2
+        if [[ $action == apply ]]; then
+          echo "refusing to silently unpublish those hostnames" >&2
+          exit 1
+        fi
+        echo "WARNING: applying this plan would unpublish those hostnames" >&2
+      fi
+
       if [[ $action == apply ]]; then
         if [[ ''${SERVICE_PUBLICATION_APPROVE:-} != APPLY ]]; then
           read -r -p "Type APPLY to apply this exact locked plan: " approval
