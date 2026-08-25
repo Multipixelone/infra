@@ -4,6 +4,14 @@
   lib,
   ...
 }:
+let
+  # Shared by services.calibre-web and the publication route below; the route is
+  # resolved at flake level, where the NixOS module's own config is out of
+  # scope, so the port cannot be read back from services.calibre-web. Set
+  # explicitly rather than relying on the nixpkgs default so the two cannot
+  # drift apart.
+  webPort = 8083;
+in
 {
   flake-file.inputs.calibre-plugins.url = "github:nydragon/calibre-plugins";
   flake.modules.homeManager.gui =
@@ -25,6 +33,33 @@
       '';
     };
 
+  # Published as calibre.nyc.finnrut.is (internal only). Defined here rather
+  # than in modules/service-publication/registry.nix so the listen port has one
+  # source of truth.
+  servicePublication.applications.calibre = {
+    site = "nyc";
+    homepage = {
+      name = "Calibre-Web";
+      group = "Media";
+      description = "Ebook library and reader";
+      icon = "calibre-web";
+    };
+    routes.root = {
+      backend = {
+        host = "link";
+        port = webPort;
+      };
+      health = {
+        # / answers 302 to the login form; the form itself is the unauthenticated
+        # page that proves the app rendered. Confirmed 200 against the running
+        # service.
+        path = "/login";
+        expectedStatuses = [ 200 ];
+        timeoutSeconds = 8;
+      };
+    };
+  };
+
   configurations.nixos.link.module =
     let
       username = config.flake.meta.owner.username;
@@ -39,7 +74,10 @@
         enable = true;
         user = username;
         group = "users";
-        listen.ip = "0.0.0.0";
+        listen = {
+          ip = "0.0.0.0";
+          port = webPort;
+        };
         openFirewall = true;
         options = {
           calibreLibrary = libraryLink;

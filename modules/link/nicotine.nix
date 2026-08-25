@@ -1,4 +1,37 @@
+let
+  # Shared by the container port mapping and the publication route below; the
+  # route is resolved at flake level, where the NixOS module's own config is
+  # out of scope, so the port cannot be read back from the container.
+  webPort = 5031;
+in
 {
+  # Published as nicotine.nyc.finnrut.is (internal only). Defined here rather
+  # than in modules/service-publication/registry.nix so the noVNC host port has
+  # one source of truth. slskd stays unpublished: it is the headless instance
+  # Explo drives over its API.
+  servicePublication.applications.nicotine = {
+    site = "nyc";
+    homepage = {
+      group = "Downloads";
+      name = "Nicotine+";
+      description = "Soulseek client";
+      icon = "nicotine-plus";
+    };
+    routes.root = {
+      backend = {
+        host = "link";
+        port = webPort;
+      };
+      health = {
+        # noVNC's page shell, served before the VNC session connects and
+        # confirmed 200 without credentials against the running container.
+        path = "/";
+        expectedStatuses = [ 200 ];
+        timeoutSeconds = 8;
+      };
+    };
+  };
+
   configurations.nixos.link.module = {
     infra.backup.srvPaths = [ "/srv/slskd" ];
     systemd.tmpfiles.rules = [
@@ -8,7 +41,7 @@
       autoStart = true;
       image = "ghcr.io/fletchto99/nicotine-plus-docker:latest";
       ports = [
-        "5031:6080"
+        "${toString webPort}:6080"
         "2234:2234"
       ];
       # user = "1000:100";
