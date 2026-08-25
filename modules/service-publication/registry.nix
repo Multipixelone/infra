@@ -292,6 +292,8 @@ in
 
   config = {
     servicePublication = {
+      rollout.enableLocalCutover = true;
+
       # These are target identities, not permission to deploy. Policy
       # definitions intentionally remain empty until Finn confirms the
       # adoption inputs documented in the runbook.
