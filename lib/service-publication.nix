@@ -354,6 +354,13 @@ let
               || (!pair.outer.access.bypassAccess && pair.inner.access.bypassAccess)
             )
           ) routePairs;
+          bypassWideningPairs = filter (
+            pair:
+            pathContains pair.outer.pathPrefix pair.inner.pathPrefix
+            && pair.outer.pathPrefix != pair.inner.pathPrefix
+            && pair.outer.access.bypassAccess
+            && !pair.inner.access.bypassAccess
+          ) routePairs;
           policyKeys = lib.unique (map (route: route.access.policy) publicRoutes);
         in
         optional (
@@ -373,6 +380,10 @@ let
         ++ optional (
           conflictingPairs != [ ]
         ) "application ${application.name}: invalid nested path exposure or bypass precedence"
+        ++ map (
+          pair:
+          "route ${pair.outer.key}: bypassAccess at ${pair.outer.pathPrefix} covers protected route ${pair.inner.key} at ${pair.inner.pathPrefix}; narrow the bypass route pathPrefix"
+        ) bypassWideningPairs
         ++ concatMap (
           route:
           optional (!validPath route.pathPrefix) "route ${route.key}: pathPrefix must begin with /"

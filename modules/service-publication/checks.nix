@@ -60,6 +60,40 @@ let
     }
   );
 
+  wideningBypass = publicationLib.resolve (
+    registry
+    // {
+      accessPolicies = registry.accessPolicies // {
+        finn-only = registry.accessPolicies.finn-only // {
+          cloudflareImportKey = "finn-only";
+          include = [ { email.email = "placeholder@example.invalid"; } ];
+        };
+      };
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // {
+            policy = "finn-only";
+          };
+          routes = {
+            root = registry.applications.grafana.routes.root // {
+              access = registry.applications.grafana.routes.root.access // {
+                bypassAccess = true;
+                bypassJustification = "public status page";
+              };
+            };
+            admin = registry.applications.grafana.routes.root // {
+              match.pathPrefix = "/admin/";
+              health = registry.applications.grafana.routes.root.health // {
+                path = "/admin/health";
+              };
+            };
+          };
+        };
+      };
+    }
+  );
+
   publicFixture = publicationLib.resolve (
     registry
     // {
@@ -114,6 +148,8 @@ let
       "Access bypass justification validation regressed";
     assert lib.assertMsg (hasError "legacy home.finnrut.is" legacyName)
       "legacy hostname projection validation regressed";
+    assert lib.assertMsg (hasError "narrow the bypass route pathPrefix" wideningBypass)
+      "outer-route bypass widening validation regressed";
     assert lib.assertMsg (publicFixture.errors == [ ]) "valid public application fixture must resolve";
     assert lib.assertMsg (
       publicFixture.cloudflare.dnsRecords.grafana.accessDependency == "grafana"
