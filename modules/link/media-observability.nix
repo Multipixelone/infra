@@ -36,7 +36,7 @@ let
     "${route.backend.scheme}://${route.backendAddress}:${toString route.backend.port}";
   browserUrl = application: "https://${inventory.applications.${application}.canonical}";
 
-  mediaSecretSource = "${inputs.secrets}/observability/media.age";
+  mediaSecretSource = "${inputs.secrets}/grafana/media.age";
   mediaSecretAvailable = builtins.pathExists mediaSecretSource;
   mediaEnvironment = "/run/agenix/media-observability";
   exporterPorts = {
