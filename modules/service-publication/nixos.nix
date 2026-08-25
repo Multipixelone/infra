@@ -147,6 +147,12 @@ let
             ++ map (route: route.backend.port) (lib.attrValues remoteBackendRoutes)
           );
           firewallPorts = lib.concatMapStringsSep "," toString protectedPorts;
+          # The chain is jumped to from position 1 of nixos-fw, ahead of the
+          # loopback, trusted-interface and conntrack accepts nixpkgs appends,
+          # so it has to re-accept loopback itself. Trusted interfaces are
+          # deliberately not re-accepted: narrowing these ports to the site's
+          # trusted client CIDRs is exactly what this chain exists for.
+          firewallLoopbackAccept = "iptables -w -A nixos-service-publication -i lo -s 127.0.0.0/8 -j nixos-fw-accept";
           firewallAccepts =
             lib.concatMapStringsSep "\n" (
               cidr: "iptables -w -A nixos-service-publication -p tcp --dport 443 -s ${cidr} -j nixos-fw-accept"
@@ -246,6 +252,7 @@ let
             networking.firewall = lib.mkIf (protectedPorts != [ ]) {
               extraCommands = ''
                 iptables -w -N nixos-service-publication 2>/dev/null || iptables -w -F nixos-service-publication
+                ${firewallLoopbackAccept}
                 ${firewallAccepts}
                 iptables -w -A nixos-service-publication -j nixos-fw-refuse
                 iptables -w -I nixos-fw 1 -p tcp -m multiport --dports ${firewallPorts} -j nixos-service-publication
