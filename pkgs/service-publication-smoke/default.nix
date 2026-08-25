@@ -80,14 +80,24 @@ writeShellApplication {
 
       if [[ $context == external ]]; then
         if [[ -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
-          status=$(curl --silent --show-error --output /dev/null --max-time "$timeout" --write-out '%{http_code}' "https://$hostname$path")
+          challenge=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
+            --write-out '%{http_code} %{redirect_url}' "https://$hostname$path")
+          read -r status redirect_url <<<"$challenge"
           case "$status" in
-          301 | 302 | 303 | 307 | 308 | 401 | 403) ;;
+          301 | 302 | 303 | 307 | 308) ;;
           *)
-            echo "$key: unauthenticated external request did not receive an Access challenge ($status)" >&2
+            echo "$key: unauthenticated external response ($status) did not come from Cloudflare Access" >&2
             exit 1
             ;;
           esac
+          redirect_host=''${redirect_url#*://}
+          redirect_host=''${redirect_host%%/*}
+          redirect_host=''${redirect_host##*@}
+          redirect_host=''${redirect_host%%:*}
+          if [[ $redirect_host != *.cloudflareaccess.com ]]; then
+            echo "$key: unauthenticated external redirect to '$redirect_url' did not come from Cloudflare Access" >&2
+            exit 1
+          fi
         else
           status=$(curl --silent --show-error --output /dev/null --max-time "$timeout" --write-out '%{http_code}' \
             --header "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
