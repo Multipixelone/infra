@@ -7,7 +7,6 @@
   servicePublicationSmoke,
   servicePublicationTofu,
   servicePublicationValidate,
-  sudo,
   writeShellApplication,
 }:
 writeShellApplication {
@@ -21,7 +20,6 @@ writeShellApplication {
     servicePublicationSmoke
     servicePublicationTofu
     servicePublicationValidate
-    sudo
   ];
   text = ''
     repo_root=$(git rev-parse --show-toplevel)
@@ -124,8 +122,9 @@ writeShellApplication {
     fi
 
     revision=$(git rev-parse HEAD)
-    sudo install -d -m 0750 "$state_dir"
-    printf '%s\n' "$revision" | sudo tee "$revision_file" >/dev/null
+    # The store sudo is not setuid, so only the NixOS wrapper can elevate here.
+    /run/wrappers/bin/sudo install -d -m 0750 "$state_dir"
+    printf '%s\n' "$revision" | /run/wrappers/bin/sudo tee "$revision_file" >/dev/null
     echo "service publication deployment succeeded at $revision"
   '';
   meta.description = "Run the full service publication deploy flow";
