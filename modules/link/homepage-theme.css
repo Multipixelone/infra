@@ -1,0 +1,336 @@
+/* Homepage dashboard restyled to match blog.finnrut.is.
+ *
+ * Ported from ../blog/static/style.css. Two things carry the look: the warm
+ * paper/ink palette and the serif type. Homepage is Tailwind-based and reads
+ * every surface colour from --color-50 .. --color-900 (RGB triples set by the
+ * .theme-<name> class on <html>), so redefining that ramp re-skins the whole
+ * app in one place. The ramp below is literally the blog's two palettes joined
+ * end to end: 50..300 are the light theme's paper/border tones, 700..900 the
+ * dark theme's — which is why Homepage's own light/dark toggle keeps working
+ * without a second ramp.
+ *
+ * Fonts are named, not fetched. The blog's Sabon Next and PragmataPro faces
+ * live on fonts.finnrut.is behind CORS locked to blog.finnrut.is, so an
+ * @font-face pointing there would fail here. Naming the families instead lets
+ * any client that has them installed use the real faces and everyone else fall
+ * back to Georgia — the same fallback the blog itself declares.
+ *
+ * Custom CSS load order relative to Next's own chunks is not guaranteed, so
+ * overrides that fight a Tailwind utility (background, border, radius, shadow)
+ * carry !important; everything else wins on ID specificity.
+ */
+
+:root {
+  /* Warm ramp — see header. Values are RGB triples, the format Tailwind's
+     rgb(var(--color-N) / <alpha>) utilities expect. */
+  --color-50: 247 244 237 !important; /* --paper       light */
+  --color-100: 239 234 221 !important; /* --paper-shade light */
+  --color-200: 232 226 216 !important; /* --ink         dark  */
+  --color-300: 221 214 198 !important; /* --border      light */
+  --color-400: 184 174 156 !important;
+  --color-500: 111 100 86 !important; /* --muted       light */
+  --color-600: 91 81 69 !important;
+  --color-700: 59 52 44 !important; /* --border      dark  */
+  --color-800: 36 32 25 !important; /* --paper-shade dark  */
+  --color-900: 28 25 21 !important; /* --paper       dark  */
+  --color-logo-start: 181 74 0 !important;
+  --color-logo-stop: 111 100 86 !important;
+
+  /* Blog tokens, light. */
+  --paper: #f7f4ed;
+  --paper-shade: #efeadd;
+  --ink: #2b2520;
+  --muted: #6f6456;
+  --accent: #b54a00;
+  --accent-hover: #8c3800;
+  --selection-bg: #f5d9c4;
+  --border: #ddd6c6;
+  --shadow: rgba(43, 37, 32, 0.06);
+  /* Top ambient highlight in the page background gradient. */
+  --glow: rgba(255, 255, 255, 0.5);
+
+  --font-serif: "Sabon Next", Georgia, "Times New Roman", serif;
+  --font-display: "Cooper Black", "Cooper", Georgia, serif;
+  --font-mono:
+    "PragmataPro Mono Liga", "PragmataPro Mono", ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  color-scheme: light;
+}
+
+/* Homepage puts .dark on <html> for its dark theme; the blog's dark values map
+   onto the same tokens. The ramp is shared, so only the tokens flip here. */
+.dark {
+  --paper: #1c1915;
+  --paper-shade: #242019;
+  --ink: #e8e2d8;
+  --muted: #9e9486;
+  --accent: #ff9e42;
+  --accent-hover: #ffb366;
+  --selection-bg: #5a2e0f;
+  --border: #3b342c;
+  --shadow: rgba(0, 0, 0, 0.2);
+  --glow: rgba(255, 255, 255, 0.04);
+
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------
+   Page ground
+   ------------------------------------------------------------------ */
+
+/* The blog's paper: flat warm base plus a top highlight and bottom shade, both
+   fixed so they read as lighting on the sheet rather than as page content. */
+html {
+  background-color: var(--paper) !important;
+  background-image:
+    radial-gradient(ellipse 120% 60% at 50% 0%, var(--glow), transparent 60%),
+    radial-gradient(
+      ellipse 120% 70% at 50% 100%,
+      var(--shadow),
+      transparent 55%
+    ) !important;
+  background-attachment: fixed !important;
+}
+
+body,
+#page_wrapper {
+  background: transparent !important;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-variant-ligatures: common-ligatures;
+  text-rendering: optimizeLegibility;
+}
+
+/* Homepage's optional background-image layer would sit on top of the paper. */
+#background {
+  display: none !important;
+}
+
+/* The blog is a 700px column. A tile grid needs more room than prose, so the
+   dashboard keeps the centred-column feel at a width that still fits three
+   cards across. #inner_wrapper is Homepage's scroll container (w-full h-full
+   overflow-auto) — narrowing that would break scrolling, so the constraint
+   goes on the blocks it holds. */
+#information-widgets,
+#tabs,
+#services,
+#bookmarks,
+#widgets-wrap,
+#footer {
+  max-width: 64rem;
+  margin-inline: auto;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------
+   Header row — the blog's rule-and-fleuron treatment
+   ------------------------------------------------------------------ */
+
+#information-widgets {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+/* The ❦ straddles the rule; its own paper-coloured padding punches the gap.
+   Sized in em against the fixed font-size so it lands on the line. */
+#information-widgets::after {
+  content: "❦";
+  position: absolute;
+  left: 50%;
+  bottom: -0.6em;
+  transform: translateX(-50%);
+  padding: 0.1em 0.75rem;
+  background: var(--paper);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.15rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Date, greeting and the resource read-outs are data, not prose — mono, the
+   way the blog sets timestamps and code. */
+#information-widgets .widget-datetime,
+#information-widgets .widget-greeting,
+.information-widget-label,
+.resource-usage {
+  font-family: var(--font-mono) !important;
+  letter-spacing: 0.01em;
+}
+
+.information-widget-label,
+.resource-usage {
+  color: var(--muted) !important;
+  font-size: 0.72rem;
+}
+
+.resource-icon {
+  color: var(--muted) !important;
+}
+
+/* ------------------------------------------------------------------
+   Groups
+   ------------------------------------------------------------------ */
+
+/* The blog separates articles with a dashed rule; groups get the same. The
+   name itself is an <h2> flex item that shrinks to its text, so the rule goes
+   on the header row holding it — that one is w-full. */
+#services div:has(> .service-group-name) {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.service-group-name {
+  font-family: var(--font-serif) !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.25;
+  color: var(--ink) !important;
+}
+
+.service-group-icon,
+.bookmark-group-icon {
+  color: var(--accent) !important;
+}
+
+.bookmark-group-name {
+  font-family: var(--font-serif) !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+}
+
+/* ------------------------------------------------------------------
+   Service cards — framed the way the blog frames code blocks
+   ------------------------------------------------------------------ */
+
+.service-card,
+a:has(> .bookmark-text) {
+  background: var(--paper-shade) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  box-shadow:
+    inset 0 0 0 1px var(--paper),
+    0 2px 6px var(--shadow) !important;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.service-card:hover,
+a:has(> .bookmark-text):hover {
+  border-color: var(--accent) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--paper),
+    0 3px 10px var(--shadow) !important;
+}
+
+.service-name,
+.bookmark-name {
+  font-family: var(--font-serif) !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+}
+
+.service-card:hover .service-name,
+a:has(> .bookmark-text):hover .bookmark-name {
+  color: var(--accent) !important;
+}
+
+.service-description,
+.bookmark-description {
+  font-family: var(--font-serif) !important;
+  font-size: 0.85rem !important;
+  font-style: italic;
+  font-weight: 400 !important;
+  color: var(--muted) !important;
+}
+
+/* Status dots and ping read-outs stay semantic in colour — only the type
+   changes, so a red dot is still unmistakably a red dot. */
+.service-tag,
+.service-block .font-mono {
+  font-family: var(--font-mono) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.02em;
+}
+
+.service-icon,
+.bookmark-icon {
+  filter: saturate(0.85);
+}
+
+/* ------------------------------------------------------------------
+   Links, focus, footer
+   ------------------------------------------------------------------ */
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.12em;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Tabs read as the blog's nav: small caps, letter-spaced, ink until hovered. */
+#tabs button,
+#tabs a {
+  font-family: var(--font-serif) !important;
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink) !important;
+}
+
+#tabs button:hover,
+#tabs a:hover {
+  color: var(--accent) !important;
+}
+
+#footer,
+#version {
+  font-family: var(--font-serif) !important;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  color: var(--muted) !important;
+}
+
+#footer {
+  margin-top: 4rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Search and any other input surfaces sit on paper, not on Tailwind white. */
+input,
+.widget-search input {
+  background: var(--paper-shade) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  color: var(--ink) !important;
+  font-family: var(--font-serif) !important;
+}
+
+input::placeholder {
+  color: var(--muted) !important;
+}

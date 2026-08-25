@@ -1120,7 +1120,13 @@ in
           headerStyle = "clean";
           statusStyle = "dot";
           hideVersion = true;
+          # "stone" is Tailwind's warmest neutral, so the handful of surfaces
+          # homepage-theme.css does not reach still land in the blog's family
+          # rather than reverting to a cold slate.
+          color = "stone";
         };
+        # Restyled to match blog.finnrut.is; see the file header for how.
+        customCSS = builtins.readFile ./homepage-theme.css;
         services =
           if localCutover then
             homepageServiceGroups
