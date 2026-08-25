@@ -1,13 +1,23 @@
 { lib, config, ... }:
 let
   nixosHosts = lib.filterAttrs (_: host: host.isNixOS) config.hosts;
+  # A route backend that is not its own proxy still receives generated
+  # firewall rules, so it has to ride the same deploy as the proxy.
+  backendHosts =
+    config.flake.servicePublicationInventory.routes
+    |> lib.attrValues
+    |> map (route: route.backend.host)
+    |> lib.unique;
   serviceHosts =
     config.servicePublication.hosts
     |> lib.filterAttrs (
-      _: host:
+      name: host:
       host.managedByNixOS
       && (
-        host.capabilities.reverseProxy || host.capabilities.internalDns || host.capabilities.publicConnector
+        host.capabilities.reverseProxy
+        || host.capabilities.internalDns
+        || host.capabilities.publicConnector
+        || lib.elem name backendHosts
       )
     );
 in
