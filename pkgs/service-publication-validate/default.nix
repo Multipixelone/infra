@@ -36,7 +36,9 @@ writeShellApplication {
       pkgs/service-publication-validate
     )
     for path in "''${scan_paths[@]}"; do
-      gitleaks dir --redact --verbose "$path"
+      # dir mode only auto-loads <path>/.gitleaks.toml, so the repository
+      # allowlist has to be passed explicitly.
+      gitleaks dir --redact --verbose --config "$repo_root/.gitleaks.toml" "$path"
     done
     gitleaks git --redact --verbose \
       --log-opts="--all -- ''${scan_paths[*]}" \

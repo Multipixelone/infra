@@ -175,6 +175,8 @@ let
     }
   );
 
+  # marin declares no reachableFromProxyHosts, unlike alexandria, which the
+  # real registry marks reachable from link.
   unreachableBackend = publicationLib.resolve (
     registry
     // {
@@ -182,7 +184,7 @@ let
         homepage = registry.applications.homepage // {
           routes.root = registry.applications.homepage.routes.root // {
             backend = registry.applications.homepage.routes.root.backend // {
-              host = "alexandria";
+              host = "marin";
             };
           };
         };
@@ -212,7 +214,11 @@ let
     ) "public DNS/Tunnel projections must carry Access and verified direct-origin intent";
     assert lib.assertMsg (
       applicationServiceToken.errors == [ ]
-      && builtins.attrNames applicationServiceToken.cloudflare.accessApplications == [ "grafana" ]
+      &&
+        builtins.attrNames applicationServiceToken.cloudflare.accessApplications == [
+          "grafana"
+          "seerr"
+        ]
       && applicationServiceToken.cloudflare.accessApplications.grafana.domain == "grafana.apps.finnrut.is"
     ) "an application-level Access setting must not duplicate its Access application";
     assert lib.assertMsg (
@@ -221,6 +227,7 @@ let
         builtins.attrNames routeAccessOverride.cloudflare.accessApplications == [
           "grafana"
           "grafana/api"
+          "seerr"
         ]
       &&
         routeAccessOverride.cloudflare.accessApplications."grafana/api".domain
@@ -250,7 +257,9 @@ in
               .errors == [] and
               (.blockyRecords["grafana.nyc.finnrut.is"] == "192.168.6.6") and
               ([.internalProbes[].resolverAddress] | unique == ["192.168.6.6"]) and
-              (.cloudflare.dnsRecords == {}) and
+              (.cloudflare.dnsRecords | keys == ["seerr"]) and
+              (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
+              (.cloudflare.accessApplications.seerr.access.policy == "family") and
               ([paths(strings) as $p | getpath($p) | select(endswith(".home.finnrut.is"))] | length == 0)
             ' registry.json >/dev/null
             touch "$out"

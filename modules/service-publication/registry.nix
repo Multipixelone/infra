@@ -354,6 +354,9 @@ in
           site = "nyc";
           addresses.lan = config.hosts.alexandria.homeAddress;
           managedByNixOS = false;
+          # The Synology publishes its Docker ports on all NAS interfaces, so
+          # the proxy needs no NAS-side firewall change.
+          reachableFromProxyHosts = [ "link" ];
         };
       };
 
@@ -405,6 +408,130 @@ in
             };
             health = {
               path = "/";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+
+        # Synology Docker media stacks
+        # (docker/compose-files/media-management/docker-compose.yml and
+        # docker/compose-files/tautulli/docker-compose.yml). Ports are the
+        # compose host-port mappings; alexandria is not NixOS-managed, so they
+        # cannot be derived from Nix service config. The stacks were down when
+        # registered, so the health contracts are the applications' documented
+        # unauthenticated endpoints, not yet confirmed live. The
+        # media-management cloudflared connector publishes no port and is not
+        # a route; watchtower and kometa in the tautulli stack are portless
+        # background jobs.
+        radarr = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 7878;
+            };
+            health = {
+              path = "/ping";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        sonarr = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 8989;
+            };
+            health = {
+              path = "/ping";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        # The compose service is still named overseerr, but the running app is
+        # Seerr (the Overseerr successor). First public application in the
+        # registry.
+        seerr = {
+          site = "nyc";
+          public = true;
+          publicHostname = "requests.finnrut.is";
+          access.policy = "family";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 5055;
+            };
+            health = {
+              path = "/api/v1/status";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        nzbhydra2 = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 5076;
+            };
+            health = {
+              # The one actuator endpoint NZBHydra2 keeps permitAll in every
+              # auth mode; plain / answers 302 once form/basic auth is enabled.
+              path = "/actuator/health/ping";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        bazarr = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 6767;
+            };
+            health = {
+              path = "/";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        # Host port 6789 is a persisted SABnzbd customization; the container's
+        # default 8080 is not published. SABnzbd's hostname verification
+        # rejects unknown Host headers before auth, so
+        # sabnzbd.nyc.finnrut.is must be added to host_whitelist in the NAS's
+        # sabnzbd.ini by hand before this route can answer through the proxy.
+        sabnzbd = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 6789;
+            };
+            health = {
+              # Documented as needing neither auth nor an API key, unlike /,
+              # which redirects to the login form when a UI password is set.
+              path = "/api?mode=version";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+        tautulli = {
+          site = "nyc";
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 8181;
+            };
+            health = {
+              path = "/status";
               expectedStatuses = [ 200 ];
               timeoutSeconds = 8;
             };

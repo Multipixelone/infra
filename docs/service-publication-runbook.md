@@ -45,8 +45,9 @@ Do not enable either rollout gate until this list is reviewed:
    an operator's protected temporary environment. The stable Cloudflare account
    ID, `finnrut.is` zone ID, and existing Tunnel name belong in the typed Nix
    registry options documented below.
-5. Select the first public application and policy explicitly. The current
-   registry makes Grafana and Homepage private; neither is implicitly a pilot.
+5. Select the first public application and policy explicitly. Seerr at
+   `requests.finnrut.is` behind the `family` policy is the explicitly selected
+   first public application; Grafana and Homepage remain private.
 6. Use the accepted AWS S3 backend recorded under **Remote state bootstrap**.
    Its storage features are confirmed, but OpenTofu lock contention and stale
    lock recovery are not yet tested. Complete those tests before treating the
@@ -218,9 +219,10 @@ it has no apply path. Reconcile imports and declarative configuration, then
 repeat `adoption-plan` until the result is no-op or an explicitly understood
 non-destructive delta. Any replacement is rejected by the wrapper.
 
-The current registry emits no public Tunnel routes, so its desired ingress is
-only the terminal `http_status:404` catch-all. If an adoption plan proposes
-removing existing live ingress entries, treat that as destructive operational
+The current registry publishes one public Tunnel route (`seerr/root` at
+`requests.finnrut.is`), so its desired ingress is that route followed by the
+terminal `http_status:404` catch-all. If an adoption plan proposes removing
+other existing live ingress entries, treat that as destructive operational
 drift: reconcile the registry and do not apply the removal.
 
 The wrapper enforces that rule instead of trusting review. Every `plan`,

@@ -24,8 +24,23 @@
             regexes = [ "^RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3$" ];
           }
           {
+            # Generated, schema-typed projection of the service-publication
+            # registry (metadata.containsSecrets is asserted false in Nix and
+            # checked in CI). High-entropy route/application keys and
+            # Cloudflare resource IDs it contains are not secrets. `paths`
+            # only takes effect for file-source scans (`gitleaks detect`),
+            # not `git --staged` diff scans, so match on the minified
+            # document's own marker instead: registry.json is emitted as a
+            # single line, so a line-target match covers the whole file.
+            description = "Generated service-publication registry.json";
+            regexTarget = "line";
+            regexes = [ "\"generatedFrom\":\"servicePublication\"" ];
+          }
+          {
             # Non-secret Cloudflare resource IDs the service-publication
-            # registry records so adoption imports rather than recreates.
+            # registry source records so adoption imports rather than
+            # recreates them. Covers occurrences outside registry.json, e.g.
+            # in modules/service-publication/registry.nix itself.
             description = "Cloudflare Access policy identifiers in the publication registry";
             regexTarget = "match";
             regexes = [ "cloudflareImportKey\"?[ =:]+\"[0-9a-f-]{36}\"" ];
