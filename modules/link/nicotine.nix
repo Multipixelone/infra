@@ -39,7 +39,7 @@ in
     ];
     virtualisation.oci-containers.containers.nicotine = {
       autoStart = true;
-      image = "ghcr.io/fletchto99/nicotine-plus-docker:latest";
+      image = "ghcr.io/fletchto99/nicotine-plus-docker:latest@sha256:1e5bedc221ea8f2c0941457f5ed929ef856305a0859c256df15ae2bc92e2bde0";
       ports = [
         "${toString webPort}:6080"
         "2234:2234"

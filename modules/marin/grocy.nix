@@ -11,7 +11,7 @@
       age.secrets."grocy".file = "${inputs.secrets}/grocy.age";
       virtualisation.oci-containers.containers.barcode-buddy = {
         autoStart = false;
-        image = "f0rc3/barcodebuddy:latest";
+        image = "docker.io/f0rc3/barcodebuddy:latest@sha256:bcba09b8a1e950ab51df653737f43d20c1b68aedb8ad19a8e7b4d23a0bffdf16";
         ports = [ "7575:80" ];
         environment.Grocy__BaseUrl = "localhost";
         volumes = [

@@ -48,7 +48,7 @@ in
       containers = {
         actual-budget = {
           autoStart = true;
-          image = "docker.io/actualbudget/actual-server:latest";
+          image = "docker.io/actualbudget/actual-server:26.8.0@sha256:0b300f370dba85a74998a953736a831bd931cc8cb76c0d8ceac3d3fd288dfd4d";
           ports = [ "${toString webPort}:5006" ];
           volumes = [ "/srv/actual:/data" ];
         };

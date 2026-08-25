@@ -1,7 +1,7 @@
 _: {
   configurations.nixos.iot.module = _: {
     virtualisation.oci-containers.containers.vnc-ipad = {
-      image = "ddayb/vnc-ipad";
+      image = "docker.io/ddayb/vnc-ipad:latest@sha256:10800ec38efb8254d0f627702de556269f6265c59a3ddfb3a700d31ad466189f";
       ports = [ "5900:5900" ]; # LAN only — iot is not WAN-exposed
       environment = {
         VNC_PASSWORD = "ipad";

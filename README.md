@@ -158,6 +158,7 @@ The following files in this repository are generated and checked
 using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 
 - `.envrc`
+- `.github/renovate.json5`
 - `.github/workflows/build.yaml`
 - `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`

@@ -64,6 +64,39 @@
         ...
       }:
       {
+        files.file.".github/renovate.json5".text =
+          builtins.toJSON {
+            "$schema" = "https://docs.renovatebot.com/renovate-schema.json";
+            enabledManagers = [ "custom.regex" ];
+            dependencyDashboard = true;
+            automerge = false;
+            pinDigests = true;
+            timezone = "America/New_York";
+            schedule = [ "* 0-5 * * 1" ];
+            customManagers = [
+              {
+                customType = "regex";
+                managerFilePatterns = [ ''/^modules\/.*\.nix$/'' ];
+                matchStrings = [
+                  ''(?<prefix>(?:^|\n)[\t ]*image[\t ]*=[\t ]*")(?<depName>[a-z0-9][a-z0-9._-]*(?::[0-9]+)?(?:/[a-z0-9][a-z0-9._-]*)+):(?<currentValue>[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?(?<suffix>";[\t ]*(?:\r?\n|$))''
+                ];
+                datasourceTemplate = "docker";
+                versioningTemplate = "docker";
+                autoReplaceStringTemplate = "{{{prefix}}}{{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}{{{suffix}}}";
+              }
+            ];
+            packageRules = [
+              {
+                matchManagers = [ "custom.regex" ];
+                matchDatasources = [ "docker" ];
+                groupName = "container images";
+                groupSlug = "container-images";
+                automerge = false;
+              }
+            ];
+          }
+          + "\n";
+
         make-shells.default.packages = [
           config.files.writer.drv
           config.packages.generate-files

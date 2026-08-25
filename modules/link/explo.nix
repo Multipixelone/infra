@@ -55,7 +55,7 @@
       ];
 
       virtualisation.oci-containers.containers.explo = {
-        image = "ghcr.io/lumepart/explo:latest";
+        image = "ghcr.io/lumepart/explo:latest@sha256:2c6fe1e5fbe0ceb17c653191001e7cb96eff0ae82539b44f61b024caa0fbfd14";
         autoStart = true;
         # Host networking: reach slskd at 127.0.0.1:5030 and serve the web UI on
         # host :7288. The container runs as root because start.sh runs

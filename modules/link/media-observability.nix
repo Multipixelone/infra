@@ -43,8 +43,6 @@ let
     scraparr = 7100;
     tautulli = 8000;
   };
-  scraparrImage = "ghcr.io/thecfu/scraparr:3.1.0@sha256:c794a9396564e798f9a68fb9dae617db92414cd5c4d41176929657b64873d8bd";
-  tautulliExporterImage = "docker.io/mm404/tautulli-exporter:0.2.2@sha256:1420c72b0c856df48dee6961be9890d0caf434a8b295ba8a8cbebdd020f357c7";
 
   routeContract =
     assert lib.assertMsg (
@@ -572,7 +570,7 @@ in
       virtualisation.oci-containers.containers = {
         scraparr = {
           autoStart = true;
-          image = scraparrImage;
+          image = "ghcr.io/thecfu/scraparr:3.1.0@sha256:c794a9396564e798f9a68fb9dae617db92414cd5c4d41176929657b64873d8bd";
           environmentFiles = [ mediaEnvironment ];
           ports = [ "127.0.0.1:${toString exporterPorts.scraparr}:7100" ];
           volumes = [ "${scraparrConfig}:/app/src/scraparr/config/config.yaml:ro" ];
@@ -580,7 +578,7 @@ in
         };
         tautulli-exporter = {
           autoStart = true;
-          image = tautulliExporterImage;
+          image = "docker.io/mm404/tautulli-exporter:0.2.2@sha256:1420c72b0c856df48dee6961be9890d0caf434a8b295ba8a8cbebdd020f357c7";
           environmentFiles = [ mediaEnvironment ];
           ports = [ "127.0.0.1:${toString exporterPorts.tautulli}:8000" ];
           environment = {
@@ -806,15 +804,6 @@ in
             && lib.hasInfix "sabnzbd_server_.*" scraparrSensitiveMetrics
             && !(lib.hasInfix "seerr_user_requests" scraparrAllowedMetrics);
           message = "Scraparr metric privacy allow/drop contract regressed";
-        }
-        {
-          assertion =
-            scraparrImage
-            == "ghcr.io/thecfu/scraparr:3.1.0@sha256:c794a9396564e798f9a68fb9dae617db92414cd5c4d41176929657b64873d8bd"
-            &&
-              tautulliExporterImage
-              == "docker.io/mm404/tautulli-exporter:0.2.2@sha256:1420c72b0c856df48dee6961be9890d0caf434a8b295ba8a8cbebdd020f357c7";
-          message = "media exporter image pins changed without review";
         }
       ];
     };

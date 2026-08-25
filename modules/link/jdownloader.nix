@@ -40,7 +40,7 @@ in
 
     virtualisation.oci-containers.containers.jdownloader = {
       autoStart = true;
-      image = "jlesage/jdownloader-2:latest";
+      image = "docker.io/jlesage/jdownloader-2:v26.08.2@sha256:f16d47986bf6a5db6d67484e3b7e76404bce74f6f212809127a79eb76aa1c641";
       ports = [ "${toString webPort}:5800" ];
       # user = "tunnel:users";
       # TODO find some universal way to declare these paths like my music library so that I can use a variable
@@ -51,7 +51,7 @@ in
     };
     virtualisation.oci-containers.containers.deluge = {
       autoStart = false;
-      image = "linuxserver/deluge:latest";
+      image = "docker.io/linuxserver/deluge:version-2.2.0@sha256:112cea440ed50b696dc672846b482438a05bc7b1b7f0bda9d1e8171b466c192c";
       ports = [
         "8112:8112"
         "6881:6881"

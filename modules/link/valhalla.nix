@@ -9,7 +9,7 @@
       containers = {
         valhalla = {
           autoStart = false;
-          image = "ghcr.io/gis-ops/docker-valhalla/valhalla:latest";
+          image = "ghcr.io/gis-ops/docker-valhalla/valhalla:latest@sha256:16e2731163f4c689f5c46270e0fe34ad893f73732a12be20cf715bde5054712c";
           ports = [ "8002:8002" ];
           volumes = [
             "/srv/valhalla:/custom_files"
