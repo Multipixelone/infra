@@ -104,6 +104,7 @@ in
     observability = {
       hubHost = "link";
       trustedClientCidrs = [
+        "192.168.3.0/24"
         "192.168.5.0/24"
         "192.168.6.0/24"
         "10.100.0.0/24"
@@ -177,11 +178,12 @@ in
       {
         assertion =
           config.observability.trustedClientCidrs == [
+            "192.168.3.0/24"
             "192.168.5.0/24"
             "192.168.6.0/24"
             "10.100.0.0/24"
           ];
-        message = "Phase 1 observability client CIDRs must remain the three explicitly approved networks.";
+        message = "Phase 1 observability client CIDRs must remain the four explicitly approved networks.";
       }
       {
         assertion = config.hosts.${config.observability.hubHost}.observabilityHub;
