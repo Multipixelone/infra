@@ -536,6 +536,11 @@ in
         "BAZARR_API_KEY"
         "SABNZBD_API_KEY"
       ];
+      generatedContainerStartHasEnvironmentFile =
+        service:
+        lib.hasInfix "--env-file ${mediaEnvironment}" (
+          lib.replaceStrings [ "'" ''"'' ] [ "" "" ] config.systemd.services.${service}.script
+        );
       mediaRulesJson = builtins.toJSON mediaRuleSettings;
       dashboardPromql = lib.concatStringsSep "\n" (
         lib.concatMap (
@@ -556,6 +561,7 @@ in
         scraparr = {
           autoStart = true;
           image = scraparrImage;
+          environmentFiles = [ mediaEnvironment ];
           ports = [ "127.0.0.1:${toString exporterPorts.scraparr}:7100" ];
           volumes = [ "${scraparrConfig}:/app/src/scraparr/config/config.yaml:ro" ];
           extraOptions = containerHardening;
@@ -563,6 +569,7 @@ in
         tautulli-exporter = {
           autoStart = true;
           image = tautulliExporterImage;
+          environmentFiles = [ mediaEnvironment ];
           ports = [ "127.0.0.1:${toString exporterPorts.tautulli}:8000" ];
           environment = {
             TAUTULLI_URL = directUrl "tautulli";
@@ -685,6 +692,24 @@ in
         {
           assertion = config.virtualisation.oci-containers.backend == "podman";
           message = "media exporters require the root-managed Podman OCI backend";
+        }
+        {
+          assertion =
+            lib.all
+              (
+                container:
+                config.virtualisation.oci-containers.containers.${container}.environmentFiles
+                == [ mediaEnvironment ]
+              )
+              [
+                "scraparr"
+                "tautulli-exporter"
+              ]
+            && lib.all generatedContainerStartHasEnvironmentFile [
+              "podman-scraparr"
+              "podman-tautulli-exporter"
+            ];
+          message = "media exporter containers must receive the agenix environment file";
         }
         {
           assertion = lib.all (
