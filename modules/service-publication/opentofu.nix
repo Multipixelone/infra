@@ -125,14 +125,59 @@ args@{
           { };
       servicePublicationDeployTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy" {
         colmena = colmenaPackage;
+        privilegeCommand = "/run/wrappers/bin/sudo";
         servicePublicationSmoke = servicePublicationSmokeTool;
         servicePublicationTofu = servicePublicationTofuTool;
         servicePublicationValidate = servicePublicationValidateTool;
+        stateDir = "/var/lib/service-publication";
+      };
+      servicePublicationDeployTestPrivilege = pkgs.writeShellApplication {
+        name = "service-publication-test-privilege";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          : "''${SERVICE_PUBLICATION_TEST_PRIVILEGE_LOG:?test privilege log is required}"
+          printf '%s\n' "$*" >> "$SERVICE_PUBLICATION_TEST_PRIVILEGE_LOG"
+          if [[ ''${1:-} == cat && ''${SERVICE_PUBLICATION_TEST_DENY_REVISION_READ:-} == 1 ]]; then
+            exit 1
+          fi
+          exec "$@"
+        '';
+      };
+      servicePublicationDeployTestCommand =
+        name:
+        pkgs.writeShellApplication {
+          inherit name;
+          runtimeInputs = [ pkgs.coreutils ];
+          text = ''
+            : "''${SERVICE_PUBLICATION_TEST_COMMAND_LOG:?test command log is required}"
+            printf '%s %s\n' ${lib.escapeShellArg name} "$*" >> "$SERVICE_PUBLICATION_TEST_COMMAND_LOG"
+            ${lib.optionalString (name == "service-publication-smoke") ''
+              : "''${SERVICE_PUBLICATION_TEST_SMOKE_COUNT:?test smoke count is required}"
+              count=0
+              if [[ -e $SERVICE_PUBLICATION_TEST_SMOKE_COUNT ]]; then
+                count=$(<"$SERVICE_PUBLICATION_TEST_SMOKE_COUNT")
+              fi
+              count=$((count + 1))
+              printf '%s\n' "$count" > "$SERVICE_PUBLICATION_TEST_SMOKE_COUNT"
+              if [[ ''${SERVICE_PUBLICATION_TEST_FAIL_FINAL_SMOKE:-} == 1 && $count -ge 2 ]]; then
+                exit 1
+              fi
+            ''}
+          '';
+        };
+      servicePublicationDeployTestTool = pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy" {
+        colmena = servicePublicationDeployTestCommand "colmena";
+        privilegeCommand = lib.getExe servicePublicationDeployTestPrivilege;
+        servicePublicationSmoke = servicePublicationDeployTestCommand "service-publication-smoke";
+        servicePublicationTofu = servicePublicationDeployTestCommand "service-publication-tofu";
+        servicePublicationValidate = servicePublicationDeployTestCommand "service-publication-validate";
+        stateDir = ".service-publication-test-state";
       };
       servicePublicationPlanOnlyTestTool =
         pkgs.callPackage "${rootPath}/pkgs/service-publication-deploy"
           {
             colmena = colmenaPackage;
+            privilegeCommand = lib.getExe servicePublicationDeployTestPrivilege;
             servicePublicationSmoke = pkgs.writeShellApplication {
               name = "service-publication-smoke";
               text = ''
@@ -148,6 +193,7 @@ args@{
               name = "service-publication-validate";
               text = "exit 0";
             };
+            stateDir = ".service-publication-plan-only-state";
           };
     in
     {
@@ -309,7 +355,105 @@ args@{
             mkdir source
             cd source
             git init --quiet
-            env -u SERVICE_PUBLICATION_BLOCKY_ADDRESS "$deploy/bin/service-publication-deploy" plan-only
+            privilege_log="$PWD/privilege.log"
+            SERVICE_PUBLICATION_TEST_PRIVILEGE_LOG="$privilege_log" \
+              env -u SERVICE_PUBLICATION_BLOCKY_ADDRESS "$deploy/bin/service-publication-deploy" plan-only
+            if [[ -s $privilege_log || -e .service-publication-plan-only-state ]]; then
+              echo "plan-only read or mutated revision state" >&2
+              exit 1
+            fi
+            touch "$out"
+          '';
+
+      checks.service-publication-deploy-revision-state =
+        pkgs.runCommand "service-publication-deploy-revision-state-check"
+          {
+            deploy = servicePublicationDeployTestTool;
+            nativeBuildInputs = [
+              pkgs.gitMinimal
+              pkgs.jq
+            ];
+          }
+          ''
+            set -euo pipefail
+            mkdir -p source/infra/service-publication
+            cd source
+            git init --quiet
+            git config user.email test@example.invalid
+            git config user.name "Service Publication Test"
+            printf '%s\n' \
+              '{"applications":{},"routes":{},"internalProbes":[],"cloudflare":{"tunnel":{"ingressHost":{}}}}' \
+              > infra/service-publication/registry.json
+            git add infra/service-publication/registry.json
+            git commit --quiet -m fixture
+
+            state_arg=.service-publication-test-state
+            state_dir="$PWD/$state_arg"
+            revision_file="$state_dir/last-successful-revision"
+            command_log="$PWD/commands.log"
+            privilege_log="$PWD/privilege.log"
+            smoke_count="$PWD/smoke-count"
+            expected_revision=$(git rev-parse HEAD)
+
+            run_deploy() {
+              SERVICE_PUBLICATION_TEST_COMMAND_LOG="$command_log" \
+              SERVICE_PUBLICATION_TEST_PRIVILEGE_LOG="$privilege_log" \
+              SERVICE_PUBLICATION_TEST_SMOKE_COUNT="$smoke_count" \
+                "$deploy/bin/service-publication-deploy" "$@"
+            }
+
+            if run_deploy apply; then
+              echo "first apply succeeded without bootstrap authorization" >&2
+              exit 1
+            fi
+            [[ ! -e $revision_file ]]
+
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            SERVICE_PUBLICATION_BOOTSTRAP=1 run_deploy apply
+            [[ $(<"$revision_file") == "$expected_revision" ]]
+            grep -Fq "install -d -m 0750 $state_arg" "$privilege_log"
+            grep -Fq "tee $state_arg/last-successful-revision" "$privilege_log"
+
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            run_deploy apply
+            grep -Fqx "cat $state_arg/last-successful-revision" "$privilege_log"
+            [[ $(<"$revision_file") == "$expected_revision" ]]
+
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            if SERVICE_PUBLICATION_TEST_FAIL_FINAL_SMOKE=1 run_deploy apply; then
+              echo "apply succeeded despite a failed final smoke probe" >&2
+              exit 1
+            fi
+            [[ $(<"$revision_file") == "$expected_revision" ]]
+            if grep -Fq "tee $state_arg/last-successful-revision" "$privilege_log"; then
+              echo "failed apply rewrote revision state" >&2
+              exit 1
+            fi
+
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            if SERVICE_PUBLICATION_TEST_DENY_REVISION_READ=1 run_deploy apply; then
+              echo "apply succeeded with unreadable revision state and no bootstrap authorization" >&2
+              exit 1
+            fi
+            [[ $(<"$revision_file") == "$expected_revision" ]]
+
+            printf ' \n' >> infra/service-publication/registry.json
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            SERVICE_PUBLICATION_ALLOW_DIRTY=1 run_deploy apply
+            [[ $(<"$revision_file") == "$expected_revision" ]]
+            if grep -Fq "tee $state_arg/last-successful-revision" "$privilege_log"; then
+              echo "dirty emergency apply rewrote revision state" >&2
+              exit 1
+            fi
+
+            rm -rf "$state_dir"
+            rm -f "$command_log" "$privilege_log" "$smoke_count"
+            run_deploy plan-only
+            if [[ -s $privilege_log || -e $state_dir ]]; then
+              echo "plan-only read or mutated revision state" >&2
+              exit 1
+            fi
+
             touch "$out"
           '';
 
@@ -797,6 +941,7 @@ args@{
             "service-publication-tofu"
             "service-publication-shell-applications"
             "service-publication-plan-only"
+            "service-publication-deploy-revision-state"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
             "service-publication-tunnel-ingress-guard"

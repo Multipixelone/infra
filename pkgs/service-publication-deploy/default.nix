@@ -4,9 +4,11 @@
   coreutils,
   gitMinimal,
   jq,
+  privilegeCommand ? "/run/wrappers/bin/sudo",
   servicePublicationSmoke,
   servicePublicationTofu,
   servicePublicationValidate,
+  stateDir ? "/var/lib/service-publication",
   writeShellApplication,
 }:
 writeShellApplication {
@@ -28,7 +30,8 @@ writeShellApplication {
     mode=''${1:-apply}
     route_filter=''${2:-}
     registry=infra/service-publication/registry.json
-    state_dir=/var/lib/service-publication
+    state_dir=${builtins.toJSON stateDir}
+    privilege_command=${builtins.toJSON privilegeCommand}
     revision_file="$state_dir/last-successful-revision"
 
     case "$mode" in
@@ -40,6 +43,16 @@ writeShellApplication {
     esac
 
     stage() { printf '\n==> %s\n' "$1"; }
+
+    read_revision() {
+      "$privilege_command" cat "$revision_file"
+    }
+
+    write_revision() {
+      local revision=$1
+      "$privilege_command" install -d -m 0750 "$state_dir"
+      printf '%s\n' "$revision" | "$privilege_command" tee "$revision_file" >/dev/null
+    }
 
     allow_dirty=''${SERVICE_PUBLICATION_ALLOW_DIRTY:-}
     if [[ $mode == apply ]]; then
@@ -59,7 +72,8 @@ writeShellApplication {
       exit 0
     fi
 
-    if [[ ! -r $revision_file ]]; then
+    previous_revision=
+    if ! previous_revision=$(read_revision) || [[ -z $previous_revision ]]; then
       if [[ ''${SERVICE_PUBLICATION_BOOTSTRAP:-} != 1 ]]; then
         echo "no last successful revision; complete the adoption runbook and set SERVICE_PUBLICATION_BOOTSTRAP=1 for the reviewed first run" >&2
         exit 1
@@ -69,7 +83,6 @@ writeShellApplication {
       previous_ingress='{}'
       previous_canonical='{}'
     else
-      previous_revision=$(<"$revision_file")
       previous_public=$(git show "$previous_revision:$registry" | jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort')
       previous_origins=$(git show "$previous_revision:$registry" | jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)')
       previous_ingress=$(git show "$previous_revision:$registry" | jq -c '.cloudflare.tunnel.ingressHost')
@@ -209,9 +222,7 @@ writeShellApplication {
     fi
 
     revision=$(git rev-parse HEAD)
-    # The store sudo is not setuid, so only the NixOS wrapper can elevate here.
-    /run/wrappers/bin/sudo install -d -m 0750 "$state_dir"
-    printf '%s\n' "$revision" | /run/wrappers/bin/sudo tee "$revision_file" >/dev/null
+    write_revision "$revision"
     echo "service publication deployment succeeded at $revision"
   '';
   meta.description = "Run the full service publication deploy flow";
