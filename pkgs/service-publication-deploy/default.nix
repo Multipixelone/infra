@@ -102,7 +102,62 @@ writeShellApplication {
       exit 1
     fi
 
+    # Publishing a new application adds a SAN, so the switch queues a fresh
+    # DNS-01 order and nginx keeps serving the previous certificate until lego
+    # finishes and reloads it, which takes about a minute. The smoke probes
+    # verify TLS exactly the way every other client does, which is the point of
+    # them, so a probe run inside that window fails on a certificate that is
+    # merely not issued yet. Wait on the certificate here rather than giving the
+    # probes retries, which would also mask a genuinely broken origin.
+    tls_select='.'
+    if [[ -n $route_filter ]]; then
+      # shellcheck disable=SC2016 # $route is a jq variable, not a shell variable.
+      tls_select='select(.key == $route)'
+    fi
+    tls_targets_tsv=$(jq -r --arg route "$route_filter" "
+      .internalProbes[] | $tls_select |
+      ([.hostname, .proxyAddress], (select(.alias != null) | [.alias, .proxyAddress]))
+      | @tsv
+    " "$registry" | sort -u)
+    tls_targets=()
+    if [[ -n $tls_targets_tsv ]]; then
+      mapfile -t tls_targets <<<"$tls_targets_tsv"
+    fi
+
+    wait_for_certificates() {
+      local timeout=''${SERVICE_PUBLICATION_TLS_READY_TIMEOUT:-180}
+      local waited=0 announced=0
+      local target name address status pending
+      while :; do
+        pending=()
+        for target in "''${tls_targets[@]}"; do
+          IFS=$'\t' read -r name address <<<"$target"
+          status=0
+          # Only the certificate verdict matters, so any HTTP status counts as
+          # ready. A non-TLS failure is left to the probes, which name the
+          # offending route far more precisely than a wait here could.
+          curl --silent --head --output /dev/null --max-time 5 \
+            --resolve "$name:443:$address" "https://$name/" >/dev/null 2>&1 || status=$?
+          case "$status" in
+          35 | 60) pending+=("$name") ;;
+          esac
+        done
+        ((''${#pending[@]} > 0)) || return 0
+        if ((waited >= timeout)); then
+          echo "certificate still does not verify for ''${pending[*]} after ''${timeout}s" >&2
+          return 1
+        fi
+        if ((announced == 0)); then
+          echo "waiting for the certificate covering ''${pending[*]}" >&2
+          announced=1
+        fi
+        sleep 5
+        waited=$((waited + 5))
+      done
+    }
+
     run_internal_smoke() {
+      wait_for_certificates
       service-publication-smoke lan "$route_filter"
       if [[ -z ''${SERVICE_PUBLICATION_VPN_PROBE_COMMAND:-} ]]; then
         echo "no SERVICE_PUBLICATION_VPN_PROBE_COMMAND set; the VPN view stays unproven for this run" >&2
