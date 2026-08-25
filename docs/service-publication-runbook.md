@@ -269,6 +269,13 @@ automated: use the accepted overlap procedure, keep the old connector healthy,
 verify both paths, then change the role and retire the old instance only after
 the separately agreed observation interval.
 
+Because the flow applies the working tree but can only record a commit, the
+apply mode refuses to start while tracked files are modified or staged: commit
+them first. Untracked files do not block. `SERVICE_PUBLICATION_ALLOW_DIRTY=1`
+is the deliberate escape hatch for an emergency apply from an uncommitted tree;
+it skips that gate and then refuses to record a revision, so the recorded
+revision never claims to describe a tree that was never committed.
+
 ## Rollback
 
 Use the same registry and `just deploy-services` flow with a reviewed previous

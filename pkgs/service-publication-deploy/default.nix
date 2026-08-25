@@ -41,6 +41,16 @@ writeShellApplication {
 
     stage() { printf '\n==> %s\n' "$1"; }
 
+    allow_dirty=''${SERVICE_PUBLICATION_ALLOW_DIRTY:-}
+    if [[ $mode == apply ]]; then
+      if [[ $allow_dirty == 1 ]]; then
+        echo "SERVICE_PUBLICATION_ALLOW_DIRTY=1; this run applies an uncommitted tree and will not record a successful revision" >&2
+      elif [[ -n $(git status --porcelain --untracked-files=no) ]]; then
+        echo "tracked files are modified or staged; the deploy applies the working tree but can only record HEAD, so commit first (or set SERVICE_PUBLICATION_ALLOW_DIRTY=1 to deploy without recording a revision)" >&2
+        exit 1
+      fi
+    fi
+
     service-publication-validate
 
     if [[ $mode == plan-only ]]; then
@@ -119,6 +129,12 @@ writeShellApplication {
       run_external_smoke
     else
       echo "registry publishes no public routes and none were withdrawn; skipping external smoke verification" >&2
+    fi
+
+    if [[ $allow_dirty == 1 ]]; then
+      echo "service publication deployment succeeded from an uncommitted tree; refusing to record HEAD as the applied revision" >&2
+      echo "$revision_file still names the last committed deployment; deploy from a committed tree before relying on addition/removal classification" >&2
+      exit 0
     fi
 
     revision=$(git rev-parse HEAD)
