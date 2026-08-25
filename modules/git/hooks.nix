@@ -23,6 +23,13 @@
             regexTarget = "secret";
             regexes = [ "^RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3$" ];
           }
+          {
+            # Non-secret Cloudflare resource IDs the service-publication
+            # registry records so adoption imports rather than recreates.
+            description = "Cloudflare Access policy identifiers in the publication registry";
+            regexTarget = "match";
+            regexes = [ "cloudflareImportKey\"?[ =:]+\"[0-9a-f-]{36}\"" ];
+          }
         ];
         extend.useDefault = true;
       };

@@ -294,9 +294,10 @@ in
     servicePublication = {
       rollout.enableLocalCutover = true;
 
-      # These are target identities, not permission to deploy. Policy
-      # definitions intentionally remain empty until Finn confirms the
-      # adoption inputs documented in the runbook.
+      # These are target identities, not permission to deploy. Access
+      # policy bodies below were read back from the live Cloudflare account
+      # and carry the existing resource IDs so adoption imports rather than
+      # recreates them.
       cloudflare = {
         accountId = "4b74fb7e0a35c9c1148bf0434d7fdffa";
         zoneId = "d8bb324032c2738ff17efde63e9a7988";
@@ -347,8 +348,27 @@ in
       };
 
       accessPolicies = {
-        finn-only = { };
-        family = { };
+        # Adopted from Cloudflare Access policy "Finn". The live policy also
+        # includes a stale residential IP rule; identity is the only include
+        # kept here, so adoption drops that rule.
+        finn-only = {
+          cloudflareImportKey = "c6e465cf-29f3-4579-a64f-4fbd6255e032";
+          decision = "allow";
+          include = [ { email.email = "finn@cnwr.net"; } ];
+          require = [ { geo.country_code = "US"; } ];
+          sessionDuration = "24h";
+        };
+        # Adopted from Cloudflare Access policy "Family".
+        family = {
+          cloudflareImportKey = "cb3f72d2-2cc4-4a09-b718-7db79eaa8249";
+          decision = "allow";
+          include = [
+            { email_domain.domain = "cnwr.net"; }
+            { email.email = "wrutis@gmail.com"; }
+          ];
+          require = [ { geo.country_code = "US"; } ];
+          sessionDuration = "24h";
+        };
       };
 
       applications = {
