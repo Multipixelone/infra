@@ -105,22 +105,39 @@ let
           ) inventory.routes;
           probeScript = pkgs.writeShellApplication {
             name = "service-publication-health-${hostName}";
-            runtimeInputs = [ pkgs.curl ];
+            runtimeInputs = [
+              pkgs.coreutils
+              pkgs.curl
+            ];
             text = lib.concatMapStringsSep "\n" (
               route:
               let
                 expected = lib.concatMapStringsSep "," toString route.health.expectedStatuses;
               in
               ''
-                status="$(curl --silent --show-error --output /dev/null \
-                  --max-time ${toString route.health.timeoutSeconds} \
-                  --resolve ${lib.escapeShellArg "${route.canonical}:443:${route.proxy.lanAddress}"} \
-                  --write-out '%{http_code}' \
-                  ${lib.escapeShellArg "https://${route.canonical}${route.health.path}"})"
-                case ",${expected}," in
-                  (*,"$status",*) ;;
-                  (*) echo ${lib.escapeShellArg "${route.key}: unexpected health status"} "$status" >&2; exit 1;;
-                esac
+                expected=${lib.escapeShellArg ",${expected},"}
+                attempt=1
+                while true; do
+                  # A newly issued certificate reaches nginx through an
+                  # asynchronous reload, so an early probe can still observe
+                  # the bootstrap self-signed certificate.
+                  if ! status="$(curl --silent --show-error --output /dev/null \
+                    --max-time ${toString route.health.timeoutSeconds} \
+                    --resolve ${lib.escapeShellArg "${route.canonical}:443:${route.proxy.lanAddress}"} \
+                    --write-out '%{http_code}' \
+                    ${lib.escapeShellArg "https://${route.canonical}${route.health.path}"})"; then
+                    status=000
+                  fi
+                  case "$expected" in
+                    (*,"$status",*) break ;;
+                  esac
+                  if [ "$attempt" -ge 3 ]; then
+                    echo ${lib.escapeShellArg "${route.key}: unexpected health status"} "$status" >&2
+                    exit 1
+                  fi
+                  attempt=$((attempt + 1))
+                  sleep 2
+                done
               ''
             ) (lib.attrValues proxyRoutes);
           };
@@ -201,15 +218,22 @@ let
 
             systemd.services.service-publication-health = lib.mkIf (proxyProjection != null) {
               description = "Probe generated service-publication routes";
-              after = [ "nginx.service" ];
+              # Ordering only: a queued certificate order must finish before a
+              # probe runs, but a probe must never trigger an order itself.
+              after = [
+                "nginx.service"
+                "acme-order-renew-${acmeCertificateName}.service"
+              ];
               serviceConfig = {
                 Type = "oneshot";
                 ExecStart = lib.getExe probeScript;
               };
             };
-            systemd.services."acme-${acmeCertificateName}".unitConfig.ConditionPathExists = lib.mkIf (
-              proxyProjection != null
-            ) runtimeAcmeSecret;
+            # The DNS-01 credential is consumed by the ordering unit; the base
+            # unit only installs the bootstrap certificate nginx starts with.
+            systemd.services."acme-order-renew-${acmeCertificateName}".unitConfig.ConditionPathExists =
+              lib.mkIf (proxyProjection != null)
+                runtimeAcmeSecret;
             systemd.timers.service-publication-health = lib.mkIf (proxyProjection != null) {
               wantedBy = [ "timers.target" ];
               timerConfig = {
