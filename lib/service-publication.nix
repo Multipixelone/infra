@@ -21,6 +21,13 @@ let
   pathContains = parent: child: parent == "/" || lib.hasPrefix parent child;
   routeKey = application: route: "${application}/${route}";
 
+  # The single Cloudflare zone this pipeline manages. Public DNS records, the
+  # Tunnel ingress and the proxy's shared ACME SAN certificate all live inside
+  # it, so a canonical hostname outside it cannot be published.
+  publicZoneApex = "finnrut.is";
+  publicCanonicalSuffix = "apps.${publicZoneApex}";
+  inPublicZone = hostname: hostname == publicZoneApex || lib.hasSuffix ".${publicZoneApex}" hostname;
+
   sortRoutes =
     routes:
     lib.sort (
@@ -63,7 +70,7 @@ let
           if application.publicHostname != null then
             application.publicHostname
           else
-            "${applicationName}.apps.finnrut.is"
+            "${applicationName}.${publicCanonicalSuffix}"
         else
           "${applicationName}.${(sites.${application.site} or { internalZone = "invalid"; }).internalZone}";
 
@@ -370,6 +377,9 @@ let
         optional (
           !validHostname application.canonical
         ) "application ${application.name}: invalid canonical hostname ${application.canonical}"
+        ++
+          optional (original.public && !inPublicZone application.canonical)
+            "application ${application.name}: canonical hostname ${application.canonical} is outside the managed ${publicZoneApex} zone"
         ++ optional (appRoutes == [ ]) "application ${application.name}: at least one route is required"
         ++ optional (
           original.publicHostname != null && !original.public

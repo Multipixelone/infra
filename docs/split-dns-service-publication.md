@@ -139,7 +139,9 @@ For a public application (`public = true`), the canonical name defaults to:
 
 An optional full `publicHostname` replaces that default and supports names such
 as `git.finnrut.is` and `files.finnrut.is`. It is a full hostname, not a label
-or suffix. Supplying `publicHostname` when `public = false` is invalid.
+or suffix. Supplying `publicHostname` when `public = false` is invalid, as is a
+name outside the managed `finnrut.is` zone: public DNS, the Tunnel ingress and
+the proxy's shared ACME SAN certificate are all scoped to that one zone.
 
 A public application's NYC name remains internal-only and redirects to the
 public canonical name. Thus `git.nyc.finnrut.is` may redirect to
@@ -448,7 +450,8 @@ module must reject at least:
 - duplicate site, host, application, route, canonical, alias, or admin names;
 - hostname and path collisions, including overlapping path exposure rules whose
   precedence is ambiguous;
-- `publicHostname` when `public = false`;
+- `publicHostname` when `public = false`, or a canonical hostname outside the
+  managed `finnrut.is` zone;
 - a private application with a route override that attempts public exposure;
 - a public application with no effective public route;
 - `bypassAccess = true` without a non-empty justification;

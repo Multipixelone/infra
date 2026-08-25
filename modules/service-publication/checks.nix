@@ -60,6 +60,21 @@ let
     }
   );
 
+  outOfZoneHostname = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          publicHostname = "wiki.example.org";
+          access = registry.applications.grafana.access // {
+            policy = "finn-only";
+          };
+        };
+      };
+    }
+  );
+
   wideningBypass = publicationLib.resolve (
     registry
     // {
@@ -185,6 +200,8 @@ let
       "Access bypass justification validation regressed";
     assert lib.assertMsg (hasError "legacy home.finnrut.is" legacyName)
       "legacy hostname projection validation regressed";
+    assert lib.assertMsg (hasError "outside the managed finnrut.is zone" outOfZoneHostname)
+      "managed-zone canonical hostname validation regressed";
     assert lib.assertMsg (hasError "narrow the bypass route pathPrefix" wideningBypass)
       "outer-route bypass widening validation regressed";
     assert lib.assertMsg (publicFixture.errors == [ ]) "valid public application fixture must resolve";
