@@ -45,6 +45,22 @@ let
           certificateNames = if proxyProjection == null then [ ] else proxyProjection.certificateNames;
           primaryCertificateName = if certificateNames == [ ] then null else builtins.head certificateNames;
 
+          # Read back from the merged NixOS options instead of from
+          # proxyProjection: certificateNames is derived from the very vhost
+          # list it would otherwise be checked against, so an assertion phrased
+          # in those terms re-derives its own expectation and can never fail.
+          acmeCertificate = config.security.acme.certs.${acmeCertificateName} or null;
+          acmeSanNames =
+            if acmeCertificate == null then
+              [ ]
+            else
+              [ acmeCertificate.domain ] ++ acmeCertificate.extraDomainNames;
+          acmeVhostNames = lib.attrNames (
+            lib.filterAttrs (
+              _: vhost: vhost.useACMEHost == acmeCertificateName
+            ) config.services.nginx.virtualHosts
+          );
+
           nginxAcl = lib.concatMapStrings (cidr: "allow ${cidr};\n") trustedCidrs + "deny all;";
           nginxPublicAcl = lib.concatMapStrings (cidr: "allow ${cidr};\n") allowedProxySources + "deny all;";
           # Keeping the connector off an internal-only route is a source-address
@@ -192,13 +208,11 @@ let
                 message = "service publication on ${hostName}: the separate ACME DNS-01 agenix secret is required";
               }
               {
-                assertion = proxyProjection == null || certificateNames != [ ];
-                message = "service publication on ${hostName}: a proxy must have at least one generated certificate name";
+                assertion = proxyProjection == null || acmeSanNames != [ ];
+                message = "service publication on ${hostName}: a proxy must order a certificate with at least one name";
               }
               {
-                assertion =
-                  proxyProjection == null
-                  || lib.all (vhost: lib.elem vhost.name certificateNames) proxyProjection.vhosts;
+                assertion = lib.all (name: lib.elem name acmeSanNames) acmeVhostNames;
                 message = "service publication on ${hostName}: every nginx vhost must be covered by its per-host SAN certificate";
               }
             ];
