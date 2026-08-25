@@ -466,6 +466,26 @@ in
         # media-management cloudflared connector publishes no port and is not
         # a route; watchtower and kometa in the tautulli stack are portless
         # background jobs.
+        plex = {
+          site = "nyc";
+          homepage = {
+            group = "Media";
+            description = "Private media library";
+            icon = "plex";
+          };
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 32400;
+            };
+            health = {
+              # Confirmed from Link without a Plex token.
+              path = "/identity";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
         radarr = {
           site = "nyc";
           homepage = {

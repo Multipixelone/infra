@@ -67,3 +67,81 @@ failed, restart count, CPU, and memory values.
 `mcp-grafana` is local stdio, connects only to loopback Grafana, and starts with
 `--disable-write --enabled-tools=prometheus,loki`. PromQL and LogQL query scope
 is otherwise unrestricted.
+
+## Private media observability
+
+Link also hosts a private media-observability slice. Plex and the existing
+Alexandria applications are selected by their stable `application/root` route
+identities in the service-publication inventory. Their direct API URLs are
+derived from each route's backend scheme, resolved address, and port, while
+Homepage links remain the inventory's canonical HTTPS names. Do not add a
+second Alexandria host/port table. Plex is private and `/identity` is its
+unauthenticated health target; neither Plex nor either exporter receives public
+DNS, Tunnel ingress, nginx publication, or a firewall opening.
+
+Scraparr and Tautulli exporter bind only to `127.0.0.1:7100` and
+`127.0.0.1:8000`. Prometheus scrapes those loopback endpoints and probes the
+Tautulli exporter's `/ready` endpoint through the existing local Blackbox
+Exporter. Metric relabeling is a strict aggregate allowlist: user, title,
+request, issue, path, provider, server, quality, genre, and per-item series are
+dropped before ingestion. The dashboards use only aggregate service labels.
+Alexandria storage, Node Exporter, Kometa, Watchtower, SAB failed-job alerting,
+Tube Archivist, and qBittorrent remain deferred or excluded because Link has no
+reliable bounded signal for them.
+
+## Media credential bundle
+
+The one encrypted source is `observability/media.age` in the private secrets
+input. On Link it becomes `/run/agenix/media-observability`, owned by root with
+mode `0400`. The declaration is optional until the encrypted source exists, so
+pure evaluation does not require the bundle. Never put URLs in it; URLs are
+route-derived. Create it manually on an authorized workstation using the
+repository's normal agenix recipient workflow, then include exactly these
+shell-compatible assignments:
+
+```text
+HOMEPAGE_VAR_PLEX_TOKEN=
+HOMEPAGE_VAR_RADARR_KEY=
+HOMEPAGE_VAR_SONARR_KEY=
+HOMEPAGE_VAR_SEERR_KEY=
+HOMEPAGE_VAR_BAZARR_KEY=
+HOMEPAGE_VAR_SABNZBD_KEY=
+HOMEPAGE_VAR_TAUTULLI_KEY=
+RADARR_API_KEY=
+SONARR_API_KEY=
+SEERR_API_KEY=
+BAZARR_API_KEY=
+SABNZBD_API_KEY=
+TAUTULLI_API_KEY=
+```
+
+The repeated application credentials are intentional: Homepage and exporters
+use consumer-specific names so neither can accidentally consume the other's
+contract. NZBHydra2 has no widget and needs no key. Homepage and the two media
+exporters are conditioned on this file; Prometheus, Grafana, Loki, Alloy,
+Blackbox, and Node Exporter are not.
+
+## Images, validation, and operations
+
+Exporter images are pinned by release tag and Linux/amd64 manifest digest.
+For an update, read the tagged configuration/metric reference, reverify the
+platform digest, review the relabel allowlist against every emitted metric,
+and update the fixtures and documentation in the same commit. Never follow a
+floating tag.
+
+Before cutover, run formatting, generated-file consistency, focused Link
+evaluation, service-publication safety checks, Prometheus rule/config tests,
+Homepage and dashboard JSON checks, and repository-text secret scans. These are
+non-deploying checks: do not read the runtime bundle. Deployment remains a
+separate reviewed operation using the repository's Link deployment command;
+this implementation does not deploy. After an approved Link deployment,
+confirm loopback listeners, exporter readiness, scrape targets, and
+aggregate-only labels. Roll back by deploying the previous known-good revision;
+removing the bundle also stops only Homepage and the two media exporters through
+their conditions.
+
+Keep Grafana's notification policy null. Enabling delivery is future work and
+requires at least 24 hours of clean aggregate telemetry plus deliberate firing
+and recovery tests for each media alert. Do not route or test Telegram during
+this cutover. Routine maintenance consists of digest review, checking exporter
+release notes for metric/schema changes, and repeating the privacy fixtures.

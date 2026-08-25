@@ -227,14 +227,14 @@ in
               }
               {
                 alert = "PrometheusScrapeTargetDown";
-                expr = ''up{job!~"blackbox-.*|link-node"} == 0'';
+                expr = ''up{job!~"blackbox-.*|link-node|scraparr|tautulli-exporter"} == 0'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
               }
               {
                 alert = "EndpointDown";
-                expr = "probe_success == 0";
+                expr = ''probe_success{job!="blackbox-tautulli-ready"} == 0'';
                 for = "5m";
                 labels.severity = "critical";
                 annotations.summary = "{{ $labels.scope }} endpoint {{ $labels.endpoint }} is down";
