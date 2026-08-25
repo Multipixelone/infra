@@ -187,8 +187,7 @@ let
               route:
               "iptables -w -A nixos-service-publication -p tcp --dport ${toString route.backend.port} -s ${route.proxy.lanAddress}/32 -j nixos-fw-accept"
             ) (lib.attrValues remoteBackendRoutes);
-          connectorPackage =
-            inputs.nixpkgs-cloudflared.legacyPackages.${pkgs.stdenv.hostPlatform.system}.cloudflared;
+          connectorPackage = pkgs.cloudflared;
         in
         lib.mkMerge [
           (lib.mkIf (localEnabled && host.capabilities.internalDns) {
