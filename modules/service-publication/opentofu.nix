@@ -233,7 +233,6 @@ args@{
       treefmt.settings.global.excludes = [
         workflowPath
         "${tofuRoot}/.terraform.lock.hcl"
-        "${tofuRoot}/registry.json"
       ];
 
       files.file.${workflowPath}.source = pkgs.writers.writeJSON "service-publication-workflow.yaml" {

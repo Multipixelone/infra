@@ -64,6 +64,18 @@
         ...
       }:
       {
+        treefmt.settings.global.excludes =
+          config.files.file
+          |> builtins.attrNames
+          |> builtins.filter (
+            path:
+            lib.any (extension: lib.hasSuffix extension path) [
+              ".json"
+              ".json5"
+              ".jsonc"
+            ]
+          );
+
         files.file.".github/renovate.json5".text =
           builtins.toJSON {
             "$schema" = "https://docs.renovatebot.com/renovate-schema.json";
