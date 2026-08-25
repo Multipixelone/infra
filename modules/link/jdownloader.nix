@@ -8,16 +8,12 @@ in
   # Published as jdownloader.nyc.finnrut.is (internal only). Defined here rather
   # than in modules/service-publication/registry.nix so the web UI port has one
   # source of truth.
-  #
-  # The container is autoStart = false, so the generated health probe reports a
-  # failure whenever it is stopped — the name and vhost exist so the UI is
-  # reachable the moment it is started by hand.
   servicePublication.applications.jdownloader = {
     site = "nyc";
     homepage = {
       name = "JDownloader";
       group = "Downloads";
-      description = "Direct-download manager (started on demand)";
+      description = "Direct-download manager";
       icon = "jdownloader";
     };
     routes.root = {
@@ -43,7 +39,7 @@ in
     ];
 
     virtualisation.oci-containers.containers.jdownloader = {
-      autoStart = false;
+      autoStart = true;
       image = "jlesage/jdownloader-2:latest";
       ports = [ "${toString webPort}:5800" ];
       # user = "tunnel:users";
