@@ -123,6 +123,43 @@ let
     }
   );
 
+  applicationServiceToken = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // {
+            policy = "finn-only";
+            serviceTokens = [ "00000000-0000-0000-0000-000000000000" ];
+          };
+        };
+      };
+    }
+  );
+
+  routeAccessOverride = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // {
+            policy = "finn-only";
+          };
+          routes = registry.applications.grafana.routes // {
+            api = registry.applications.grafana.routes.root // {
+              match.pathPrefix = "/api/";
+              access = registry.applications.grafana.routes.root.access // {
+                policy = "family";
+              };
+            };
+          };
+        };
+      };
+    }
+  );
+
   unreachableBackend = publicationLib.resolve (
     registry
     // {
@@ -156,6 +193,22 @@ let
       && (builtins.head publicFixture.cloudflare.tunnel.applications).ingress != [ ]
       && !(builtins.head (builtins.head publicFixture.cloudflare.tunnel.applications).ingress).noTlsVerify
     ) "public DNS/Tunnel projections must carry Access and verified direct-origin intent";
+    assert lib.assertMsg (
+      applicationServiceToken.errors == [ ]
+      && builtins.attrNames applicationServiceToken.cloudflare.accessApplications == [ "grafana" ]
+      && applicationServiceToken.cloudflare.accessApplications.grafana.domain == "grafana.apps.finnrut.is"
+    ) "an application-level Access setting must not duplicate its Access application";
+    assert lib.assertMsg (
+      routeAccessOverride.errors == [ ]
+      &&
+        builtins.attrNames routeAccessOverride.cloudflare.accessApplications == [
+          "grafana"
+          "grafana/api"
+        ]
+      &&
+        routeAccessOverride.cloudflare.accessApplications."grafana/api".domain
+        == "grafana.apps.finnrut.is/api/"
+    ) "a route-level Access override must keep its own Access application";
     assert lib.assertMsg (hasError "does not declare reachability" unreachableBackend)
       "remote backend reachability validation regressed";
     inventory;

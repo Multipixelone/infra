@@ -231,13 +231,17 @@ let
       accessApplicationFor =
         application:
         let
+          applicationAccess = applications.${application.name}.access;
+          # effectiveAccess already folds the application defaults into every
+          # route, so a route is an override only where its own declaration
+          # moved a field away from the application-wide value.
           advancedRoutes = filter (
             route:
             route.public
             && (
-              route.access.policy != applications.${application.name}.access.policy
-              || route.access.serviceTokens != [ ]
-              || route.access.bypassAccess
+              route.access.policy != applicationAccess.policy
+              || route.access.serviceTokens != lib.unique applicationAccess.serviceTokens
+              || route.access.bypassAccess != applicationAccess.bypassAccess
             )
           ) application.routes;
           mkAccess = suffix: domain: access: {
@@ -249,7 +253,7 @@ let
         map (
           route: mkAccess "/${route.route}" "${application.canonical}${route.pathPrefix}" route.access
         ) advancedRoutes
-        ++ [ (mkAccess "" application.canonical applications.${application.name}.access) ];
+        ++ [ (mkAccess "" application.canonical applicationAccess) ];
 
       accessApplications = concatMap accessApplicationFor publicApplications;
       accessApplicationsByKey = lib.listToAttrs (
