@@ -11,8 +11,14 @@ locals {
         hostname = local.registry.applications[element(split("/", route.key), 0)].canonical
         service  = route.service
       },
+      # cloudflared compiles an ingress path with regexp.Compile and evaluates it
+      # with MatchString, which is a substring test, so an unanchored pattern also
+      # captures sibling and nested paths (/api.* matches /apiv2 and /guides/api/x).
+      # Anchor at the start and stop on a path-segment boundary; the prefix is
+      # regex-escaped because the registry only constrains pathPrefix to "begins
+      # with /".
       route.pathPrefix == "/" ? {} : {
-        path = "${trimsuffix(route.pathPrefix, "/")}.*"
+        path = "^${replace(trimsuffix(route.pathPrefix, "/"), "/([\\\\.\\[\\]{}()*+?^$|])/", "\\$1")}(/|$)"
       },
       startswith(route.service, "https://") ? {
         origin_request = {
