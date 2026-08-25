@@ -9,10 +9,7 @@ let
   publicationSite =
     config.servicePublication.sites.${config.servicePublication.applications.grafana.site};
   effectiveTrustedCidrs =
-    if localCutover then
-      publicationSite.routedLanCidrs ++ publicationSite.vpnClientCidrs
-    else
-      observability.trustedClientCidrs;
+    if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
@@ -674,10 +671,8 @@ in
         }
         {
           assertion =
-            if localCutover then
-              effectiveTrustedCidrs == publicationSite.routedLanCidrs ++ publicationSite.vpnClientCidrs
-            else
-              observability.trustedClientCidrs == expectedCidrs;
+            observability.trustedClientCidrs == expectedCidrs
+            && (!localCutover || publicationSite.trustedClientCidrs == observability.trustedClientCidrs);
           message = "DNS, firewall, and nginx must share the active registry's exact client CIDRs.";
         }
         {

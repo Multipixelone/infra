@@ -21,7 +21,7 @@ let
     let
       proxyProjection = inventory.nginxByHost.${hostName} or null;
       site = registry.sites.${host.site};
-      trustedCidrs = site.routedLanCidrs ++ site.vpnClientCidrs;
+      trustedCidrs = site.trustedClientCidrs;
       connectorHost = registry.hosts.${site.publicIngressHost};
       publicOnProxy =
         proxyProjection != null

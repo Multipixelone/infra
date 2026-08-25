@@ -52,8 +52,11 @@ Do not enable either rollout gate until this list is reviewed:
    lock recovery are not yet tested. Complete those tests before treating the
    backend bootstrap as operationally verified.
 
-Fill `sites.nyc.routedLanCidrs`, `vpnClientCidrs`, and
-`networkInventoryConfirmed = true` only after item 1. Evaluate and deploy the
+Fill `sites.nyc.routedLanCidrs`, `vpnClientCidrs`, `trustedClientCidrs`, and
+`networkInventoryConfirmed = true` only after item 1. `routedLanCidrs` records
+destinations pushed to VPN peers; only `trustedClientCidrs` grants inbound
+access to the generated DNS, firewall, and nginx policy, and it must match
+`observability.trustedClientCidrs`. Evaluate and deploy the
 new local names, run LAN and VPN smoke tests, update clients/bookmarks, and only
 then set `rollout.enableLocalCutover = true`. With that flag, the legacy
 `*.home.finnrut.is` Blocky mappings, vhosts, SANs, and probe names are replaced;

@@ -139,6 +139,11 @@ let
         default = [ ];
         description = "VPN client source networks accepted by generated DNS and proxy policy.";
       };
+      trustedClientCidrs = mkOption {
+        type = types.listOf (types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+");
+        default = [ ];
+        description = "Reviewed inbound client source networks allowed to reach generated DNS and proxy listeners; routed destinations are not implicitly trusted sources.";
+      };
       networkInventoryConfirmed = mkOption {
         type = types.bool;
         default = false;
@@ -314,6 +319,11 @@ in
           "192.168.8.0/24"
         ];
         vpnClientCidrs = [ "10.100.0.0/24" ];
+        trustedClientCidrs = [
+          "192.168.5.0/24"
+          "192.168.6.0/24"
+          "10.100.0.0/24"
+        ];
         networkInventoryConfirmed = true;
         publicIngressHost = "link";
         defaultProxyHosts = [ "link" ];
