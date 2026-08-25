@@ -175,6 +175,24 @@ let
     }
   );
 
+  unboundApplicationPolicy = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          routes = registry.applications.grafana.routes // {
+            root = registry.applications.grafana.routes.root // {
+              access = registry.applications.grafana.routes.root.access // {
+                policy = "finn-only";
+              };
+            };
+          };
+        };
+      };
+    }
+  );
+
   # marin declares no reachableFromProxyHosts, unlike alexandria, which the
   # real registry marks reachable from link.
   unreachableBackend = publicationLib.resolve (
@@ -233,6 +251,9 @@ let
         routeAccessOverride.cloudflare.accessApplications."grafana/api".domain
         == "grafana.apps.finnrut.is/api/"
     ) "a route-level Access override must keep its own Access application";
+    assert lib.assertMsg
+      (hasError "default Access policy is missing or unknown" unboundApplicationPolicy)
+      "application-level default Access policy validation regressed";
     assert lib.assertMsg (hasError "does not declare reachability" unreachableBackend)
       "remote backend reachability validation regressed";
     inventory;

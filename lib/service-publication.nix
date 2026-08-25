@@ -536,7 +536,23 @@ let
           optional (
             !(builtins.hasAttr name accessApplicationsByKey)
           ) "public DNS ${name}: missing Access application dependency"
-        ) (attrNames publicDns);
+        ) (attrNames publicDns)
+        # Route validation only sees route-effective access, so an application
+        # whose own access block never names a policy still emits a base Access
+        # application. Cloudflare binds that policy as the default at the lowest
+        # precedence, so every emitted application must name a real, adopted one.
+        ++ concatMap (
+          application:
+          let
+            policy = application.access.policy;
+          in
+          optional (
+            policy == null || !(builtins.hasAttr policy accessPolicies)
+          ) "Access application ${application.key}: default Access policy is missing or unknown"
+          ++ optional (
+            policy != null && builtins.hasAttr policy accessPolicies && !(builtins.hasAttr policy readyPolicies)
+          ) "Access application ${application.key}: default Access policy ${policy} is not import-ready"
+        ) accessApplications;
 
       errors =
         siteErrors ++ hostErrors ++ concatMap errorsForApplication applicationList ++ projectionErrors;
