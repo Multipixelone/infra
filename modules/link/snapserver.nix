@@ -29,6 +29,8 @@
         allowedTCPPorts = [
           7000 # AirPlay 2 RTSP control
           6600 # MPD remote control
+          1704 # Snapcast audio stream
+          1705 # Snapcast control
         ];
         allowedTCPPortRanges = [
           {
@@ -109,7 +111,10 @@
         };
         snapserver = {
           enable = true;
-          openFirewall = true;
+          # Snapweb is published privately through Link's HTTPS service
+          # publication vhost. Ports 1704/1705 remain explicitly open above
+          # for Snapcast clients, while HTTP port 1780 is no longer exposed.
+          openFirewall = false;
           settings = {
             tcp-control.enabled = true;
             http.enabled = true;

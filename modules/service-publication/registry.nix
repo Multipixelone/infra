@@ -455,6 +455,26 @@ in
             };
           };
         };
+        snapweb = {
+          site = "nyc";
+          homepage = {
+            name = "Snapweb";
+            group = "Media";
+            description = "Private Snapcast control and listening UI";
+            icon = "snapcast";
+          };
+          routes.root = {
+            backend = {
+              host = "link";
+              port = 1780;
+            };
+            health = {
+              path = "/";
+              expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
 
         # Synology Docker media stacks
         # (docker/compose-files/media-management/docker-compose.yml and

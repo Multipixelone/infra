@@ -1,8 +1,11 @@
-# Phase 1 Link observability
+# Central observability on Link
 
 Phase 1 designates `link` as the observability hub without changing its
 `desktop` role. It provisions Grafana, Prometheus, Loki, Alloy, Blackbox
 Exporter, Homepage, nginx, Blocky records, and local read-only `mcp-grafana`.
+Link remains the only Grafana and Prometheus host. The `iot` and `marin` hosts
+run only node exporter with the systemd collector; port 9100 binds to each
+host's LAN address and accepts connections only from Link (`192.168.6.6`).
 
 ## Activation gate
 
@@ -51,10 +54,10 @@ reached first. Loki retains seven days. These are application retention
 settings, not hard filesystem caps: Btrfs qgroups, partitions, loop devices,
 and `StateDirectoryQuota` are intentionally absent.
 
-Link root was already 89% used during implementation. The 15%-free
-`RootDiskPressure` warning is therefore expected to fire on first activation
-and must not be silenced. Review disk capacity before any rebuild, switch, or
-deployment.
+The fleet dashboard selects `link-node`, `iot-node`, or `marin-node` and scopes
+all host panels to that exporter. The 15%-free `RootDiskPressure` warning
+applies independently to every monitored host. Prometheus storage-growth
+forecasting remains scoped to Link because Link owns the telemetry store.
 
 ## Privacy boundary
 

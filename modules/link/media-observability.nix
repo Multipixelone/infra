@@ -1359,6 +1359,7 @@ in
         sonarr = 4;
         bazarr = 5;
         calibre = 6;
+        snapweb = 7;
       };
       homepageServices =
         let

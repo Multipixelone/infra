@@ -61,6 +61,10 @@ let
   effectiveTrustedCidrs =
     if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
+  remoteNodeTargets = {
+    iot = config.hosts.iot.homeAddress;
+    marin = config.hosts.marin.homeAddress;
+  };
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
   probedEndpoints = builtins.filter (endpoint: endpoint.probe != null) endpointList;
@@ -816,12 +820,35 @@ let
 
     "fleet.json" = viz.dashboard {
       uid = "fleet";
-      title = "Fleet / Link";
+      title = "Fleet / NixOS hosts";
       tags = [
         "provisioned"
         "fleet"
       ];
-      description = "Host health for the observability hub.";
+      description = "Host health for Link, iot, and marin. Use the host filter to inspect one node exporter at a time.";
+      templating.list = [
+        {
+          name = "node_job";
+          label = "Host";
+          type = "query";
+          datasource = {
+            type = "prometheus";
+            uid = "prometheus";
+          };
+          query = "label_values(node_uname_info{job=~\"(link|iot|marin)-node\"}, job)";
+          definition = "label_values(node_uname_info{job=~\"(link|iot|marin)-node\"}, job)";
+          refresh = 1;
+          sort = 1;
+          multi = false;
+          includeAll = false;
+          current = {
+            selected = true;
+            text = "link-node";
+            value = "link-node";
+          };
+          options = [ ];
+        }
+      ];
       rows = [
         [ (viz.row "At a glance") ]
         [
@@ -832,7 +859,7 @@ let
             h = 7;
             # avg() over the idle series normalises across cores without a
             # separate core-count divisor.
-            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
+            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{job="$node_job",mode="idle"}[$__rate_interval])))'';
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -860,7 +887,7 @@ let
             h = 7;
             # MemAvailable, not MemFree: page cache is reclaimable and
             # counting it as "used" makes every Linux box look full.
-            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
+            expr = ''clamp_min((1 - (node_memory_MemAvailable_bytes{job="$node_job"} / node_memory_MemTotal_bytes{job="$node_job"})) * 100, 0)'';
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -886,8 +913,8 @@ let
             type = "gauge";
             w = 4;
             h = 7;
-            description = "Link root was already heavily used when the stack was built; RootDiskPressure firing here is expected, not a bug.";
-            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
+            description = "Root filesystem use on the selected NixOS host.";
+            expr = ''(1 - (node_filesystem_avail_bytes{job="$node_job",mountpoint="/"} / node_filesystem_size_bytes{job="$node_job",mountpoint="/"})) * 100'';
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -913,7 +940,7 @@ let
             type = "stat";
             w = 4;
             h = 7;
-            expr = "node_time_seconds - node_boot_time_seconds";
+            expr = ''node_time_seconds{job="$node_job"} - node_boot_time_seconds{job="$node_job"}'';
             unit = viz.units.duration;
             thresholds = [ { color = "text"; } ];
             options = {
@@ -926,7 +953,7 @@ let
             type = "stat";
             w = 4;
             h = 7;
-            expr = ''node_systemd_units{state="failed"}'';
+            expr = ''node_systemd_units{job="$node_job",state="failed"}'';
             unit = viz.units.none;
             decimals = 0;
             noValue = "0";
@@ -949,7 +976,7 @@ let
             h = 7;
             # `up` has 37 series; a bare stat of it rendered 37 anonymous
             # "1"s. The count of failures is the number worth showing.
-            expr = "count(up == 0) or vector(0)";
+            expr = ''count(up{job="$node_job"} == 0) or vector(0)'';
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -973,17 +1000,17 @@ let
             h = 8;
             targets = [
               {
-                expr = "up";
+                expr = ''up{job="$node_job"}'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "scrape_duration_seconds";
+                expr = ''scrape_duration_seconds{job="$node_job"}'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "scrape_samples_scraped";
+                expr = ''scrape_samples_scraped{job="$node_job"}'';
                 instant = true;
                 format = "table";
               }
@@ -1077,7 +1104,7 @@ let
             targets =
               map
                 (mode: {
-                  expr = ''sum(rate(node_cpu_seconds_total{mode="${mode}"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total) by (cpu)))'';
+                  expr = ''sum(rate(node_cpu_seconds_total{job="$node_job",mode="${mode}"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{job="$node_job"}) by (cpu)))'';
                   legend = mode;
                 })
                 [
@@ -1113,23 +1140,23 @@ let
             h = 8;
             targets = [
               {
-                expr = "node_memory_MemTotal_bytes";
+                expr = ''node_memory_MemTotal_bytes{job="$node_job"}'';
                 legend = "Total";
               }
               {
-                expr = "node_memory_MemTotal_bytes - node_memory_MemFree_bytes - (node_memory_Cached_bytes + node_memory_Buffers_bytes + node_memory_SReclaimable_bytes)";
+                expr = ''node_memory_MemTotal_bytes{job="$node_job"} - node_memory_MemFree_bytes{job="$node_job"} - (node_memory_Cached_bytes{job="$node_job"} + node_memory_Buffers_bytes{job="$node_job"} + node_memory_SReclaimable_bytes{job="$node_job"})'';
                 legend = "Used";
               }
               {
-                expr = "node_memory_Cached_bytes + node_memory_Buffers_bytes + node_memory_SReclaimable_bytes";
+                expr = ''node_memory_Cached_bytes{job="$node_job"} + node_memory_Buffers_bytes{job="$node_job"} + node_memory_SReclaimable_bytes{job="$node_job"}'';
                 legend = "Cache + buffers";
               }
               {
-                expr = "node_memory_MemFree_bytes";
+                expr = ''node_memory_MemFree_bytes{job="$node_job"}'';
                 legend = "Free";
               }
               {
-                expr = "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes";
+                expr = ''node_memory_SwapTotal_bytes{job="$node_job"} - node_memory_SwapFree_bytes{job="$node_job"}'';
                 legend = "Swap used";
               }
             ];
@@ -1174,19 +1201,19 @@ let
             h = 7;
             targets = [
               {
-                expr = "node_load1";
+                expr = ''node_load1{job="$node_job"}'';
                 legend = "1m";
               }
               {
-                expr = "node_load5";
+                expr = ''node_load5{job="$node_job"}'';
                 legend = "5m";
               }
               {
-                expr = "node_load15";
+                expr = ''node_load15{job="$node_job"}'';
                 legend = "15m";
               }
               {
-                expr = "count(count(node_cpu_seconds_total) by (cpu))";
+                expr = ''count(count(node_cpu_seconds_total{job="$node_job"}) by (cpu))'';
                 legend = "Cores";
               }
             ];
@@ -1225,7 +1252,7 @@ let
             title = "Temperatures";
             w = 12;
             h = 7;
-            expr = "node_hwmon_temp_celsius";
+            expr = ''node_hwmon_temp_celsius{job="$node_job"}'';
             legend = "{{chip}} / {{sensor}}";
             unit = viz.units.celsius;
             custom.fillOpacity = 0;
@@ -1241,7 +1268,7 @@ let
             h = 8;
             targets = [
               {
-                expr = "1 - (node_filesystem_avail_bytes{${realFilesystems}} / node_filesystem_size_bytes{${realFilesystems}})";
+                expr = ''1 - (node_filesystem_avail_bytes{job="$node_job",${realFilesystems}} / node_filesystem_size_bytes{job="$node_job",${realFilesystems}})'';
                 legend = "{{mountpoint}}";
                 instant = true;
               }
@@ -1266,7 +1293,7 @@ let
             title = "Filesystem free";
             w = 12;
             h = 8;
-            expr = "node_filesystem_avail_bytes{${realFilesystems}}";
+            expr = ''node_filesystem_avail_bytes{job="$node_job",${realFilesystems}}'';
             legend = "{{mountpoint}}";
             unit = viz.units.bytes;
             min = 0;
@@ -1280,11 +1307,11 @@ let
             h = 7;
             targets = [
               {
-                expr = "rate(node_disk_read_bytes_total{${wholeDisks}}[$__rate_interval])";
+                expr = ''rate(node_disk_read_bytes_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} read";
               }
               {
-                expr = "rate(node_disk_written_bytes_total{${wholeDisks}}[$__rate_interval])";
+                expr = ''rate(node_disk_written_bytes_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} write";
               }
             ];
@@ -1302,11 +1329,11 @@ let
             targets = [
               {
                 # The `* 8` is what makes the `bps` bit-rate unit correct.
-                expr = "rate(node_network_receive_bytes_total{${realInterfaces}}[$__rate_interval]) * 8";
+                expr = ''rate(node_network_receive_bytes_total{job="$node_job",${realInterfaces}}[$__rate_interval]) * 8'';
                 legend = "{{device}} in";
               }
               {
-                expr = "rate(node_network_transmit_bytes_total{${realInterfaces}}[$__rate_interval]) * 8";
+                expr = ''rate(node_network_transmit_bytes_total{job="$node_job",${realInterfaces}}[$__rate_interval]) * 8'';
                 legend = "{{device}} out";
               }
             ];
@@ -1325,11 +1352,11 @@ let
             h = 7;
             targets = [
               {
-                expr = "rate(node_disk_reads_completed_total{${wholeDisks}}[$__rate_interval])";
+                expr = ''rate(node_disk_reads_completed_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} read";
               }
               {
-                expr = "rate(node_disk_writes_completed_total{${wholeDisks}}[$__rate_interval])";
+                expr = ''rate(node_disk_writes_completed_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} write";
               }
             ];
@@ -1341,7 +1368,7 @@ let
             title = "Disk busy";
             w = 8;
             h = 7;
-            expr = "rate(node_disk_io_time_seconds_total{${wholeDisks}}[$__rate_interval])";
+            expr = ''rate(node_disk_io_time_seconds_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
             legend = "{{device}}";
             unit = viz.units.percentunit;
             min = 0;
@@ -1354,15 +1381,15 @@ let
             description = "Share of wall-clock time tasks spent stalled waiting for CPU, memory or IO.";
             targets = [
               {
-                expr = "rate(node_pressure_cpu_waiting_seconds_total[$__rate_interval])";
+                expr = ''rate(node_pressure_cpu_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
                 legend = "CPU";
               }
               {
-                expr = "rate(node_pressure_memory_waiting_seconds_total[$__rate_interval])";
+                expr = ''rate(node_pressure_memory_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
                 legend = "Memory";
               }
               {
-                expr = "rate(node_pressure_io_waiting_seconds_total[$__rate_interval])";
+                expr = ''rate(node_pressure_io_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
                 legend = "IO";
               }
             ];
@@ -1380,7 +1407,7 @@ let
             targets =
               map
                 (state: {
-                  expr = ''node_systemd_units{state="${state}"}'';
+                  expr = ''node_systemd_units{job="$node_job",state="${state}"}'';
                   legend = state;
                 })
                 [
@@ -3316,11 +3343,11 @@ in
             interval = "1m";
             rules = [
               {
-                alert = "LinkHostDown";
-                expr = ''up{job="link-node"} == 0'';
+                alert = "NixOSHostExporterDown";
+                expr = ''up{job=~"(link|iot|marin)-node"} == 0'';
                 for = "5m";
                 labels.severity = "critical";
-                annotations.summary = "Link host exporter is unreachable";
+                annotations.summary = "Node exporter {{ $labels.job }} at {{ $labels.instance }} is unreachable";
               }
               {
                 alert = "PrometheusScrapeTargetDown";
@@ -3338,10 +3365,10 @@ in
               }
               {
                 alert = "SystemdUnitFailed";
-                expr = ''node_systemd_unit_state{state="failed"} == 1'';
+                expr = ''node_systemd_unit_state{job=~"(link|iot|marin)-node",state="failed"} == 1'';
                 for = "5m";
                 labels.severity = "warning";
-                annotations.summary = "Systemd unit {{ $labels.name }} is failed";
+                annotations.summary = "Systemd unit {{ $labels.name }} is failed on {{ $labels.instance }}";
               }
               {
                 alert = "OpenClawGatewayDown";
@@ -3352,14 +3379,14 @@ in
               }
               {
                 alert = "RootDiskPressure";
-                expr = ''node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} < 0.15'';
+                expr = ''node_filesystem_avail_bytes{job=~"(link|iot|marin)-node",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job=~"(link|iot|marin)-node",mountpoint="/",fstype!~"tmpfs|overlay"} < 0.15'';
                 for = "10m";
                 labels.severity = "warning";
-                annotations.summary = "Link root filesystem has less than 15% free (expected to fire initially)";
+                annotations.summary = "Root filesystem on {{ $labels.instance }} has less than 15% free";
               }
               {
                 alert = "TelemetryStorageGrowth";
-                expr = ''predict_linear(node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}[6h], 7 * 24 * 3600) < 0'';
+                expr = ''predict_linear(node_filesystem_avail_bytes{job="link-node",mountpoint="/",fstype!~"tmpfs|overlay"}[6h], 7 * 24 * 3600) < 0'';
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Current filesystem growth projects Link root exhaustion within seven days";
@@ -3845,6 +3872,14 @@ in
           {
             job_name = "link-node";
             static_configs = [ { targets = [ "${node.backendAddress}:${toString node.port}" ]; } ];
+          }
+          {
+            job_name = "iot-node";
+            static_configs = [ { targets = [ "${remoteNodeTargets.iot}:${toString node.port}" ]; } ];
+          }
+          {
+            job_name = "marin-node";
+            static_configs = [ { targets = [ "${remoteNodeTargets.marin}:${toString node.port}" ]; } ];
           }
           {
             job_name = "prometheus";
