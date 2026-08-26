@@ -6,6 +6,9 @@
 }:
 let
   inherit (config) observability;
+  # Named `viz`, not `grafana`: the module's inner `let` already binds
+  # `grafana` to the endpoint registry entry.
+  viz = import ../../lib/grafana.nix { inherit lib; };
   inherit (config.flake.meta.owner) email username;
   serviceInventory = config.flake.servicePublicationInventory;
   localCutover = config.servicePublication.rollout.enableLocalCutover;
@@ -61,6 +64,13 @@ let
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
   probedEndpoints = builtins.filter (endpoint: endpoint.probe != null) endpointList;
+  # An application published to the internet is held to the public latency
+  # objective; everything else to the internal one. Both cutover branches used
+  # to hardcode "internal", which is why `PublicSloLatencyHigh` could never
+  # fire no matter how slow a public endpoint got.
+  sloClassFor =
+    application:
+    if (serviceInventory.applications.${application}.public or false) then "public" else "internal";
   internalProbes =
     if localCutover then
       map (route: {
@@ -70,7 +80,7 @@ let
         labels = {
           endpoint = route.canonical;
           scope = "internal";
-          slo_class = "internal";
+          slo_class = sloClassFor route.application;
         };
       }) (builtins.attrValues serviceInventory.routes)
     else
@@ -91,7 +101,9 @@ let
         labels = {
           endpoint = probe.canonical;
           scope = "private";
-          slo_class = "internal";
+          # `internalProbes` entries carry the route key, not the
+          # application name.
+          slo_class = sloClassFor serviceInventory.routes.${probe.key}.application;
         };
       }) serviceInventory.internalProbes
     else
@@ -116,6 +128,2265 @@ let
     runtimeGrafanaSecret
   ];
 
+  # Loopback interfaces and container/VM bridges carry no signal worth a
+  # panel, and their names would crowd out the one physical NIC.
+  realInterfaces = ''device!~"lo|veth.*|podman.*|br-.*|virbr.*|docker.*|tailscale.*|wg.*|zt.*"'';
+  realFilesystems = ''fstype!~"tmpfs|ramfs|overlay|nsfs|squashfs|fuse.*|autofs"'';
+  # Partitions duplicate their parent disk's counters.
+  wholeDisks = ''device=~"nvme[0-9]+n[0-9]+|sd[a-z]|mmcblk[0-9]+"'';
+  sloTargetPercent = observability.slo.availability * 100;
+
+  dashboards = {
+    "fleet.json" = viz.dashboard {
+      uid = "fleet";
+      title = "Fleet / Link";
+      tags = [
+        "provisioned"
+        "fleet"
+      ];
+      description = "Host health for the observability hub.";
+      rows = [
+        [ (viz.row "At a glance") ]
+        [
+          (viz.panel {
+            title = "CPU busy";
+            type = "gauge";
+            w = 4;
+            h = 6;
+            # avg() over the idle series normalises across cores without a
+            # separate core-count divisor.
+            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 85;
+              }
+              {
+                color = "red";
+                value = 95;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Memory used";
+            type = "gauge";
+            w = 4;
+            h = 6;
+            # MemAvailable, not MemFree: page cache is reclaimable and
+            # counting it as "used" makes every Linux box look full.
+            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Root filesystem";
+            type = "gauge";
+            w = 4;
+            h = 6;
+            description = "Link root was already heavily used when the stack was built; RootDiskPressure firing here is expected, not a bug.";
+            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Uptime";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = "node_time_seconds - node_boot_time_seconds";
+            unit = viz.units.duration;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Failed units";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = ''node_systemd_units{state="failed"}'';
+            unit = viz.units.none;
+            decimals = 0;
+            noValue = "0";
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Scrape targets down";
+            type = "stat";
+            w = 4;
+            h = 6;
+            # `up` has 37 series; a bare stat of it rendered 37 anonymous
+            # "1"s. The count of failures is the number worth showing.
+            expr = "count(up == 0) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Scrape targets";
+            type = "table";
+            w = 24;
+            h = 8;
+            targets = [
+              {
+                expr = "up";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "scrape_duration_seconds";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "scrape_samples_scraped";
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "joinByField";
+                options = {
+                  byField = "instance";
+                  mode = "outerTabular";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    "Time 1" = true;
+                    "Time 2" = true;
+                    "Time 3" = true;
+                    __name__ = true;
+                    "__name__ 1" = true;
+                    "__name__ 2" = true;
+                    "__name__ 3" = true;
+                    "job 2" = true;
+                    "job 3" = true;
+                    endpoint = true;
+                    scope = true;
+                    slo_class = true;
+                  };
+                  renameByName = {
+                    instance = "Target";
+                    job = "Job";
+                    "job 1" = "Job";
+                    "Value #A" = "Up";
+                    "Value #B" = "Scrape duration";
+                    "Value #C" = "Samples";
+                  };
+                };
+              }
+            ];
+            options.sortBy = [
+              {
+                displayName = "Up";
+                desc = false;
+              }
+            ];
+            overrides = [
+              (viz.overrideByName "Up" [
+                {
+                  id = "mappings";
+                  value = viz.boolMapping { };
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "color-background";
+                    mode = "basic";
+                  };
+                }
+                {
+                  id = "custom.width";
+                  value = 90;
+                }
+              ])
+              (viz.overrideByName "Scrape duration" [
+                {
+                  id = "unit";
+                  value = viz.units.seconds;
+                }
+                {
+                  id = "decimals";
+                  value = 3;
+                }
+              ])
+              (viz.overrideByName "Samples" [
+                {
+                  id = "unit";
+                  value = viz.units.short;
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "CPU, memory and load") ]
+        [
+          (viz.panel {
+            title = "CPU by mode";
+            w = 12;
+            h = 8;
+            targets =
+              map
+                (mode: {
+                  expr = ''sum(rate(node_cpu_seconds_total{mode="${mode}"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total) by (cpu)))'';
+                  legend = mode;
+                })
+                [
+                  "system"
+                  "user"
+                  "nice"
+                  "iowait"
+                  "irq"
+                  "softirq"
+                  "steal"
+                  "idle"
+                ];
+            # Percent stacking normalises the modes to fill the axis, which
+            # is why `idle` belongs in the stack rather than being filtered.
+            unit = viz.units.percentunit;
+            min = 0;
+            custom = {
+              fillOpacity = 70;
+              lineWidth = 0;
+              stacking = {
+                mode = "percent";
+                group = "A";
+              };
+            };
+            options.legend.calcs = [
+              "mean"
+              "max"
+            ];
+          })
+          (viz.panel {
+            title = "Memory";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "node_memory_MemTotal_bytes";
+                legend = "Total";
+              }
+              {
+                expr = "node_memory_MemTotal_bytes - node_memory_MemFree_bytes - (node_memory_Cached_bytes + node_memory_Buffers_bytes + node_memory_SReclaimable_bytes)";
+                legend = "Used";
+              }
+              {
+                expr = "node_memory_Cached_bytes + node_memory_Buffers_bytes + node_memory_SReclaimable_bytes";
+                legend = "Cache + buffers";
+              }
+              {
+                expr = "node_memory_MemFree_bytes";
+                legend = "Free";
+              }
+              {
+                expr = "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes";
+                legend = "Swap used";
+              }
+            ];
+            unit = viz.units.bytes;
+            min = 0;
+            custom = {
+              fillOpacity = 40;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            overrides = [
+              # Total is a ceiling line, not another slice of the stack.
+              (viz.overrideByName "Total" [
+                {
+                  id = "custom.fillOpacity";
+                  value = 0;
+                }
+                {
+                  id = "custom.stacking";
+                  value = {
+                    mode = "normal";
+                    group = false;
+                  };
+                }
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "#E0F9D7";
+                  };
+                }
+              ])
+            ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Load average";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "node_load1";
+                legend = "1m";
+              }
+              {
+                expr = "node_load5";
+                legend = "5m";
+              }
+              {
+                expr = "node_load15";
+                legend = "15m";
+              }
+              {
+                expr = "count(count(node_cpu_seconds_total) by (cpu))";
+                legend = "Cores";
+              }
+            ];
+            # Load is dimensionless, so it gets `short`, not a percentage.
+            unit = viz.units.short;
+            min = 0;
+            custom.fillOpacity = 20;
+            overrides = [
+              # The core count is the line load should be compared against.
+              (viz.overrideByName "Cores" [
+                {
+                  id = "custom.fillOpacity";
+                  value = 0;
+                }
+                {
+                  id = "custom.lineStyle";
+                  value = {
+                    fill = "dash";
+                    dash = [
+                      10
+                      10
+                    ];
+                  };
+                }
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "dark-red";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Temperatures";
+            w = 12;
+            h = 7;
+            expr = "node_hwmon_temp_celsius";
+            legend = "{{chip}} / {{sensor}}";
+            unit = viz.units.celsius;
+            custom.fillOpacity = 0;
+            options.legend.placement = "right";
+          })
+        ]
+        [ (viz.row "Storage and network") ]
+        [
+          (viz.panel {
+            title = "Filesystem used";
+            type = "bargauge";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "1 - (node_filesystem_avail_bytes{${realFilesystems}} / node_filesystem_size_bytes{${realFilesystems}})";
+                legend = "{{mountpoint}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 0.8;
+              }
+              {
+                color = "red";
+                value = 0.9;
+              }
+            ];
+            options.displayMode = "lcd";
+          })
+          (viz.panel {
+            title = "Filesystem free";
+            w = 12;
+            h = 8;
+            expr = "node_filesystem_avail_bytes{${realFilesystems}}";
+            legend = "{{mountpoint}}";
+            unit = viz.units.bytes;
+            min = 0;
+            custom.fillOpacity = 20;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Disk throughput";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "rate(node_disk_read_bytes_total{${wholeDisks}}[$__rate_interval])";
+                legend = "{{device}} read";
+              }
+              {
+                expr = "rate(node_disk_written_bytes_total{${wholeDisks}}[$__rate_interval])";
+                legend = "{{device}} write";
+              }
+            ];
+            unit = viz.units.bytesPerSecond;
+            custom = {
+              fillOpacity = 30;
+              axisLabel = "read (-) / write (+)";
+            };
+            overrides = [ (viz.negativeY "/read/") ];
+          })
+          (viz.panel {
+            title = "Network throughput";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                # The `* 8` is what makes the `bps` bit-rate unit correct.
+                expr = "rate(node_network_receive_bytes_total{${realInterfaces}}[$__rate_interval]) * 8";
+                legend = "{{device}} in";
+              }
+              {
+                expr = "rate(node_network_transmit_bytes_total{${realInterfaces}}[$__rate_interval]) * 8";
+                legend = "{{device}} out";
+              }
+            ];
+            unit = viz.units.bitsPerSecond;
+            custom = {
+              fillOpacity = 30;
+              axisLabel = "out (-) / in (+)";
+            };
+            overrides = [ (viz.negativeY "/out/") ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Disk IOPS";
+            w = 8;
+            h = 7;
+            targets = [
+              {
+                expr = "rate(node_disk_reads_completed_total{${wholeDisks}}[$__rate_interval])";
+                legend = "{{device}} read";
+              }
+              {
+                expr = "rate(node_disk_writes_completed_total{${wholeDisks}}[$__rate_interval])";
+                legend = "{{device}} write";
+              }
+            ];
+            unit = viz.units.iops;
+            custom.axisLabel = "read (-) / write (+)";
+            overrides = [ (viz.negativeY "/read/") ];
+          })
+          (viz.panel {
+            title = "Disk busy";
+            w = 8;
+            h = 7;
+            expr = "rate(node_disk_io_time_seconds_total{${wholeDisks}}[$__rate_interval])";
+            legend = "{{device}}";
+            unit = viz.units.percentunit;
+            min = 0;
+            custom.fillOpacity = 20;
+          })
+          (viz.panel {
+            title = "Pressure stall";
+            w = 8;
+            h = 7;
+            description = "Share of wall-clock time tasks spent stalled waiting for CPU, memory or IO.";
+            targets = [
+              {
+                expr = "rate(node_pressure_cpu_waiting_seconds_total[$__rate_interval])";
+                legend = "CPU";
+              }
+              {
+                expr = "rate(node_pressure_memory_waiting_seconds_total[$__rate_interval])";
+                legend = "Memory";
+              }
+              {
+                expr = "rate(node_pressure_io_waiting_seconds_total[$__rate_interval])";
+                legend = "IO";
+              }
+            ];
+            unit = viz.units.percentunit;
+            min = 0;
+            custom.fillOpacity = 20;
+          })
+        ]
+        [ (viz.row "Systemd and services") ]
+        [
+          (viz.panel {
+            title = "Unit states";
+            w = 12;
+            h = 7;
+            targets =
+              map
+                (state: {
+                  expr = ''node_systemd_units{state="${state}"}'';
+                  legend = state;
+                })
+                [
+                  "active"
+                  "activating"
+                  "deactivating"
+                  "inactive"
+                  "failed"
+                ];
+            unit = viz.units.short;
+            decimals = 0;
+            custom = {
+              fillOpacity = 60;
+              lineWidth = 0;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            overrides = [
+              (viz.overrideByName "failed" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "#F2495C";
+                  };
+                }
+              ])
+              (viz.overrideByName "active" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "#73BF69";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Failed units";
+            type = "table";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = ''node_systemd_unit_state{state="failed"} == 1'';
+                instant = true;
+                format = "table";
+              }
+            ];
+            noValue = "No failed units.";
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    __name__ = true;
+                    instance = true;
+                    job = true;
+                    state = true;
+                    type = true;
+                    Value = true;
+                  };
+                  renameByName.name = "Unit";
+                };
+              }
+            ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "OpenClaw gateway";
+            type = "state-timeline";
+            w = 12;
+            h = 6;
+            expr = "openclaw_gateway_active";
+            legend = "gateway";
+            mappings = viz.boolMapping {
+              falseText = "INACTIVE";
+              trueText = "ACTIVE";
+            };
+            options.legend.showLegend = false;
+          })
+          (viz.panel {
+            title = "OpenClaw resources";
+            w = 12;
+            h = 6;
+            targets = [
+              {
+                expr = "openclaw_gateway_memory_bytes";
+                legend = "Memory";
+              }
+              {
+                expr = "rate(openclaw_gateway_cpu_seconds_total[$__rate_interval])";
+                legend = "CPU";
+              }
+              {
+                expr = "openclaw_gateway_restarts_total";
+                legend = "Restarts";
+              }
+            ];
+            unit = viz.units.bytes;
+            overrides = [
+              (viz.overrideByName "CPU" [
+                {
+                  id = "unit";
+                  value = viz.units.percentunit;
+                }
+                {
+                  id = "custom.axisPlacement";
+                  value = "right";
+                }
+              ])
+              (viz.overrideByName "Restarts" [
+                {
+                  id = "unit";
+                  value = viz.units.none;
+                }
+                {
+                  id = "custom.axisPlacement";
+                  value = "hidden";
+                }
+              ])
+            ];
+          })
+        ]
+      ];
+    };
+
+    "service-health.json" = viz.dashboard {
+      uid = "service-health";
+      title = "Service health";
+      tags = [
+        "provisioned"
+        "health"
+      ];
+      description = "Every probed endpoint: is it up, how fast, and when did it last break?";
+      rows = [
+        [ (viz.row "Endpoints") ]
+        [
+          (viz.panel {
+            title = "Endpoints up";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = "sum(probe_success) / count(probe_success)";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.999;
+              }
+              {
+                color = "green";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "area";
+            };
+          })
+          (viz.panel {
+            title = "Endpoints down";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = "count(probe_success == 0) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Slowest probe";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = "max(probe_duration_seconds)";
+            legend = "slowest";
+            unit = viz.units.seconds;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = observability.slo.latencySeconds.internal;
+              }
+              {
+                color = "red";
+                value = observability.slo.latencySeconds.public;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Nearest certificate expiry";
+            type = "stat";
+            w = 6;
+            h = 6;
+            expr = "min(probe_ssl_earliest_cert_expiry - time())";
+            unit = viz.units.duration;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 7 * 24 * 3600;
+              }
+              {
+                color = "green";
+                value = 21 * 24 * 3600;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Probes configured";
+            type = "stat";
+            w = 6;
+            h = 6;
+            targets = [
+              {
+                expr = ''count(probe_success{scope="internal"})'';
+                legend = "Internal";
+              }
+              {
+                expr = ''count(probe_success{scope="private"})'';
+                legend = "Private (TLS)";
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Endpoint status";
+            type = "table";
+            w = 24;
+            h = 12;
+            description = "One row per probe. Sorted so anything down floats to the top.";
+            targets = [
+              {
+                expr = "probe_success";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "avg_over_time(probe_success[$__range])";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "probe_duration_seconds";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "probe_http_status_code";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "probe_ssl_earliest_cert_expiry - time()";
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "joinByField";
+                options = {
+                  byField = "instance";
+                  # Tabular instant data can repeat a join value; `outer`
+                  # silently drops those rows, `outerTabular` keeps them.
+                  mode = "outerTabular";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    "Time 1" = true;
+                    "Time 2" = true;
+                    "Time 3" = true;
+                    "Time 4" = true;
+                    "Time 5" = true;
+                    __name__ = true;
+                    "__name__ 1" = true;
+                    "__name__ 2" = true;
+                    "__name__ 3" = true;
+                    "__name__ 4" = true;
+                    "__name__ 5" = true;
+                    job = true;
+                    "job 1" = true;
+                    "job 2" = true;
+                    "job 3" = true;
+                    "job 4" = true;
+                    "job 5" = true;
+                    "endpoint 2" = true;
+                    "endpoint 3" = true;
+                    "endpoint 4" = true;
+                    "endpoint 5" = true;
+                    "scope 2" = true;
+                    "scope 3" = true;
+                    "scope 4" = true;
+                    "scope 5" = true;
+                    slo_class = true;
+                    "slo_class 1" = true;
+                    "slo_class 2" = true;
+                    "slo_class 3" = true;
+                    "slo_class 4" = true;
+                    "slo_class 5" = true;
+                  };
+                  renameByName = {
+                    endpoint = "Endpoint";
+                    "endpoint 1" = "Endpoint";
+                    scope = "Scope";
+                    "scope 1" = "Scope";
+                    instance = "Target";
+                    "Value #A" = "Status";
+                    "Value #B" = "Uptime (range)";
+                    "Value #C" = "Latency";
+                    "Value #D" = "HTTP";
+                    "Value #E" = "Cert expires";
+                  };
+                };
+              }
+            ];
+            options = {
+              cellHeight = "sm";
+              sortBy = [
+                {
+                  displayName = "Status";
+                  desc = false;
+                }
+              ];
+            };
+            overrides = [
+              (viz.overrideByName "Status" [
+                {
+                  id = "mappings";
+                  value = viz.boolMapping { };
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "color-background";
+                    mode = "basic";
+                    # Tint the whole row, so a broken endpoint is
+                    # unmissable rather than one red square.
+                    applyToRow = true;
+                  };
+                }
+                {
+                  id = "custom.width";
+                  value = 90;
+                }
+              ])
+              (viz.overrideByName "Uptime (range)" [
+                {
+                  id = "unit";
+                  value = viz.units.percentunit;
+                }
+                {
+                  id = "decimals";
+                  value = 3;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 1;
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "gauge";
+                    mode = "gradient";
+                  };
+                }
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "red"; }
+                      {
+                        color = "orange";
+                        value = 0.9;
+                      }
+                      {
+                        color = "yellow";
+                        value = observability.slo.availability;
+                      }
+                      {
+                        color = "green";
+                        value = 0.999;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Latency" [
+                {
+                  id = "unit";
+                  value = viz.units.seconds;
+                }
+                {
+                  id = "decimals";
+                  value = 3;
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "color-text";
+                  };
+                }
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "orange";
+                        value = observability.slo.latencySeconds.internal;
+                      }
+                      {
+                        color = "red";
+                        value = observability.slo.latencySeconds.public;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "HTTP" [
+                {
+                  id = "unit";
+                  value = viz.units.none;
+                }
+                {
+                  id = "decimals";
+                  value = 0;
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "color-text";
+                  };
+                }
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "text"; }
+                      {
+                        color = "green";
+                        value = 200;
+                      }
+                      {
+                        color = "yellow";
+                        value = 300;
+                      }
+                      {
+                        color = "orange";
+                        value = 400;
+                      }
+                      {
+                        color = "red";
+                        value = 500;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Cert expires" [
+                {
+                  id = "unit";
+                  value = viz.units.duration;
+                }
+                {
+                  id = "custom.cellOptions";
+                  value = {
+                    type = "color-text";
+                  };
+                }
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "red"; }
+                      {
+                        color = "orange";
+                        value = 7 * 24 * 3600;
+                      }
+                      {
+                        color = "green";
+                        value = 21 * 24 * 3600;
+                      }
+                    ];
+                  };
+                }
+              ])
+            ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Availability timeline";
+            type = "state-timeline";
+            w = 24;
+            h = 14;
+            description = "Green bands are healthy runs; the red slivers are the outages.";
+            expr = "probe_success";
+            legend = "{{endpoint}} ({{scope}})";
+            mappings = viz.boolMapping { };
+            options = {
+              # 29 probe series would otherwise paginate at Grafana's
+              # default of 20 rows.
+              perPage = 40;
+              legend.showLegend = false;
+            };
+          })
+        ]
+        [ (viz.row "Latency") ]
+        [
+          (viz.panel {
+            title = "Probe duration";
+            w = 12;
+            h = 8;
+            expr = "probe_duration_seconds";
+            legend = "{{endpoint}} ({{scope}})";
+            unit = viz.units.seconds;
+            min = 0;
+            custom.fillOpacity = 0;
+            options.legend.placement = "right";
+          })
+          (viz.panel {
+            title = "Where the time goes";
+            w = 12;
+            h = 8;
+            description = "HTTP phases are additive, so stacking them shows the total and the split at once.";
+            expr = "avg by (phase) (probe_http_duration_seconds)";
+            legend = "{{phase}}";
+            unit = viz.units.seconds;
+            min = 0;
+            custom = {
+              fillOpacity = 60;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+          })
+        ]
+        [ (viz.row "TLS") ]
+        [
+          (viz.panel {
+            title = "Certificate lifetime remaining";
+            type = "bargauge";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400";
+                legend = "{{endpoint}}";
+                instant = true;
+              }
+            ];
+            unit = "d";
+            min = 0;
+            max = 90;
+            decimals = 0;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 7;
+              }
+              {
+                color = "yellow";
+                value = 21;
+              }
+              {
+                color = "green";
+                value = 30;
+              }
+            ];
+            options.displayMode = "lcd";
+          })
+          (viz.panel {
+            title = "Certificate expiry over time";
+            w = 12;
+            h = 8;
+            expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400";
+            legend = "{{endpoint}}";
+            unit = "d";
+            min = 0;
+            custom = {
+              fillOpacity = 0;
+              thresholdsStyle.mode = "dashed";
+            };
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 21;
+              }
+            ];
+            color.mode = "palette-classic";
+            options.legend.placement = "right";
+          })
+        ]
+      ];
+    };
+
+    "rolling-slo.json" = viz.dashboard {
+      uid = "rolling-slo";
+      title = "Rolling SLO / error budget";
+      tags = [
+        "provisioned"
+        "slo"
+      ];
+      description = "${observability.slo.window} rolling availability against a ${toString sloTargetPercent}% target.";
+      from = "now-7d";
+      rows = [
+        [ (viz.row "Error budget") ]
+        [
+          (viz.panel {
+            title = "Worst error budget";
+            type = "stat";
+            w = 6;
+            h = 6;
+            expr = "min(endpoint:error_budget_remaining_7d)";
+            unit = viz.units.percentunit;
+            max = 1;
+            decimals = 1;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.25;
+              }
+              {
+                color = "green";
+                value = 0.5;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "area";
+            };
+          })
+          (viz.panel {
+            title = "Endpoints breaching target";
+            type = "stat";
+            w = 6;
+            h = 6;
+            expr = "count(endpoint:error_budget_remaining_7d < 0) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Fleet availability";
+            type = "stat";
+            w = 6;
+            h = 6;
+            expr = "avg(endpoint:availability_7d)";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 3;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.9;
+              }
+              {
+                color = "yellow";
+                value = observability.slo.availability;
+              }
+              {
+                color = "green";
+                value = 0.999;
+              }
+            ];
+            options.colorMode = "background";
+          })
+          (viz.panel {
+            title = "Worst p95 latency";
+            type = "stat";
+            w = 6;
+            h = 6;
+            expr = "max(endpoint:latency_p95_7d)";
+            unit = viz.units.seconds;
+            decimals = 3;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = observability.slo.latencySeconds.internal;
+              }
+              {
+                color = "red";
+                value = observability.slo.latencySeconds.public;
+              }
+            ];
+            options.colorMode = "background";
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Error budget remaining";
+            type = "bargauge";
+            w = 12;
+            h = 12;
+            description = "1.0 means the budget is untouched; 0 means it is spent; negative means the ${toString sloTargetPercent}% objective is already breached.";
+            targets = [
+              {
+                expr = "endpoint:error_budget_remaining_7d";
+                legend = "{{endpoint}} ({{scope}})";
+                instant = true;
+              }
+            ];
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 1;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.25;
+              }
+              {
+                color = "green";
+                value = 0.5;
+              }
+            ];
+            options.displayMode = "gradient";
+          })
+          (viz.panel {
+            title = "Availability against target";
+            type = "bargauge";
+            w = 12;
+            h = 12;
+            targets = [
+              {
+                expr = "endpoint:availability_7d";
+                legend = "{{endpoint}} ({{scope}})";
+                instant = true;
+              }
+            ];
+            unit = viz.units.percentunit;
+            # Anchoring the bar at the target rather than at zero is what
+            # makes a 99.2% and a 99.9% endpoint visibly different.
+            min = observability.slo.availability;
+            max = 1;
+            decimals = 3;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = observability.slo.availability;
+              }
+              {
+                color = "green";
+                value = 0.999;
+              }
+            ];
+            options.displayMode = "lcd";
+          })
+        ]
+        [ (viz.row "Trends") ]
+        [
+          (viz.panel {
+            title = "Error budget burn-down";
+            w = 12;
+            h = 8;
+            expr = "endpoint:error_budget_remaining_7d";
+            legend = "{{endpoint}}";
+            unit = viz.units.percentunit;
+            max = 1;
+            custom = {
+              fillOpacity = 0;
+              thresholdsStyle.mode = "dashed";
+            };
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 0;
+              }
+            ];
+            color.mode = "palette-classic";
+            options.legend.placement = "right";
+          })
+          (viz.panel {
+            title = "p95 latency";
+            w = 12;
+            h = 8;
+            expr = "endpoint:latency_p95_7d";
+            legend = "{{endpoint}} ({{scope}})";
+            unit = viz.units.seconds;
+            min = 0;
+            custom = {
+              fillOpacity = 0;
+              thresholdsStyle.mode = "dashed";
+            };
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = observability.slo.latencySeconds.internal;
+              }
+            ];
+            color.mode = "palette-classic";
+            options.legend.placement = "right";
+          })
+        ]
+      ];
+    };
+
+    "log-explorer.json" = viz.dashboard {
+      uid = "log-explorer";
+      title = "System log explorer";
+      tags = [
+        "provisioned"
+        "logs"
+      ];
+      description = "Journal from Link. User journals are dropped and secrets redacted before they reach Loki.";
+      from = "now-1h";
+      templating.list = [
+        {
+          name = "unit";
+          label = "Unit";
+          type = "query";
+          datasource.uid = "loki";
+          query = {
+            refId = "LokiVariableQueryEditor-VariableQuery";
+            type = 1;
+            label = "unit";
+            stream = ''{host="link"}'';
+          };
+          includeAll = true;
+          multi = true;
+          # Loki labels are time-bounded, so the variable refreshes with
+          # the range rather than only on dashboard load.
+          allValue = ".+";
+          refresh = 2;
+          sort = 1;
+        }
+        {
+          name = "level";
+          label = "Level";
+          type = "custom";
+          query = "emerg,alert,crit,err,warning,notice,info,debug";
+          includeAll = true;
+          multi = true;
+          allValue = ".+";
+        }
+        {
+          name = "search";
+          label = "Search";
+          type = "textbox";
+          query = "";
+          current = {
+            text = "";
+            value = "";
+          };
+        }
+      ];
+      rows = [
+        [
+          (viz.panel {
+            title = "Log volume by level";
+            w = 24;
+            h = 6;
+            datasource = "loki";
+            # `count_over_time` with $__auto makes one bar per plotted
+            # bucket, which is what Explore's own volume histogram does.
+            expr = ''sum by (level) (count_over_time({host="link", unit=~"$unit", level=~"$level"} |= `$search` [$__auto]))'';
+            legend = "{{level}}";
+            unit = viz.units.short;
+            decimals = 0;
+            custom = viz.barsCustom;
+            overrides = viz.logLevelOverrides;
+            options.legend = {
+              calcs = [ "sum" ];
+              displayMode = "list";
+              placement = "bottom";
+              showLegend = true;
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Journal";
+            type = "logs";
+            w = 24;
+            h = 22;
+            datasource = "loki";
+            expr = ''{host="link", unit=~"$unit", level=~"$level"} |= `$search`'';
+          })
+        ]
+        [ (viz.row "Noisiest units") ]
+        [
+          (viz.panel {
+            title = "Lines by unit";
+            type = "bargauge";
+            w = 12;
+            h = 9;
+            datasource = "loki";
+            targets = [
+              {
+                expr = ''topk(15, sum by (unit) (count_over_time({host="link", unit=~"$unit"} [$__range])))'';
+                legend = "{{unit}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-BlPu";
+          })
+          (viz.panel {
+            title = "Warnings and errors by unit";
+            type = "bargauge";
+            w = 12;
+            h = 9;
+            datasource = "loki";
+            targets = [
+              {
+                expr = ''topk(15, sum by (unit) (count_over_time({host="link", level=~"emerg|alert|crit|err|warning"} [$__range])))'';
+                legend = "{{unit}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-YlRd";
+          })
+        ]
+      ];
+    };
+
+    "dns.json" = viz.dashboard {
+      uid = "dns";
+      title = "DNS / Blocky";
+      tags = [
+        "provisioned"
+        "dns"
+      ];
+      description = "Private resolver: query volume, what is being blocked, cache behaviour and resolution latency.";
+      rows = [
+        [ (viz.row "Overview") ]
+        [
+          (viz.panel {
+            title = "Blocking";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "min(blocky_blocking_enabled)";
+            mappings = viz.boolMapping {
+              falseText = "DISABLED";
+              trueText = "ENABLED";
+              falseColor = "red";
+              trueColor = "green";
+            };
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Query rate";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "sum(rate(blocky_query_total[$__rate_interval]))";
+            unit = viz.units.reqps;
+            decimals = 1;
+            thresholds = [ { color = "blue"; } ];
+          })
+          (viz.panel {
+            title = "Blocked";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = ''sum(increase(blocky_response_total{response_type=~"BLOCKED|REBIND"}[$__range])) / sum(increase(blocky_query_total[$__range]))'';
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 1;
+            thresholds = [ { color = "purple"; } ];
+            options.graphMode = "none";
+          })
+          (viz.panel {
+            title = "Cache hit rate";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "sum(rate(blocky_cache_hits_total[$__rate_interval])) / (sum(rate(blocky_cache_hits_total[$__rate_interval])) + sum(rate(blocky_cache_misses_total[$__rate_interval])))";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 1;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.3;
+              }
+              {
+                color = "green";
+                value = 0.6;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "p95 resolution";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket[$__rate_interval])))";
+            unit = viz.units.seconds;
+            decimals = 3;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 0.1;
+              }
+              {
+                color = "red";
+                value = 0.5;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Denylist entries";
+            type = "stat";
+            w = 4;
+            h = 5;
+            targets = [
+              {
+                expr = "sum(blocky_denylist_cache_entries)";
+                legend = "Blocked domains";
+              }
+              {
+                expr = "sum(blocky_cache_entries)";
+                legend = "Cached answers";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+        ]
+        [ (viz.row "Traffic") ]
+        [
+          (viz.panel {
+            title = "Queries by outcome";
+            w = 16;
+            h = 8;
+            expr = "sum by (response_type) (rate(blocky_response_total[$__rate_interval]))";
+            legend = "{{response_type}}";
+            unit = viz.units.reqps;
+            custom = {
+              fillOpacity = 50;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            overrides = [
+              (viz.overrideByRegexp "/(?i)blocked/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+              (viz.overrideByRegexp "/(?i)cached/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "green";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Record types";
+            type = "piechart";
+            w = 8;
+            h = 8;
+            targets = [
+              {
+                # `ceil(increase(...))` so the slice labels read as whole
+                # query counts rather than extrapolated fractions.
+                expr = "sum by (type) (ceil(increase(blocky_query_total[$__range])))";
+                legend = "{{type}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Top clients";
+            type = "bargauge";
+            w = 8;
+            h = 9;
+            targets = [
+              {
+                expr = "topk(10, sum by (client) (ceil(increase(blocky_query_total[$__range]))))";
+                legend = "{{client}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-BlPu";
+          })
+          (viz.panel {
+            title = "Query rate by client";
+            w = 8;
+            h = 9;
+            expr = "topk(10, sum by (client) (rate(blocky_query_total[$__rate_interval])))";
+            legend = "{{client}}";
+            unit = viz.units.reqps;
+            custom.fillOpacity = 20;
+            options.legend.placement = "right";
+          })
+          (viz.panel {
+            title = "Top block reasons";
+            type = "bargauge";
+            w = 8;
+            h = 9;
+            targets = [
+              {
+                expr = ''topk(10, sum by (reason) (ceil(increase(blocky_response_total{response_type=~"BLOCKED|REBIND"}[$__range]))))'';
+                legend = "{{reason}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-YlRd";
+          })
+        ]
+        [ (viz.row "Latency and cache") ]
+        [
+          (viz.panel {
+            title = "Resolution latency distribution";
+            type = "heatmap";
+            w = 12;
+            h = 9;
+            targets = [
+              {
+                expr = "sum by (le) (increase(blocky_request_duration_seconds_bucket[$__rate_interval]))";
+                legend = "{{le}}";
+                format = "heatmap";
+              }
+            ];
+            # The series are already bucketed, so Grafana must not
+            # re-bucket them, and the unit belongs on the y-axis.
+            options = {
+              calculate = false;
+              yAxis = {
+                unit = viz.units.seconds;
+                axisPlacement = "left";
+                reverse = false;
+              };
+            };
+          })
+          (viz.panel {
+            title = "Resolution percentiles";
+            w = 12;
+            h = 9;
+            targets =
+              map
+                (quantile: {
+                  expr = "histogram_quantile(0.${quantile}, sum by (le) (rate(blocky_request_duration_seconds_bucket[$__rate_interval])))";
+                  legend = "p${quantile}";
+                })
+                [
+                  "50"
+                  "90"
+                  "99"
+                ];
+            unit = viz.units.seconds;
+            min = 0;
+            custom.fillOpacity = 10;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Cache";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "sum(blocky_cache_entries)";
+                legend = "Entries";
+              }
+              {
+                expr = "sum(blocky_prefetch_domain_name_cache_entries)";
+                legend = "Prefetch candidates";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+          })
+          (viz.panel {
+            title = "Cache and prefetch rates";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "sum(rate(blocky_cache_hits_total[$__rate_interval]))";
+                legend = "Hits";
+              }
+              {
+                expr = "sum(rate(blocky_cache_misses_total[$__rate_interval]))";
+                legend = "Misses";
+              }
+              {
+                expr = "sum(rate(blocky_prefetches_total[$__rate_interval]))";
+                legend = "Prefetches";
+              }
+              {
+                expr = "sum(rate(blocky_prefetch_hits_total[$__rate_interval]))";
+                legend = "Prefetch hits";
+              }
+            ];
+            unit = viz.units.reqps;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Blocklist freshness";
+            type = "stat";
+            w = 8;
+            h = 5;
+            expr = "time() - max(blocky_last_list_group_refresh_timestamp_seconds)";
+            unit = viz.units.duration;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 26 * 3600;
+              }
+              {
+                color = "red";
+                value = 72 * 3600;
+              }
+            ];
+            options.graphMode = "none";
+          })
+          (viz.panel {
+            title = "Denylist size by group";
+            type = "bargauge";
+            w = 8;
+            h = 5;
+            targets = [
+              {
+                expr = "sum by (group) (blocky_denylist_cache_entries)";
+                legend = "{{group}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-BlPu";
+          })
+          (viz.panel {
+            title = "Resolver errors";
+            type = "stat";
+            w = 8;
+            h = 5;
+            targets = [
+              {
+                expr = "sum(increase(blocky_error_total[$__range])) or vector(0)";
+                legend = "Errors";
+              }
+              {
+                expr = "sum(increase(blocky_failed_downloads_total[$__range])) or vector(0)";
+                legend = "Failed list downloads";
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              graphMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+        ]
+      ];
+    };
+
+    "telemetry.json" = viz.dashboard {
+      uid = "telemetry";
+      title = "Telemetry pipeline";
+      tags = [
+        "provisioned"
+        "meta"
+      ];
+      description = "Prometheus, Loki and Alloy watching themselves. Retention here is ${observability.retention.prometheusTime} or ${observability.retention.prometheusSize}, whichever comes first.";
+      rows = [
+        [ (viz.row "Prometheus") ]
+        [
+          (viz.panel {
+            title = "Active series";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "prometheus_tsdb_head_series";
+            unit = viz.units.short;
+            thresholds = [ { color = "blue"; } ];
+          })
+          (viz.panel {
+            title = "Block storage";
+            type = "stat";
+            w = 4;
+            h = 5;
+            description = "Compared against the 2 GB logical retention limit, which is not a filesystem quota.";
+            expr = "prometheus_tsdb_storage_blocks_bytes";
+            unit = viz.units.bytes;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 1800000000;
+              }
+              {
+                color = "red";
+                value = 2000000000;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Ingestion";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "sum(rate(prometheus_tsdb_head_samples_appended_total[$__rate_interval]))";
+            unit = viz.units.ops;
+            decimals = 0;
+            thresholds = [ { color = "blue"; } ];
+          })
+          (viz.panel {
+            title = "Slowest scrape";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "max(scrape_duration_seconds)";
+            unit = viz.units.seconds;
+            decimals = 3;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 1;
+              }
+              {
+                color = "red";
+                value = 5;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Config reload";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "prometheus_config_last_reload_successful";
+            mappings = viz.boolMapping {
+              falseText = "FAILED";
+              trueText = "OK";
+            };
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Rule failures";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "sum(increase(prometheus_rule_evaluation_failures_total[$__range])) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Series cardinality by job";
+            type = "bargauge";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = ''topk(15, count by (job) ({__name__=~".+"}))'';
+                legend = "{{job}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            color.mode = "continuous-BlPu";
+          })
+          (viz.panel {
+            title = "Scrape duration by job";
+            w = 12;
+            h = 8;
+            expr = "max by (job) (scrape_duration_seconds)";
+            legend = "{{job}}";
+            unit = viz.units.seconds;
+            min = 0;
+            custom.fillOpacity = 0;
+            options.legend.placement = "right";
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Head series and chunks";
+            w = 8;
+            h = 7;
+            targets = [
+              {
+                expr = "prometheus_tsdb_head_series";
+                legend = "Series";
+              }
+              {
+                expr = "prometheus_tsdb_head_chunks";
+                legend = "Chunks";
+              }
+            ];
+            unit = viz.units.short;
+            min = 0;
+          })
+          (viz.panel {
+            title = "Series churn";
+            w = 8;
+            h = 7;
+            targets = [
+              {
+                expr = "sum(rate(prometheus_tsdb_head_series_created_total[$__rate_interval]))";
+                legend = "Created";
+              }
+              {
+                expr = "sum(rate(prometheus_tsdb_head_series_removed_total[$__rate_interval]))";
+                legend = "Removed";
+              }
+            ];
+            unit = viz.units.ops;
+          })
+          (viz.panel {
+            title = "Rule evaluation";
+            w = 8;
+            h = 7;
+            expr = "max by (rule_group) (prometheus_rule_group_last_duration_seconds)";
+            legend = "{{rule_group}}";
+            unit = viz.units.seconds;
+            min = 0;
+          })
+        ]
+        [ (viz.row "Loki and Alloy") ]
+        [
+          (viz.panel {
+            title = "Lines shipped";
+            type = "stat";
+            w = 6;
+            h = 5;
+            description = "Alloy's own count of entries accepted by Loki. A flat zero here means the write path is broken, not that the box is quiet.";
+            expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+            unit = viz.units.ops;
+            decimals = 2;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "green";
+                value = 0.001;
+              }
+            ];
+            options.colorMode = "background";
+          })
+          (viz.panel {
+            title = "Entries dropped";
+            type = "stat";
+            w = 6;
+            h = 5;
+            expr = "sum(increase(loki_write_dropped_entries_total[$__range])) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Ingest volume";
+            type = "stat";
+            w = 6;
+            h = 5;
+            expr = "sum(rate(loki_distributor_bytes_received_total[$__rate_interval]))";
+            unit = viz.units.bytesPerSecond;
+            thresholds = [ { color = "blue"; } ];
+          })
+          (viz.panel {
+            title = "Active streams";
+            type = "stat";
+            w = 6;
+            h = 5;
+            expr = "sum(loki_ingester_memory_streams) or vector(0)";
+            unit = viz.units.short;
+            decimals = 0;
+            thresholds = [ { color = "blue"; } ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Loki write path";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+                legend = "Sent";
+              }
+              {
+                expr = "sum by (reason) (rate(loki_write_dropped_entries_total[$__rate_interval]))";
+                legend = "Dropped ({{reason}})";
+              }
+              {
+                expr = "sum(rate(loki_source_journal_target_lines_total[$__rate_interval]))";
+                legend = "Journal lines read";
+              }
+            ];
+            unit = viz.units.ops;
+            overrides = [
+              (viz.overrideByRegexp "/Dropped/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Loki request latency";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "histogram_quantile(0.99, sum by (le, route) (rate(loki_request_duration_seconds_bucket[$__rate_interval])))";
+                legend = "p99 {{route}}";
+              }
+            ];
+            unit = viz.units.seconds;
+            min = 0;
+            options.legend.placement = "right";
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Loki responses by status";
+            w = 12;
+            h = 7;
+            expr = "sum by (status_code) (rate(loki_request_duration_seconds_count[$__rate_interval]))";
+            legend = "{{status_code}}";
+            unit = viz.units.reqps;
+            custom = {
+              fillOpacity = 40;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            overrides = [
+              (viz.overrideByRegexp "/^5/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Exporter self-health";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = ''process_resident_memory_bytes{job=~"prometheus|loki|alloy|blackbox|link-node"}'';
+                legend = "{{job}} RSS";
+              }
+            ];
+            unit = viz.units.bytes;
+            min = 0;
+            custom.fillOpacity = 10;
+          })
+        ]
+      ];
+    };
+  };
+
   expectedCidrs = [
     "192.168.3.0/24"
     "192.168.5.0/24"
@@ -124,6 +2395,8 @@ let
   ];
 in
 {
+  flake.grafanaDashboards = dashboards;
+
   configurations.nixos.link.module =
     {
       config,
@@ -305,237 +2578,6 @@ in
             ];
           }
         ];
-      };
-
-      panel =
-        {
-          id,
-          title,
-          expr,
-          type ? "timeseries",
-          datasource ? "prometheus",
-          legend ? "{{instance}}",
-          unit ? null,
-          x ? 0,
-          y ? 0,
-          w ? 12,
-          h ? 8,
-        }:
-        {
-          inherit id title type;
-          datasource.uid = datasource;
-          gridPos = {
-            inherit
-              x
-              y
-              w
-              h
-              ;
-          };
-          targets = [
-            {
-              refId = "A";
-              inherit expr;
-              legendFormat = legend;
-            }
-          ];
-          fieldConfig.defaults = lib.optionalAttrs (unit != null) { inherit unit; };
-          options = { };
-        };
-
-      dashboard =
-        {
-          uid,
-          title,
-          panels,
-          tags,
-          templating ? {
-            list = [ ];
-          },
-        }:
-        {
-          inherit
-            uid
-            title
-            panels
-            tags
-            templating
-            ;
-          schemaVersion = 41;
-          version = 1;
-          editable = false;
-          refresh = "30s";
-          time = {
-            from = "now-6h";
-            to = "now";
-          };
-        };
-
-      dashboards = {
-        "fleet.json" = dashboard {
-          uid = "fleet";
-          title = "Fleet / Link";
-          tags = [
-            "provisioned"
-            "fleet"
-          ];
-          panels = [
-            (panel {
-              id = 1;
-              title = "Scrape health";
-              expr = "up";
-              legend = "{{job}}";
-              type = "stat";
-              w = 6;
-            })
-            (panel {
-              id = 2;
-              title = "Failed systemd units";
-              expr = ''sum(node_systemd_unit_state{state="failed"})'';
-              type = "stat";
-              x = 6;
-              w = 6;
-            })
-            (panel {
-              id = 3;
-              title = "CPU busy";
-              expr = ''100 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100'';
-              y = 8;
-            })
-            (panel {
-              id = 4;
-              title = "Memory used";
-              expr = "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes";
-              unit = "gbytes";
-              y = 8;
-              x = 12;
-            })
-            (panel {
-              id = 5;
-              title = "Root filesystem free";
-              expr = ''node_filesystem_avail_bytes{mountpoint="/"}'';
-              unit = "gbytes";
-              y = 16;
-              w = 24;
-            })
-          ];
-        };
-        "service-health.json" = dashboard {
-          uid = "service-health";
-          title = "Service health";
-          tags = [
-            "provisioned"
-            "health"
-          ];
-          panels = [
-            (panel {
-              id = 1;
-              title = "Endpoint availability";
-              expr = "probe_success";
-              legend = "{{scope}} / {{endpoint}}";
-              type = "stat";
-              w = 8;
-            })
-            (panel {
-              id = 2;
-              title = "Probe duration";
-              expr = "probe_duration_seconds";
-              legend = "{{scope}} / {{endpoint}}";
-              x = 8;
-              w = 8;
-            })
-            (panel {
-              id = 3;
-              title = "TLS days remaining";
-              expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400";
-              legend = "{{endpoint}}";
-              x = 16;
-              w = 8;
-            })
-            (panel {
-              id = 4;
-              title = "OpenClaw service-only telemetry";
-              expr = "openclaw_gateway_active";
-              legend = "active";
-              type = "stat";
-              y = 8;
-              w = 8;
-            })
-            (panel {
-              id = 5;
-              title = "Service restarts";
-              expr = "openclaw_gateway_restarts_total";
-              legend = "OpenClaw";
-              y = 8;
-              x = 8;
-              w = 8;
-            })
-          ];
-        };
-        "log-explorer.json" = dashboard {
-          uid = "log-explorer";
-          title = "System log explorer";
-          tags = [
-            "provisioned"
-            "logs"
-          ];
-          templating.list = [
-            {
-              name = "unit";
-              type = "query";
-              datasource.uid = "loki";
-              query = "label_values(unit)";
-              includeAll = true;
-              multi = true;
-            }
-          ];
-          panels = [
-            (panel {
-              id = 1;
-              title = "System journal (user journals excluded, secrets redacted)";
-              expr = ''{host="link", unit=~"$unit"}'';
-              datasource = "loki";
-              type = "logs";
-              legend = "";
-              w = 24;
-              h = 16;
-            })
-          ];
-        };
-        "rolling-slo.json" = dashboard {
-          uid = "rolling-slo";
-          title = "Rolling SLO / error budget";
-          tags = [
-            "provisioned"
-            "slo"
-          ];
-          panels = [
-            (panel {
-              id = 1;
-              title = "7-day availability (target 99%)";
-              expr = "endpoint:availability_7d * 100";
-              legend = "{{scope}} / {{endpoint}}";
-              y = 0;
-              w = 8;
-            })
-            (panel {
-              id = 2;
-              title = "7-day error budget remaining";
-              expr = "endpoint:error_budget_remaining_7d * 100";
-              legend = "{{scope}} / {{endpoint}}";
-              x = 8;
-              w = 8;
-            })
-            (panel {
-              id = 3;
-              title = "7-day p95 latency";
-              expr = "endpoint:latency_p95_7d";
-              legend = "{{scope}} / {{endpoint}}";
-              x = 16;
-              w = 8;
-            })
-          ];
-        };
       };
 
       dashboardDir = pkgs.linkFarm "grafana-observability-dashboards" (
@@ -1065,7 +3107,19 @@ in
           common = {
             path_prefix = "/var/lib/loki";
             replication_factor = 1;
-            ring.kvstore.store = "inmemory";
+            # Loki advertises itself to its own components by auto-detecting
+            # the host's primary interface, so it registered as
+            # 192.168.6.6:9095 while `grpc_listen_address` above binds
+            # loopback only. The distributor then dialled an address nothing
+            # was listening on: every push failed with a 500 and the whole
+            # journal was silently discarded. `common.instance_addr` covers
+            # the query frontend as well as the ring -- pinning the ring alone
+            # fixes writes but leaves reads broken.
+            instance_addr = loki.backendAddress;
+            ring = {
+              kvstore.store = "inmemory";
+              instance_addr = loki.backendAddress;
+            };
           };
           schema_config.configs = [
             {

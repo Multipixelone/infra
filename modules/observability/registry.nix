@@ -65,6 +65,16 @@ let
   );
 in
 {
+  # Every provisioned Grafana dashboard, as pure data. Exposing them here is
+  # what lets `checks.grafana-dashboards` validate the generated JSON without
+  # building a whole NixOS system, and lets both observability modules
+  # contribute without one clobbering the other.
+  options.flake.grafanaDashboards = lib.mkOption {
+    type = lib.types.attrsOf (lib.types.attrsOf lib.types.raw);
+    default = { };
+    description = "Generated Grafana dashboard definitions, keyed by file name.";
+  };
+
   options.observability = {
     hubHost = lib.mkOption {
       type = lib.types.str;

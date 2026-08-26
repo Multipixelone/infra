@@ -26,6 +26,19 @@ let
     "sabnzbd"
     "tautulli"
   ];
+  viz = import ../../lib/grafana.nix { inherit lib; };
+  mediaTags = [
+    "media"
+    "provisioned"
+  ];
+  # The blackbox `endpoint` label is the application's canonical hostname, so
+  # deriving the selector from the inventory is both exact and self-maintaining.
+  # The old hand-written `.*(plex|radarr|...).*` regex silently missed Seerr,
+  # whose canonical is `requests.finnrut.is` and contains none of those words.
+  mediaEndpointRegex = lib.concatStringsSep "|" (
+    map (application: inventory.applications.${application}.canonical) expectedApplications
+  );
+
   selectedRoutes = lib.genAttrs routeKeys (key: inventory.routes.${key});
   routeFor = application: selectedRoutes."${application}/root";
   directUrl =
@@ -42,6 +55,957 @@ let
   exporterPorts = {
     scraparr = 7100;
     tautulli = 8000;
+  };
+
+  # Scraparr labels every series with `alias`, and its Radarr connector
+  # reports the alias capitalised ("Radarr") while the others are lower
+  # case. The old `$service` variable offered lower-case values only, so
+  # `alias=~"$service"` matched nothing for Radarr and the whole
+  # media-services dashboard was blank. Drive the variable off the label
+  # itself instead of a hand-written list.
+  connectorVariable = {
+    name = "service";
+    label = "Connector";
+    type = "query";
+    datasource.uid = "prometheus";
+    query = {
+      qryType = 1;
+      query = "label_values(scraparr_services_up, alias)";
+      refId = "PrometheusVariableQueryEditor-VariableQuery";
+    };
+    includeAll = true;
+    multi = true;
+    allValue = ".+";
+    refresh = 2;
+    sort = 1;
+  };
+
+  mediaDashboards = {
+    "media-overview.json" = viz.dashboard {
+      uid = "media-overview";
+      title = "Media Overview";
+      tags = mediaTags;
+      description = "Library size, request pipeline, download queues and Plex playback.";
+      rows = [
+        [ (viz.row "Right now") ]
+        [
+          (viz.panel {
+            title = "Plex streams";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "media:plex_streams";
+            unit = viz.units.none;
+            noValue = "0";
+            decimals = 0;
+            thresholds = [
+              { color = "blue"; }
+            ];
+            options.graphMode = "area";
+          })
+          (viz.panel {
+            title = "Transcoding";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "media:plex_transcodes";
+            unit = viz.units.none;
+            noValue = "0";
+            decimals = 0;
+            description = "Transcodes are the expensive streams; direct play costs Alexandria almost nothing.";
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 2;
+              }
+              {
+                color = "red";
+                value = 4;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Plex bandwidth";
+            type = "stat";
+            w = 4;
+            h = 5;
+            # Tautulli reports kbps, so the series is scaled to bits per
+            # second and rendered with a bit-rate unit rather than a bare
+            # five-digit number.
+            expr = "media:plex_bandwidth_kbps * 1000";
+            unit = viz.units.bitsPerSecond;
+            noValue = "0";
+            thresholds = [ { color = "blue"; } ];
+            options.graphMode = "area";
+          })
+          (viz.panel {
+            title = "Download rate";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "media:sab_queue_rate_bytes";
+            unit = viz.units.bytesPerSecond;
+            noValue = "0";
+            thresholds = [ { color = "purple"; } ];
+            options.graphMode = "area";
+          })
+          (viz.panel {
+            title = "Queued for download";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "media:arr_queue_items";
+            unit = viz.units.none;
+            noValue = "0";
+            decimals = 0;
+            thresholds = [ { color = "text"; } ];
+            options.graphMode = "none";
+          })
+          (viz.panel {
+            title = "Queue remaining";
+            type = "stat";
+            w = 4;
+            h = 5;
+            expr = "media:sab_queue_remaining_bytes";
+            unit = viz.units.bytes;
+            noValue = "0";
+            thresholds = [ { color = "text"; } ];
+            options.graphMode = "none";
+          })
+        ]
+        [ (viz.row "Library") ]
+        [
+          (viz.panel {
+            title = "Library size";
+            type = "stat";
+            w = 8;
+            h = 5;
+            targets = [
+              {
+                expr = "sum(radarr_movies_total)";
+                legend = "Movies";
+              }
+              {
+                expr = "sum(sonarr_series_total)";
+                legend = "Series";
+              }
+              {
+                expr = "sum(sonarr_episodes_total)";
+                legend = "Episodes";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            noValue = "0";
+            thresholds = [ { color = "green"; } ];
+            options = {
+              graphMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+          (viz.panel {
+            title = "On disk";
+            type = "bargauge";
+            w = 8;
+            h = 5;
+            targets = [
+              {
+                expr = "sum(radarr_disk_size_total)";
+                legend = "Movies";
+                instant = true;
+              }
+              {
+                expr = "sum(sonarr_disk_size_total)";
+                legend = "Series";
+                instant = true;
+              }
+            ];
+            # 9450791520133 is unreadable; 9.45 TB is the point of the panel.
+            unit = viz.units.bytes;
+            color = {
+              mode = "continuous-BlPu";
+            };
+          })
+          (viz.panel {
+            title = "Missing from library";
+            type = "bargauge";
+            w = 8;
+            h = 5;
+            targets = [
+              {
+                expr = "sum(radarr_missing_movies_total)";
+                legend = "Movies";
+                instant = true;
+              }
+              {
+                expr = "sum(sonarr_missing_episodes_total)";
+                legend = "Episodes";
+                instant = true;
+              }
+              {
+                expr = "sum(bazarr_wanted_movies_total)";
+                legend = "Movie subtitles";
+                instant = true;
+              }
+              {
+                expr = "sum(bazarr_wanted_episodes_total)";
+                legend = "Episode subtitles";
+                instant = true;
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            noValue = "0";
+            color = {
+              mode = "continuous-YlRd";
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Library growth";
+            w = 24;
+            h = 8;
+            targets = [
+              {
+                expr = "sum(radarr_movies_total)";
+                legend = "Movies";
+              }
+              {
+                expr = "sum(sonarr_series_total)";
+                legend = "Series";
+              }
+              {
+                expr = "sum(sonarr_episodes_total)";
+                legend = "Episodes";
+              }
+              {
+                expr = "media:missing_items";
+                legend = "Missing";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            overrides = [
+              (viz.overrideByName "Missing" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "Requests") ]
+        [
+          (viz.panel {
+            title = "Requests by status";
+            type = "piechart";
+            w = 8;
+            h = 7;
+            # Seerr's status label is Title-cased ("Pending", "Processing"),
+            # which is why the old `status=~"pending|processing"` selector
+            # returned nothing at all.
+            expr = "media:seerr_requests_by_status";
+            legend = "{{status}}";
+            unit = viz.units.short;
+            decimals = 0;
+          })
+          (viz.panel {
+            title = "Awaiting action";
+            type = "stat";
+            w = 8;
+            h = 7;
+            targets = [
+              {
+                expr = ''sum(media:seerr_requests_by_status{status="Pending"}) or vector(0)'';
+                legend = "Pending";
+              }
+              {
+                expr = ''sum(media:seerr_requests_by_status{status="Processing"}) or vector(0)'';
+                legend = "Processing";
+              }
+              {
+                expr = ''sum(media:seerr_requests_by_status{status="Failed"}) or vector(0)'';
+                legend = "Failed";
+              }
+              {
+                expr = "sum(seerr_issue_total) or vector(0)";
+                legend = "Open issues";
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            noValue = "0";
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+            overrides = [
+              (viz.overrideByName "Failed" [
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "red";
+                        value = 1;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Open issues" [
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "orange";
+                        value = 1;
+                      }
+                    ];
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Request backlog";
+            w = 8;
+            h = 7;
+            expr = "media:seerr_requests_by_status";
+            legend = "{{status}}";
+            unit = viz.units.short;
+            decimals = 0;
+            custom = {
+              fillOpacity = 40;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+          })
+        ]
+        [ (viz.row "Downloads") ]
+        [
+          (viz.panel {
+            title = "SABnzbd throughput";
+            w = 12;
+            h = 7;
+            expr = "media:sab_queue_rate_bytes";
+            legend = "Download rate";
+            unit = viz.units.bytesPerSecond;
+            custom.fillOpacity = 30;
+          })
+          (viz.panel {
+            title = "SABnzbd queue";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "media:sab_queue_size_bytes";
+                legend = "Queue size";
+              }
+              {
+                expr = "media:sab_queue_remaining_bytes";
+                legend = "Remaining";
+              }
+            ];
+            unit = viz.units.bytes;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Arr download queues";
+            w = 16;
+            h = 7;
+            targets = [
+              {
+                expr = "sum(radarr_queue_count)";
+                legend = "Radarr";
+              }
+              {
+                expr = "sum(sonarr_queue_count)";
+                legend = "Sonarr";
+              }
+              {
+                expr = "media:radarr_queue_problems";
+                legend = "Radarr warnings/errors";
+              }
+              {
+                expr = "media:sonarr_queue_problems";
+                legend = "Sonarr warnings/errors";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            overrides = [
+              (viz.overrideByRegexp "/warnings/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+                {
+                  id = "custom.fillOpacity";
+                  value = 0;
+                }
+                {
+                  id = "custom.lineStyle";
+                  value = {
+                    fill = "dash";
+                    dash = [
+                      10
+                      10
+                    ];
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Downloader paused";
+            type = "stat";
+            w = 8;
+            h = 7;
+            expr = "media:sab_queue_paused";
+            mappings = viz.boolMapping {
+              falseText = "Downloading";
+              trueText = "Paused";
+              falseColor = "green";
+              trueColor = "orange";
+            };
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+        ]
+        [ (viz.row "Plex") ]
+        [
+          (viz.panel {
+            title = "Streams and transcodes";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "plex_active_streams_total";
+                legend = "Total streams";
+              }
+              {
+                expr = "plex_active_streams_direct_play";
+                legend = "Direct play";
+              }
+              {
+                expr = "plex_active_streams_direct_stream";
+                legend = "Direct stream";
+              }
+              {
+                expr = "plex_active_streams_transcode";
+                legend = "Transcode";
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            custom.fillOpacity = 20;
+            overrides = [
+              (viz.overrideByName "Transcode" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "orange";
+                  };
+                }
+              ])
+              (viz.overrideByName "Total streams" [
+                {
+                  id = "custom.fillOpacity";
+                  value = 0;
+                }
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "blue";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Plex bandwidth";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "plex_bandwidth_total_kbps * 1000";
+                legend = "Total";
+              }
+              {
+                expr = "plex_bandwidth_lan_kbps * 1000";
+                legend = "LAN";
+              }
+              {
+                expr = "plex_bandwidth_wan_kbps * 1000";
+                legend = "WAN";
+              }
+            ];
+            unit = viz.units.bitsPerSecond;
+            custom.fillOpacity = 20;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Transcode sessions by kind";
+            w = 24;
+            h = 6;
+            targets = [
+              {
+                expr = "plex_transcode_video_sessions";
+                legend = "Video";
+              }
+              {
+                expr = "plex_transcode_audio_sessions";
+                legend = "Audio";
+              }
+              {
+                expr = "plex_transcode_container_sessions";
+                legend = "Container";
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            custom = {
+              fillOpacity = 40;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+          })
+        ]
+      ];
+    };
+
+    "media-health.json" = viz.dashboard {
+      uid = "media-health";
+      title = "Media Health";
+      tags = mediaTags;
+      description = "Is every media endpoint reachable, and is telemetry fresh?";
+      rows = [
+        [ (viz.row "Endpoint reachability") ]
+        [
+          (viz.panel {
+            title = "Media endpoints up";
+            type = "stat";
+            w = 6;
+            h = 5;
+            # This used to be a bare `probe_success` stat, which rendered
+            # one giant "1" per probed endpoint. A ratio answers the
+            # question the panel is actually asking.
+            expr = ''
+              sum(probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})
+              / count(probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})'';
+            legend = "Reachable";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 0;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.999;
+              }
+              {
+                color = "green";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Down right now";
+            type = "table";
+            w = 18;
+            h = 5;
+            # Naming the broken endpoint beats colouring a number.
+            targets = [
+              {
+                expr = ''probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"} == 0'';
+                instant = true;
+                format = "table";
+              }
+            ];
+            noValue = "Every media endpoint is responding.";
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    __name__ = true;
+                    job = true;
+                    slo_class = true;
+                    Value = true;
+                  };
+                  renameByName = {
+                    endpoint = "Endpoint";
+                    instance = "Target";
+                    scope = "Scope";
+                  };
+                };
+              }
+            ];
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Media endpoint state";
+            type = "state-timeline";
+            w = 24;
+            h = 10;
+            expr = ''probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}'';
+            legend = "{{endpoint}} ({{scope}})";
+            mappings = viz.boolMapping { };
+            options.legend.showLegend = false;
+          })
+        ]
+        [ (viz.row "Probe latency") ]
+        [
+          (viz.panel {
+            title = "Probe duration";
+            w = 12;
+            h = 7;
+            expr = ''probe_duration_seconds{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}'';
+            legend = "{{endpoint}} ({{scope}})";
+            unit = viz.units.seconds;
+          })
+          (viz.panel {
+            title = "HTTP phase breakdown";
+            w = 12;
+            h = 7;
+            description = "Where the time goes: DNS resolve, TCP connect, TLS handshake, server processing, transfer.";
+            expr = ''sum by (phase) (probe_http_duration_seconds{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})'';
+            legend = "{{phase}}";
+            unit = viz.units.seconds;
+            custom = {
+              fillOpacity = 40;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+          })
+        ]
+        [ (viz.row "Exporters and connectors") ]
+        [
+          (viz.panel {
+            title = "Exporter targets";
+            type = "stat";
+            w = 6;
+            h = 5;
+            targets = [
+              {
+                expr = ''up{job="scraparr"}'';
+                legend = "Scraparr";
+              }
+              {
+                expr = ''up{job="tautulli-exporter"}'';
+                legend = "Tautulli exporter";
+              }
+              {
+                expr = ''probe_success{job="blackbox-tautulli-ready"}'';
+                legend = "Tautulli readiness";
+              }
+            ];
+            mappings = viz.boolMapping { };
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+          (viz.panel {
+            title = "Connector state";
+            type = "state-timeline";
+            w = 18;
+            h = 5;
+            expr = "media:connector_up";
+            legend = "{{scraparr_services}}";
+            mappings = viz.boolMapping {
+              falseText = "FAILING";
+              trueText = "OK";
+            };
+            options.legend.showLegend = false;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Telemetry freshness";
+            type = "bargauge";
+            w = 12;
+            h = 7;
+            description = "Seconds since each connector last completed a scrape. Scraparr polls every 60s, so anything past a couple of minutes is stale.";
+            targets = [
+              {
+                expr = "time() - max(radarr_last_scrape)";
+                legend = "Radarr";
+                instant = true;
+              }
+              {
+                expr = "time() - max(sonarr_last_scrape)";
+                legend = "Sonarr";
+                instant = true;
+              }
+              {
+                expr = "time() - max(bazarr_last_scrape)";
+                legend = "Bazarr";
+                instant = true;
+              }
+              {
+                expr = "time() - max(sabnzbd_last_scrape)";
+                legend = "SABnzbd";
+                instant = true;
+              }
+              {
+                expr = "time() - max(seerr_last_scrape)";
+                legend = "Seerr";
+                instant = true;
+              }
+            ];
+            unit = viz.units.duration;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "#EAB839";
+                value = 120;
+              }
+              {
+                color = "red";
+                value = 300;
+              }
+            ];
+            options.displayMode = "lcd";
+          })
+          (viz.panel {
+            title = "Scrape duration";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = "radarr_scrape_duration";
+                legend = "Radarr";
+              }
+              {
+                expr = "sonarr_scrape_duration";
+                legend = "Sonarr";
+              }
+              {
+                expr = "bazarr_scrape_duration";
+                legend = "Bazarr";
+              }
+              {
+                expr = "sabnzbd_scrape_duration";
+                legend = "SABnzbd";
+              }
+              {
+                expr = "seerr_scrape_duration";
+                legend = "Seerr";
+              }
+            ];
+            unit = viz.units.seconds;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Exporter containers";
+            type = "state-timeline";
+            w = 24;
+            h = 6;
+            expr = ''node_systemd_unit_state{name=~"podman-(scraparr|tautulli-exporter)\\.service",state="active"}'';
+            legend = "{{name}}";
+            mappings = viz.boolMapping {
+              falseText = "INACTIVE";
+              trueText = "ACTIVE";
+            };
+            options.legend.showLegend = false;
+          })
+        ]
+      ];
+    };
+
+    "media-services.json" = viz.dashboard {
+      uid = "media-services";
+      title = "Media Services";
+      tags = mediaTags;
+      description = "Per-connector drill-down. Pick a connector with the variable at the top.";
+      templating.list = [ connectorVariable ];
+      rows = [
+        [
+          (viz.panel {
+            title = "Connector up";
+            type = "stat";
+            w = 6;
+            h = 5;
+            expr = ''media:connector_up{alias=~"$service"}'';
+            legend = "{{scraparr_services}}";
+            mappings = viz.boolMapping { };
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+              textMode = "value_and_name";
+            };
+          })
+          (viz.panel {
+            title = "Last scrape";
+            type = "bargauge";
+            w = 9;
+            h = 5;
+            targets = [
+              {
+                expr = ''time() - max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_last_scrape",alias=~"$service"})'';
+                legend = "{{alias}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.duration;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "#EAB839";
+                value = 120;
+              }
+              {
+                color = "red";
+                value = 300;
+              }
+            ];
+            options.displayMode = "lcd";
+          })
+          (viz.panel {
+            title = "Scrape duration";
+            type = "bargauge";
+            w = 9;
+            h = 5;
+            targets = [
+              {
+                expr = ''max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_scrape_duration",alias=~"$service"})'';
+                legend = "{{alias}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.seconds;
+            color.mode = "continuous-BlPu";
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Queues";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = ''{__name__=~"(radarr|sonarr)_queue_count",alias=~"$service"}'';
+                legend = "{{alias}} queued";
+              }
+              {
+                expr = ''{__name__=~"(radarr|sonarr)_queue_warning",alias=~"$service"}'';
+                legend = "{{alias}} warnings";
+              }
+              {
+                expr = ''{__name__=~"(radarr|sonarr)_queue_error",alias=~"$service"}'';
+                legend = "{{alias}} errors";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            overrides = [
+              (viz.overrideByRegexp "/errors/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Catalogue";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = ''{__name__=~"radarr_(movies|monitored_movies|missing_movies)_total",alias=~"$service"}'';
+                legend = "{{__name__}}";
+              }
+              {
+                expr = ''{__name__=~"sonarr_(series|episodes|monitored_series|missing_episodes)_total",alias=~"$service"}'';
+                legend = "{{__name__}}";
+              }
+              {
+                expr = ''{__name__=~"bazarr_(series|movies|wanted_episodes|wanted_movies)_total",alias=~"$service"}'';
+                legend = "{{__name__}}";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Storage consumed";
+            w = 12;
+            h = 7;
+            expr = ''{__name__=~"(radarr|sonarr)_disk_size_total",alias=~"$service"}'';
+            legend = "{{alias}}";
+            unit = viz.units.bytes;
+            custom.fillOpacity = 20;
+          })
+          (viz.panel {
+            title = "SABnzbd storage";
+            w = 12;
+            h = 7;
+            targets = [
+              {
+                expr = ''sabnzbd_disk_space_bytes{alias=~"$service"}'';
+                legend = "Free";
+              }
+              {
+                expr = ''sabnzbd_disk_space_total_bytes{alias=~"$service"}'';
+                legend = "Total";
+              }
+              {
+                expr = ''sabnzbd_history_total_bytes{alias=~"$service"}'';
+                legend = "Downloaded (lifetime)";
+              }
+            ];
+            unit = viz.units.bytes;
+          })
+        ]
+      ];
+    };
   };
 
   routeContract =
@@ -68,6 +1032,8 @@ let
     true;
 in
 {
+  flake.grafanaDashboards = mediaDashboards;
+
   configurations.nixos.link.module =
     {
       config,
@@ -250,8 +1216,15 @@ in
       scraparrSensitiveMetrics = lib.concatStringsSep "|" [
         "seerr_user_requests"
         "(seerr|overseerr|jellyseerr)_(request_timestamp|request_seasons|issue_title|issue_created|issue_updated|user_requests)"
+        # Scraparr's per-library-folder breakdowns are the bare metric names
+        # carrying a `path` label (`sonarr_series{path="/main/Anime"}`); the
+        # aggregates are the `_total` suffixed ones. Prometheus relabel regexes
+        # are fully anchored, so `sonarr_series_.*` used to match — and drop —
+        # `sonarr_series_total`, which is why `media:library_items` and the
+        # library panels evaluated empty. Drop the exact bare names instead.
+        "radarr_movies"
         "radarr_movie_.*"
-        "sonarr_series_.*"
+        "sonarr_series"
         "bazarr_wanted_(episodes|movies)"
         "bazarr_provider.*"
         "sabnzbd_server_.*"
@@ -322,8 +1295,11 @@ in
                 expr = "sum by (status) (seerr_request_status)";
               }
               {
-                record = "media:seerr_issues_by_status";
-                expr = "sum by (status) (seerr_issue_status)";
+                # Scraparr exposes only a total for issues, never a per-status
+                # breakdown, so the old `sum by (status) (seerr_issue_status)`
+                # rule recorded nothing.
+                record = "media:seerr_issues_total";
+                expr = "sum(seerr_issue_total)";
               }
               {
                 record = "media:sab_queue_rate_bytes";
@@ -388,129 +1364,6 @@ in
       };
       mediaRules = yaml.generate "media-observability-rules.yaml" mediaRuleSettings;
 
-      panel = id: title: expr: type: y: {
-        inherit id title type;
-        datasource.uid = "prometheus";
-        gridPos = {
-          x = 0;
-          inherit y;
-          w = 24;
-          h = 7;
-        };
-        targets = [
-          {
-            refId = "A";
-            inherit expr;
-            legendFormat = "{{alias}} {{status}} {{job}}";
-          }
-        ];
-        fieldConfig.defaults = { };
-        options = { };
-      };
-      dashboard = uid: title: panels: templating: {
-        inherit
-          uid
-          title
-          panels
-          templating
-          ;
-        tags = [
-          "media"
-          "provisioned"
-        ];
-        schemaVersion = 41;
-        version = 1;
-        editable = false;
-        refresh = "30s";
-        time = {
-          from = "now-6h";
-          to = "now";
-        };
-      };
-      mediaDashboards = {
-        "media-overview.json" = dashboard "media-overview" "Media Overview" [
-          (panel 1 "Media health"
-            ''min({__name__=~"probe_success|scraparr_services_up|up",job=~"blackbox-internal|scraparr|tautulli-exporter"})''
-            "stat"
-            0
-          )
-          (panel 2 "Arr queues" "radarr_queue_count or sonarr_queue_count" "timeseries" 7)
-          (panel 3 "Library and missing totals"
-            ''{__name__=~"radarr_movies_total|sonarr_series_total|radarr_missing_movies_total|sonarr_missing_episodes_total"}''
-            "timeseries"
-            14
-          )
-          (panel 4 "Seerr pending, processing, and issues"
-            ''seerr_request_status{status=~"pending|processing"} or seerr_issue_total''
-            "timeseries"
-            21
-          )
-          (panel 5 "Bazarr missing subtitles"
-            ''{__name__=~"bazarr_wanted_episodes_total|bazarr_wanted_movies_total"}''
-            "timeseries"
-            28
-          )
-          (panel 6 "SAB queue"
-            ''{__name__=~"sabnzbd_queue_speed_bytes|sabnzbd_queue_size_bytes|sabnzbd_queue_remaining_bytes"}''
-            "timeseries"
-            35
-          )
-          (panel 7 "Plex streams and transcodes" ''{__name__=~"plex_active_streams_.*|plex_transcode_.*"}''
-            "timeseries"
-            42
-          )
-          (panel 8 "Plex bandwidth" ''{__name__=~"plex_bandwidth_.*"}'' "timeseries" 49)
-        ] { list = [ ]; };
-        "media-health.json" = dashboard "media-health" "Media Health" [
-          (panel 1 "Media endpoint probes"
-            ''probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~".*(plex|radarr|sonarr|seerr|bazarr|sabnzbd|tautulli).*"}''
-            "stat"
-            0
-          )
-          (panel 2 "Exporter and connector health"
-            ''up{job=~"scraparr|tautulli-exporter"} or scraparr_services_up''
-            "stat"
-            7
-          )
-          (panel 3 "Scrape age"
-            ''time() - {__name__=~"radarr_last_scrape|sonarr_last_scrape|bazarr_last_scrape|sabnzbd_last_scrape|seerr_last_scrape"}''
-            "timeseries"
-            14
-          )
-          (panel 4 "Scrape duration"
-            ''{__name__=~"radarr_scrape_duration|sonarr_scrape_duration|bazarr_scrape_duration|sabnzbd_scrape_duration|seerr_scrape_duration"}''
-            "timeseries"
-            21
-          )
-          (panel 5 "Tautulli readiness" ''probe_success{job="blackbox-tautulli-ready"}'' "stat" 28)
-          (panel 6 "Exporter systemd units"
-            ''node_systemd_unit_state{name=~"podman-(scraparr|tautulli-exporter)\\.service",state=~"active|failed"}''
-            "stat"
-            35
-          )
-        ] { list = [ ]; };
-        "media-services.json" =
-          dashboard "media-services" "Media Services"
-            [
-              (panel 1 "Connector health" ''media:connector_up{scraparr_services=~"$service"}'' "stat" 0)
-              (panel 2 "Aggregate service metrics"
-                ''{__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_.*",alias=~"$service"}''
-                "timeseries"
-                7
-              )
-            ]
-            {
-              list = [
-                {
-                  name = "service";
-                  type = "custom";
-                  query = "radarr,sonarr,bazarr,sabnzbd,seerr";
-                  includeAll = true;
-                  multi = true;
-                }
-              ];
-            };
-      };
       mediaDashboardDir = pkgs.linkFarm "grafana-media-dashboards" (
         lib.mapAttrsToList (name: value: {
           inherit name;
@@ -552,11 +1405,9 @@ in
           lib.replaceStrings [ "'" ''"'' ] [ "" "" ] config.systemd.services.${service}.script
         );
       mediaRulesJson = builtins.toJSON mediaRuleSettings;
-      dashboardPromql = lib.concatStringsSep "\n" (
-        lib.concatMap (
-          dashboardValue: map (panelValue: (builtins.head panelValue.targets).expr) dashboardValue.panels
-        ) (builtins.attrValues mediaDashboards)
-      );
+      # Panels now carry several targets each, so the privacy guard reflects
+      # over all of them rather than only each panel's first query.
+      dashboardPromql = lib.concatStringsSep "\n" (viz.allExpressions mediaDashboards);
     in
     {
       age.secrets.media-observability = lib.mkIf mediaSecretAvailable {
@@ -784,6 +1635,31 @@ in
           message = "media dashboard PromQL must not select high-cardinality identity labels";
         }
         {
+          # The guard above only works if it actually sees every query. Panels
+          # carry up to a dozen targets now, so assert the reflection is wired
+          # to all of them rather than silently checking a handful.
+          assertion =
+            builtins.length (viz.allExpressions mediaDashboards)
+            >= builtins.foldl' (total: dashboardValue: total + builtins.length dashboardValue.panels) 0 (
+              builtins.attrValues mediaDashboards
+            );
+          message = "media dashboard privacy reflection must cover every panel target";
+        }
+        {
+          # `sonarr_series_.*` used to sit in the drop list and, because
+          # Prometheus relabel regexes are fully anchored, it silently removed
+          # the `sonarr_series_total` aggregate the library panels depend on.
+          assertion =
+            !(lib.hasInfix "sonarr_series_.*" scraparrSensitiveMetrics)
+            && !(lib.hasInfix "radarr_movies_.*" scraparrSensitiveMetrics)
+            && lib.all (metric: lib.hasInfix metric scraparrAllowedMetrics) [
+              "series_total"
+              "movies_total"
+              "episodes_total"
+            ];
+          message = "the Scraparr drop list must not swallow the aggregates the dashboards query";
+        }
+        {
           assertion =
             lib.hasInfix "MediaApplicationScrapeFailed" mediaRulesJson
             && lib.hasInfix "MediaExporterTargetDown" mediaRulesJson
@@ -793,14 +1669,19 @@ in
             && lib.hasInfix ''"for":"5m"'' mediaRulesJson
             && lib.hasInfix ''"for":"15m"'' mediaRulesJson
             && !(lib.hasInfix "keep_firing_for" mediaRulesJson)
-            && !(lib.hasInfix "sabnzbd_history_failed_jobs" mediaRulesJson);
+            && !(lib.hasInfix "sabnzbd_history_failed_jobs" mediaRulesJson)
+            # Recording rules must reference metrics Scraparr actually emits.
+            && !(lib.hasInfix "seerr_issue_status" mediaRulesJson)
+            && !(lib.hasInfix "sonarr_series_total\")" mediaRulesJson);
           message = "media alert names, timing, or deferred SAB alert contract regressed";
         }
         {
           assertion =
             lib.hasInfix "seerr_user_requests" scraparrSensitiveMetrics
             && lib.hasInfix "radarr_movie_.*" scraparrSensitiveMetrics
-            && lib.hasInfix "sonarr_series_.*" scraparrSensitiveMetrics
+            && lib.hasInfix "|radarr_movies|" scraparrSensitiveMetrics
+            && lib.hasInfix "|sonarr_series|" scraparrSensitiveMetrics
+            && lib.hasInfix "sonarr_series" scraparrSensitiveMetrics
             && lib.hasInfix "sabnzbd_server_.*" scraparrSensitiveMetrics
             && !(lib.hasInfix "seerr_user_requests" scraparrAllowedMetrics);
           message = "Scraparr metric privacy allow/drop contract regressed";
