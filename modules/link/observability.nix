@@ -137,99 +137,90 @@ let
   sloTargetPercent = observability.slo.availability * 100;
 
   dashboards = {
-    "fleet.json" = viz.dashboard {
-      uid = "fleet";
-      title = "Fleet / Link";
+    "home.json" = viz.dashboard {
+      uid = "home";
+      title = "Home";
       tags = [
         "provisioned"
-        "fleet"
+        "home"
       ];
-      description = "Host health for the observability hub.";
+      description = "One screen for the whole stack, and the index to everything else.";
+      refresh = "1m";
+      preload = true;
       rows = [
-        [ (viz.row "At a glance") ]
+        [ (viz.row "Is anything wrong?") ]
         [
           (viz.panel {
-            title = "CPU busy";
-            type = "gauge";
-            w = 4;
+            title = "Alerts firing";
+            type = "stat";
+            w = 5;
             h = 6;
-            # avg() over the idle series normalises across cores without a
-            # separate core-count divisor.
-            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
-            unit = viz.units.percent;
-            min = 0;
-            max = 100;
-            decimals = 1;
+            expr = ''count(ALERTS{alertstate="firing"}) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
             thresholds = [
               { color = "green"; }
               {
                 color = "orange";
-                value = 85;
+                value = 1;
               }
               {
                 color = "red";
-                value = 95;
+                value = 5;
               }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "area";
+            };
+            links = [
+              (viz.dataLink {
+                title = "Open the alerts dashboard";
+                url = "/d/alerts/alerts?\${__url_time_range}";
+              })
             ];
           })
           (viz.panel {
-            title = "Memory used";
+            title = "Endpoints up";
             type = "gauge";
-            w = 4;
+            w = 5;
             h = 6;
-            # MemAvailable, not MemFree: page cache is reclaimable and
-            # counting it as "used" makes every Linux box look full.
-            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
-            unit = viz.units.percent;
+            expr = "sum(probe_success) / count(probe_success)";
+            unit = viz.units.percentunit;
             min = 0;
-            max = 100;
-            decimals = 1;
+            max = 1;
+            decimals = 2;
             thresholds = [
-              { color = "green"; }
+              { color = "red"; }
               {
                 color = "orange";
-                value = 80;
+                value = 0.95;
               }
               {
-                color = "red";
-                value = 90;
+                color = "green";
+                value = 1;
               }
             ];
+            options = viz.gaugePresets.segmented;
           })
           (viz.panel {
-            title = "Root filesystem";
-            type = "gauge";
-            w = 4;
-            h = 6;
-            description = "Link root was already heavily used when the stack was built; RootDiskPressure firing here is expected, not a bug.";
-            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
-            unit = viz.units.percent;
-            min = 0;
-            max = 100;
-            decimals = 1;
-            thresholds = [
-              { color = "green"; }
-              {
-                color = "orange";
-                value = 80;
-              }
-              {
-                color = "red";
-                value = 90;
-              }
-            ];
-          })
-          (viz.panel {
-            title = "Uptime";
+            title = "Scrape targets down";
             type = "stat";
             w = 4;
             h = 6;
-            expr = "node_time_seconds - node_boot_time_seconds";
-            unit = viz.units.duration;
-            thresholds = [ { color = "text"; } ];
+            expr = "count(up == 0) or vector(0)";
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
             options = {
+              colorMode = "background";
               graphMode = "none";
-              colorMode = "none";
             };
           })
           (viz.panel {
@@ -254,10 +245,708 @@ let
             };
           })
           (viz.panel {
-            title = "Scrape targets down";
+            title = "Logs flowing";
+            type = "stat";
+            w = 6;
+            h = 6;
+            description = "Lines per second reaching Loki. A flat zero means the write path is broken, not that the box is quiet.";
+            expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+            unit = viz.units.ops;
+            decimals = 2;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "green";
+                value = 0.001;
+              }
+            ];
+            options.colorMode = "background";
+          })
+        ]
+        [ (viz.row "Host") ]
+        [
+          (viz.panel {
+            title = "CPU";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 85;
+              }
+              {
+                color = "red";
+                value = 95;
+              }
+            ];
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Memory";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Root disk";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Load and uptime";
+            type = "stat";
+            w = 6;
+            h = 7;
+            targets = [
+              {
+                expr = "node_load1";
+                legend = "Load 1m";
+              }
+              {
+                expr = "count(count(node_cpu_seconds_total) by (cpu))";
+                legend = "Cores";
+              }
+              {
+                expr = "node_time_seconds - node_boot_time_seconds";
+                legend = "Uptime";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 1;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+            overrides = [
+              (viz.overrideByName "Uptime" [
+                {
+                  id = "unit";
+                  value = viz.units.duration;
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "DNS and media";
+            type = "stat";
+            w = 6;
+            h = 7;
+            targets = [
+              {
+                expr = "sum(rate(blocky_query_total[$__rate_interval]))";
+                legend = "DNS q/s";
+              }
+              {
+                expr = "media:plex_streams or vector(0)";
+                legend = "Plex streams";
+              }
+              {
+                expr = "media:arr_queue_items or vector(0)";
+                legend = "Downloads queued";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 1;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+          })
+        ]
+        [ (viz.row "Everything else") ]
+        [
+          (viz.panel {
+            title = "Dashboards";
+            type = "dashlist";
+            w = 8;
+            h = 10;
+            options.tags = [ "provisioned" ];
+          })
+          (viz.panel {
+            title = "Endpoint availability";
+            type = "state-timeline";
+            w = 16;
+            h = 10;
+            expr = "probe_success";
+            legend = "{{endpoint}} ({{scope}})";
+            mappings = viz.boolMapping { };
+            options = {
+              perPage = 40;
+              legend.showLegend = false;
+            };
+          })
+        ]
+      ];
+    };
+
+    "alerts.json" = viz.dashboard {
+      uid = "alerts";
+      title = "Alerts";
+      tags = [
+        "provisioned"
+        "alerts"
+      ];
+      description = "Prometheus-side alerting rules. There is no Alertmanager: rules evaluate in Prometheus and surface here and as the ALERTS series.";
+      from = "now-24h";
+      rows = [
+        [ (viz.row "Right now") ]
+        [
+          (viz.panel {
+            title = "Firing";
             type = "stat";
             w = 4;
             h = 6;
+            # `or vector(0)` so a healthy fleet reads "0" rather than "No data".
+            expr = ''count(ALERTS{alertstate="firing"}) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "area";
+            };
+          })
+          (viz.panel {
+            title = "Critical";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = ''sum(ALERTS{alertstate="firing",severity="critical"}) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Warning";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = ''sum(ALERTS{alertstate="firing",severity="warning"}) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Pending";
+            type = "stat";
+            w = 4;
+            h = 6;
+            description = "Alerts whose condition is true but whose `for` window has not elapsed yet.";
+            expr = ''count(ALERTS{alertstate="pending"}) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
+            thresholds = [
+              { color = "text"; }
+              {
+                color = "orange";
+                value = 1;
+              }
+            ];
+            options.graphMode = "none";
+          })
+          (viz.panel {
+            title = "Longest active";
+            type = "stat";
+            w = 8;
+            h = 6;
+            # ALERTS_FOR_STATE carries no `alertstate` label, so an unqualified
+            # `and` matches nothing at all; the label must be ignored.
+            expr = ''max(time() - (ALERTS_FOR_STATE and ignoring(alertstate) ALERTS{alertstate="firing"})) or vector(0)'';
+            unit = viz.units.duration;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 3600;
+              }
+              {
+                color = "red";
+                value = 86400;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Active alerts";
+            type = "table";
+            w = 24;
+            h = 11;
+            description = "Duration counts from when the alert became pending, so it includes each rule's `for` window.";
+            targets = [
+              {
+                expr = ''time() - (ALERTS_FOR_STATE and ignoring(alertstate) ALERTS{alertstate="firing"})'';
+                instant = true;
+                format = "table";
+              }
+            ];
+            noValue = "Nothing is firing.";
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    __name__ = true;
+                    job = true;
+                    fstype = true;
+                    device = true;
+                    mountpoint = true;
+                    alertstate = true;
+                  };
+                  indexByName = {
+                    severity = 0;
+                    alertname = 1;
+                    endpoint = 2;
+                    instance = 3;
+                    Value = 4;
+                  };
+                  renameByName = {
+                    alertname = "Alert";
+                    severity = "Severity";
+                    instance = "Instance";
+                    endpoint = "Endpoint";
+                    scope = "Scope";
+                    slo_class = "SLO class";
+                    Value = "Active for";
+                  };
+                };
+              }
+              {
+                id = "sortBy";
+                options = {
+                  fields = { };
+                  sort = [
+                    {
+                      field = "Active for";
+                      desc = true;
+                    }
+                  ];
+                };
+              }
+            ];
+            options.cellHeight = "sm";
+            overrides = [
+              {
+                matcher = {
+                  id = "byName";
+                  options = "Severity";
+                };
+                properties = [
+                  viz.pillCell
+                  {
+                    id = "custom.width";
+                    value = 110;
+                  }
+                  {
+                    id = "mappings";
+                    value = [
+                      {
+                        type = "value";
+                        options = {
+                          critical = {
+                            text = "critical";
+                            color = "red";
+                            index = 0;
+                          };
+                          warning = {
+                            text = "warning";
+                            color = "orange";
+                            index = 1;
+                          };
+                        };
+                      }
+                    ];
+                  }
+                ];
+              }
+              {
+                matcher = {
+                  id = "byName";
+                  options = "Active for";
+                };
+                properties = [
+                  {
+                    id = "unit";
+                    value = viz.units.duration;
+                  }
+                  {
+                    id = "decimals";
+                    value = 0;
+                  }
+                  {
+                    id = "custom.width";
+                    value = 160;
+                  }
+                  (viz.colorBackgroundCell { mode = "gradient"; })
+                  {
+                    id = "thresholds";
+                    value = {
+                      mode = "absolute";
+                      steps = viz.thresholdSteps [
+                        { color = "green"; }
+                        {
+                          color = "orange";
+                          value = 3600;
+                        }
+                        {
+                          color = "red";
+                          value = 86400;
+                        }
+                      ];
+                    };
+                  }
+                ];
+              }
+              {
+                matcher = {
+                  id = "byName";
+                  options = "Endpoint";
+                };
+                properties = [
+                  {
+                    id = "links";
+                    # Table columns are named after the `organize` rename, and
+                    # a table's fields carry no label object, so the row is
+                    # addressed through __data rather than __field.labels.
+                    value = [
+                      (viz.dataLink {
+                        title = "Open the log explorer";
+                        url = "/d/log-explorer/system-log-explorer?$${__url_time_range}";
+                      })
+                      (viz.dataLink {
+                        title = "Open service health";
+                        url = "/d/service-health/service-health?$${__url_time_range}";
+                      })
+                    ];
+                  }
+                ];
+              }
+            ];
+          })
+        ]
+        [ (viz.row "History") ]
+        [
+          (viz.panel {
+            title = "Alert state over time";
+            type = "state-timeline";
+            w = 24;
+            h = 14;
+            description = "A gap means the alert was not firing: Prometheus stops emitting the series entirely rather than reporting zero.";
+            # Encode the two states as distinct numbers so one series can carry
+            # both pending and firing.
+            expr = ''(ALERTS{alertstate="pending"} * 1) or (ALERTS{alertstate="firing"} * 2)'';
+            legend = "[{{severity}}] {{alertname}} {{endpoint}}{{instance}}";
+            mappings = [
+              {
+                type = "value";
+                options = {
+                  "1" = {
+                    text = "Pending";
+                    color = "orange";
+                    index = 0;
+                  };
+                  "2" = {
+                    text = "Firing";
+                    color = "red";
+                    index = 1;
+                  };
+                };
+              }
+            ];
+            noValue = "OK";
+            options = {
+              perPage = 40;
+              legend.showLegend = false;
+            };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Firing over time";
+            w = 12;
+            h = 8;
+            expr = ''sum by (severity) (ALERTS{alertstate="firing"})'';
+            legend = "{{severity}}";
+            unit = viz.units.none;
+            decimals = 0;
+            custom = {
+              fillOpacity = 50;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            overrides = [
+              (viz.overrideByName "critical" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+              (viz.overrideByName "warning" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "orange";
+                  };
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Noisiest rules";
+            type = "bargauge";
+            w = 12;
+            h = 8;
+            description = "How many times each rule entered the pending state over the window -- the flapping detector.";
+            targets = [
+              {
+                expr = "topk(10, sum by (alertname) (changes(ALERTS_FOR_STATE[$__range])))";
+                legend = "{{alertname}}";
+                instant = true;
+              }
+            ];
+            unit = viz.units.none;
+            decimals = 0;
+            color.mode = "continuous-YlRd";
+          })
+        ]
+        [ (viz.row "Rule state from Prometheus") ]
+        [
+          (viz.panel {
+            title = "Rules";
+            type = "alertlist";
+            w = 24;
+            h = 14;
+            description = "Read live from Prometheus's rules API. Namespaces show as Nix store paths because that is the rule file's location on disk.";
+            options = {
+              # This is the datasource *name*, not its uid: the panel filters
+              # rules by `rule.dataSourceName`.
+              datasource = "Prometheus";
+              maxItems = 100;
+              sortOrder = 3;
+            };
+          })
+        ]
+      ];
+    };
+
+    "fleet.json" = viz.dashboard {
+      uid = "fleet";
+      title = "Fleet / Link";
+      tags = [
+        "provisioned"
+        "fleet"
+      ];
+      description = "Host health for the observability hub.";
+      rows = [
+        [ (viz.row "At a glance") ]
+        [
+          (viz.panel {
+            title = "CPU busy";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            # avg() over the idle series normalises across cores without a
+            # separate core-count divisor.
+            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 85;
+              }
+              {
+                color = "red";
+                value = 95;
+              }
+            ];
+            # Grafana 13 renders this as a ring of discrete segments
+            # with an inline sparkline under the value, instead of a
+            # single solid arc.
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Memory used";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            # MemAvailable, not MemFree: page cache is reclaimable and
+            # counting it as "used" makes every Linux box look full.
+            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+            # Grafana 13 renders this as a ring of discrete segments
+            # with an inline sparkline under the value, instead of a
+            # single solid arc.
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Root filesystem";
+            type = "gauge";
+            w = 4;
+            h = 7;
+            description = "Link root was already heavily used when the stack was built; RootDiskPressure firing here is expected, not a bug.";
+            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 80;
+              }
+              {
+                color = "red";
+                value = 90;
+              }
+            ];
+            # Grafana 13 renders this as a ring of discrete segments
+            # with an inline sparkline under the value, instead of a
+            # single solid arc.
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Uptime";
+            type = "stat";
+            w = 4;
+            h = 7;
+            expr = "node_time_seconds - node_boot_time_seconds";
+            unit = viz.units.duration;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Failed units";
+            type = "stat";
+            w = 4;
+            h = 7;
+            expr = ''node_systemd_units{state="failed"}'';
+            unit = viz.units.none;
+            decimals = 0;
+            noValue = "0";
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            options = {
+              colorMode = "background";
+              graphMode = "none";
+            };
+          })
+          (viz.panel {
+            title = "Scrape targets down";
+            type = "stat";
+            w = 4;
+            h = 7;
             # `up` has 37 series; a bare stat of it rendered 37 anonymous
             # "1"s. The count of failures is the number worth showing.
             expr = "count(up == 0) or vector(0)";
@@ -1257,6 +1946,16 @@ let
             min = 0;
             custom.fillOpacity = 0;
             options.legend.placement = "right";
+            links = [
+              (viz.dataLink {
+                title = "Logs around this window";
+                url = "/d/log-explorer/system-log-explorer?\${__url_time_range}";
+              })
+              (viz.dataLink {
+                title = "Rolling SLO for this endpoint";
+                url = "/d/rolling-slo/rolling-slo-error-budget?\${__url_time_range}";
+              })
+            ];
           })
           (viz.panel {
             title = "Where the time goes";
@@ -1274,6 +1973,119 @@ let
                 group = "A";
               };
             };
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Latency against availability";
+            type = "xychart";
+            w = 12;
+            h = 10;
+            description = "One point per probe over the ${observability.slo.window} window. Bottom-right is healthy; anything drifting left or down is slow, flaky, or both.";
+            targets = [
+              {
+                expr = "endpoint:latency_p95_7d";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "endpoint:availability_7d";
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              # The Time columns would collide on the join and confuse the
+              # axis matchers, so drop them first.
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    __name__ = true;
+                    job = true;
+                    slo_class = true;
+                  };
+                  indexByName = { };
+                  renameByName = { };
+                };
+              }
+              {
+                id = "joinByField";
+                options = {
+                  byField = "instance";
+                  mode = "outerTabular";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = { };
+                  indexByName = { };
+                  renameByName = {
+                    "Value #A" = "p95 latency";
+                    "Value #B" = "availability";
+                  };
+                };
+              }
+            ];
+            unit = viz.units.percentunit;
+            color.mode = "continuous-RdYlGr";
+            custom = {
+              pointSize.fixed = 9;
+              axisSoftMin = 0;
+            };
+            options = {
+              mapping = "manual";
+              series = [
+                {
+                  name.fixed = "Probes";
+                  frame.matcher = {
+                    id = "byIndex";
+                    options = 0;
+                  };
+                  x.matcher = {
+                    id = "byName";
+                    options = "p95 latency";
+                  };
+                  y.matcher = {
+                    id = "byName";
+                    options = "availability";
+                  };
+                  # Colour and size matchers only bind to numeric fields, so
+                  # the availability column doubles as the colour ramp.
+                  color.matcher = {
+                    id = "byName";
+                    options = "availability";
+                  };
+                }
+              ];
+            };
+            overrides = [
+              (viz.overrideByName "p95 latency" [
+                {
+                  id = "unit";
+                  value = viz.units.seconds;
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Probe duration distribution";
+            type = "histogram";
+            w = 12;
+            h = 10;
+            description = "How probe latency is actually distributed, rather than just its average. Scaled to milliseconds because the bucket size is an integer.";
+            # The panel buckets raw values client-side, so it wants the plain
+            # series rather than a pre-bucketed histogram.
+            expr = "probe_duration_seconds * 1000";
+            legend = "{{scope}}";
+            unit = viz.units.milliseconds;
+            custom = {
+              fillOpacity = 70;
+              gradientMode = "opacity";
+            };
+            options.bucketCount = 40;
           })
         ]
         [ (viz.row "TLS") ]
@@ -1586,13 +2398,25 @@ let
           sort = 1;
         }
         {
+          # Driven off the label rather than a hand-written list: Alloy's
+          # journal priority keyword resolves to `error`/`info`/`notice` here,
+          # not the classic syslog `err`/`warning` spellings, so a fixed list
+          # offers values that match nothing.
           name = "level";
           label = "Level";
-          type = "custom";
-          query = "emerg,alert,crit,err,warning,notice,info,debug";
+          type = "query";
+          datasource.uid = "loki";
+          query = {
+            refId = "LokiVariableQueryEditor-VariableQuery";
+            type = 1;
+            label = "level";
+            stream = ''{host="link"}'';
+          };
           includeAll = true;
           multi = true;
           allValue = ".+";
+          refresh = 2;
+          sort = 1;
         }
         {
           name = "search";
@@ -1665,7 +2489,7 @@ let
             datasource = "loki";
             targets = [
               {
-                expr = ''topk(15, sum by (unit) (count_over_time({host="link", level=~"emerg|alert|crit|err|warning"} [$__range])))'';
+                expr = ''topk(15, sum by (unit) (count_over_time({host="link", level=~"emerg|alert|crit|critical|err|error|warn|warning"} [$__range])))'';
                 legend = "{{unit}}";
                 instant = true;
               }
@@ -2928,6 +3752,8 @@ in
             reporting_enabled = false;
             check_for_updates = false;
           };
+          # Land on the overview instead of Grafana's stock welcome page.
+          dashboards.default_home_dashboard_path = "${dashboardDir}/home.json";
           security = {
             admin_user = "admin";
             admin_password = "$__env{GRAFANA_ADMIN_PASSWORD}";

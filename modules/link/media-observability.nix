@@ -80,6 +80,175 @@ let
     sort = 1;
   };
 
+  # A live topology of the media pipeline. Canvas geometry is static -- the
+  # element and connection lists are config, not data -- but every colour and
+  # label is bound to a Prometheus field, so the boxes light up with the real
+  # state of each service. Element names are what `targetName` refers to, and
+  # each `field` binding matches its target's legendFormat, so those must stay
+  # in step.
+  topologyNodes = [
+    {
+      key = "seerr";
+      label = "Seerr";
+      expr = ''min(scraparr_services_up{scraparr_services="seerr"})'';
+      left = 20;
+      top = 150;
+      to = [
+        "radarr"
+        "sonarr"
+      ];
+    }
+    {
+      key = "radarr";
+      label = "Radarr";
+      expr = ''min(scraparr_services_up{scraparr_services="radarr"})'';
+      left = 230;
+      top = 60;
+      to = [ "sabnzbd" ];
+    }
+    {
+      key = "sonarr";
+      label = "Sonarr";
+      expr = ''min(scraparr_services_up{scraparr_services="sonarr"})'';
+      left = 230;
+      top = 240;
+      to = [ "sabnzbd" ];
+    }
+    {
+      key = "sabnzbd";
+      label = "SABnzbd";
+      expr = ''min(scraparr_services_up{scraparr_services="sabnzbd"})'';
+      left = 440;
+      top = 150;
+      to = [ "alexandria" ];
+    }
+    {
+      key = "bazarr";
+      label = "Bazarr";
+      expr = ''min(scraparr_services_up{scraparr_services="bazarr"})'';
+      left = 440;
+      top = 330;
+      to = [ "alexandria" ];
+    }
+    {
+      key = "alexandria";
+      label = "Alexandria";
+      expr = ''min(probe_success{job="blackbox-internal",endpoint=~"(plex|radarr|sonarr)\\..*"})'';
+      left = 650;
+      top = 150;
+      to = [ "plex" ];
+    }
+    {
+      key = "plex";
+      label = "Plex";
+      expr = ''min(probe_success{job="blackbox-internal",endpoint=~"plex\\..*"})'';
+      left = 860;
+      top = 150;
+      to = [ "tautulli" ];
+    }
+    {
+      key = "tautulli";
+      label = "Tautulli";
+      expr = ''min(probe_success{job="blackbox-internal",endpoint=~"tautulli\\..*"})'';
+      left = 1070;
+      top = 150;
+      to = [ ];
+    }
+  ];
+
+  topologyElement = node: {
+    name = node.key;
+    type = "metric-value";
+    config = {
+      align = "center";
+      valign = "middle";
+      size = 14;
+      color.fixed = "#000000";
+      # In field mode the value runs through the field's display processor, so
+      # the UP/DOWN value mappings supply the text.
+      text = {
+        mode = "field";
+        field = node.key;
+        fixed = "";
+      };
+    };
+    background.color = {
+      field = node.key;
+      fixed = "#D9D9D9";
+    };
+    border = {
+      color.fixed = "text";
+      width = 2;
+      radius = 4;
+    };
+    constraint = {
+      horizontal = "left";
+      vertical = "top";
+    };
+    placement = {
+      inherit (node) left top;
+      width = 150;
+      height = 56;
+      rotation = 0;
+    };
+    # Connection anchors are normalised offsets from the element centre:
+    # x grows rightwards, y grows *upwards*, and 1 is the edge.
+    connections = map (target: {
+      source = {
+        x = 1;
+        y = 0;
+      };
+      target = {
+        x = -1;
+        y = 0;
+      };
+      targetName = target;
+      path = "straight";
+      color.field = node.key;
+      size = {
+        fixed = 2;
+        min = 1;
+        max = 6;
+      };
+      direction = {
+        mode = "fixed";
+        fixed = "forward";
+      };
+      lineStyle = {
+        style = "solid";
+        animate = true;
+      };
+      vertices = [ ];
+    }) node.to;
+  };
+
+  topologyLabel = node: {
+    name = "${node.key}-label";
+    type = "text";
+    config = {
+      align = "center";
+      valign = "middle";
+      size = 12;
+      color.fixed = "text";
+      text = {
+        mode = "fixed";
+        fixed = node.label;
+      };
+    };
+    constraint = {
+      horizontal = "left";
+      vertical = "top";
+    };
+    placement = {
+      inherit (node) left;
+      top = node.top - 24;
+      width = 150;
+      height = 22;
+      rotation = 0;
+    };
+    connections = [ ];
+  };
+
   mediaDashboards = {
     "media-overview.json" = viz.dashboard {
       uid = "media-overview";
@@ -87,6 +256,34 @@ let
       tags = mediaTags;
       description = "Library size, request pipeline, download queues and Plex playback.";
       rows = [
+        [ (viz.row "Pipeline") ]
+        [
+          (viz.panel {
+            title = "Media pipeline";
+            type = "canvas";
+            w = 24;
+            h = 12;
+            description = "Requests flow left to right: Seerr asks, the *arrs search, SABnzbd fetches, Alexandria stores, Plex serves, Tautulli watches. Every box is coloured by live state.";
+            targets = map (node: {
+              inherit (node) expr;
+              legend = node.key;
+              instant = true;
+            }) topologyNodes;
+            # Canvas resolves a `field` binding through the field's display
+            # processor, so these mappings drive both the text and the colour.
+            mappings = viz.boolMapping {
+              falseText = "DOWN";
+              trueText = "UP";
+              nullText = "NO DATA";
+              nullColor = "purple";
+            };
+            options.root = {
+              name = "root";
+              type = "frame";
+              elements = map topologyElement topologyNodes ++ map topologyLabel topologyNodes;
+            };
+          })
+        ]
         [ (viz.row "Right now") ]
         [
           (viz.panel {

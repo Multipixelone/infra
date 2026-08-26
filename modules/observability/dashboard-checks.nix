@@ -6,9 +6,10 @@
 # that were silently violated before: panels without units rendering raw
 # numbers, `stat` panels pointed at many-series booleans rendering a wall of
 # 1's, and hand-written grid coordinates overlapping.
-{ config, ... }:
+{ lib, config, ... }:
 let
   dashboards = config.flake.grafanaDashboards;
+  viz = import ../../lib/grafana.nix { inherit lib; };
 
   # Unit ids as spelled in grafana-data's `valueFormats/categories.ts`.
   knownUnits = [
@@ -71,6 +72,7 @@ in
           inherit knownUnits;
           inherit numericPanelTypes;
           inherit statMultiSeriesAllowance;
+          targetlessPanelTypes = viz.targetlessTypes;
         }
       );
       validator = pkgs.writeText "validate-grafana-dashboards.py" ''
@@ -81,6 +83,7 @@ in
         known_units = set(config["knownUnits"])
         numeric_types = set(config["numericPanelTypes"])
         stat_allowance = config["statMultiSeriesAllowance"]
+        targetless_types = set(config["targetlessPanelTypes"])
         problems = []
 
 
@@ -89,8 +92,10 @@ in
 
 
         for name, dashboard in sorted(dashboards.items()):
-            if dashboard.get("schemaVersion") != 41:
-                fail(name, "schemaVersion must be 41")
+            # 42 is the final v1 dashboard schema. Emitting anything lower
+            # makes Grafana rewrite datasource refs and panel fields on load.
+            if dashboard.get("schemaVersion") != 42:
+                fail(name, "schemaVersion must be 42")
             if not dashboard.get("uid"):
                 fail(name, "missing uid")
 
@@ -132,6 +137,8 @@ in
 
                 defaults = panel.get("fieldConfig", {}).get("defaults", {})
                 unit = defaults.get("unit")
+                if ptype in targetless_types:
+                    continue
                 if ptype in numeric_types and unit is None:
                     fail(name, f"{title}: {ptype} panel declares no unit")
                 if unit is not None and unit not in known_units:
@@ -146,8 +153,19 @@ in
                         fail(name, f"{title}: base threshold step must have value null")
 
                 targets = panel.get("targets", [])
-                if not targets:
+                if not targets and ptype not in targetless_types:
                     fail(name, f"{title}: no targets")
+
+                # The alertlist panel filters rules by datasource *display
+                # name*, not uid, so a uid here silently renders nothing.
+                if ptype == "alertlist":
+                    ds = panel.get("options", {}).get("datasource")
+                    if ds is not None and ds.islower() and " " not in ds:
+                        fail(
+                            name,
+                            f"{title}: alertlist options.datasource must be the datasource "
+                            f"display name, not the uid {ds!r}",
+                        )
                 for target in targets:
                     if not target.get("expr", "").strip():
                         fail(name, f"{title}: target with empty expr")
