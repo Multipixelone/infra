@@ -143,9 +143,9 @@ let
                 expected=${lib.escapeShellArg ",${expected},"}
                 attempt=1
                 while true; do
-                  # A newly issued certificate reaches nginx through an
-                  # asynchronous reload, so an early probe can still observe
-                  # the bootstrap self-signed certificate.
+                  # Certificate reloads and restarted container backends are
+                  # asynchronous during activation. Keep the probe bounded,
+                  # but give routes a 30-attempt readiness window.
                   if ! status="$(curl --silent --show-error --output /dev/null \
                     --max-time ${toString route.health.timeoutSeconds} \
                     --resolve ${lib.escapeShellArg "${route.canonical}:443:${route.proxy.lanAddress}"} \
@@ -156,7 +156,7 @@ let
                   case "$expected" in
                     (*,"$status",*) break ;;
                   esac
-                  if [ "$attempt" -ge 3 ]; then
+                  if [ "$attempt" -ge 30 ]; then
                     echo ${lib.escapeShellArg "${route.key}: unexpected health status"} "$status" >&2
                     exit 1
                   fi
