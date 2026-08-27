@@ -168,7 +168,6 @@
             exclude = [
               ".local/share/Steam"
               ".local/share/baloo"
-              ".local/share/flatpak"
               ".local/share/Trash"
               ".local/share/bottles"
               ".local/share/lutris/runners"

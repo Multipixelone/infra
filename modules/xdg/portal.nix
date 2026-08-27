@@ -3,7 +3,7 @@
     { pkgs, ... }:
     {
       environment.systemPackages = [ pkgs.xdg-utils ];
-      services.flatpak.enable = true;
+      services.flatpak.enable = false;
       services.gvfs.enable = true;
       xdg = {
         portal = {

@@ -25,7 +25,9 @@
     { pkgs, ... }:
     {
       home.packages = [
+        pkgs.balatro-mod-manager
         pkgs.prismlauncher
+        pkgs.sgdboop
         pkgs.vintagestory
       ];
     };
