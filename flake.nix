@@ -244,7 +244,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     playlist-download.url = "github:Multipixelone/playlist-downloader";
-    prem-tweet.url = "github:Multipixelone/prem-tweet";
+    prem-tweet.url = "git+ssh://git@github.com/Multipixelone/prem-tweet.git";
     qmd.url = "github:tobi/qmd";
     quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
     rb-scrobbler = {

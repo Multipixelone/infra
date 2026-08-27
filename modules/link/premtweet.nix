@@ -16,8 +16,13 @@
 # runtime, so no OnCalendar timer is needed here.
 { inputs, ... }:
 {
+  # SSH, not `github:` — prem-tweet is a private repo, and Nix's `github:`
+  # fetcher authenticates only via `access-tokens` in nix.conf, which CI does
+  # not set (see modules/hylia/nix-github-token.nix). `git+ssh://` goes over the
+  # git transport instead, so CI's existing SSH_PRIVATE_KEY deploy key covers
+  # it — the same shape nix-secrets uses in modules/security/secrets.nix.
   flake-file.inputs.prem-tweet = {
-    url = "github:Multipixelone/prem-tweet";
+    url = "git+ssh://git@github.com/Multipixelone/prem-tweet.git";
   };
 
   configurations.nixos.link.module =
