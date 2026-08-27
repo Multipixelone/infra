@@ -1,10 +1,12 @@
 # Split DNS and service publication design
 
-Status: accepted design; implementation foundation exists, rollout is bootstrap-gated
+NYC uses ordered independent Blocky resolvers: Impa (`192.168.6.50`) first and Link (`192.168.6.6`) second. Both receive identical generated records; each application has one A record targeting active ingress Impa. DNS policy is separate from HTTPS trust: only `192.168.3.0/24` and `192.168.6.0/24` query both, while Link additionally serves WireGuard at `10.100.0.1`. Existing routed trusted-network HTTPS semantics remain unchanged. See [`impa-edge-bootstrap-cutover.md`](impa-edge-bootstrap-cutover.md).
+
+Status: accepted design implemented in Git; live rollout remains separately authorized
 
 Implementation and bootstrap status is tracked in
 [`service-publication-runbook.md`](service-publication-runbook.md). The rollout
-gates remain disabled until its discovery and adoption requirements are met.
+configuration is enabled declaratively, but physical bootstrap and live cutover remain manual.
 
 This document is the implementation contract for publishing services from the
 New York City site. It records the accepted target state, the decisions it

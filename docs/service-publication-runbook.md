@@ -1,10 +1,12 @@
 # Service publication implementation and bootstrap runbook
 
+Impa is the NYC active ingress and default proxy. The adopted Cloudflare account, zone, provider identity, and Tunnel name `link` remain unchanged. During overlap, generated wiring runs the same existing encrypted Tunnel credential on Link and Impa. Follow [`impa-edge-bootstrap-cutover.md`](impa-edge-bootstrap-cutover.md); retirement and provider operations are manual.
+
 This runbook implements the accepted contract in
 [`split-dns-service-publication.md`](split-dns-service-publication.md). The Nix
 registry and all non-secret projections exist, and Finn has accepted the
-Cloudflare adoption plan. Rollout remains deliberately disabled until its
-separate prerequisites below are satisfied. The accepted remote-state bucket
+Cloudflare adoption plan. Declarative wiring is enabled, while live rollout
+still requires the separate authorization and prerequisites below. The accepted remote-state bucket
 is recorded below. No command in this runbook has been run against a live host,
 AWS account, or Cloudflare account as part of the implementation.
 
