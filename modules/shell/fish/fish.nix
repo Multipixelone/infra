@@ -25,7 +25,7 @@
         # Wayland clipboard-history (cliphist + wl-clipboard) is Linux-only;
         # macOS has no equivalent clipboard manager, so the `clip` alias is
         # simply absent there.
-        clipboardAliases = lib.optionalAttrs pkgs.stdenv.isLinux {
+        clipboardAliases = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           clip = "${getExe pkgs.cliphist} list | fzf | ${getExe pkgs.cliphist} decode | ${getExe' pkgs.wl-clipboard "wl-copy"}";
         };
         fzf-config = ''
@@ -133,7 +133,7 @@
             set -gx NIXPKGS_ALLOW_INSECURE 1
             # OpenClaw is installed via npm --prefix "$HOME/.npm-global".
             fish_add_path --global --move $HOME/.npm-global/bin
-            ${lib.optionalString pkgs.stdenv.isDarwin ''
+            ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
               # macOS exposes /opt/homebrew/bin via /etc/paths.d + path_helper,
               # but fish doesn't run path_helper, so brew CLIs are invisible
               # here. Add it once — covers every (non-keg-only) brew formula.

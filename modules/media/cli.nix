@@ -9,6 +9,6 @@
           gifski
         ])
         # imv is a Wayland/X11 image viewer — Linux-only.
-        ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.imv ];
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.imv ];
     };
 }

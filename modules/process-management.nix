@@ -8,7 +8,7 @@
           procs
           watchexec
         ])
-        ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.psmisc ];
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.psmisc ];
 
       programs.bottom = {
         enable = true;

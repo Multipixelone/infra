@@ -12,7 +12,7 @@
           socat
         ])
         # Linux-only network tooling.
-        ++ lib.optionals pkgs.stdenv.isLinux (
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux (
           with pkgs;
           [
             ethtool

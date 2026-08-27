@@ -9,7 +9,7 @@
       { pkgs, lib, ... }:
       {
         # EFI tooling is Linux-only.
-        home.packages = lib.optionals pkgs.stdenv.isLinux [
+        home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
           pkgs.efivar
           pkgs.efibootmgr
         ];

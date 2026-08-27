@@ -24,7 +24,7 @@
     {
       # `nh os switch/test` wrappers (with a Linux icon-theme notify icon) are
       # NixOS rebuild helpers — Linux-only.
-      home.packages = lib.optionals pkgs.stdenv.isLinux (
+      home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux (
         withSystem pkgs.stdenv.hostPlatform.system (
           { config, ... }:
           let

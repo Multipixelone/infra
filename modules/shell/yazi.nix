@@ -33,7 +33,7 @@
             }
           ]
           # ripdrag (drag-and-drop) and wl-clipboard are Wayland/Linux-only.
-          ++ lib.optionals pkgs.stdenv.isLinux [
+          ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             {
               on = [ "<C-n>" ];
               run = ''
@@ -52,7 +52,7 @@
             }
           ]
           # macOS: yank file paths to the system clipboard via pbcopy.
-          ++ lib.optionals pkgs.stdenv.isDarwin [
+          ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
             {
               on = [ "y" ];
               run = [

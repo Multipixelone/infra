@@ -59,7 +59,7 @@
       { pkgs, lib, ... }:
       {
         # ALSA/pipewire CLI tooling is Linux-only.
-        home.packages = lib.optionals pkgs.stdenv.isLinux (
+        home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux (
           with pkgs;
           [
             wiremix

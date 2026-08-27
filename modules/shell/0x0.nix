@@ -12,7 +12,7 @@
           ])
           # Wayland clipboard + libnotify only exist on Linux; macOS uses the
           # built-in pbcopy.
-          ++ lib.optionals pkgs.stdenv.isLinux (
+          ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux (
             with pkgs;
             [
               wl-clipboard
@@ -74,7 +74,7 @@
 
             printf '%s\n' "''${url}"
             ${
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 ''
                   printf '%s' "''${url}" | pbcopy
                 ''

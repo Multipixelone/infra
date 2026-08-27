@@ -10,7 +10,7 @@
           devenv
         ])
         # Linux-only hardware/perf tooling.
-        ++ lib.optionals pkgs.stdenv.isLinux (
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux (
           with pkgs;
           [
             sysstat

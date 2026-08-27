@@ -24,7 +24,7 @@
         ''
       ];
       # systemd user units are inert on darwin (no systemd) — Linux-only.
-      systemd.user.services.update-programs-sqlite = lib.mkIf pkgs.stdenv.isLinux {
+      systemd.user.services.update-programs-sqlite = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         Unit = {
           Description = "Update programs.sqlite for Carapace tab completion";
         };
@@ -45,7 +45,7 @@
           '';
         };
       };
-      systemd.user.timers.update-programs-sqlite = lib.mkIf pkgs.stdenv.isLinux {
+      systemd.user.timers.update-programs-sqlite = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         Unit = {
           Description = "Weekly update of programs.sqlite";
         };
