@@ -12,7 +12,7 @@ let
   acmeEmail = config.flake.meta.owner.email;
   runtimeAcmeSecret = "/run/agenix/cloudflare-acme-dns01";
   acmeSecret = "${inputs.secrets}/cloudflare/acme-dns01.age";
-  connectorSecret = "${inputs.secrets}/cloudflare/service-publication-tunnel-token.age";
+  connectorSecret = "${inputs.secrets}/cloudflare/service-publication-tunnel.age";
   hasAcmeSecret = builtins.pathExists acmeSecret;
   hasConnectorSecret = builtins.pathExists connectorSecret;
 
@@ -299,7 +299,7 @@ let
               }
             ];
 
-            age.secrets.service-publication-tunnel-token = {
+            age.secrets.service-publication-tunnel = {
               file = connectorSecret;
               owner = "cloudflared";
               group = "cloudflared";
@@ -316,7 +316,7 @@ let
               wants = [ "network-online.target" ];
               after = [ "network-online.target" ];
               serviceConfig = {
-                ExecStart = "${lib.getExe connectorPackage} tunnel --no-autoupdate run --token-file ${config.age.secrets.service-publication-tunnel-token.path}";
+                ExecStart = "${lib.getExe connectorPackage} tunnel --no-autoupdate run --token-file ${config.age.secrets.service-publication-tunnel.path}";
                 Restart = "always";
                 User = "cloudflared";
                 Group = "cloudflared";

@@ -4173,7 +4173,10 @@ in
         {
           assertion =
             config.systemd.services.grafana.unitConfig.ConditionPathExists == requiredRuntimeSecrets
-            && config.systemd.services.nginx.unitConfig.ConditionPathExists == requiredRuntimeSecrets;
+            && (
+              localCutover
+              || config.systemd.services.nginx.unitConfig.ConditionPathExists == requiredRuntimeSecrets
+            );
           message = "Grafana and HTTPS must remain gated on both runtime secrets.";
         }
         {
@@ -4630,7 +4633,9 @@ in
       systemd.services.grafana.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.homepage-dashboard.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.loki.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
-      systemd.services.nginx.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
+      systemd.services.nginx.unitConfig.ConditionPathExists = lib.mkIf (
+        !localCutover
+      ) requiredRuntimeSecrets;
       systemd.services.openclaw-service-metrics.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.prometheus.unitConfig.ConditionPathExists = requiredRuntimeSecrets;
       systemd.services.prometheus-blackbox-exporter.unitConfig.ConditionPathExists =

@@ -1230,7 +1230,7 @@ let
         route.application == application
         && route.route == "root"
         && route.backend.host == "alexandria"
-        && route.proxy.host == "link"
+        && lib.elem "link" inventory.hosts.${route.backend.host}.reachableFromProxyHosts
         && lib.hasPrefix "https://" (browserUrl application)
       ) expectedApplications)
       "media observability: selected routes must be Link-reachable Alexandria roots with HTTPS canonicals";
