@@ -125,14 +125,17 @@ let
         sudo mkdir -p /etc/nix /etc/determinate
         echo "machine attic-cache.fly.dev login automated password ''${{ secrets.ATTIC_KEY }}" | sudo tee /etc/nix/netrc > /dev/null
         echo '{"authentication":{"additionalNetrcSources":["/etc/nix/netrc"]}}' | sudo tee /etc/determinate/config.json > /dev/null
-        git config --global url."https://''${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
+        # `x-access-token:<pat>` form, not `<pat>@` — GitHub accepts a bare
+        # token as the username only for CLASSIC PATs; a fine-grained PAT must
+        # arrive as the PASSWORD or the clone 404s as "Repository not found".
+        git config --global url."https://x-access-token:''${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
         # Nix's git fetcher (private `git+https://` inputs, e.g. prem-tweet)
         # spawns git with a sanitized HOME, so the --global rewrite above is
         # invisible to it. GIT_CONFIG_* env vars ride through the environment
         # instead; $GITHUB_ENV exports them to every later step in the job.
         {
           echo "GIT_CONFIG_COUNT=1"
-          echo "GIT_CONFIG_KEY_0=url.https://''${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf"
+          echo "GIT_CONFIG_KEY_0=url.https://x-access-token:''${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf"
           echo "GIT_CONFIG_VALUE_0=https://github.com/"
         } >> "$GITHUB_ENV"
       '';

@@ -25,12 +25,12 @@ jobs:
       # generated eval/build workflows install (modules/ci.nix).
       - name: Authenticate git to GitHub
         run: |
-          git config --global url."https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
+          git config --global url."https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
           # Nix spawns git with a sanitized HOME, so --global is invisible to
           # it; GIT_CONFIG_* env vars ride through the environment instead.
           {
             echo "GIT_CONFIG_COUNT=1"
-            echo "GIT_CONFIG_KEY_0=url.https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf"
+            echo "GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf"
             echo "GIT_CONFIG_VALUE_0=https://github.com/"
           } >> "$GITHUB_ENV"
       - name: Update flake.lock
