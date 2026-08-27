@@ -14,7 +14,7 @@
       { pkgs, lib, ... }:
       {
         # nixos-facter is Linux-only.
-        home.packages = lib.optionals pkgs.stdenv.isLinux [ pkgs.nixos-facter ];
+        home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.nixos-facter ];
       };
   };
 }

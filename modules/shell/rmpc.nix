@@ -64,7 +64,7 @@
       ];
       # xdg.desktopEntries is a Linux-only HM module (and this entry is
       # Hyprland/foot specific) — skip on darwin.
-      xdg.desktopEntries = lib.mkIf pkgs.stdenv.isLinux {
+      xdg.desktopEntries = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         "rmpc" = {
           name = "rmpc";
           comment = "rmpc music player";

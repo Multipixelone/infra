@@ -435,7 +435,7 @@
             markdown-oxide
           ])
           # helix uses wl-clipboard on Wayland; on macOS it uses pbcopy/pbpaste.
-          ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.wl-clipboard ];
+          ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.wl-clipboard ];
       in
       {
         home.packages = packages;

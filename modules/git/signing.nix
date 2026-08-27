@@ -36,7 +36,7 @@
       # Without an agent there is no pinentry at all, and every signature fails
       # with "gpg: signing failed: No pinentry". macOS keeps its own agent
       # setup, so this is Linux-only.
-      services.gpg-agent = lib.mkIf pkgs.stdenv.isLinux {
+      services.gpg-agent = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         enable = true;
         pinentry.package = pkgs.pinentry-curses;
         defaultCacheTtl = 86400;
