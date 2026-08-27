@@ -15,6 +15,7 @@ let
     "seerr/root"
     "bazarr/root"
     "sabnzbd/root"
+    "nzbhydra2/root"
     "tautulli/root"
   ];
   expectedApplications = [
@@ -24,6 +25,7 @@ let
     "seerr"
     "bazarr"
     "sabnzbd"
+    "nzbhydra2"
     "tautulli"
   ];
   viz = import ../../lib/grafana.nix { inherit lib; };
@@ -91,8 +93,8 @@ let
       key = "seerr";
       label = "Seerr";
       expr = ''min(scraparr_services_up{scraparr_services="seerr"})'';
-      left = 20;
-      top = 150;
+      left = 15;
+      top = 64;
       to = [
         "radarr"
         "sonarr"
@@ -102,56 +104,66 @@ let
       key = "radarr";
       label = "Radarr";
       expr = ''min(scraparr_services_up{scraparr_services="radarr"})'';
-      left = 230;
-      top = 60;
-      to = [ "sabnzbd" ];
+      left = 170;
+      top = 22;
+      to = [ "nzbhydra2" ];
     }
     {
       key = "sonarr";
       label = "Sonarr";
       expr = ''min(scraparr_services_up{scraparr_services="sonarr"})'';
-      left = 230;
-      top = 240;
+      left = 170;
+      top = 106;
+      to = [ "nzbhydra2" ];
+    }
+    {
+      key = "nzbhydra2";
+      label = "NZBHydra2";
+      # Scraparr has no NZBHydra connector, so use the endpoint probe that is
+      # already generated from the service-publication health contract.
+      expr = ''min(probe_success{job=~"blackbox-internal|blackbox-private",endpoint="${inventory.applications.nzbhydra2.canonical}"})'';
+      left = 325;
+      top = 64;
       to = [ "sabnzbd" ];
     }
     {
       key = "sabnzbd";
       label = "SABnzbd";
       expr = ''min(scraparr_services_up{scraparr_services="sabnzbd"})'';
-      left = 440;
-      top = 150;
+      left = 480;
+      top = 64;
       to = [ "alexandria" ];
     }
     {
       key = "bazarr";
       label = "Bazarr";
       expr = ''min(scraparr_services_up{scraparr_services="bazarr"})'';
-      left = 440;
-      top = 330;
+      left = 480;
+      top = 148;
       to = [ "alexandria" ];
     }
     {
       key = "alexandria";
       label = "Alexandria";
       expr = ''min(probe_success{job="blackbox-internal",endpoint=~"(plex|radarr|sonarr)\\..*"})'';
-      left = 650;
-      top = 150;
+      left = 635;
+      top = 64;
       to = [ "plex" ];
     }
     {
       key = "plex";
       label = "Plex";
       expr = ''min(probe_success{job="blackbox-internal",endpoint=~"plex\\..*"})'';
-      left = 860;
-      top = 150;
+      left = 790;
+      top = 64;
       to = [ "tautulli" ];
     }
     {
       key = "tautulli";
       label = "Tautulli";
       expr = ''min(probe_success{job="blackbox-internal",endpoint=~"tautulli\\..*"})'';
-      left = 1070;
-      top = 150;
+      left = 945;
+      top = 64;
       to = [ ];
     }
   ];
@@ -187,8 +199,8 @@ let
     };
     placement = {
       inherit (node) left top;
-      width = 150;
-      height = 56;
+      width = 130;
+      height = 44;
       rotation = 0;
     };
     # Connection anchors are normalised offsets from the element centre:
@@ -242,7 +254,7 @@ let
     placement = {
       inherit (node) left;
       top = node.top - 24;
-      width = 150;
+      width = 130;
       height = 22;
       rotation = 0;
     };
@@ -262,8 +274,8 @@ let
             title = "Media pipeline";
             type = "canvas";
             w = 24;
-            h = 12;
-            description = "Requests flow left to right: Seerr asks, the *arrs search, SABnzbd fetches, Alexandria stores, Plex serves, Tautulli watches. Every box is coloured by live state.";
+            h = 8;
+            description = "Requests flow left to right: Seerr asks, the *arrs search through NZBHydra2, SABnzbd fetches, Alexandria stores, Plex serves, and Tautulli watches. Every box is coloured by live state.";
             targets = map (node: {
               inherit (node) expr;
               legend = node.key;
