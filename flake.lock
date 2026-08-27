@@ -3974,15 +3974,15 @@
       "locked": {
         "lastModified": 1786936271,
         "narHash": "sha256-6gk9uoYH7BcLCi9UG0W6TD0HBaWfbdiPkmMfdlL1Nws=",
-        "owner": "Multipixelone",
-        "repo": "prem-tweet",
+        "ref": "refs/heads/main",
         "rev": "2b948cbf808824ebb5f42b440bc257b698bac55d",
-        "type": "github"
+        "revCount": 203,
+        "type": "git",
+        "url": "https://github.com/Multipixelone/prem-tweet.git"
       },
       "original": {
-        "owner": "Multipixelone",
-        "repo": "prem-tweet",
-        "type": "github"
+        "type": "git",
+        "url": "https://github.com/Multipixelone/prem-tweet.git"
       }
     },
     "qmd": {

@@ -20,6 +20,12 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      # Private `git+https://github.com/...` inputs (prem-tweet) authenticate
+      # over the git transport, not via access-tokens. Mirrors the rewrite the
+      # generated eval/build workflows install (modules/ci.nix).
+      - name: Authenticate git to GitHub
+        run: |
+          git config --global url."https://${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
       - name: Update flake.lock
         run: nix flake update
       # Mirror `just update`: keep the pinned Firefox addons in lockstep with the

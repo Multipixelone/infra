@@ -16,16 +16,24 @@
 # runtime, so no OnCalendar timer is needed here.
 { inputs, ... }:
 {
-  # prem-tweet is a PRIVATE repo, so this input needs credentials. Nix's
-  # `github:` fetcher does a plain tarball GET and reads the token ONLY from
-  # `access-tokens` in nix.conf — never netrc, never git's `url.insteadOf`
-  # (see modules/hylia/nix-github-token.nix, which wires the same thing up for
-  # hosts). CI supplies it via `access-tokens` in mkNixConf, modules/ci.nix.
+  # prem-tweet is a PRIVATE repo, so this input needs credentials, and the
+  # transport decides which ones apply:
   #
-  # Not `git+ssh://`: CI's SSH_PRIVATE_KEY is a deploy key, and GitHub binds a
-  # deploy key to exactly one repo — it already belongs to nix-secrets.
+  #   `github:`    tarball GET; honours ONLY `access-tokens` in nix.conf. CI
+  #                sets that (mkNixConf, modules/ci.nix) with a PAT that
+  #                demonstrably can read the repo, yet upstream Nix 2.34 still
+  #                404s — it sends `Authorization: token`, which GitHub rejects
+  #                for fine-grained PATs. Determinate's Nix does not have this
+  #                problem, which is why update-lock.yml worked and eval/build
+  #                did not.
+  #   `git+ssh://` CI's SSH_PRIVATE_KEY is a deploy key, and GitHub binds those
+  #                to exactly one repo — it already belongs to nix-secrets.
+  #   `git+https:` shells out to the git CLI, so the `url.insteadOf` rewrite in
+  #                modules/ci.nix picks up the same PAT over HTTPS basic auth.
+  #
+  # Hence git+https. Every Nix job installs that rewrite before any nix call.
   flake-file.inputs.prem-tweet = {
-    url = "github:Multipixelone/prem-tweet";
+    url = "git+https://github.com/Multipixelone/prem-tweet.git";
   };
 
   configurations.nixos.link.module =
