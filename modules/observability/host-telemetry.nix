@@ -1,6 +1,7 @@
 { config, lib, ... }:
 let
   telemetryHosts = [
+    "impa"
     "iot"
     "marin"
   ];

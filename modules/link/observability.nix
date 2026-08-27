@@ -6,6 +6,7 @@
 }:
 let
   inherit (config) observability;
+  hostRegistry = config.hosts;
   # Named `viz`, not `grafana`: the module's inner `let` already binds
   # `grafana` to the endpoint registry entry.
   viz = import ../../lib/grafana.nix { inherit lib; };
@@ -63,8 +64,11 @@ let
   hub = config.hosts.${observability.hubHost};
   linkLanAddress = config.hosts.link.homeAddress;
   remoteNodeTargets = {
+    impa = config.hosts.impa.homeAddress;
     iot = config.hosts.iot.homeAddress;
     marin = config.hosts.marin.homeAddress;
+    zelda = config.hosts.zelda.wireguard.ipv4Address;
+    hylia = config.hosts.hylia.wireguard.ipv4Address;
   };
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
@@ -141,7 +145,7 @@ let
   # Partitions duplicate their parent disk's counters.
   wholeDisks = ''device=~"nvme[0-9]+n[0-9]+|sd[a-z]|mmcblk[0-9]+"'';
   sloTargetPercent = observability.slo.availability * 100;
-  hostJobSelector = ''job=~"(link|iot|marin)-node"'';
+  hostJobSelector = ''job=~"(link|impa|iot|marin|zelda|hylia)-node"'';
   # Prometheus retains `up = 0` when a configured exporter cannot be scraped,
   # but a missing target would otherwise disappear from a table entirely. The
   # three -1 series are a stable fleet scaffold: a real 0/1 wins under max(),
@@ -150,8 +154,11 @@ let
     max by (job) (
       up{${hostJobSelector}}
       or label_replace(vector(-1), "job", "link-node", "", "")
+      or label_replace(vector(-1), "job", "impa-node", "", "")
       or label_replace(vector(-1), "job", "iot-node", "", "")
       or label_replace(vector(-1), "job", "marin-node", "", "")
+      or label_replace(vector(-1), "job", "zelda-node", "", "")
+      or label_replace(vector(-1), "job", "hylia-node", "", "")
     )
   '';
   hostStatusMappings = [
@@ -2973,6 +2980,23 @@ let
         "dns"
       ];
       description = "Private resolver: query volume, what is being blocked, cache behaviour and resolution latency.";
+      templating.list = [
+        {
+          name = "resolver";
+          label = "Resolver";
+          type = "query";
+          datasource.uid = "prometheus";
+          query = "label_values(blocky_query_total, resolver)";
+          definition = "label_values(blocky_query_total, resolver)";
+          multi = true;
+          includeAll = true;
+          allValue = ".*";
+          current = {
+            text = "All";
+            value = "$__all";
+          };
+        }
+      ];
       rows = [
         [ (viz.row "Overview") ]
         [
@@ -2981,7 +3005,7 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "min(blocky_blocking_enabled)";
+            expr = ''min by (resolver) (blocky_blocking_enabled{resolver=~"$resolver"})'';
             mappings = viz.boolMapping {
               falseText = "DISABLED";
               trueText = "ENABLED";
@@ -3065,11 +3089,11 @@ let
             h = 5;
             targets = [
               {
-                expr = "sum(blocky_denylist_cache_entries)";
+                expr = ''blocky_denylist_cache_entries{resolver=~"$resolver"}'';
                 legend = "Blocked domains";
               }
               {
-                expr = "sum(blocky_cache_entries)";
+                expr = ''blocky_cache_entries{resolver=~"$resolver"}'';
                 legend = "Cached answers";
               }
             ];
@@ -3235,11 +3259,11 @@ let
             h = 7;
             targets = [
               {
-                expr = "sum(blocky_cache_entries)";
+                expr = ''blocky_cache_entries{resolver=~"$resolver"}'';
                 legend = "Entries";
               }
               {
-                expr = "sum(blocky_prefetch_domain_name_cache_entries)";
+                expr = ''blocky_prefetch_domain_name_cache_entries{resolver=~"$resolver"}'';
                 legend = "Prefetch candidates";
               }
             ];
@@ -3724,6 +3748,18 @@ in
               fail_if_not_ssl = true;
             };
           };
+          dns = {
+            prober = "dns";
+            timeout = "5s";
+            dns = {
+              preferred_ip_protocol = "ip4";
+              query_name = "grafana.nyc.finnrut.is";
+              query_type = "A";
+              validate_answer_rrs.fail_if_not_matches_regexp = [
+                "^grafana\\.nyc\\.finnrut\\.is.*192\\.168\\.6\\.50$"
+              ];
+            };
+          };
         };
       };
 
@@ -3780,17 +3816,52 @@ in
             rules = [
               {
                 alert = "NixOSHostExporterDown";
-                expr = ''up{job=~"(link|iot|marin)-node"} == 0'';
+                expr = ''up{job=~"(link|impa|iot|marin)-node"} == 0'';
                 for = "5m";
                 labels.severity = "critical";
                 annotations.summary = "Node exporter {{ $labels.job }} at {{ $labels.instance }} is unreachable";
               }
               {
                 alert = "PrometheusScrapeTargetDown";
-                expr = ''up{job!~"blackbox-.*|link-node|scraparr|tautulli-exporter"} == 0'';
+                expr = ''up{job!~"blackbox-.*|(link|impa|iot|marin|zelda|hylia)-node|scraparr|tautulli-exporter"} == 0'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
+              }
+              {
+                alert = "DnsResolverUnavailable";
+                expr = ''probe_success{job="blackbox-dns"} == 0'';
+                for = "5m";
+                labels.severity = "warning";
+                annotations.summary = "DNS resolver {{ $labels.resolver }} is unavailable";
+              }
+              {
+                alert = "BothDnsResolversUnavailable";
+                expr = ''sum(probe_success{job="blackbox-dns"} == 0) == 2'';
+                for = "1m";
+                labels.severity = "critical";
+                annotations.summary = "Both NYC internal DNS resolvers are unavailable";
+              }
+              {
+                alert = "DnsInternalRecordMismatch";
+                expr = ''probe_success{job="blackbox-dns"} == 0 and on (resolver) up{job="blocky"} == 1'';
+                for = "2m";
+                labels.severity = "critical";
+                annotations.summary = "Generated internal DNS fixture mismatches on {{ $labels.resolver }}";
+              }
+              {
+                alert = "DnsBlockingStopped";
+                expr = "min by (resolver) (blocky_blocking_enabled) == 0";
+                for = "5m";
+                labels.severity = "warning";
+                annotations.summary = "Blocky filtering stopped on {{ $labels.resolver }}";
+              }
+              {
+                alert = "DnsUpstreamFailures";
+                expr = "sum by (resolver) (rate(blocky_error_total[5m])) > 0";
+                for = "5m";
+                labels.severity = "warning";
+                annotations.summary = "Blocky upstream errors persist on {{ $labels.resolver }}";
               }
               {
                 alert = "EndpointDown";
@@ -4310,12 +4381,24 @@ in
             static_configs = [ { targets = [ "${node.backendAddress}:${toString node.port}" ]; } ];
           }
           {
+            job_name = "impa-node";
+            static_configs = [ { targets = [ "${remoteNodeTargets.impa}:${toString node.port}" ]; } ];
+          }
+          {
             job_name = "iot-node";
             static_configs = [ { targets = [ "${remoteNodeTargets.iot}:${toString node.port}" ]; } ];
           }
           {
             job_name = "marin-node";
             static_configs = [ { targets = [ "${remoteNodeTargets.marin}:${toString node.port}" ]; } ];
+          }
+          {
+            job_name = "zelda-node";
+            static_configs = [ { targets = [ "${remoteNodeTargets.zelda}:${toString node.port}" ]; } ];
+          }
+          {
+            job_name = "hylia-node";
+            static_configs = [ { targets = [ "${remoteNodeTargets.hylia}:${toString node.port}" ]; } ];
           }
           {
             job_name = "prometheus";
@@ -4335,8 +4418,25 @@ in
           }
           {
             job_name = "blocky";
-            static_configs = [ { targets = [ "${blocky.backendAddress}:${toString blocky.port}" ]; } ];
+            static_configs = [
+              {
+                targets = [ "${blocky.backendAddress}:${toString blocky.port}" ];
+                labels.resolver = "link";
+              }
+              {
+                targets = [ "${remoteNodeTargets.impa}:${toString blocky.port}" ];
+                labels.resolver = "impa";
+              }
+            ];
           }
+          (mkBlackboxScrape {
+            name = "dns";
+            module = "dns";
+            targets = map (resolver: {
+              targets = [ "${hostRegistry.${resolver}.homeAddress}:53" ];
+              labels = { inherit resolver; };
+            }) publicationSite.internalDnsHosts;
+          })
           (mkBlackboxScrape {
             name = "internal";
             module = "http_internal";

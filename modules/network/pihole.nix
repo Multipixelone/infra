@@ -186,10 +186,18 @@ in
           iptables -w -A nixos-edge-dns -j nixos-fw-refuse
           iptables -w -I nixos-fw 1 -p udp --dport 53 -j nixos-edge-dns
           iptables -w -I nixos-fw 1 -p tcp --dport 53 -j nixos-edge-dns
+          ${lib.optionalString isImpa ''
+            iptables -w -I nixos-fw 1 -p tcp --dport ${toString observability.endpoints.blocky.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept
+            iptables -w -I nixos-fw 2 -p tcp --dport ${toString observability.endpoints.blocky.port} -j nixos-fw-refuse
+          ''}
         '';
         extraStopCommands = ''
           iptables -w -D nixos-fw -p udp --dport 53 -j nixos-edge-dns 2>/dev/null || true
           iptables -w -D nixos-fw -p tcp --dport 53 -j nixos-edge-dns 2>/dev/null || true
+          ${lib.optionalString isImpa ''
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blocky.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blocky.port} -j nixos-fw-refuse 2>/dev/null || true
+          ''}
           iptables -w -F nixos-edge-dns 2>/dev/null || true
           iptables -w -X nixos-edge-dns 2>/dev/null || true
         '';
