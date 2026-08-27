@@ -52,25 +52,6 @@
         };
       });
     })
-    # inline-snapshot 0.32.5: test_docs re-renders the code blocks in its own
-    # markdown docs via black and diffs them against what's committed. At this
-    # nixpkgs pin the rendered output drifts from the docs (a black version
-    # skew upstream hasn't re-pinned yet), failing all 3 doc files. It's a
-    # doc-sync check with no bearing on the library's behavior, so skip it
-    # rather than block anything that transitively needs inline-snapshot
-    # (python312Packages.openai's own test suite pulls it in). `python3` on
-    # this pin aliases to python314, a distinct package set from python312 —
-    # override python312 itself (not python3Packages) so it actually reaches
-    # `pkgs.python312.withPackages` call sites like foodtown-sort/nudge-writer.
-    (_final: prev: {
-      python312 = prev.python312.override {
-        packageOverrides = _pyFinal: pyPrev: {
-          inline-snapshot = pyPrev.inline-snapshot.overridePythonAttrs (old: {
-            disabledTests = (old.disabledTests or [ ]) ++ [ "test_docs" ];
-          });
-        };
-      };
-    })
     # https://github.com/NixOS/nixpkgs/pull/493604
     # (final: prev: {
     #   anki = prev.anki.overrideAttrs {

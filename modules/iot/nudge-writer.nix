@@ -10,13 +10,11 @@ _: {
       # Skill files consumed by nudge-writer.py at runtime.
       skillDir = ./skills/nudge-writer;
 
-      # python3 defaults to 3.14 which has broken pydantic-core. Bake the
-      # python312 path so patchShebangs can't pick up 3.14, and scrub PYTHON*
-      # env that HA's systemd service leaks. See foodtown-sort.nix for the
-      # original incident notes.
+      # Bake the interpreter path so patchShebangs cannot change it, and scrub
+      # the PYTHON* environment inherited from Home Assistant before starting.
       nudgeWriter =
         let
-          pyEnv = pkgs.python312.withPackages (ps: [ ps.openai ]);
+          pyEnv = pkgs.python3.withPackages (ps: [ ps.openai ]);
         in
         pkgs.writeShellScriptBin "nudge-writer" ''
           unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE

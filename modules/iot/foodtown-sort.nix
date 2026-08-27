@@ -10,12 +10,11 @@ _: {
       # Skill files consumed by foodtown-sort.py at runtime.
       skillDir = ./skills;
 
-      # python3 defaults to 3.14 which has broken pydantic-core (ModuleNotFoundError: No module named 'pydantic_core._pydantic_core').
-      # Bake the python312 path so patchShebangs can't pick up 3.14, and scrub PYTHON* env that HA's systemd service leaks
-      # (it sets PYTHONPATH to a 3.14 package list; 3.12 then finds pure-python modules but fails to load 3.14-ABI .so files).
+      # Bake the interpreter path so patchShebangs cannot change it, and scrub
+      # the PYTHON* environment inherited from Home Assistant before starting.
       foodtownSort =
         let
-          pyEnv = pkgs.python312.withPackages (ps: [ ps.openai ]);
+          pyEnv = pkgs.python3.withPackages (ps: [ ps.openai ]);
         in
         pkgs.writeShellScriptBin "foodtown-sort" ''
           unset PYTHONPATH PYTHONHOME PYTHONNOUSERSITE
