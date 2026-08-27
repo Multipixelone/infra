@@ -32,6 +32,7 @@ Built on top of [flake-parts](https://flake.parts/), this setup manages system c
 | `hylia` | Apple Silicon MacBook (nix-darwin) | Apple | MacBook Neo | Laptop | macOS | nix-darwin host |
 | `zelda` | My personal laptop | Razer | Razer Blade | Laptop | Hyprland | - |
 | `alexandria` | Synology NAS (home-manager only, non-NixOS) | Synology | DS920+ | NAS | None | DSM host managed via standalone home-manager |
+| `impa` | NYC edge host | - | - | Server | None | DNS and ingress edge |
 | `iot` | Old Dell laptop running IoT services | Dell | Laptop | Server | None | IoT services |
 | `marin` | Mac Mini as Airport Express | Apple | Mac Mini | Server | None | Audio + home services |
 | `iphone` | Personal phone | Apple | iPhone | Mobile | - | - |

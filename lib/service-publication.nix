@@ -52,17 +52,7 @@ let
       isProxy =
         hostName:
         ((hosts.${hostName} or { capabilities.reverseProxy = false; }).capabilities.reverseProxy or false);
-      internalDnsHosts =
-        siteName:
-        filter (
-          hostName: hostSite hostName == siteName && (hosts.${hostName}.capabilities.internalDns or false)
-        ) (attrNames hosts);
-      internalDnsAddress =
-        siteName:
-        let
-          candidates = internalDnsHosts siteName;
-        in
-        if length candidates == 1 then hostLan (head candidates) else null;
+      internalDnsHosts = siteName: (sites.${siteName} or { internalDnsHosts = [ ]; }).internalDnsHosts;
 
       canonicalFor =
         applicationName: application:
@@ -94,8 +84,6 @@ let
         application: route:
         if route.proxy.host != null then
           route.proxy.host
-        else if isProxy route.backend.host then
-          route.backend.host
         else
           let
             candidates = fallbackCandidates application.site;
@@ -312,17 +300,22 @@ let
         }
       ) publicApplications;
 
-      internalProbes = map (route: {
-        inherit (route) key;
-        scope = "internal";
-        hostname = route.canonical;
-        inherit (route) canonical alias;
-        resolverAddress = internalDnsAddress route.site;
-        proxyAddress = route.proxy.lanAddress;
-        path = route.health.path;
-        expectedStatuses = route.health.expectedStatuses;
-        timeoutSeconds = route.health.timeoutSeconds;
-      }) routeList;
+      internalProbes = concatMap (
+        route:
+        map (resolverHost: {
+          key = "${route.key}@${resolverHost}";
+          routeKey = route.key;
+          scope = "internal";
+          hostname = route.canonical;
+          inherit (route) canonical alias;
+          inherit resolverHost;
+          resolverAddress = hostLan resolverHost;
+          proxyAddress = route.proxy.lanAddress;
+          path = route.health.path;
+          expectedStatuses = route.health.expectedStatuses;
+          timeoutSeconds = route.health.timeoutSeconds;
+        }) (internalDnsHosts route.site)
+      ) routeList;
 
       externalProbes = map (route: {
         inherit (route) key;
@@ -463,6 +456,7 @@ let
         let
           site = sites.${siteName};
           ingress = hosts.${site.publicIngressHost} or null;
+          resolvers = map (name: hosts.${name} or null) site.internalDnsHosts;
           fallbacks = fallbackCandidates siteName;
         in
         optional (ingress == null) "site ${siteName}: unknown publicIngressHost ${site.publicIngressHost}"
@@ -480,8 +474,21 @@ let
           length fallbacks != 1
         ) "site ${siteName}: exactly one capable default proxy is required"
         ++ optional (
-          length (internalDnsHosts siteName) != 1
-        ) "site ${siteName}: exactly one internal DNS host is required"
+          site.internalDnsHosts == [ ]
+        ) "site ${siteName}: at least one internal DNS host is required"
+        ++ optional (!unique site.internalDnsHosts) "site ${siteName}: duplicate internal DNS host"
+        ++
+          optional
+            (lib.any (
+              resolver: resolver == null || resolver.site != siteName || !resolver.capabilities.internalDns
+            ) resolvers)
+            "site ${siteName}: internal DNS hosts must exist, belong to the site, and have internalDns capability"
+        ++ optional (
+          !unique (map (resolver: if resolver == null then null else resolver.addresses.lan) resolvers)
+        ) "site ${siteName}: internal DNS hosts must have unique LAN addresses"
+        ++ optional (
+          !lib.elem site.publicIngressHost site.connectorHosts
+        ) "site ${siteName}: active ingress must be a connector host"
       ) (attrNames sites);
 
       hostErrors = concatMap (
@@ -584,6 +591,7 @@ let
         dnsRecords = publicDns;
         tunnel = {
           ingressHost = lib.mapAttrs (_: site: site.publicIngressHost) sites;
+          connectorHosts = lib.mapAttrs (_: site: site.connectorHosts) sites;
           applications = tunnelApplications;
           catchAll = "http_status:404";
         };

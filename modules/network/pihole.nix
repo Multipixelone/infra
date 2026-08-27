@@ -2,6 +2,7 @@
 let
   inherit (config) observability;
   hostRegistry = config.hosts;
+  publication = config.servicePublication;
   hub = config.hosts.${observability.hubHost};
   privateDnsRecords =
     observability.endpoints
@@ -171,6 +172,27 @@ in
             prefetching = true;
           };
         };
+      };
+
+      networking.firewall = lib.mkIf (lanAddress != null) {
+        extraCommands = ''
+          iptables -w -N nixos-edge-dns 2>/dev/null || iptables -w -F nixos-edge-dns
+          ${lib.concatMapStringsSep "\n" (cidr: "iptables -w -A nixos-edge-dns -s ${cidr} -j nixos-fw-accept")
+            (
+              publication.sites.nyc.dnsClientCidrs
+              ++ lib.optionals isObservabilityHub publication.sites.nyc.vpnClientCidrs
+            )
+          }
+          iptables -w -A nixos-edge-dns -j nixos-fw-refuse
+          iptables -w -I nixos-fw 1 -p udp --dport 53 -j nixos-edge-dns
+          iptables -w -I nixos-fw 1 -p tcp --dport 53 -j nixos-edge-dns
+        '';
+        extraStopCommands = ''
+          iptables -w -D nixos-fw -p udp --dport 53 -j nixos-edge-dns 2>/dev/null || true
+          iptables -w -D nixos-fw -p tcp --dport 53 -j nixos-edge-dns 2>/dev/null || true
+          iptables -w -F nixos-edge-dns 2>/dev/null || true
+          iptables -w -X nixos-edge-dns 2>/dev/null || true
+        '';
       };
 
       systemd.services.blocky = {

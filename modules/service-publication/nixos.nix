@@ -287,7 +287,7 @@ let
             };
           })
 
-          (lib.mkIf (connectorEnabled && site.publicIngressHost == hostName) {
+          (lib.mkIf (connectorEnabled && lib.elem hostName site.connectorHosts) {
             assertions = [
               {
                 assertion = hasConnectorSecret;

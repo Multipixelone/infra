@@ -61,6 +61,7 @@ let
   effectiveTrustedCidrs =
     if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
+  linkLanAddress = config.hosts.link.homeAddress;
   remoteNodeTargets = {
     iot = config.hosts.iot.homeAddress;
     marin = config.hosts.marin.homeAddress;
@@ -107,7 +108,8 @@ let
           scope = "private";
           # `internalProbes` entries carry the route key, not the
           # application name.
-          slo_class = sloClassFor serviceInventory.routes.${probe.key}.application;
+          slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
+          resolver = probe.resolverHost;
         };
       }) serviceInventory.internalProbes
     else
@@ -4203,7 +4205,7 @@ in
         openFirewall = false;
         settings = {
           server = {
-            http_addr = grafana.backendAddress;
+            http_addr = if localCutover then linkLanAddress else grafana.backendAddress;
             http_port = grafana.port;
             domain = if localCutover then grafanaCanonical else grafana.dnsName;
             root_url = "https://${if localCutover then grafanaCanonical else grafana.dnsName}/";
@@ -4507,7 +4509,8 @@ in
           }
         ];
       };
-      systemd.services.homepage-dashboard.environment.HOSTNAME = homepage.backendAddress;
+      systemd.services.homepage-dashboard.environment.HOSTNAME =
+        if localCutover then linkLanAddress else homepage.backendAddress;
 
       home-manager.users.${username} = {
         home.packages = [ mcpGrafana ];

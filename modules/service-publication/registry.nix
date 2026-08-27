@@ -177,11 +177,23 @@ let
         default = [ ];
         description = "Reviewed inbound client source networks allowed to reach generated DNS and proxy listeners; routed destinations are not implicitly trusted sources.";
       };
+      dnsClientCidrs = mkOption {
+        type = types.nonEmptyListOf (types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+");
+        description = "Client networks allowed to query the site's internal resolvers.";
+      };
       networkInventoryConfirmed = mkOption {
         type = types.bool;
         default = false;
       };
       publicIngressHost = mkOption { type = types.str; };
+      internalDnsHosts = mkOption {
+        type = types.nonEmptyListOf types.str;
+        description = "Ordered internal resolver hosts, primary first.";
+      };
+      connectorHosts = mkOption {
+        type = types.nonEmptyListOf types.str;
+        description = "Hosts concurrently running the adopted movable Tunnel connector during overlap.";
+      };
       defaultProxyHosts = mkOption {
         type = types.listOf types.str;
         default = [ ];
@@ -331,6 +343,7 @@ in
   config = {
     servicePublication = {
       rollout.enableLocalCutover = true;
+      rollout.enableConnector = true;
 
       # These are target identities, not permission to deploy. Access
       # policy bodies below were read back from the live Cloudflare account
@@ -359,15 +372,38 @@ in
           "192.168.6.0/24"
           "10.100.0.0/24"
         ];
+        dnsClientCidrs = [
+          "192.168.3.0/24"
+          "192.168.6.0/24"
+        ];
         networkInventoryConfirmed = true;
-        publicIngressHost = "link";
-        defaultProxyHosts = [ "link" ];
+        publicIngressHost = "impa";
+        internalDnsHosts = [
+          "impa"
+          "link"
+        ];
+        connectorHosts = [
+          "link"
+          "impa"
+        ];
+        defaultProxyHosts = [ "impa" ];
       };
 
       hosts = {
         link = {
           site = "nyc";
           addresses.lan = config.hosts.link.homeAddress;
+          managedByNixOS = true;
+          capabilities = {
+            reverseProxy = true;
+            publicConnector = true;
+            internalDns = true;
+          };
+          reachableFromProxyHosts = [ "impa" ];
+        };
+        impa = {
+          site = "nyc";
+          addresses.lan = config.hosts.impa.homeAddress;
           managedByNixOS = true;
           capabilities = {
             reverseProxy = true;
@@ -391,7 +427,10 @@ in
           managedByNixOS = false;
           # The Synology publishes its Docker ports on all NAS interfaces, so
           # the proxy needs no NAS-side firewall change.
-          reachableFromProxyHosts = [ "link" ];
+          reachableFromProxyHosts = [
+            "link"
+            "impa"
+          ];
         };
       };
 
