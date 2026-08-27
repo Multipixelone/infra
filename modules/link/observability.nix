@@ -139,6 +139,52 @@ let
   # Partitions duplicate their parent disk's counters.
   wholeDisks = ''device=~"nvme[0-9]+n[0-9]+|sd[a-z]|mmcblk[0-9]+"'';
   sloTargetPercent = observability.slo.availability * 100;
+  hostJobSelector = ''job=~"(link|iot|marin)-node"'';
+  # Prometheus retains `up = 0` when a configured exporter cannot be scraped,
+  # but a missing target would otherwise disappear from a table entirely. The
+  # three -1 series are a stable fleet scaffold: a real 0/1 wins under max(),
+  # while an absent target remains present as NO DATA.
+  hostExporterStatus = ''
+    max by (job) (
+      up{${hostJobSelector}}
+      or label_replace(vector(-1), "job", "link-node", "", "")
+      or label_replace(vector(-1), "job", "iot-node", "", "")
+      or label_replace(vector(-1), "job", "marin-node", "", "")
+    )
+  '';
+  hostStatusMappings = [
+    {
+      type = "value";
+      options = {
+        "-1" = {
+          text = "NO DATA";
+          color = "gray";
+          index = 2;
+        };
+        "0" = {
+          text = "DOWN";
+          color = "red";
+          index = 1;
+        };
+        "1" = {
+          text = "UP";
+          color = "green";
+          index = 0;
+        };
+      };
+    }
+    {
+      type = "special";
+      options = {
+        match = "null+nan";
+        result = {
+          text = "NO DATA";
+          color = "gray";
+          index = 3;
+        };
+      };
+    }
+  ];
 
   dashboards = {
     "home.json" = viz.dashboard {
@@ -813,6 +859,394 @@ let
               maxItems = 100;
               sortOrder = 3;
             };
+          })
+        ]
+      ];
+    };
+
+    "nix-host-combined.json" = viz.dashboard {
+      uid = "nix-host-combined";
+      title = "Nix / Host Combined";
+      tags = [
+        "provisioned"
+        "fleet"
+      ];
+      description = "Side-by-side health and resource use for link, iot, and marin. Open a host from the summary for detailed drill-down.";
+      rows = [
+        [ (viz.row "Fleet summary") ]
+        [
+          (viz.panel {
+            title = "NixOS hosts";
+            type = "table";
+            w = 24;
+            h = 10;
+            description = "One row per configured node exporter. DOWN is a failed scrape; NO DATA means the target is missing from Prometheus.";
+            links = [
+              (viz.dataLink {
+                title = "Open host details";
+                url = "/d/fleet/fleet?var-node_job=\${__data.fields[\"Host\"]}&\${__url_time_range}";
+              })
+            ];
+            targets = [
+              {
+                expr = hostExporterStatus;
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "max by (job) (node_time_seconds{${hostJobSelector}} - node_boot_time_seconds{${hostJobSelector}})";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''100 * (1 - avg by (job) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = "100 * clamp_min(1 - (max by (job) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (job) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''100 * max by (job) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''max by (job) (node_systemd_units{${hostJobSelector},state="failed"})'';
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "joinByField";
+                options = {
+                  byField = "job";
+                  mode = "outerTabular";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = {
+                    Time = true;
+                    "Time 1" = true;
+                    "Time 2" = true;
+                    "Time 3" = true;
+                    "Time 4" = true;
+                    "Time 5" = true;
+                    "Time 6" = true;
+                    __name__ = true;
+                    "__name__ 1" = true;
+                    "__name__ 2" = true;
+                    "__name__ 3" = true;
+                    "__name__ 4" = true;
+                    "__name__ 5" = true;
+                    "__name__ 6" = true;
+                    "job 1" = true;
+                    "job 2" = true;
+                    "job 3" = true;
+                    "job 4" = true;
+                    "job 5" = true;
+                    "job 6" = true;
+                  };
+                  renameByName = {
+                    job = "Host";
+                    "Value #A" = "Exporter";
+                    "Value #B" = "Uptime";
+                    "Value #C" = "CPU";
+                    "Value #D" = "Memory";
+                    "Value #E" = "Root filesystem";
+                    "Value #F" = "Failed units";
+                  };
+                };
+              }
+            ];
+            options.sortBy = [
+              {
+                displayName = "Host";
+                desc = false;
+              }
+            ];
+            overrides = [
+              (viz.overrideByName "Host" [
+                {
+                  id = "custom.width";
+                  value = 140;
+                }
+              ])
+              (viz.overrideByName "Exporter" [
+                {
+                  id = "mappings";
+                  value = hostStatusMappings;
+                }
+                (viz.colorBackgroundCell { })
+                {
+                  id = "custom.width";
+                  value = 110;
+                }
+              ])
+              (viz.overrideByName "Uptime" [
+                {
+                  id = "unit";
+                  value = viz.units.duration;
+                }
+                {
+                  id = "decimals";
+                  value = 0;
+                }
+                {
+                  id = "custom.width";
+                  value = 140;
+                }
+              ])
+              (viz.overrideByName "CPU" [
+                {
+                  id = "unit";
+                  value = viz.units.percent;
+                }
+                {
+                  id = "decimals";
+                  value = 1;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 100;
+                }
+                (viz.gaugeCell { })
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "orange";
+                        value = 85;
+                      }
+                      {
+                        color = "red";
+                        value = 95;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Memory" [
+                {
+                  id = "unit";
+                  value = viz.units.percent;
+                }
+                {
+                  id = "decimals";
+                  value = 1;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 100;
+                }
+                (viz.gaugeCell { })
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "orange";
+                        value = 80;
+                      }
+                      {
+                        color = "red";
+                        value = 90;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Root filesystem" [
+                {
+                  id = "unit";
+                  value = viz.units.percent;
+                }
+                {
+                  id = "decimals";
+                  value = 1;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 100;
+                }
+                (viz.gaugeCell { })
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "orange";
+                        value = 80;
+                      }
+                      {
+                        color = "red";
+                        value = 90;
+                      }
+                    ];
+                  };
+                }
+              ])
+              (viz.overrideByName "Failed units" [
+                {
+                  id = "unit";
+                  value = viz.units.none;
+                }
+                {
+                  id = "decimals";
+                  value = 0;
+                }
+                (viz.colorBackgroundCell { })
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "red";
+                        value = 1;
+                      }
+                    ];
+                  };
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "Fleet history") ]
+        [
+          (viz.panel {
+            title = "Availability by host";
+            type = "status-history";
+            w = 24;
+            h = 7;
+            expr = hostExporterStatus;
+            legend = "{{job}}";
+            mappings = hostStatusMappings;
+            options.legend.showLegend = false;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "CPU and memory utilization";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = ''100 * (1 - avg by (job) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
+                legend = "{{job}} CPU";
+              }
+              {
+                expr = "100 * clamp_min(1 - (max by (job) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (job) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
+                legend = "{{job}} memory";
+              }
+            ];
+            unit = viz.units.percent;
+            min = 0;
+            max = 100;
+            decimals = 1;
+            custom.fillOpacity = 20;
+          })
+          (viz.panel {
+            title = "Root filesystem and normalized load";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = ''100 * max by (job) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
+                legend = "{{job}} root";
+              }
+              {
+                expr = ''100 * max by (job) (node_load1{${hostJobSelector}}) / count by (job) (node_cpu_seconds_total{${hostJobSelector},mode="idle"})'';
+                legend = "{{job}} load / cores";
+              }
+            ];
+            unit = viz.units.percent;
+            min = 0;
+            decimals = 1;
+            custom.fillOpacity = 20;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Aggregate network throughput";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "sum by (job) (rate(node_network_receive_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
+                legend = "{{job}} receive";
+              }
+              {
+                expr = "sum by (job) (rate(node_network_transmit_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
+                legend = "{{job}} transmit";
+              }
+            ];
+            unit = viz.units.bitsPerSecond;
+            min = 0;
+            custom.fillOpacity = 20;
+          })
+          (viz.panel {
+            title = "Aggregate disk throughput";
+            w = 12;
+            h = 8;
+            targets = [
+              {
+                expr = "sum by (job) (rate(node_disk_read_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
+                legend = "{{job}} read";
+              }
+              {
+                expr = "sum by (job) (rate(node_disk_written_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
+                legend = "{{job}} write";
+              }
+            ];
+            unit = viz.units.bytesPerSecond;
+            min = 0;
+            custom.fillOpacity = 20;
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Failed systemd units by host";
+            w = 24;
+            h = 7;
+            expr = ''max by (job) (node_systemd_units{${hostJobSelector},state="failed"})'';
+            legend = "{{job}}";
+            unit = viz.units.none;
+            min = 0;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "red";
+                value = 1;
+              }
+            ];
+            custom.fillOpacity = 20;
           })
         ]
       ];
