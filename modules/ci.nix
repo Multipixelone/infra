@@ -23,6 +23,7 @@ let
       download-attempts = 100
       accept-flake-config = true
       netrc-file = /etc/nix/netrc
+      access-tokens = github.com=''${{ secrets.GH_TOKEN_FOR_UPDATES }}
       substituters = ${substituters}
       trusted-public-keys = ${trustedKeys}
       min-free = 5368709120
