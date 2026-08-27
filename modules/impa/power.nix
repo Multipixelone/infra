@@ -1,11 +1,11 @@
 {
   configurations.nixos.impa.module = {
-    systemd.sleep.extraConfig = ''
-      AllowSuspend=no
-      AllowHibernation=no
-      AllowHybridSleep=no
-      AllowSuspendThenHibernate=no
-    '';
+    systemd.sleep.settings.Sleep = {
+      AllowSuspend = false;
+      AllowHibernation = false;
+      AllowHybridSleep = false;
+      AllowSuspendThenHibernate = false;
+    };
     services.logind.settings.Login = {
       IdleAction = "ignore";
       HandleLidSwitch = "ignore";
