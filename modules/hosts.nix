@@ -116,6 +116,18 @@ in
       homeAddress = "192.168.6.6";
       wireguard.ipv4Address = "10.100.0.1";
     };
+    impa = {
+      isNixOS = true;
+      roles = [
+        "server"
+        "edge"
+      ];
+      description = "NYC edge host";
+      readmeRole = "Server";
+      desktopWindowManager = "None";
+      homeAddress = "192.168.6.50";
+      notes = "DNS and ingress edge";
+    };
     zelda = {
       isNixOS = true;
       roles = [ "laptop" ];

@@ -14,6 +14,11 @@
     inputs = {
       nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
+      disko = {
+        url = "github:nix-community/disko";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
       # All four systems (incl. aarch64-darwin) so flake-utils-based inputs that
       # `follows = "systems"` (e.g. agenix) expose darwin packages. NOTE: this is
       # the *input*; the flake-parts perSystem list (modules/systems.nix) stays

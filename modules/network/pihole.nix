@@ -1,6 +1,7 @@
 { lib, config, ... }:
 let
   inherit (config) observability;
+  hostRegistry = config.hosts;
   hub = config.hosts.${observability.hubHost};
   privateDnsRecords =
     observability.endpoints
@@ -13,12 +14,14 @@ in
     flake = false;
   };
 
-  flake.modules.nixos.pc =
+  flake.modules.nixos.edge =
     { lib, config, ... }:
     let
       dnscryptPort = 6000;
       unboundPort = 5335;
       isObservabilityHub = config.networking.hostName == observability.hubHost;
+      isImpa = config.networking.hostName == "impa";
+      lanAddress = (hostRegistry.${config.networking.hostName} or { homeAddress = null; }).homeAddress;
     in
     {
       # Disable systemd-resolved to allow blocky to bind to port 53
@@ -103,19 +106,19 @@ in
             "127.0.0.1:53"
             "[::1]:53"
           ]
-          ++ lib.optionals isObservabilityHub [
-            "${hub.homeAddress}:53"
-            "${hub.wireguard.ipv4Address}:53"
-          ];
+          ++ lib.optional (lanAddress != null) "${lanAddress}:53"
+          ++ lib.optional isObservabilityHub "${hub.wireguard.ipv4Address}:53";
 
-          ports.http = lib.mkIf isObservabilityHub "127.0.0.1:${toString observability.endpoints.blocky.port}";
+          ports.http =
+            lib.mkIf (isObservabilityHub || isImpa)
+              "${if isImpa then lanAddress else "127.0.0.1"}:${toString observability.endpoints.blocky.port}";
 
           customDNS = lib.mkIf isObservabilityHub {
             customTTL = "5m";
             mapping = privateDnsRecords;
           };
 
-          prometheus.enable = isObservabilityHub;
+          prometheus.enable = isObservabilityHub || isImpa;
 
           upstreams.groups.default = [
             "127.0.0.1:${toString unboundPort}"
@@ -182,4 +185,8 @@ in
         wants = lib.optionals isObservabilityHub [ "wireguard-wg0.service" ];
       };
     };
+
+  flake.modules.nixos.pc = {
+    imports = [ config.flake.modules.nixos.edge ];
+  };
 }

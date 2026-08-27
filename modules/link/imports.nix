@@ -5,7 +5,6 @@
       efi
       pc
       gaming
-      cloudflared
     ];
   };
 }

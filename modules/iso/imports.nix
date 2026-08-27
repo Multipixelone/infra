@@ -24,5 +24,9 @@
       wifi
       pc
     ];
+    environment.systemPackages = [
+      inputs.disko.packages.x86_64-linux.disko
+      inputs.nixpkgs.legacyPackages.x86_64-linux.nixos-facter
+    ];
   };
 }
