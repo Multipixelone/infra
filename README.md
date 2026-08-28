@@ -101,7 +101,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`beets-plugins`](https://github.com/Multipixelone/infra/blob/main/modules/media/beets.nix) — Music tagger and library organizer · `nix run github:Multipixelone/infra#beets-plugins`
 - [`claude-status-line`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/status-line.nix) · `nix run github:Multipixelone/infra#claude-status-line`
 - [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
-- [`convert-mpc`](https://github.com/Multipixelone/infra/blob/main/modules/media/convert-mpc.nix) · `nix run github:Multipixelone/infra#convert-mpc`
+- `convert-mpc` · `nix run github:Multipixelone/infra#convert-mpc`
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
@@ -114,7 +114,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
-- [`musepack`](https://github.com/Multipixelone/infra/blob/main/modules/media/convert-mpc.nix) — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
+- `musepack` — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
 - [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A sleek, customizable desktop shell crafted for Wayland. · `nix run github:Multipixelone/infra#noctalia-shell`
 - [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
 - [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
