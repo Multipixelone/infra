@@ -27,7 +27,11 @@ in
     url = "github:catppuccin/foot";
     flake = false;
   };
-  perSystem.wrappers.packages.foot = true;
+  perSystem =
+    { pkgs, ... }:
+    {
+      wrappers.packages.foot = pkgs.stdenv.hostPlatform.isLinux;
+    };
   flake.wrappers.foot =
     { pkgs, wlib, ... }:
     {
