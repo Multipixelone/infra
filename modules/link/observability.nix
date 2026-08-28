@@ -15,6 +15,13 @@ let
   localCutover = config.servicePublication.rollout.enableLocalCutover;
   grafanaCanonical = serviceInventory.applications.grafana.canonical;
   homepageCanonical = serviceInventory.applications.homepage.canonical;
+  # Each of these servers binds a single address, so it has to be the one the
+  # generated proxy dials. Reading it back from the inventory means a proxy
+  # move (link -> impa) flips loopback to the LAN address on its own, instead
+  # of binding the LAN address unconditionally and 502ing while link is still
+  # its own proxy.
+  homepageBindAddress = serviceInventory.routes."homepage/root".backendAddress;
+  grafanaBindAddress = serviceInventory.routes."grafana/root".backendAddress;
   # Homepage tiles come from the service-publication registry, so every
   # application registered there is listed automatically. Links use the
   # canonical hostname (blocky resolves it for every trusted client); the
@@ -62,7 +69,6 @@ let
   effectiveTrustedCidrs =
     if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
-  linkLanAddress = config.hosts.link.homeAddress;
   remoteNodeTargets = {
     impa = config.hosts.impa.homeAddress;
     iot = config.hosts.iot.homeAddress;
@@ -4279,7 +4285,7 @@ in
         openFirewall = false;
         settings = {
           server = {
-            http_addr = if localCutover then linkLanAddress else grafana.backendAddress;
+            http_addr = if localCutover then grafanaBindAddress else grafana.backendAddress;
             http_port = grafana.port;
             domain = if localCutover then grafanaCanonical else grafana.dnsName;
             root_url = "https://${if localCutover then grafanaCanonical else grafana.dnsName}/";
@@ -4613,7 +4619,7 @@ in
         ];
       };
       systemd.services.homepage-dashboard.environment.HOSTNAME =
-        if localCutover then linkLanAddress else homepage.backendAddress;
+        if localCutover then homepageBindAddress else homepage.backendAddress;
 
       home-manager.users.${username} = {
         home.packages = [ mcpGrafana ];
