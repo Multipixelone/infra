@@ -36,7 +36,20 @@ let
           description = "Whether this host is managed as a nix-darwin configuration.";
         };
         roles = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
+          # Closed vocabulary: a typo here would silently skip the role's module
+          # and still ship as a colmena deployment tag.
+          type = lib.types.listOf (
+            lib.types.enum [
+              "desktop"
+              "edge"
+              "laptop"
+              "mobile"
+              "nas"
+              "server"
+              "tablet"
+              "wsl"
+            ]
+          );
           default = [ ];
           description = "Roles or tags describing this host (e.g. desktop, laptop, server, mobile).";
         };

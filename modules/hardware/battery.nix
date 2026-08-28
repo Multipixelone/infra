@@ -8,6 +8,17 @@
     nixos.laptop = {
       imports = [
         # inputs.auto-cpufreq.nixosModules.default
+        (
+          { config, ... }:
+          {
+            assertions = [
+              {
+                assertion = config.systemd.sleep.settings.Sleep.HibernateDelaySec or null == "300s";
+                message = "laptop sleep policy: ${config.networking.hostName} must keep the 300s hibernate delay";
+              }
+            ];
+          }
+        )
       ];
       powerManagement = {
         enable = true;
