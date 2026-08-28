@@ -9,7 +9,6 @@
     { pkgs, ... }:
     {
       packages = {
-        lossywav = pkgs.callPackage "${rootPath}/pkgs/lossywav" { };
         beets-lossyflac = pkgs.writers.writeFishBin "beets-lossyflac" ''
           set query $argv[1]
 
@@ -18,6 +17,9 @@
           # not entirely sure why i have to run it twice, but it only works the second time for some reason.
           beet convert -y -a -f lossyflac -k -d ~/tmpTranscoded $query
         '';
+      }
+      // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+        lossywav = pkgs.callPackage "${rootPath}/pkgs/lossywav" { };
         # lossyflac converter for super-duper transparent lossy archival
         convert-lossyflac =
           let
@@ -46,7 +48,7 @@
     {
       home.packages = [
         beets-lossyflac
-        convert-lossyflac
-      ];
+      ]
+      ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ convert-lossyflac ];
     };
 }
