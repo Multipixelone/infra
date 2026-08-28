@@ -48,20 +48,32 @@
           };
       };
       # https://www.reddit.com/r/NixOS/comments/u0cdpi/tuigreet_with_xmonad_how/
-      systemd.services.greetd.serviceConfig = lib.mkMerge [
-        {
-          Type = "idle";
-          StandardError = "journal";
-        }
-        # TTY settings are only needed for direct VT greeters (link autologin).
-        # cage manages its own display, so these interfere with VT handoff to Hyprland.
-        (lib.mkIf (config.networking.hostName == "link") {
-          StandardInput = "tty";
-          StandardOutput = "tty";
-          TTYReset = true;
-          TTYVHangup = true;
-          TTYVTDisallocate = true;
-        })
-      ];
+      systemd.services.greetd = {
+        # services.greetd.restart defaults to false whenever initial_session is
+        # set, so on link a compositor crash left the machine with no graphical
+        # login until someone started greetd by hand. Bound the autologin loop
+        # instead: five tries in five minutes, then give up and leave a TTY.
+        startLimitIntervalSec = lib.mkIf (config.networking.hostName == "link") 300;
+        startLimitBurst = lib.mkIf (config.networking.hostName == "link") 5;
+        serviceConfig = lib.mkMerge [
+          {
+            Type = "idle";
+            StandardError = "journal";
+          }
+          # TTY settings are only needed for direct VT greeters (link autologin).
+          # cage manages its own display, so these interfere with VT handoff to Hyprland.
+          (lib.mkIf (config.networking.hostName == "link") {
+            StandardInput = "tty";
+            StandardOutput = "tty";
+            TTYReset = true;
+            TTYVHangup = true;
+            TTYVTDisallocate = true;
+            # "always", not the module's "on-success": Hyprland getting OOM-killed
+            # exits with a failure status, which is exactly the case to recover from.
+            Restart = "always";
+            RestartSec = "2s";
+          })
+        ];
+      };
     };
 }
