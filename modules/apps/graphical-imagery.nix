@@ -8,7 +8,7 @@
         gimp
         imagemagick
         imv
-        inkscape
+        # inkscape
         jpeginfo
         wl-color-picker
       ];
