@@ -9,7 +9,7 @@
     {
       age.secrets."n8n".file = "${inputs.secrets}/ai/n8n.age";
       services.n8n = {
-        enable = true;
+        enable = false;
         openFirewall = true;
         environment = {
           N8N_SECURE_COOKIE = false;
