@@ -39,6 +39,33 @@
         platforms = platforms.all;
       };
     };
+    "tree-style-tab" = buildMozillaXpiAddon {
+      pname = "tree-style-tab";
+      version = "4.4.3";
+      addonId = "treestyletab@piro.sakura.ne.jp";
+      url = "https://addons.mozilla.org/firefox/downloads/file/4985978/tree_style_tab-4.4.3.xpi";
+      sha256 = "5d4d2a7ec7e3027d8e8e4e0b3d8a0355070267fbda8c927dfaeb0fd3b7cb09c8";
+      meta = with lib;
+      {
+        homepage = "http://piro.sakura.ne.jp/xul/_treestyletab.html.en";
+        description = "Show tabs like a tree.";
+        mozPermissions = [
+          "activeTab"
+          "contextualIdentities"
+          "cookies"
+          "menus"
+          "menus.overrideContext"
+          "notifications"
+          "search"
+          "sessions"
+          "storage"
+          "tabGroups"
+          "tabs"
+          "theme"
+        ];
+        platforms = platforms.all;
+      };
+    };
     "youtube-popout-player" = buildMozillaXpiAddon {
       pname = "youtube-popout-player";
       version = "5.2.2";

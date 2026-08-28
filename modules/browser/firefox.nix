@@ -41,7 +41,7 @@
           fastforwardteam
           facebook-container
           # ui
-          tree-style-tab
+          customAddons."tree-style-tab"
           # utility
           darkreader
           zotero-connector
