@@ -300,15 +300,15 @@ in
               .metadata.schemaVersion == 1 and
               .metadata.containsSecrets == false and
               .errors == [] and
-              (.blockyRecords["grafana.nyc.finnrut.is"] == "192.168.6.50") and
+              (.blockyRecords["grafana.nyc.finnrut.is"] == "192.168.6.6") and
               (.applications.plex.public == false) and
               (.applications.plex.canonical == "plex.nyc.finnrut.is") and
               (.routes["plex/root"].health.path == "/identity") and
-              (.sites.nyc.internalDnsHosts == ["impa", "link"]) and
-              (.sites.nyc.publicIngressHost == "impa") and
+              (.sites.nyc.internalDnsHosts == ["link"]) and
+              (.sites.nyc.publicIngressHost == "link") and
               (.cloudflare.tunnel.connectorHosts.nyc == ["link", "impa"]) and
-              (([.internalProbes[].resolverAddress] | unique | sort) == (["192.168.6.50", "192.168.6.6"] | sort)) and
-              ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
+              (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.6"]) and
+              ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 1) and
               (.cloudflare.dnsRecords | keys == ["seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
