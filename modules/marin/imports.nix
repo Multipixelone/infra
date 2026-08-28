@@ -4,7 +4,6 @@
     imports = with config.flake.modules.nixos; [
       efi
       wifi
-      base
       media
     ];
   };

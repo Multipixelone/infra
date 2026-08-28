@@ -10,7 +10,7 @@ let
   # Compare like for like in both directions: only the keys the policy owns.
   policyKeysIn = nixos: lib.intersectAttrs sleepPolicy nixos.systemd.sleep.settings.Sleep;
   nixosHosts = lib.filterAttrs (_: host: host.isNixOS) config.hosts;
-  isServer = host: lib.elem "server" host.roles;
+  nonServerHosts = lib.filterAttrs (_: host: !(lib.elem "server" host.roles)) nixosHosts;
 
   nonServerGuard =
     { config, ... }:
@@ -25,8 +25,8 @@ let
 in
 {
   flake.modules.nixos.server = {
-    systemd.sleep.settings.Sleep = sleepPolicy;
     imports = [
+      config.flake.modules.nixos.base
       (
         { config, ... }:
         {
@@ -39,13 +39,8 @@ in
         }
       )
     ];
+    systemd.sleep.settings.Sleep = sleepPolicy;
   };
 
-  configurations.nixos = lib.mapAttrs (
-    _: host:
-    if isServer host then
-      { module.imports = [ config.flake.modules.nixos.server ]; }
-    else
-      { module = nonServerGuard; }
-  ) nixosHosts;
+  configurations.nixos = lib.mapAttrs (_: _: { module = nonServerGuard; }) nonServerHosts;
 }
