@@ -319,7 +319,7 @@
       url = "github:bashonly/yt-dlp-YTNSigDeno";
       flake = false;
     };
-    zjstatus.url = "github:dj95/zjstatus";
+    zjstatus.url = "github:Multipixelone/zjstatus/nix-build";
     zjstatus-hints = {
       url = "github:b0o/zjstatus-hints";
       inputs.rust-overlay.follows = "monocle/rust-overlay";
