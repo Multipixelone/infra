@@ -30,25 +30,29 @@
       };
     in
     {
-      # Env file with TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID. Moved here from
-      # modules/link/deadman.nix so all pc hosts (link + zelda) can alert; the
-      # .age is already encrypted to every system key. deadman.nix still
-      # references it by name.
-      age.secrets."telegram-deadman" = {
-        file = "${inputs.secrets}/ai/telegram-deadman.age";
-        owner = "tunnel";
-        group = "users";
-        mode = "0400";
-      };
+      # The unit reads the secret's .path, so it has to be suppressed with the
+      # declaration on installer media rather than left dangling.
+      config = lib.mkIf (!config.infra.installerMedia) {
+        # Env file with TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID. Moved here from
+        # modules/link/deadman.nix so all pc hosts (link + zelda) can alert; the
+        # .age is already encrypted to every system key. deadman.nix still
+        # references it by name.
+        age.secrets."telegram-deadman" = {
+          file = "${inputs.secrets}/ai/telegram-deadman.age";
+          owner = "tunnel";
+          group = "users";
+          mode = "0400";
+        };
 
-      systemd.services."notify-telegram@" = {
-        description = "Telegram alert for failed unit %i";
-        serviceConfig = {
-          Type = "oneshot";
-          # systemd reads EnvironmentFile as root, so the tunnel-owned 0400
-          # secret works for this root-run unit.
-          EnvironmentFile = config.age.secrets."telegram-deadman".path;
-          ExecStart = "${lib.getExe notify-telegram} %i";
+        systemd.services."notify-telegram@" = {
+          description = "Telegram alert for failed unit %i";
+          serviceConfig = {
+            Type = "oneshot";
+            # systemd reads EnvironmentFile as root, so the tunnel-owned 0400
+            # secret works for this root-run unit.
+            EnvironmentFile = config.age.secrets."telegram-deadman".path;
+            ExecStart = "${lib.getExe notify-telegram} %i";
+          };
         };
       };
     };
