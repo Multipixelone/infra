@@ -143,6 +143,18 @@ args@{
           exec "$@"
         '';
       };
+      servicePublicationDeployTestSsh = pkgs.writeShellApplication {
+        name = "service-publication-test-ssh";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          : "''${SERVICE_PUBLICATION_TEST_SSH_LOG:?test ssh log is required}"
+          printf '%s\n' "$*" >> "$SERVICE_PUBLICATION_TEST_SSH_LOG"
+          if [[ ''${SERVICE_PUBLICATION_TEST_SSH_FAIL:-} == 1 ]]; then
+            exit 255
+          fi
+          printf '%s\n' "''${SERVICE_PUBLICATION_TEST_SSH_REVISION-}"
+        '';
+      };
       servicePublicationDeployTestCommand =
         name:
         pkgs.writeShellApplication {
@@ -171,6 +183,7 @@ args@{
         servicePublicationSmoke = servicePublicationDeployTestCommand "service-publication-smoke";
         servicePublicationTofu = servicePublicationDeployTestCommand "service-publication-tofu";
         servicePublicationValidate = servicePublicationDeployTestCommand "service-publication-validate";
+        sshCommand = lib.getExe servicePublicationDeployTestSsh;
         stateDir = ".service-publication-test-state";
       };
       servicePublicationPlanOnlyTestTool =
@@ -361,6 +374,118 @@ args@{
               echo "plan-only read or mutated revision state" >&2
               exit 1
             fi
+            touch "$out"
+          '';
+
+      checks.service-publication-applied-revision =
+        pkgs.runCommand "service-publication-applied-revision-check"
+          {
+            deploy = servicePublicationDeployTestTool;
+            nativeBuildInputs = [ pkgs.gitMinimal ];
+          }
+          ''
+            set -euo pipefail
+            mkdir -p source/infra/service-publication
+            cd source
+            git init --quiet
+            git config user.email test@example.invalid
+            git config user.name "Service Publication Test"
+            printf '%s\n' ${
+              lib.escapeShellArg (
+                builtins.toJSON {
+                  applications = { };
+                  routes = { };
+                  internalProbes = [ ];
+                  cloudflare.tunnel.ingressHost = { };
+                  hosts = {
+                    link = {
+                      managedByNixOS = true;
+                      capabilities = {
+                        reverseProxy = true;
+                        internalDns = true;
+                        publicConnector = true;
+                      };
+                    };
+                    iot = {
+                      managedByNixOS = true;
+                      capabilities = {
+                        reverseProxy = false;
+                        internalDns = false;
+                        publicConnector = false;
+                      };
+                    };
+                  };
+                }
+              )
+            } > infra/service-publication/registry.json
+            git add infra/service-publication/registry.json
+            git commit --quiet -m fixture
+
+            # What the generated /etc/service-publication/revision holds: the
+            # registry bytes without the trailing newline the file adds.
+            applied=$(head -c -1 infra/service-publication/registry.json | sha256sum | cut -d' ' -f1)
+            command_log="$PWD/commands.log"
+            privilege_log="$PWD/privilege.log"
+            smoke_count="$PWD/smoke-count"
+            ssh_log="$PWD/ssh.log"
+            export SERVICE_PUBLICATION_TEST_COMMAND_LOG="$command_log"
+            export SERVICE_PUBLICATION_TEST_PRIVILEGE_LOG="$privilege_log"
+            export SERVICE_PUBLICATION_TEST_SMOKE_COUNT="$smoke_count"
+            export SERVICE_PUBLICATION_TEST_SSH_LOG="$ssh_log"
+
+            reset_logs() {
+              rm -f "$command_log" "$privilege_log" "$smoke_count" "$ssh_log"
+            }
+
+            run_deploy() { "$deploy/bin/service-publication-deploy" "$@"; }
+
+            export SERVICE_PUBLICATION_BOOTSTRAP=1
+            run_deploy apply
+            unset SERVICE_PUBLICATION_BOOTSTRAP
+            if [[ $(grep -n -e 'colmena build' -e 'service-publication-tofu apply' "$command_log" |
+              head -n1) != *'colmena build'* ]]; then
+              echo "external state was touched before every host had been built" >&2
+              exit 1
+            fi
+
+            reset_logs
+            export SERVICE_PUBLICATION_TEST_SSH_REVISION="$applied"
+            run_deploy apply
+            grep -Fq colmena.link "$ssh_log"
+            if grep -Fq colmena.iot "$ssh_log"; then
+              echo "queried a host outside the service-publication deploy set" >&2
+              exit 1
+            fi
+
+            reset_logs
+            SERVICE_PUBLICATION_TEST_SSH_REVISION=0000
+            if run_deploy apply 2> drift.log; then
+              echo "apply classified additions and removals against a stale ledger" >&2
+              exit 1
+            fi
+            grep -Fq "link runs 0000" drift.log
+            if grep -Fq colmena "$command_log" || grep -Fq service-publication-tofu "$command_log"; then
+              echo "a drifting host built or deployed something" >&2
+              exit 1
+            fi
+
+            reset_logs
+            export SERVICE_PUBLICATION_IGNORE_HOST_REVISION=1
+            run_deploy apply
+            unset SERVICE_PUBLICATION_IGNORE_HOST_REVISION
+            grep -Fq 'colmena apply' "$command_log"
+
+            reset_logs
+            unset SERVICE_PUBLICATION_TEST_SSH_REVISION
+            run_deploy apply
+
+            reset_logs
+            export SERVICE_PUBLICATION_TEST_SSH_FAIL=1
+            if run_deploy apply; then
+              echo "apply proceeded without reading an applied revision" >&2
+              exit 1
+            fi
+
             touch "$out"
           '';
 
@@ -940,6 +1065,7 @@ args@{
             "service-publication-tofu"
             "service-publication-shell-applications"
             "service-publication-plan-only"
+            "service-publication-applied-revision"
             "service-publication-deploy-revision-state"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
