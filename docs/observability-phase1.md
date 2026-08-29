@@ -61,6 +61,13 @@ all host panels to that exporter. The 15%-free `RootDiskPressure` warning
 applies independently to every monitored host. Prometheus storage-growth
 forecasting remains scoped to Link because Link owns the telemetry store.
 
+Each service-publication route contributes one internal HTTPS probe to the
+endpoint dashboards and rolling SLO. The direct backend check used before the
+local cutover is not retained as a second `private` series for the same logical
+endpoint. `SloErrorBudgetExhausted` also requires the live probe to have a
+sample at the far edge of the seven-day window, so a new target cannot fire a
+seven-day-budget alert from only a partial first week of data.
+
 ## Privacy boundary
 
 Alloy drops journal entries carrying `_SYSTEMD_USER_UNIT` before they reach

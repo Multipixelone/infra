@@ -86,18 +86,22 @@ let
   sloClassFor =
     application:
     if (serviceInventory.applications.${application}.public or false) then "public" else "internal";
+  # After the service-publication cutover, its generated internal HTTPS probe
+  # is the user-visible health check. Keeping the old direct-backend probe as
+  # well made every logical endpoint appear once as internal and once as
+  # private, and counted both copies independently in the SLO.
+  internalProbeModule = if localCutover then "https_internal" else "http_internal";
   internalProbes =
     if localCutover then
-      map (route: {
-        targets = [
-          "${route.backend.scheme}://${route.backendAddress}:${toString route.backend.port}${route.health.path}"
-        ];
+      map (probe: {
+        targets = [ "https://${probe.canonical}${probe.path}" ];
         labels = {
-          endpoint = route.canonical;
+          endpoint = probe.canonical;
           scope = "internal";
-          slo_class = sloClassFor route.application;
+          slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
+          resolver = probe.resolverHost;
         };
-      }) (builtins.attrValues serviceInventory.routes)
+      }) serviceInventory.internalProbes
     else
       map (endpoint: {
         targets = [
@@ -111,17 +115,7 @@ let
       }) probedEndpoints;
   privateProbes =
     if localCutover then
-      map (probe: {
-        targets = [ "https://${probe.canonical}${probe.path}" ];
-        labels = {
-          endpoint = probe.canonical;
-          scope = "private";
-          # `internalProbes` entries carry the route key, not the
-          # application name.
-          slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
-          resolver = probe.resolverHost;
-        };
-      }) serviceInventory.internalProbes
+      [ ]
     else
       map (endpoint: {
         targets = [ "https://${endpoint.dnsName}${endpoint.probe.privatePath}" ];
@@ -2098,11 +2092,11 @@ let
                 expr = ''count(probe_success{scope="internal"})'';
                 legend = "Internal";
               }
-              {
-                expr = ''count(probe_success{scope="private"})'';
-                legend = "Private (TLS)";
-              }
-            ];
+            ]
+            ++ lib.optional (!localCutover) {
+              expr = ''count(probe_success{scope="private"})'';
+              legend = "Private (TLS)";
+            };
             unit = viz.units.none;
             decimals = 0;
             thresholds = [ { color = "text"; } ];
@@ -3745,7 +3739,7 @@ in
               follow_redirects = true;
             };
           };
-          https_private = {
+          https_internal = {
             prober = "http";
             timeout = "8s";
             http = {
@@ -3804,7 +3798,9 @@ in
             rules = [
               {
                 record = "endpoint:availability_7d";
-                expr = "avg_over_time(probe_success[${observability.slo.window}])";
+                # A removed probe otherwise keeps producing a rolling value
+                # until its last sample ages out of the range vector.
+                expr = "avg_over_time(probe_success[${observability.slo.window}]) and probe_success";
               }
               {
                 record = "endpoint:error_budget_remaining_7d";
@@ -3812,7 +3808,7 @@ in
               }
               {
                 record = "endpoint:latency_p95_7d";
-                expr = "quantile_over_time(0.95, probe_duration_seconds[${observability.slo.window}])";
+                expr = "quantile_over_time(0.95, probe_duration_seconds[${observability.slo.window}]) and probe_duration_seconds";
               }
             ];
           }
@@ -3934,7 +3930,11 @@ in
               }
               {
                 alert = "SloErrorBudgetExhausted";
-                expr = "endpoint:error_budget_remaining_7d < 0";
+                # Do not call a partial range a seven-day SLO. Requiring the
+                # same live probe at the far edge of the window also prevents
+                # newly added targets from exhausting their budget during
+                # their first week.
+                expr = "endpoint:error_budget_remaining_7d < 0 and probe_success offset ${observability.slo.window}";
                 for = "15m";
                 labels.severity = "critical";
                 annotations.summary = "{{ $labels.endpoint }} exhausted its 99% seven-day error budget";
@@ -4448,15 +4448,15 @@ in
           })
           (mkBlackboxScrape {
             name = "internal";
-            module = "http_internal";
+            module = internalProbeModule;
             targets = internalProbes;
           })
-          (mkBlackboxScrape {
-            name = "private";
-            module = "https_private";
-            targets = privateProbes;
-          })
-        ];
+        ]
+        ++ lib.optional (!localCutover) (mkBlackboxScrape {
+          name = "private";
+          module = "https_internal";
+          targets = privateProbes;
+        });
         exporters = {
           node = {
             enable = true;
