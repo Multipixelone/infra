@@ -36,9 +36,16 @@ let
   buildFilePath = ".github/workflows/${buildFilename}";
   nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
   nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
+  updateLockFilename = "update-lock.yml";
+  updateLockFilePath = ".github/workflows/${updateLockFilename}";
 
   evalWorkflowName = "Eval";
   buildWorkflowName = "Build";
+  updateLockWorkflowName = "Update flake inputs";
+
+  # `configurations/nixos/iso` builds an installer image nothing deploys, so it
+  # only earns a runner slot when someone is about to reinstall a host.
+  dispatchOnlyChecks = [ "configurations/nixos/iso" ];
 
   ids = {
     jobs = {
@@ -161,9 +168,13 @@ let
   };
 
   # Shared nix-fast-build invocation for a check matrix entry on a given flake
-  # system. Tries the attic-cached path first, then retries without attic if the
-  # cache upload fails. Parametrised by system so the same recipe serves the
-  # x86_64 and aarch64 build jobs.
+  # system. Parametrised by system so the same recipe serves the x86_64 and
+  # aarch64 build jobs.
+  #
+  # There is deliberately no `|| retry-without-attic` fallback: it fired on ANY
+  # non-zero exit, so an eval error or a failed NixOS assertion was reported as
+  # "Attic upload failed" and then re-run to produce the identical failure.
+  # `--retries 2` already covers the transient cache errors it was meant to.
   mkNixFastBuild = flakeSystem: ''
     nix run github:Mic92/nix-fast-build -- \
       --skip-cached \
@@ -174,17 +185,7 @@ let
       --eval-max-memory-size 2048 \
       --retries 2 \
       --no-link \
-      --flake '.#checks.${flakeSystem}."''${{ matrix.${matrixParam} }}"' \
-    || { echo "::warning::Attic upload failed, retrying without attic cache"; \
-         nix run github:Mic92/nix-fast-build -- \
-           --skip-cached \
-           --no-nom \
-           -j 2 \
-           --eval-workers 2 \
-           --eval-max-memory-size 2048 \
-           --retries 2 \
-           --no-link \
-           --flake '.#checks.${flakeSystem}."''${{ matrix.${matrixParam} }}"'; }
+      --flake '.#checks.${flakeSystem}."''${{ matrix.${matrixParam} }}"'
   '';
 
   ciFilename = "ci.yml";
@@ -219,7 +220,8 @@ in
       ''
         <div align="center">
 
-        [![Eval](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/eval.yaml?branch=${defaultBranch}&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/eval.yaml?query=branch%3A${defaultBranch})
+        [![Eval](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/${evalFilename}?branch=${defaultBranch}&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/${evalFilename}?query=branch%3A${defaultBranch})
+        [![Build](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/${buildFilename}?branch=${defaultBranch}&style=for-the-badge&logo=github&label=build&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/${buildFilename}?query=branch%3A${defaultBranch})
         [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3A${defaultBranch})
 
         </div>
@@ -283,7 +285,10 @@ in
             path = buildFilePath;
             drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
               name = buildWorkflowName;
-              on.push = { };
+              on = {
+                push = { };
+                workflow_dispatch = { };
+              };
               jobs = {
                 ${ids.jobs.getCheckNames} = {
                   runs-on = runner.name;
@@ -306,8 +311,12 @@ in
                       id = ids.steps.getCheckNames;
                       run = ''
                         all_checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
+                        nixos_checks="$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')"
+                        if [ "''${{ github.event_name }}" != workflow_dispatch ]; then
+                          nixos_checks="$(echo "$nixos_checks" | jq -c --argjson skip '${builtins.toJSON dispatchOnlyChecks}' 'map(select(IN($skip[]) | not))')"
+                        fi
                         echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
-                        echo "${ids.outputs.steps.getCheckNamesNixos}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')" >> $GITHUB_OUTPUT
+                        echo "${ids.outputs.steps.getCheckNamesNixos}=$nixos_checks" >> $GITHUB_OUTPUT
                         aarch64_checks="$(nix ${nixArgs} eval --json .#checks.${aarch64Runner.system} --apply builtins.attrNames)"
                         echo "${ids.outputs.steps.getCheckNamesAarch64}=$aarch64_checks" >> $GITHUB_OUTPUT
                       '';
@@ -316,6 +325,9 @@ in
                 };
 
                 ${ids.jobs.check} = {
+                  # Package cells only. Several are genuinely flaky (upstream
+                  # fetchers, IFD), so they stay advisory; the host toplevels in
+                  # check-nixos are the ones allowed to turn the run red.
                   continue-on-error = true;
                   needs = ids.jobs.getCheckNames;
                   runs-on = runner.name;
@@ -340,13 +352,18 @@ in
                 };
 
                 ${ids.jobs.checkNixos} = {
-                  continue-on-error = true;
-                  needs = [
-                    ids.jobs.getCheckNames
-                    ids.jobs.check
-                  ];
+                  # No continue-on-error: a host toplevel that fails to build is
+                  # the one thing this workflow exists to catch. fail-fast below
+                  # keeps the sibling hosts running anyway, so a red cell is
+                  # per-host rather than a cancelled matrix.
+                  #
+                  # Deliberately NOT gated on the `check` job: queueing 7 host
+                  # closures behind a ~74-entry package matrix at max-parallel 5
+                  # delayed the first host cell by 3.5h and got link and zelda
+                  # cancelled at the timeout without ever reaching attic.
+                  needs = ids.jobs.getCheckNames;
                   runs-on = runner.name;
-                  timeout-minutes = 180;
+                  timeout-minutes = 350;
                   strategy = {
                     fail-fast = false;
                     max-parallel = 5;
@@ -367,6 +384,8 @@ in
                 };
 
                 ${ids.jobs.checkAarch64} = {
+                  # Same package subset as `check`, on ARM: portability
+                  # information, not a deployment gate. Stays advisory.
                   continue-on-error = true;
                   needs = ids.jobs.getCheckNames;
                   runs-on = aarch64Runner.name;
@@ -389,6 +408,64 @@ in
                     }
                   ];
                 };
+              };
+            };
+          }
+          {
+            # Generated rather than hand-written so the scheduled lock bump
+            # shares the eval/build credential setup. The hand-written version
+            # installed Determinate Nix, which could not fetch the private
+            # `git+https://` inputs however the token was presented, and every
+            # scheduled run from 2026-08-19 onwards died on a prem-tweet 404.
+            path = updateLockFilePath;
+            drv = pkgs.writers.writeJSON "gh-actions-workflow-update-lock.yaml" {
+              name = updateLockWorkflowName;
+              on = {
+                workflow_dispatch = { };
+                schedule = [ { cron = "0 0 1-31/3 * *"; } ];
+              };
+              jobs.update-flake-lock = {
+                runs-on = runner.name;
+                steps = [
+                  steps.removeUnusedSoftware
+                  steps.checkout
+                  steps.createAtticNetrc
+                  steps.nixInstaller
+                  steps.installSshKey
+                  {
+                    name = "Update flake.lock";
+                    run = "nix ${nixArgs} flake update";
+                  }
+                  {
+                    # Mirror `just update`: keep the pinned Firefox addons in
+                    # lockstep with the flake bump so the automated PR doesn't
+                    # drift from a manual update.
+                    name = "Update Firefox addons";
+                    run = ''
+                      nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
+                        --option allow-import-from-derivation true \
+                        -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
+                    '';
+                  }
+                  {
+                    # No build step here on purpose: pushing the branch triggers
+                    # the Build workflow, which is the real gate.
+                    name = "Create pull request";
+                    uses = "peter-evans/create-pull-request@v8";
+                    "with" = {
+                      token = "\${{ secrets.GH_TOKEN_FOR_UPDATES }}";
+                      branch = "update_flake_lock_action";
+                      title = "chore: update flake.lock";
+                      commit-message = "⚙️ bump flake.lock";
+                      assignees = repo.owner;
+                      labels = "automated";
+                      add-paths = ''
+                        flake.lock
+                        pkgs/firefox-addons/generated.nix
+                      '';
+                    };
+                  }
+                ];
               };
             };
           }
@@ -549,6 +626,7 @@ in
         evalFilePath
         buildFilePath
         nixpkgsAgeFilePath
+        updateLockFilePath
         ciFilePath
       ];
     };
