@@ -24,9 +24,20 @@
       wifi
       pc
     ];
-    environment.systemPackages = [
-      inputs.disko.packages.x86_64-linux.disko
-      inputs.nixpkgs.legacyPackages.x86_64-linux.nixos-facter
-    ];
+    environment.systemPackages =
+      let
+        pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+      in
+      [
+        # disko's package.nix still reads the deprecated stdenv.isDarwin alias.
+        # This flake sets abort-on-warn, so that warning aborts the ISO build -
+        # hand disko a stdenv where the alias is a plain bool instead.
+        (inputs.disko.packages.x86_64-linux.disko.override {
+          stdenv = pkgs.stdenv // {
+            inherit (pkgs.stdenv.hostPlatform) isDarwin;
+          };
+        })
+        pkgs.nixos-facter
+      ];
   };
 }
