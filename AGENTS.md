@@ -13,10 +13,31 @@ runners; no hosts are aarch64). Declared in `modules/systems.nix`.
 - `just update` — update flake lock + firefox addons
 - `just fastb` — `nix-fast-build` + attic push
 - `just iso` — build installer ISO
+- `just install <host> <ip>` — install a declared host onto bare metal via `nix run .#nixos-anywhere` (see [`docs/new-host.md`](docs/new-host.md))
 - `just gc` — garbage collect + wipe old generations
 - `nix flake check` — run all checks (CI does this too)
 
 **NEVER use bare `nix build` or `nixos-rebuild`.**
+
+Every node carries its own name as a colmena tag alongside its roles, so `--on @<host>` targets a single machine (`just colmena-apply-tag iot`) and `--on @server` targets a role.
+
+### Deploy key (`~/.ssh/colmena`)
+
+Colmena authenticates to `root@` on every node with `~/.ssh/colmena`. Only the **public** half is in this repo — `modules/ssh.nix` pins it as the sole entry in `users.users.root.openssh.authorizedKeys.keys`. The private half is deliberately outside nix and outside agenix: it is the credential that bootstraps access to the hosts that hold the agenix identities, so storing it in a secret those hosts decrypt would be circular.
+
+Consequence: after a workstation rebuild, home-manager restores `~/.ssh/config` (the generated `colmena.<host>` blocks) but **not** the key, and every `just colmena-apply` fails with `Permission denied (publickey)`. Restore it by hand from your password manager / offline backup to `~/.ssh/colmena`, `chmod 600`, then retry.
+
+Rotation, in this order — the overlap step is what keeps you from locking yourself out:
+
+1. Generate the new keypair; keep the old one in place.
+2. Append the new public key to `users.users.root.openssh.authorizedKeys.keys` in `modules/ssh.nix`. It is a merging `listOf str`, so both keys coexist.
+3. `just colmena-apply` with the **old** key still active.
+4. Swap `~/.ssh/colmena` to the new private key and prove it works against every node.
+5. Only then remove the old entry and `just colmena-apply` again.
+
+Rotating an **agenix** recipient is a separate procedure: edit `secrets.nix` in the private `nix-secrets` repo, run `agenix -r` to re-encrypt every secret to the current recipients, then bump the pin here with `nix flake update secrets` and commit `flake.lock`. Until that lock bump lands, deploys still ship the old ciphertext.
+
+Adding a new machine end to end: [`docs/new-host.md`](docs/new-host.md).
 
 ## Key Files
 
@@ -59,8 +80,11 @@ Consume in home-manager: `withSystem pkgs.stdenv.hostPlatform.system (ps: ps.con
 
 ## Hosts
 
-Zelda characters: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server).
-Each has: `imports.nix`, `facter.nix`, `hardware-configuration.nix`, `hostname.nix`, `state-version.nix`.
+Zelda characters. NixOS: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server), `minish` (NixOS-WSL under Windows), `impa` (NYC edge server — **declared and evaluating, not yet installed on hardware**; see [`docs/impa-edge-bootstrap-cutover.md`](docs/impa-edge-bootstrap-cutover.md)). Also `hylia` (nix-darwin) and `alexandria` (Synology NAS, standalone home-manager).
+
+Registry: `modules/hosts.nix` — one entry per host, including non-NixOS devices. `roles` there is a closed enum that both injects modules (`modules/roles.nix`) and becomes colmena tags (`modules/deployment-tags.nix`).
+
+Per-host files under `modules/<host>/`: `imports.nix`, `hostname.nix`, `state-version.nix`, and `facter.nix` (+ its generated `facter.json`), plus `hardware-configuration.nix` on the bare-metal hosts — `minish` gets its hardware from NixOS-WSL instead. `impa` carries neither yet: it has `disko.nix`, a declarative layout gated on an installer-supplied `/dev/disk/by-id` path, and an architecture-only bootstrap `facter.nix` to be replaced by a real report at install time.
 
 ## Secrets
 
