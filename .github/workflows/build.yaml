@@ -196,7 +196,7 @@
         },
         {
           "id": "get-check-names",
-          "run": "all_checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\nnixos_checks=\"$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\"\nif [ \"${{ github.event_name }}\" != workflow_dispatch ]; then\n  nixos_checks=\"$(echo \"$nixos_checks\" | jq -c --argjson skip '[\"configurations/nixos/iso\"]' 'map(select(IN($skip[]) | not))')\"\nfi\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$nixos_checks\" >> $GITHUB_OUTPUT\naarch64_checks=\"$(nix --accept-flake-config eval --json .#checks.aarch64-linux --apply builtins.attrNames)\"\necho \"checks-aarch64=$aarch64_checks\" >> $GITHUB_OUTPUT\n"
+          "run": "all_checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\nnixos_checks=\"$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\"\nif [ \"${{ github.event_name }}\" != workflow_dispatch ]; then\n  nixos_checks=\"$(echo \"$nixos_checks\" | jq -c --argjson skip '[\"configurations/nixos/iso\",\"configurations/nixos/impa\"]' 'map(select(IN($skip[]) | not))')\"\nfi\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$nixos_checks\" >> $GITHUB_OUTPUT\naarch64_checks=\"$(nix --accept-flake-config eval --json .#checks.aarch64-linux --apply builtins.attrNames)\"\necho \"checks-aarch64=$aarch64_checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }

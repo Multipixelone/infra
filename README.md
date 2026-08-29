@@ -12,6 +12,7 @@
 <div align="center">
 
 [![Eval](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/eval.yaml?branch=main&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/eval.yaml?query=branch%3Amain)
+[![Build](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/build.yaml?branch=main&style=for-the-badge&logo=github&label=build&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/build.yaml?query=branch%3Amain)
 [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3Amain)
 
 </div>
@@ -58,19 +59,23 @@ Task execution is managed via `just`.
 |---|---|
 | `just rebuild` | Local system rebuild (uses `nh os switch`). |
 | `just deploy` | Rebuild and push closures to the Attic binary cache. |
-| `just colmena-apply` | Deploy configurations to remote hosts via Colmena. |
+| `just colmena-apply <host>` | Deploy one host via Colmena. Host names are tags, so any node name works. |
+| `just colmena-apply-servers` | Deploy every always-on server (`@server`) in one run. |
 | `just colmena-apply-tag <tag>` | Deploy configurations to a specific Colmena tag. |
-| `just deploy-services` | See Justfile recipe. |
-| `just services-smoke` | See Justfile recipe. |
-| `just services-tofu` | See Justfile recipe. |
-| `just minishb` | Build selected hosts and push resulting closures. |
+| `just colmena-build <host>` | Build one host's closure locally without touching the machine. |
+| `just colmena-dry <host>` | Dry-activate on the target: report what would start, stop or restart. |
+| `just colmena-diff <host>` | Diff the target's running closure against a freshly built one via `nvd`. |
+| `just deploy-services [mode] [routes]` | Fail-closed split-DNS and service publication deployment. |
+| `just services-smoke [context] [routes]` | Smoke-test published service routes from a given network context. |
+| `just services-tofu [action]` | Run the service publication OpenTofu workspace. |
 | `just fastb` | Fast build with `nix-fast-build` and Attic cache upload. |
-| `just hm-build` | See Justfile recipe. |
-| `just hm-deploy` | See Justfile recipe. |
+| `just hm-build <host>` | Build a standalone Home Manager activation package locally. |
+| `just hm-deploy <host> [remote_nix_bindir]` | Build, copy and activate a Home Manager closure over SSH. |
 | `just iso` | Build an installer ISO. |
-| `just darwin-switch` | See Justfile recipe. |
-| `just darwin-perms` | See Justfile recipe. |
-| `just darwin-bootstrap` | See Justfile recipe. |
+| `just install <host> <ssh_target>` | Install NixOS onto a machine booted into the installer, via nixos-anywhere. |
+| `just darwin-switch [host]` | Activate a nix-darwin host. Run on the Mac itself. |
+| `just darwin-perms` | Re-grant macOS Accessibility and Input Monitoring to the hotkey daemon. |
+| `just darwin-bootstrap [host]` | First-time nix-darwin activation on a fresh Mac. |
 | `just debug` | Run rebuild with `--show-trace` for debugging. |
 | `just update` | Update flake lockfile and Firefox addons. |
 | `just update-flake` | Update flake lockfile inputs. |
@@ -164,6 +169,7 @@ using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 - `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.github/workflows/service-publication.yaml`
+- `.github/workflows/update-lock.yml`
 - `.gitignore`
 - `.gitleaks.toml`
 - `README.md`

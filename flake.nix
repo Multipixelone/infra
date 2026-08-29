@@ -93,7 +93,7 @@
       flake = false;
     };
     colmena = {
-      url = "github:zhaofengli/colmena";
+      url = "github:zhaofengli/colmena/main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     commutecompass.url = "github:Multipixelone/commutecompass";
