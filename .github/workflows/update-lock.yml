@@ -1,56 +1,66 @@
-name: Update flake inputs
-on:
-  workflow_dispatch: # allow manual triggering
-  schedule:
-    - cron: "0 0 1-31/3 * *" # runs every third day
-jobs:
-  update-flake-lock:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
-        with:
-          extra-conf: |
-            accept-flake-config = true
-            auto-optimise-store = true
-            access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}
-      - name: Install SSH Key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      # Private `git+https://github.com/...` inputs (prem-tweet) authenticate
-      # over the git transport, not via access-tokens. Mirrors the rewrite the
-      # generated eval/build workflows install (modules/ci.nix).
-      - name: Authenticate git to GitHub
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com".insteadOf https://github.com
-          # Nix spawns git with a sanitized HOME, so --global is invisible to
-          # it; GIT_CONFIG_* env vars ride through the environment instead.
-          {
-            echo "GIT_CONFIG_COUNT=1"
-            echo "GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf"
-            echo "GIT_CONFIG_VALUE_0=https://github.com/"
-          } >> "$GITHUB_ENV"
-      - name: Update flake.lock
-        run: nix flake update
-      # Mirror `just update`: keep the pinned Firefox addons in lockstep with the
-      # flake bump so the automated PR doesn't drift from a manual update.
-      - name: Update Firefox addons
-        run: |
-          nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
-            --option allow-import-from-derivation true \
-            -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
-      - name: Create pull request
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
-          branch: update_flake_lock_action
-          title: "chore: update flake.lock"
-          commit-message: "⚙️ bump flake.lock"
-          assignees: Multipixelone
-          labels: automated
-          add-paths: |
-            flake.lock
-            pkgs/firefox-addons/generated.nix
+{
+  "jobs": {
+    "update-flake-lock": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Remove unused toolkits",
+          "run": "sudo rm -rf $AGENT_TOOLSDIRECTORY\nsudo rm -rf /usr/local/.ghcup\nsudo rm -rf /usr/local/share/powershell\nsudo rm -rf /usr/local/share/chromium\nsudo rm -rf /usr/local/lib/node_modules\nsudo rm -rf /usr/local/lib/heroku\nsudo rm -rf /var/lib/docker/overlay2\nsudo rm -rf /home/linuxbrew\nsudo rm -rf /home/runner/.rustup\nsudo rm -rf /etc/ssh/sshd_config.d/50-cloud-init.conf\n"
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "submodules": true
+          }
+        },
+        {
+          "name": "Create attic netrc",
+          "run": "sudo mkdir -p /etc/nix /etc/determinate\necho \"machine attic-cache.fly.dev login automated password ${{ secrets.ATTIC_KEY }}\" | sudo tee /etc/nix/netrc > /dev/null\necho '{\"authentication\":{\"additionalNetrcSources\":[\"/etc/nix/netrc\"]}}' | sudo tee /etc/determinate/config.json > /dev/null\n# `x-access-token:<pat>` form, not `<pat>@` — GitHub accepts a bare\n# token as the username only for CLASSIC PATs; a fine-grained PAT must\n# arrive as the PASSWORD or the clone 404s as \"Repository not found\".\ngit config --global url.\"https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com\".insteadOf https://github.com\n# Nix's git fetcher (private `git+https://` inputs, e.g. prem-tweet)\n# spawns git with a sanitized HOME, so the --global rewrite above is\n# invisible to it. GIT_CONFIG_* env vars ride through the environment\n# instead; $GITHUB_ENV exports them to every later step in the job.\n{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n"
+        },
+        {
+          "uses": "nixbuild/nix-quick-install-action@v35",
+          "with": {
+            "nix_conf": "fallback = true\nhttp-connections = 25\nmax-substitution-jobs = 16\nconnect-timeout = 15\nstalled-download-timeout = 15\ndownload-attempts = 100\naccept-flake-config = true\nnetrc-file = /etc/nix/netrc\naccess-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\nsubstituters = https://yazi.cachix.org https://helix.cachix.org https://cache.nixos.org https://attic-cache.fly.dev/system?priority=50 https://nix-community.cachix.org https://hyprland.cachix.org https://anyrun.cachix.org https://prismlauncher.cachix.org https://nix-gaming.cachix.org\ntrusted-public-keys = yazi.cachix.org-1:Dcdz63NZKfvUCbDGngQDAZq6kOroIrFoyO064uvLh8k= helix.cachix.org-1:ejp9KQpR1FBI2onstMQ34yogDm4OgU2ru6lIwPvuCVs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= system:qjMAtak3MMVYM2B3EoLvNG9duRTrjdNS65RTagsr+y4= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= anyrun.cachix.org-1:pqBobmOjI7nKlsUMV25u9QHa9btJK65/C8vnO3p346s= prismlauncher.cachix.org-1:9/n/FGyABA2jLUVfY+DEp4hKds/rwO+SCOtbOkDzd+c= nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=\nmin-free = 5368709120\nmax-free = 16106127360\n"
+          }
+        },
+        {
+          "name": "Install SSH key",
+          "uses": "webfactory/ssh-agent@v0.9.0",
+          "with": {
+            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
+          }
+        },
+        {
+          "name": "Update flake.lock",
+          "run": "nix --accept-flake-config flake update"
+        },
+        {
+          "name": "Update Firefox addons",
+          "run": "nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \\\n  --option allow-import-from-derivation true \\\n  -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix\n"
+        },
+        {
+          "name": "Create pull request",
+          "uses": "peter-evans/create-pull-request@v8",
+          "with": {
+            "add-paths": "flake.lock\npkgs/firefox-addons/generated.nix\n",
+            "assignees": "Multipixelone",
+            "branch": "update_flake_lock_action",
+            "commit-message": "⚙️ bump flake.lock",
+            "labels": "automated",
+            "title": "chore: update flake.lock",
+            "token": "${{ secrets.GH_TOKEN_FOR_UPDATES }}"
+          }
+        }
+      ]
+    }
+  },
+  "name": "Update flake inputs",
+  "on": {
+    "schedule": [
+      {
+        "cron": "0 0 1-31/3 * *"
+      }
+    ],
+    "workflow_dispatch": {}
+  }
+}
