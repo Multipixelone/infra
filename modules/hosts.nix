@@ -17,7 +17,7 @@ let
   };
 
   hostSubmodule = lib.types.submodule (
-    { name, ... }:
+    { name, config, ... }:
     {
       options = {
         hostName = lib.mkOption {
@@ -105,6 +105,26 @@ let
           default = { };
           description = "WireGuard network configuration for this host.";
         };
+        deployAddress = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          readOnly = true;
+          default =
+            if config.wireguard.ipv4Address != null then config.wireguard.ipv4Address else config.homeAddress;
+          description = "Address colmena and SSH use to reach this host; null means unreachable.";
+        };
+        deployable = lib.mkOption {
+          type = lib.types.bool;
+          default = config.isNixOS;
+          description = "Whether colmena may deploy to this host. False while a host is declared but not yet installed.";
+        };
+        sshHostKey = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = ''
+            Contents of this host's /etc/ssh/ssh_host_ed25519_key.pub.
+            Must equal this host's agenix recipient in nix-secrets.
+          '';
+        };
       };
     }
   );
@@ -128,9 +148,14 @@ in
       desktopWindowManager = "Hyprland";
       homeAddress = "192.168.6.6";
       wireguard.ipv4Address = "10.100.0.1";
+      sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDW3JFfjgVfQxXRj343LPp7VnQ5O11eGl55LMtkYQIBQ root@link";
     };
     impa = {
       isNixOS = true;
+      # Hardware is not installed yet: modules/impa/facter.nix is a hand-written
+      # bootstrap placeholder and impa.install.diskDevice is unset, so the disko
+      # layout produces no root filesystem. Keep it out of the hive until then.
+      deployable = false;
       roles = [
         "server"
         "edge"
@@ -153,6 +178,7 @@ in
         ipv4Address = "10.100.0.2";
         publicKey = "8mNNHB03ytgnnZMPv0AZOpgZVumEvy3tr+E7h3WBCUI=";
       };
+      sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjWdSmIUxhdOJxY4IwKGTPJP3gC3cdNpbGDGui4xQvy root@zelda";
     };
     iot = {
       isNixOS = true;
@@ -165,6 +191,7 @@ in
       readmeRole = "Server";
       desktopWindowManager = "None";
       notes = "IoT services";
+      sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIz+/E9T3UyH7i7x8yKw85U/yeS6cfKXjrS5pWUrOGRT root@iot";
     };
     marin = {
       isNixOS = true;
@@ -177,6 +204,7 @@ in
       readmeRole = "Server";
       desktopWindowManager = "None";
       notes = "Audio + home services";
+      sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC95oj0z4gZSBkAQ2k+HQDsPuK/J9iDXYnLFxt3Hl1UG root@marin";
     };
     hylia = {
       isDarwin = true;
