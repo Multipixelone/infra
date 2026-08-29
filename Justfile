@@ -11,11 +11,39 @@ deploy:
   genswitch
   attic push system /run/current-system -j 2
 
-colmena-apply:
-  colmena apply
+# Every node carries its own name as a tag, so a bare host name is a valid
+# selector. The hive sets `allowApplyAll = false`, so there is deliberately no
+# filterless recipe: a fleet-wide deploy has to be typed out by hand.
+[doc("Deploy one host.")]
+colmena-apply host:
+  colmena apply --on {{host}}
+
+# Every always-on server, in one go.
+colmena-apply-servers:
+  colmena apply --on @server
 
 colmena-apply-tag tag:
   colmena apply --on @{{tag}}
+
+# Evaluate + build one host's closure locally without touching it.
+colmena-build host:
+  colmena build --on {{host}}
+
+# Say what would start/stop/restart on the target; changes nothing.
+colmena-dry host:
+  colmena apply dry-activate --on {{host}}
+
+# Only works while the target's *current* closure is still in the local store —
+# nvd reads both sides locally, so a host last built on another machine (or
+# since garbage-collected) fails with a confusing "does not exist" rather than a
+# clear error.
+[doc("What actually changes on the target, package by package.")]
+colmena-diff host:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  colmena build --on {{host}} --keep-result
+  # command substitution, NOT process substitution — nvd needs a real store path
+  nvd diff "$(ssh colmena.{{host}} readlink -f /run/current-system)" ./.gcroots/node-{{host}}
 
 # Fail-closed split-DNS/service publication deployment. Modes: apply, plan-only.
 deploy-services mode="apply" routes="":
@@ -26,17 +54,6 @@ services-smoke context="lan" routes="":
 
 services-tofu action="plan":
   nix run .#service-publication-tofu -- "{{action}}"
-
-minishb:
-  # nix build .#nixosConfigurations.minish.config.system.build.toplevel
-  # attic push system result -j 3
-  # nix build .#nixosConfigurations.marin.config.system.build.toplevel
-  nh os build -H marin
-  attic push system result -j 3
-  # nix build .#nixosConfigurations.zelda.config.system.build.toplevel
-  nh os build -H zelda
-  attic push system result -j 3
-  unlink result
 
 fastb:
   nix-fast-build --attic-cache system --no-link
@@ -58,6 +75,16 @@ hm-deploy host remote_nix_bindir="/nix/var/nix/profiles/default/bin":
 
 iso:
   nix build .#nixosConfigurations.iso.config.system.build.isoImage
+
+# See docs/new-host.md for the full procedure, including agenix recipient
+# enrolment. `modules/<host>/facter.nix` must already exist and point at
+# `./facter.json`; nixos-anywhere writes the report this recipe names.
+[doc("Install NixOS on a machine already booted into the installer.")]
+install host ssh_target:
+  nix run github:nix-community/nixos-anywhere -- \
+    --flake .#{{host}} \
+    --generate-hardware-config nixos-facter modules/{{host}}/facter.json \
+    root@{{ssh_target}}
 
 # Activate a nix-darwin host. Run on the Mac itself.
 darwin-switch host=`hostname -s`:

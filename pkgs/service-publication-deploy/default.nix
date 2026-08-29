@@ -7,7 +7,9 @@
   privilegeCommand ? "/run/wrappers/bin/sudo",
   servicePublicationSmoke,
   servicePublicationTofu,
+  openssh,
   servicePublicationValidate,
+  sshCommand ? "ssh",
   stateDir ? "/var/lib/service-publication",
   writeShellApplication,
 }:
@@ -19,6 +21,7 @@ writeShellApplication {
     coreutils
     gitMinimal
     jq
+    openssh
     servicePublicationSmoke
     servicePublicationTofu
     servicePublicationValidate
@@ -32,7 +35,9 @@ writeShellApplication {
     registry=infra/service-publication/registry.json
     state_dir=${builtins.toJSON stateDir}
     privilege_command=${builtins.toJSON privilegeCommand}
+    ssh_command=${builtins.toJSON sshCommand}
     revision_file="$state_dir/last-successful-revision"
+    applied_revision_file=/etc/service-publication/revision
 
     case "$mode" in
     apply | plan-only) ;;
@@ -52,6 +57,71 @@ writeShellApplication {
       local revision=$1
       "$privilege_command" install -d -m 0750 "$state_dir"
       printf '%s\n' "$revision" | "$privilege_command" tee "$revision_file" >/dev/null
+    }
+
+    # The same predicate deployment-tags.nix uses to build the colmena tag this
+    # flow deploys, so the hosts checked here are the hosts that carry a
+    # generated /etc/service-publication/revision.
+    publication_hosts() {
+      jq -r '
+        [(.routes // {})[].backend.host] as $backends
+        | (.hosts // {})
+        | to_entries[]
+        | . as $host
+        | select(
+            $host.value.managedByNixOS
+            and (
+              $host.value.capabilities.reverseProxy
+              or $host.value.capabilities.internalDns
+              or $host.value.capabilities.publicConnector
+              or (($backends | index($host.key)) != null)
+            )
+          )
+        | .key
+      ' "$1" | sort -u
+    }
+
+    # Every addition/removal decision below is a diff against the ledger, and a
+    # host is only described by that ledger while no generic deploy (just
+    # rebuild, just colmena-apply, a tag deploy) has shipped registry-derived
+    # config behind this wrapper's back. Ask the hosts rather than trusting it.
+    assert_hosts_match_ledger() {
+      local ledger=$1
+      local expected hosts host applied
+      local drifted=() unreachable=() untracked=()
+      expected=$(printf '%s' "$(git show "$ledger:$registry")" | sha256sum | cut -d' ' -f1)
+      hosts=$(publication_hosts "$registry")
+      while read -r host; do
+        [[ -n $host ]] || continue
+        if ! applied=$("$ssh_command" -o BatchMode=yes -o ConnectTimeout=10 \
+          "colmena.$host" "cat $applied_revision_file 2>/dev/null"); then
+          unreachable+=("$host")
+        elif [[ -z $applied ]]; then
+          untracked+=("$host")
+        elif [[ $applied != "$expected" ]]; then
+          drifted+=("$host runs $applied")
+        fi
+      done <<<"$hosts"
+
+      if ((''${#untracked[@]} > 0)); then
+        echo "no applied revision recorded on ''${untracked[*]}; they predate on-host revision tracking and this deploy installs it" >&2
+      fi
+      if ((''${#unreachable[@]} == 0 && ''${#drifted[@]} == 0)); then
+        return 0
+      fi
+      if ((''${#drifted[@]} > 0)); then
+        echo "applied service publication config has drifted from the ledger revision $ledger ($expected): ''${drifted[*]}" >&2
+      fi
+      if ((''${#unreachable[@]} > 0)); then
+        echo "could not read $applied_revision_file from ''${unreachable[*]}" >&2
+      fi
+      if [[ ''${SERVICE_PUBLICATION_IGNORE_HOST_REVISION:-} == 1 ]]; then
+        echo "SERVICE_PUBLICATION_IGNORE_HOST_REVISION=1; classifying additions and removals against the ledger anyway" >&2
+        return 0
+      fi
+      echo "the ledger no longer describes what every publication host runs, so additions and removals cannot be classified" >&2
+      echo "review 'git diff $ledger -- $registry', then re-run with SERVICE_PUBLICATION_IGNORE_HOST_REVISION=1 to redeploy every host from this tree and reconcile the ledger" >&2
+      return 1
     }
 
     allow_dirty=''${SERVICE_PUBLICATION_ALLOW_DIRTY:-}
@@ -83,6 +153,7 @@ writeShellApplication {
       previous_ingress='{}'
       previous_canonical='{}'
     else
+      assert_hosts_match_ledger "$previous_revision"
       previous_public=$(git show "$previous_revision:$registry" | jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort')
       previous_origins=$(git show "$previous_revision:$registry" | jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)')
       previous_ingress=$(git show "$previous_revision:$registry" | jq -c '.cloudflare.tunnel.ingressHost')
@@ -191,6 +262,16 @@ writeShellApplication {
       fi
       SERVICE_PUBLICATION_ROUTE_FILTER="$route_filter" bash -c "$SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND"
     }
+
+    # Colmena builds every selected node before it pushes any of them, so a node
+    # that does not evaluate or build aborts the deploy - and in the withdrawal
+    # branch it would do so after Cloudflare publication had already been torn
+    # down. Force that failure here, where nothing external has moved yet.
+    stage "build every publication host before touching external state"
+    if ! colmena build --on @service-publication; then
+      echo "a publication host failed to build; no external change has been made yet and no host was deployed" >&2
+      exit 1
+    fi
 
     if ((removed > 0)); then
       stage "withdraw external reachability before local removal"

@@ -16,6 +16,11 @@
                     default = null;
                     description = "SSH target hostname or IP address. Defaults to the NixOS hostname if null.";
                   };
+                  targetPort = lib.mkOption {
+                    type = lib.types.nullOr lib.types.ints.unsigned;
+                    default = null;
+                    description = "SSH port for colmena deployment. Null uses the standard port or ssh_config.";
+                  };
                   targetUser = lib.mkOption {
                     type = lib.types.str;
                     default = "root";
@@ -31,10 +36,20 @@
                     default = false;
                     description = "Allow colmena to deploy to the local machine.";
                   };
-                  useWireguardAddress = lib.mkOption {
+                  buildOnTarget = lib.mkOption {
                     type = lib.types.bool;
                     default = false;
-                    description = "When true and targetHost is null, use the host's WireGuard address from the hosts registry for deployment.";
+                    description = "Build the system profile on the target node instead of locally.";
+                  };
+                  replaceUnknownProfiles = lib.mkOption {
+                    type = lib.types.bool;
+                    default = true;
+                    description = "Allow applying over a profile this colmena has no knowledge of.";
+                  };
+                  sshOptions = lib.mkOption {
+                    type = lib.types.listOf lib.types.str;
+                    default = [ ];
+                    description = "Extra options passed to the SSH command colmena runs.";
                   };
                 };
               }

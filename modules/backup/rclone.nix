@@ -134,7 +134,9 @@
         };
       };
 
-      config = {
+      # `seedFile` defaults to the secret's .path and the seed unit bakes it in,
+      # so installer media drops the whole tier along with the declaration.
+      config = lib.mkIf (!config.infra.installerMedia) {
         age.secrets."restic/rclone".file =
           "${inputs.secrets}/restic/${config.networking.hostName}rclone.age";
 

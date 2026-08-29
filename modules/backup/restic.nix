@@ -85,7 +85,10 @@
         };
       };
 
-      config = {
+      # Installer media has no repository to back up and cannot decrypt the
+      # password, and every unit below bakes `restic/password`'s .path into a
+      # command line — so the whole tier goes, not just the declaration.
+      config = lib.mkIf (!config.infra.installerMedia) {
         age.secrets."restic/password".file = "${inputs.secrets}/restic/password.age";
 
         environment.systemPackages = [ restic-onedrive ];

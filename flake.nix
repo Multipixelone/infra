@@ -93,7 +93,7 @@
       flake = false;
     };
     colmena = {
-      url = "github:zhaofengli/colmena";
+      url = "github:zhaofengli/colmena/main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     commutecompass.url = "github:Multipixelone/commutecompass";
@@ -223,6 +223,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixcord.url = "github:FlameFlag/nixcord";
+    nixos-anywhere = {
+      url = "github:nix-community/nixos-anywhere";
+      inputs = {
+        disko.follows = "disko";
+        nixpkgs.follows = "nixpkgs";
+        treefmt-nix.follows = "treefmt-nix";
+      };
+    };
     nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
     nixos-generators = {
       url = "github:nix-community/nixos-generators";

@@ -1,43 +1,26 @@
 { lib, config, ... }:
 let
+  # `iso` is a nixosConfiguration with no entry in the host registry, so every
+  # lookup here has to tolerate a missing host.
+  hostKey = name: config.hosts.${name}.sshHostKey or null;
+  hostAddress = name: config.hosts.${name}.deployAddress or null;
+
   reachableNixoss =
     config.flake.nixosConfigurations
     |> lib.filterAttrs (
-      _name: nixos:
+      name: nixos:
       !(lib.any isNull [
         nixos.config.networking.domain
         nixos.config.networking.hostName
-        nixos.config.services.openssh.publicKey
+        (hostKey name)
       ])
     );
 
-  # Resolve host address: wireguard -> homeAddress -> null
-  resolveHostAddress =
-    name:
-    let
-      host = config.hosts.${name} or null;
-    in
-    if host == null then
-      null
-    else if host.wireguard.ipv4Address != null then
-      host.wireguard.ipv4Address
-    else if host.homeAddress != null then
-      host.homeAddress
-    else
-      null;
-
-  # Get deployable hosts with resolvable addresses
-  deployableHosts = lib.filterAttrs (_: cfg: cfg.deployment != null) config.configurations.nixos;
-  colmenaHosts = lib.filterAttrs (name: _: resolveHostAddress name != null) deployableHosts;
+  colmenaHosts = lib.filterAttrs (_: cfg: cfg.deployment != null) config.configurations.nixos;
 in
 {
   flake.modules = {
     nixos.base = {
-      options.services.openssh.publicKey = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-      };
-
       config = {
         programs.mosh = {
           enable = true;
@@ -68,16 +51,24 @@ in
           "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBGm2epY8mE3z7qoL10fXmBuv4EPHnQoqJoYrL9TgfJwhnZMsaf1FQ2jalGSCE6T+QuYF/WM+bIWxZiYrT/XisM= ipad"
         ];
 
+        # Root login is deploy-only, and every deploy originates on the WireGuard
+        # mesh or the home LAN.
         users.users.root.openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOVPE0NP1EtHnnzhBXZ4Cz6YAw/ZaEFUA8T6YvtnzGcK colmena-deploy"
+          ''from="10.100.0.0/24,192.168.0.0/16" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOVPE0NP1EtHnnzhBXZ4Cz6YAw/ZaEFUA8T6YvtnzGcK colmena-deploy''
         ];
 
+        # ssh matches known_hosts on the address it dialled, and colmena dials the
+        # `colmena.<name>` alias whose HostName is the bare deploy address, so the
+        # fqdn pin alone would never apply.
         programs.ssh.knownHosts =
           reachableNixoss
           |> lib.mapAttrs (
-            _name: nixos: {
-              hostNames = [ nixos.config.networking.fqdn ];
-              inherit (nixos.config.services.openssh) publicKey;
+            name: nixos: {
+              hostNames = [
+                nixos.config.networking.fqdn
+              ]
+              ++ lib.optional (hostAddress name != null) (hostAddress name);
+              publicKey = hostKey name;
             }
           );
       };
@@ -102,7 +93,7 @@ in
             |> lib.mapAttrsToList (
               name: _: {
                 "colmena.${name}" = {
-                  HostName = resolveHostAddress name;
+                  HostName = hostAddress name;
                   User = "root";
                   IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
                   IdentitiesOnly = true;
@@ -113,7 +104,7 @@ in
           |> lib.concat [
             {
               "alexandria" = {
-                HostName = resolveHostAddress "alexandria";
+                HostName = hostAddress "alexandria";
                 User = config.flake.meta.owner.username;
                 IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
                 IdentitiesOnly = true;

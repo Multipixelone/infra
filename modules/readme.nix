@@ -68,26 +68,46 @@
         let
           justfileLines = lib.splitString "\n" (builtins.readFile ../Justfile);
 
-          recipeNames =
+          # The parameter group deliberately excludes `:`, which is what keeps
+          # recipe bodies and dependency lines out of the table.
+          recipes =
             justfileLines
             |> map (
               line:
               let
                 match = builtins.match "^([A-Za-z0-9_-]+)([[:space:]][^:]*)?:([[:space:]].*)?$" line;
               in
-              if match == null then null else builtins.elemAt match 0
+              if match == null then
+                null
+              else
+                {
+                  name = builtins.elemAt match 0;
+                  params = builtins.elemAt match 1;
+                }
             )
-            |> lib.filter (name: name != null)
+            |> lib.filter (recipe: recipe != null)
             |> lib.unique;
 
           commandDescriptions = {
             rebuild = "Local system rebuild (uses `nh os switch`).";
             deploy = "Rebuild and push closures to the Attic binary cache.";
-            colmena-apply = "Deploy configurations to remote hosts via Colmena.";
+            colmena-apply = "Deploy one host via Colmena. Host names are tags, so any node name works.";
+            colmena-apply-servers = "Deploy every always-on server (`@server`) in one run.";
             colmena-apply-tag = "Deploy configurations to a specific Colmena tag.";
-            minishb = "Build selected hosts and push resulting closures.";
+            colmena-build = "Build one host's closure locally without touching the machine.";
+            colmena-dry = "Dry-activate on the target: report what would start, stop or restart.";
+            colmena-diff = "Diff the target's running closure against a freshly built one via `nvd`.";
+            deploy-services = "Fail-closed split-DNS and service publication deployment.";
+            services-smoke = "Smoke-test published service routes from a given network context.";
+            services-tofu = "Run the service publication OpenTofu workspace.";
             fastb = "Fast build with `nix-fast-build` and Attic cache upload.";
+            hm-build = "Build a standalone Home Manager activation package locally.";
+            hm-deploy = "Build, copy and activate a Home Manager closure over SSH.";
             iso = "Build an installer ISO.";
+            install = "Install NixOS onto a machine booted into the installer, via nixos-anywhere.";
+            darwin-switch = "Activate a nix-darwin host. Run on the Mac itself.";
+            darwin-perms = "Re-grant macOS Accessibility and Input Monitoring to the hotkey daemon.";
+            darwin-bootstrap = "First-time nix-darwin activation on a fresh Mac.";
             debug = "Run rebuild with `--show-trace` for debugging.";
             update = "Update flake lockfile and Firefox addons.";
             update-flake = "Update flake lockfile inputs.";
@@ -96,13 +116,35 @@
             gc = "Garbage collect and wipe old generations.";
           };
 
-          commandDisplay =
-            name: if name == "colmena-apply-tag" then "`just colmena-apply-tag <tag>`" else "`just ${name}`";
+          # `<required>` / `[optional]`. A default value can itself contain
+          # whitespace (`host=`hostname -s``), so fragments that do not open a
+          # parameter name are dropped rather than split into bogus arguments.
+          paramsDisplay =
+            params:
+            if params == null then
+              ""
+            else
+              params
+              |> builtins.split "[[:space:]]+"
+              |> lib.filter lib.isString
+              |> map (token: builtins.match "([A-Za-z_][A-Za-z0-9_-]*)(=.*)?" token)
+              |> lib.filter (match: match != null)
+              |> map (
+                match:
+                let
+                  name = builtins.elemAt match 0;
+                in
+                if builtins.elemAt match 1 == null then " <${name}>" else " [${name}]"
+              )
+              |> lib.concatStrings;
 
           commandRows =
-            recipeNames
+            recipes
             |> map (
-              name: "| ${commandDisplay name} | ${commandDescriptions.${name} or "See Justfile recipe."} |"
+              recipe:
+              "| `just ${recipe.name}${paramsDisplay recipe.params}` | ${
+                commandDescriptions.${recipe.name} or "See Justfile recipe."
+              } |"
             );
         in
         (

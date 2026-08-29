@@ -10,6 +10,35 @@ still requires the separate authorization and prerequisites below. The accepted 
 is recorded below. No command in this runbook has been run against a live host,
 AWS account, or Cloudflare account as part of the implementation.
 
+## Never deploy a publication host generically
+
+The generated nginx, ACME, Blocky, firewall, and connector configuration lives
+in the ordinary host modules, so **any** switch of a publication host ships it:
+`just rebuild` (or `nh os switch`/`genswitch`) on Link itself, `just
+colmena-apply`, and `just colmena-apply-tag desktop` all apply whatever the
+registry currently says. None of them runs validation, the certificate wait, the
+smoke probes, the withdrawal-before-removal ordering, or the mixed add/remove
+refusal, and none of them advances the deployment ledger.
+
+So: while a registry change is pending in the working tree, do not switch or
+deploy any host carrying the `service-publication` colmena tag (today Link and
+Impa) by any route other than `just deploy-services`. Commit unrelated host work
+separately and deploy it before the registry change, or deploy the registry
+change first.
+
+This is enforced, not merely advised. Every tagged host installs the applied
+inventory hash at `/etc/service-publication/revision`, and `just deploy-services`
+reads that file back before it classifies additions and removals, over the same
+`colmena.<host>` SSH alias colmena itself deploys through. A host whose applied hash is not the one the ledger
+records makes that classification meaningless, so the deploy stops, names the
+host, and changes nothing. Recovery: review `git diff <ledger revision> --
+infra/service-publication/registry.json`, confirm the difference is intended,
+then re-run with `SERVICE_PUBLICATION_IGNORE_HOST_REVISION=1`, which redeploys
+every tagged host from the current tree and re-records the ledger. A host that
+cannot be reached at all stops the deploy the same way, before any external
+change. A host that has never applied a revision file only warns: it predates
+the tracking and this deploy installs it.
+
 ## Source and generated boundaries
 
 - `modules/service-publication/registry.nix` is the typed intent registry.
@@ -248,7 +277,12 @@ safely.
 
 `just deploy-services` is the only normal mutation flow. It regenerates and
 checks artifacts, formats Nix/OpenTofu, scans for secrets, evaluates the flake,
-builds focused checks, and stops on the first failure. Additions deploy and
+builds focused checks, and stops on the first failure. It then confirms that
+every tagged host still runs the ledger's inventory (see **Never deploy a
+publication host generically**) and builds every tagged host before anything
+external moves, because colmena builds all selected nodes before it pushes any
+and a node that fails to build would otherwise abort a removal after Cloudflare
+publication had already been withdrawn. Additions deploy and
 probe the local origin before the locked OpenTofu plan is applied. Removals
 withdraw Cloudflare reachability first. Mixed add/remove changes are rejected
 so the ordering cannot be ambiguous.
@@ -290,7 +324,8 @@ just services-smoke external '<public-app>/<route>'
 
 The successful registry revision is recorded outside the repository at
 `/var/lib/service-publication/last-successful-revision`. The next deployment
-uses it to distinguish additions from removals. A proxy/connector move is not
+uses it to distinguish additions from removals, and refuses to do so while any
+tagged host's `/etc/service-publication/revision` disagrees with it. A proxy/connector move is not
 automated: use the accepted overlap procedure, keep the old connector healthy,
 verify both paths, then change the role and retire the old instance only after
 the separately agreed observation interval.
@@ -300,7 +335,9 @@ apply mode refuses to start while tracked files are modified or staged: commit
 them first. Untracked files do not block. `SERVICE_PUBLICATION_ALLOW_DIRTY=1`
 is the deliberate escape hatch for an emergency apply from an uncommitted tree;
 it skips that gate and then refuses to record a revision, so the recorded
-revision never claims to describe a tree that was never committed.
+revision never claims to describe a tree that was never committed. Such a run
+leaves the hosts ahead of the ledger, so the next deployment reports the drift
+and needs `SERVICE_PUBLICATION_IGNORE_HOST_REVISION=1` once to reconcile.
 
 ## Rollback
 

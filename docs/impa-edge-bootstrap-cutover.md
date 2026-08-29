@@ -2,6 +2,8 @@
 
 This runbook is operational guidance only. Firmware, FortiGate/DHCP/client, agenix recipient, provider, backend ACL, deployment, connector-retirement, and final-cutover actions are manual and require separate authorization.
 
+The general bare-metal-to-hive-node procedure lives in [`new-host.md`](new-host.md) and is not repeated here. This runbook covers only what is specific to Impa: the edge hardware prerequisites, the secret-free first install, and the ingress cutover and rollback.
+
 ## Hardware prerequisites
 
 Enable automatic power-on after AC loss in firmware and disable firmware sleep where available. From the repository installer ISO, record the real persistent disk path under `/dev/disk/by-id`, wired NIC name and MAC, and a `nixos-facter` report. Never guess them.
@@ -9,14 +11,16 @@ Enable automatic power-on after AC loss in firmware and disable firmware sleep w
 ## Stage 1: secret-free bootstrap
 
 1. Boot the repository installer ISO. Confirm the disk with `ls -l /dev/disk/by-id` and interface with `ip -br link`.
-2. Supply the reviewed disk path as `impa.install.diskDevice` in an installer-only module and run Disko against Impa. The layout is GPT, a 1 GiB EFI partition, and unencrypted Btrfs `@root`, `@home`, and `@nix`; it has no swap.
+2. Supply the reviewed disk path as `impa.install.diskDevice` in an installer-only module, and **commit that module** — nix drops untracked files from a dirty flake source, so an uncommitted installer module leaves `diskDevice` null and configures no Disko layout at all. Then run Disko against Impa. The layout is GPT, a 1 GiB EFI partition, and unencrypted Btrfs `@root`, `@home`, and `@nix`; it has no swap.
 3. Generate and review the Impa `nixos-facter` report and hardware configuration. Commit those facts separately, replacing the architecture-only bootstrap report. Pin the discovered NIC/MAC then if stable matching is required.
 4. Install without agenix secrets. Use `192.168.6.50/24`, gateway `192.168.6.1`, disabled IPv6, and local DNS.
 5. Boot and verify console, network, key-only SSH, Mosh, `impa.hosts.nyc.finnrut.is`, disabled sleep, and the generated SSH host public key. Never copy the private host key into Git.
 
 ## Stage 2: secret enrollment
 
-Finn manually enrolls Impa's SSH host public key as an agenix recipient in the private secrets repository. Review that private change independently. Only afterward, and with separate authorization, perform the first secret-bearing Colmena deployment. Link and Impa reference the same existing `service-publication-tunnel-token.age`; never create another token or plaintext copy.
+Finn manually enrolls Impa's SSH host public key as an agenix recipient in the private secrets repository, following [`new-host.md`](new-host.md) step 5. Review that private change independently. Only afterward, and with separate authorization, perform the first secret-bearing Colmena deployment.
+
+Link and Impa reference the same existing `cloudflare/service-publication-tunnel.age`; never create another token or plaintext copy. That entry names its recipients explicitly rather than using `systems`, so adding Impa to `systems` is not sufficient — Impa must also be added to that entry's own `publicKeys` list before `agenix -r`. Deploying without it half-activates Impa: the connector's secret fails to decrypt, activation reports failure, and the system profile has already switched.
 
 ## Pre-cutover validation
 

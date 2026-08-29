@@ -40,7 +40,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
         }
       ],
       "strategy": {
@@ -92,7 +92,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.aarch64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.aarch64-linux.\"${{ matrix.checks }}\"'; }\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.aarch64-linux.\"${{ matrix.checks }}\"'\n"
         }
       ],
       "strategy": {
@@ -105,11 +105,7 @@
       "timeout-minutes": 180
     },
     "check-nixos": {
-      "continue-on-error": true,
-      "needs": [
-        "get-check-names",
-        "check"
-      ],
+      "needs": "get-check-names",
       "runs-on": "ubuntu-latest",
       "steps": [
         {
@@ -147,7 +143,7 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"' \\\n|| { echo \"::warning::Attic upload failed, retrying without attic cache\"; \\\n     nix run github:Mic92/nix-fast-build -- \\\n       --skip-cached \\\n       --no-nom \\\n       -j 2 \\\n       --eval-workers 2 \\\n       --eval-max-memory-size 2048 \\\n       --retries 2 \\\n       --no-link \\\n       --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'; }\n"
+          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
         }
       ],
       "strategy": {
@@ -157,7 +153,7 @@
         },
         "max-parallel": 5
       },
-      "timeout-minutes": 180
+      "timeout-minutes": 350
     },
     "get-check-names": {
       "outputs": {
@@ -200,13 +196,14 @@
         },
         {
           "id": "get-check-names",
-          "run": "all_checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\" >> $GITHUB_OUTPUT\naarch64_checks=\"$(nix --accept-flake-config eval --json .#checks.aarch64-linux --apply builtins.attrNames)\"\necho \"checks-aarch64=$aarch64_checks\" >> $GITHUB_OUTPUT\n"
+          "run": "all_checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\nnixos_checks=\"$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\"\nif [ \"${{ github.event_name }}\" != workflow_dispatch ]; then\n  nixos_checks=\"$(echo \"$nixos_checks\" | jq -c --argjson skip '[\"configurations/nixos/iso\",\"configurations/nixos/impa\"]' 'map(select(IN($skip[]) | not))')\"\nfi\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$nixos_checks\" >> $GITHUB_OUTPUT\naarch64_checks=\"$(nix --accept-flake-config eval --json .#checks.aarch64-linux --apply builtins.attrNames)\"\necho \"checks-aarch64=$aarch64_checks\" >> $GITHUB_OUTPUT\n"
         }
       ]
     }
   },
   "name": "Build",
   "on": {
-    "push": {}
+    "push": {},
+    "workflow_dispatch": {}
   }
 }

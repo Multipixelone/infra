@@ -1,8 +1,18 @@
-{ lib, ... }:
+{ inputs, lib, ... }:
 {
   configurations.nixos.zelda.module =
     { pkgs, ... }:
     let
+      # This repo is public, so the home coordinates come from the private
+      # secrets flake instead of being written here. commutecompass' [origin]
+      # is the same address and sunwait only resolves sunrise/sunset to the
+      # minute, so reuse that datum rather than adding a second copy.
+      origin =
+        (builtins.fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml")).origin;
+      degrees =
+        value: positive: negative:
+        if value < 0 then "${toString (-value)}${negative}" else "${toString value}${positive}";
+
       sunpaper = pkgs.sunpaper.overrideAttrs (oldAttrs: {
         postPatch = ''
           substituteInPlace sunpaper.sh \
@@ -31,8 +41,8 @@
             PLAYLIST_DIR = "/home/tunnel/Music/Playlists";
           };
           xdg.configFile."sunpaper/config".text = ''
-            latitude="40.680271N"
-            longitude="73.944893W"
+            latitude="${degrees origin.lat "N" "S"}"
+            longitude="${degrees origin.lon "E" "W"}"
 
             awww_enable="true"
             awww_fps="240"

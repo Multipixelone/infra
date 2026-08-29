@@ -15,6 +15,9 @@ let
   connectorSecret = "${inputs.secrets}/cloudflare/service-publication-tunnel.age";
   hasAcmeSecret = builtins.pathExists acmeSecret;
   hasConnectorSecret = builtins.pathExists connectorSecret;
+  # The same bytes as the generated registry.json minus its trailing newline, so
+  # the deploy wrapper can recompute this from any git revision of that file.
+  inventoryRevision = builtins.hashString "sha256" (builtins.toJSON inventory);
 
   configForHost =
     hostName: host:
@@ -31,6 +34,12 @@ let
         ) proxyProjection.vhosts;
       allowedProxySources =
         trustedCidrs ++ lib.optional publicOnProxy "${connectorHost.addresses.lan}/32";
+      # Read the colmena tag back instead of re-deriving its predicate, so the
+      # hosts that record an applied revision are exactly the hosts
+      # `colmena apply --on @service-publication` refreshes.
+      deployedForPublication = lib.elem "service-publication" (
+        config.configurations.nixos.${hostName}.deployment.tags or [ ]
+      );
     in
     {
       module =
@@ -190,6 +199,15 @@ let
           connectorPackage = pkgs.cloudflared;
         in
         lib.mkMerge [
+          # A generic switch of this host (just rebuild, just colmena-apply, a
+          # tag deploy) applies registry-derived publication config with none of
+          # the wrapper's guarantees and without advancing its ledger. Recording
+          # the applied inventory on the host itself turns that silent bypass
+          # into a refusal from the next reviewed deploy.
+          (lib.mkIf deployedForPublication {
+            environment.etc."service-publication/revision".text = inventoryRevision;
+          })
+
           (lib.mkIf (localEnabled && host.capabilities.internalDns) {
             services.blocky.settings.customDNS = {
               customTTL = "5m";

@@ -129,6 +129,7 @@ result-*
 *_override.tf.json
 .terraformrc
 /.claude/settings.local.json
+/.gcroots/
 /.pre-commit-config.yaml
 /result
 /result.*
