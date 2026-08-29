@@ -19,8 +19,14 @@
 
   config = {
     flake.aiConfig = {
-      agentsDir = rootPath + /docs/agents;
-      skillsDir = rootPath + /docs/skills;
+      agentsDir = builtins.path {
+        path = rootPath + /docs/agents;
+        name = "infra-agents";
+      };
+      skillsDir = builtins.path {
+        path = rootPath + /docs/skills;
+        name = "infra-skills";
+      };
       context = ''
         ## Rules
         System config: Nix only in `/home/tunnel/Documents/Git/infra`. Read repo `CLAUDE.md` / `AGENTS.md` before edits.

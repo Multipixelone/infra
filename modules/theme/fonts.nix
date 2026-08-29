@@ -29,6 +29,10 @@
     { pkgs, ... }:
     let
       pragmata = withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.pragmata);
+      appleEmojiPatch = builtins.path {
+        path = rootPath + /pkgs/apple-emoji/dedupe-cmap.patch;
+        name = "apple-emoji-dedupe-cmap.patch";
+      };
       appleEmoji =
         (pkgs.callPackage "${inputs.apple-emoji}/default.nix" {
           src = inputs.apple-emoji;
@@ -40,7 +44,7 @@
           (old: {
             # Newer fontTools rejects duplicate (platformID, platEncID, language)
             # cmap subtables that the windows target's cmap juggling produces.
-            patches = (old.patches or [ ]) ++ [ (rootPath + /pkgs/apple-emoji/dedupe-cmap.patch) ];
+            patches = (old.patches or [ ]) ++ [ appleEmojiPatch ];
           });
     in
     {
