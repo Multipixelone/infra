@@ -56,9 +56,15 @@ reached first. Loki retains seven days. These are application retention
 settings, not hard filesystem caps: Btrfs qgroups, partitions, loop devices,
 and `StateDirectoryQuota` are intentionally absent.
 
-The fleet dashboard selects `link-node`, `iot-node`, or `marin-node` and scopes
-all host panels to that exporter. The 15%-free `RootDiskPressure` warning
-applies independently to every monitored host. Prometheus storage-growth
+The fleet dashboard derives its host selector from the typed observability node
+registry and scopes all panels to the selected exporter. That same registry
+generates node scrape jobs, missing-host rows, and alert policy. Every
+Prometheus target normalizes its public `instance` label to a hostname or
+endpoint FQDN; transport IP addresses, ports, and URLs remain scrape
+implementation details and must not appear as dashboard names. The 15%-free
+`RootDiskPressure` warning
+applies independently to every required registered host; portable best-effort
+nodes remain visible without paging when they are offline. Prometheus storage-growth
 forecasting remains scoped to Link because Link owns the telemetry store.
 
 Each service-publication route contributes one internal HTTPS probe to the
@@ -66,7 +72,9 @@ endpoint dashboards and rolling SLO. The direct backend check used before the
 local cutover is not retained as a second `private` series for the same logical
 endpoint. `SloErrorBudgetExhausted` also requires the live probe to have a
 sample at the far edge of the seven-day window, so a new target cannot fire a
-seven-day-budget alert from only a partial first week of data.
+seven-day-budget alert from only a partial first week of data. Dashboard and
+SLO queries collapse resolver-level copies to the logical endpoint FQDN using
+the worst availability/latency result.
 
 ## Privacy boundary
 

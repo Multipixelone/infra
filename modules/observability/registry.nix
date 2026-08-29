@@ -63,6 +63,27 @@ let
       };
     }
   );
+  nodeTargetType = lib.types.submodule (
+    { name, ... }:
+    {
+      options = {
+        scrapeAddress = lib.mkOption {
+          type = lib.types.str;
+          description = "Transport address Prometheus uses to scrape ${name}.";
+        };
+        provisionExporter = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether the shared host-telemetry module provisions this node exporter.";
+        };
+        alertOnDown = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether an unreachable exporter is actionable instead of expected mobility.";
+        };
+      };
+    }
+  );
 in
 {
   # Every provisioned Grafana dashboard, as pure data. Exposing them here is
@@ -107,6 +128,10 @@ in
     endpoints = lib.mkOption {
       type = lib.types.attrsOf endpointType;
       description = "Typed, Link-only Phase 1 service and probe registry.";
+    };
+    nodes = lib.mkOption {
+      type = lib.types.attrsOf nodeTargetType;
+      description = "Node-exporter scrape inventory; dashboard identities come from the matching host registry entries.";
     };
   };
 
@@ -182,6 +207,30 @@ in
           description = "Private DNS metrics";
         };
       };
+      nodes = {
+        link.scrapeAddress = config.observability.endpoints.node.backendAddress;
+      }
+      //
+        lib.genAttrs
+          [
+            "impa"
+            "iot"
+            "marin"
+          ]
+          (hostName: {
+            scrapeAddress = config.hosts.${hostName}.homeAddress;
+            provisionExporter = true;
+          })
+      //
+        lib.genAttrs
+          [
+            "zelda"
+            "hylia"
+          ]
+          (hostName: {
+            scrapeAddress = config.hosts.${hostName}.wireguard.ipv4Address;
+            alertOnDown = false;
+          });
     };
 
     configurations.nixos.link.module.assertions = [
@@ -198,6 +247,12 @@ in
       {
         assertion = config.hosts.${config.observability.hubHost}.observabilityHub;
         message = "The observability hub must be explicit in the host registry.";
+      }
+      {
+        assertion = lib.all (hostName: builtins.hasAttr hostName config.hosts) (
+          builtins.attrNames config.observability.nodes
+        );
+        message = "Every observability node must have a matching host registry entry.";
       }
       {
         assertion = config.hosts.link.roles == [ "desktop" ];

@@ -69,13 +69,37 @@ let
   effectiveTrustedCidrs =
     if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
-  remoteNodeTargets = {
-    impa = config.hosts.impa.homeAddress;
-    iot = config.hosts.iot.homeAddress;
-    marin = config.hosts.marin.homeAddress;
-    zelda = config.hosts.zelda.wireguard.ipv4Address;
-    hylia = config.hosts.hylia.wireguard.ipv4Address;
-  };
+  nodeEntries = lib.mapAttrsToList (
+    registryName: target:
+    target
+    // {
+      hostName = hostRegistry.${registryName}.hostName;
+    }
+  ) observability.nodes;
+  nodeHostNames = map (node: node.hostName) nodeEntries;
+  requiredNodeHostNames = map (node: node.hostName) (
+    builtins.filter (node: node.alertOnDown) nodeEntries
+  );
+  regexFor = values: lib.concatStringsSep "|" (map lib.escapeRegex values);
+  nodeHostRegex = regexFor nodeHostNames;
+  nodeJobRegex = "(${nodeHostRegex})-node";
+  requiredNodeHostRegex = regexFor requiredNodeHostNames;
+  requiredNodeJobRegex = "(${requiredNodeHostRegex})-node";
+  resolverEntries =
+    lib.mapAttrsToList
+      (registryName: publicationHost: {
+        inherit registryName;
+        hostName = hostRegistry.${registryName}.hostName;
+        inherit (publicationHost.addresses) lan;
+      })
+      (
+        lib.filterAttrs (
+          _: publicationHost:
+          publicationHost.site == config.servicePublication.applications.grafana.site
+          && publicationHost.capabilities.internalDns
+        ) config.servicePublication.hosts
+      );
+  resolverHostRegex = regexFor (map (resolver: resolver.hostName) resolverEntries);
   endpointList = observability.endpoints |> builtins.attrValues;
   privateEndpoints = builtins.filter (endpoint: endpoint.exposure == "private") endpointList;
   probedEndpoints = builtins.filter (endpoint: endpoint.probe != null) endpointList;
@@ -145,20 +169,22 @@ let
   # Partitions duplicate their parent disk's counters.
   wholeDisks = ''device=~"nvme[0-9]+n[0-9]+|sd[a-z]|mmcblk[0-9]+"'';
   sloTargetPercent = observability.slo.availability * 100;
-  hostJobSelector = ''job=~"(link|impa|iot|marin|zelda|hylia)-node"'';
+  # The instance matcher also excludes pre-normalization history whose label
+  # was an IP address. It is better to show a gap across this one-time schema
+  # migration than leak transport addresses back into a host legend.
+  hostJobSelector = ''job=~"${nodeJobRegex}",instance=~"${nodeHostRegex}"'';
+  requiredNodeJobSelector = ''job=~"${requiredNodeJobRegex}",instance=~"${requiredNodeHostRegex}"'';
   # Prometheus retains `up = 0` when a configured exporter cannot be scraped,
-  # but a missing target would otherwise disappear from a table entirely. The
-  # three -1 series are a stable fleet scaffold: a real 0/1 wins under max(),
-  # while an absent target remains present as NO DATA.
+  # but a missing target would otherwise disappear from a table entirely.
+  # Generate a -1 scaffold from the same node inventory as the scrape jobs: a
+  # real 0/1 wins under max(), while an absent target remains as NO DATA.
+  hostExporterScaffold = lib.concatMapStringsSep "\n      or " (
+    hostName: ''label_replace(vector(-1), "instance", "${hostName}", "", "")''
+  ) nodeHostNames;
   hostExporterStatus = ''
-    max by (job) (
+    max by (instance) (
       up{${hostJobSelector}}
-      or label_replace(vector(-1), "job", "link-node", "", "")
-      or label_replace(vector(-1), "job", "impa-node", "", "")
-      or label_replace(vector(-1), "job", "iot-node", "", "")
-      or label_replace(vector(-1), "job", "marin-node", "", "")
-      or label_replace(vector(-1), "job", "zelda-node", "", "")
-      or label_replace(vector(-1), "job", "hylia-node", "", "")
+      or ${hostExporterScaffold}
     )
   '';
   hostStatusMappings = [
@@ -244,7 +270,7 @@ let
             type = "gauge";
             w = 5;
             h = 6;
-            expr = "sum(probe_success) / count(probe_success)";
+            expr = ''sum(min by (endpoint) (probe_success{endpoint!=""})) / count(min by (endpoint) (probe_success{endpoint!=""}))'';
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
@@ -287,7 +313,8 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = ''node_systemd_units{state="failed"}'';
+            expr = ''max by (instance) (node_systemd_units{${hostJobSelector},state="failed"})'';
+            legend = "{{instance}}";
             unit = viz.units.none;
             decimals = 0;
             noValue = "0";
@@ -309,7 +336,7 @@ let
             w = 6;
             h = 6;
             description = "Lines per second reaching Loki. A flat zero means the write path is broken, not that the box is quiet.";
-            expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+            expr = ''sum(rate(loki_write_sent_entries_total{instance="link"}[$__rate_interval]))'';
             unit = viz.units.ops;
             decimals = 2;
             thresholds = [
@@ -329,7 +356,8 @@ let
             type = "gauge";
             w = 4;
             h = 7;
-            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'';
+            expr = ''100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
+            legend = "{{instance}}";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -352,7 +380,8 @@ let
             type = "gauge";
             w = 4;
             h = 7;
-            expr = "clamp_min((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100, 0)";
+            expr = "100 * clamp_min(1 - (max by (instance) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (instance) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
+            legend = "{{instance}}";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -375,7 +404,8 @@ let
             type = "gauge";
             w = 4;
             h = 7;
-            expr = ''(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100'';
+            expr = ''100 * max by (instance) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
+            legend = "{{instance}}";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -400,16 +430,16 @@ let
             h = 7;
             targets = [
               {
-                expr = "node_load1";
-                legend = "Load 1m";
+                expr = "max by (instance) (node_load1{${hostJobSelector}})";
+                legend = "{{instance}} load 1m";
               }
               {
-                expr = "count(count(node_cpu_seconds_total) by (cpu))";
-                legend = "Cores";
+                expr = "count by (instance) (count by (instance, cpu) (node_cpu_seconds_total{${hostJobSelector}}))";
+                legend = "{{instance}} cores";
               }
               {
-                expr = "node_time_seconds - node_boot_time_seconds";
-                legend = "Uptime";
+                expr = "max by (instance) (node_time_seconds{${hostJobSelector}} - node_boot_time_seconds{${hostJobSelector}})";
+                legend = "{{instance}} uptime";
               }
             ];
             unit = viz.units.short;
@@ -422,7 +452,7 @@ let
               orientation = "horizontal";
             };
             overrides = [
-              (viz.overrideByName "Uptime" [
+              (viz.overrideByRegexp "/ uptime$/" [
                 {
                   id = "unit";
                   value = viz.units.duration;
@@ -474,8 +504,8 @@ let
             type = "state-timeline";
             w = 16;
             h = 10;
-            expr = "probe_success";
-            legend = "{{endpoint}} ({{scope}})";
+            expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
+            legend = "{{endpoint}}";
             mappings = viz.boolMapping { };
             options = {
               perPage = 40;
@@ -625,7 +655,6 @@ let
                   excludeByName = {
                     Time = true;
                     __name__ = true;
-                    job = true;
                     fstype = true;
                     device = true;
                     mountpoint = true;
@@ -641,8 +670,10 @@ let
                   renameByName = {
                     alertname = "Alert";
                     severity = "Severity";
-                    instance = "Instance";
+                    job = "Service";
+                    instance = "Host";
                     endpoint = "Endpoint";
+                    resolver = "Resolver";
                     scope = "Scope";
                     slo_class = "SLO class";
                     Value = "Active for";
@@ -772,8 +803,20 @@ let
             description = "A gap means the alert was not firing: Prometheus stops emitting the series entirely rather than reporting zero.";
             # Encode the two states as distinct numbers so one series can carry
             # both pending and firing.
-            expr = ''(ALERTS{alertstate="pending"} * 1) or (ALERTS{alertstate="firing"} * 2)'';
-            legend = "[{{severity}}] {{alertname}} {{endpoint}}{{instance}}";
+            targets = [
+              {
+                expr = ''
+                  label_replace(ALERTS{alertstate="pending",job=~".+-node"} * 1, "host", "$1", "job", "(.+)-node")
+                  or label_replace(ALERTS{alertstate="firing",job=~".+-node"} * 2, "host", "$1", "job", "(.+)-node")'';
+                legend = "[{{severity}}] {{alertname}} {{host}}";
+              }
+              {
+                expr = ''
+                  (ALERTS{alertstate="pending",job!~".+-node"} * 1)
+                  or (ALERTS{alertstate="firing",job!~".+-node"} * 2)'';
+                legend = "[{{severity}}] {{alertname}} {{endpoint}}{{resolver}}{{job}}";
+              }
+            ];
             mappings = [
               {
                 type = "value";
@@ -893,7 +936,7 @@ let
             links = [
               (viz.dataLink {
                 title = "Open host details";
-                url = "/d/fleet/fleet?var-node_job=\${__data.fields[\"Host\"]}&\${__url_time_range}";
+                url = "/d/fleet/fleet?var-node=\${__data.fields[\"Host\"]}&\${__url_time_range}";
               })
             ];
             targets = [
@@ -903,27 +946,27 @@ let
                 format = "table";
               }
               {
-                expr = "max by (job) (node_time_seconds{${hostJobSelector}} - node_boot_time_seconds{${hostJobSelector}})";
+                expr = "max by (instance) (node_time_seconds{${hostJobSelector}} - node_boot_time_seconds{${hostJobSelector}})";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''100 * (1 - avg by (job) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
+                expr = ''100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "100 * clamp_min(1 - (max by (job) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (job) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
+                expr = "100 * clamp_min(1 - (max by (instance) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (instance) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''100 * max by (job) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
+                expr = ''100 * max by (instance) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''max by (job) (node_systemd_units{${hostJobSelector},state="failed"})'';
+                expr = ''max by (instance) (node_systemd_units{${hostJobSelector},state="failed"})'';
                 instant = true;
                 format = "table";
               }
@@ -932,7 +975,7 @@ let
               {
                 id = "joinByField";
                 options = {
-                  byField = "job";
+                  byField = "instance";
                   mode = "outerTabular";
                 };
               }
@@ -954,15 +997,15 @@ let
                     "__name__ 4" = true;
                     "__name__ 5" = true;
                     "__name__ 6" = true;
-                    "job 1" = true;
-                    "job 2" = true;
-                    "job 3" = true;
-                    "job 4" = true;
-                    "job 5" = true;
-                    "job 6" = true;
+                    "instance 1" = true;
+                    "instance 2" = true;
+                    "instance 3" = true;
+                    "instance 4" = true;
+                    "instance 5" = true;
+                    "instance 6" = true;
                   };
                   renameByName = {
-                    job = "Host";
+                    instance = "Host";
                     "Value #A" = "Exporter";
                     "Value #B" = "Uptime";
                     "Value #C" = "CPU";
@@ -1154,7 +1197,11 @@ let
             w = 24;
             h = 7;
             expr = hostExporterStatus;
-            legend = "{{job}}";
+            legend = "{{instance}}";
+            # Status history only needs enough buckets to show transitions.
+            # Let Grafana scale the Prometheus step with the selected range
+            # instead of returning every scrape and exceeding its point cap.
+            maxDataPoints = 120;
             mappings = hostStatusMappings;
             options.legend.showLegend = false;
           })
@@ -1166,12 +1213,12 @@ let
             h = 8;
             targets = [
               {
-                expr = ''100 * (1 - avg by (job) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
-                legend = "{{job}} CPU";
+                expr = ''100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{${hostJobSelector},mode="idle"}[$__rate_interval])))'';
+                legend = "{{instance}} CPU";
               }
               {
-                expr = "100 * clamp_min(1 - (max by (job) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (job) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
-                legend = "{{job}} memory";
+                expr = "100 * clamp_min(1 - (max by (instance) (node_memory_MemAvailable_bytes{${hostJobSelector}}) / max by (instance) (node_memory_MemTotal_bytes{${hostJobSelector}})), 0)";
+                legend = "{{instance}} memory";
               }
             ];
             unit = viz.units.percent;
@@ -1186,12 +1233,12 @@ let
             h = 8;
             targets = [
               {
-                expr = ''100 * max by (job) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
-                legend = "{{job}} root";
+                expr = ''100 * max by (instance) (1 - (node_filesystem_avail_bytes{${hostJobSelector},mountpoint="/"} / node_filesystem_size_bytes{${hostJobSelector},mountpoint="/"}))'';
+                legend = "{{instance}} root";
               }
               {
-                expr = ''100 * max by (job) (node_load1{${hostJobSelector}}) / count by (job) (node_cpu_seconds_total{${hostJobSelector},mode="idle"})'';
-                legend = "{{job}} load / cores";
+                expr = ''100 * max by (instance) (node_load1{${hostJobSelector}}) / count by (instance) (node_cpu_seconds_total{${hostJobSelector},mode="idle"})'';
+                legend = "{{instance}} load / cores";
               }
             ];
             unit = viz.units.percent;
@@ -1207,12 +1254,12 @@ let
             h = 8;
             targets = [
               {
-                expr = "sum by (job) (rate(node_network_receive_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
-                legend = "{{job}} receive";
+                expr = "sum by (instance) (rate(node_network_receive_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
+                legend = "{{instance}} receive";
               }
               {
-                expr = "sum by (job) (rate(node_network_transmit_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
-                legend = "{{job}} transmit";
+                expr = "sum by (instance) (rate(node_network_transmit_bytes_total{${hostJobSelector},${realInterfaces}}[$__rate_interval])) * 8";
+                legend = "{{instance}} transmit";
               }
             ];
             unit = viz.units.bitsPerSecond;
@@ -1225,12 +1272,12 @@ let
             h = 8;
             targets = [
               {
-                expr = "sum by (job) (rate(node_disk_read_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
-                legend = "{{job}} read";
+                expr = "sum by (instance) (rate(node_disk_read_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
+                legend = "{{instance}} read";
               }
               {
-                expr = "sum by (job) (rate(node_disk_written_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
-                legend = "{{job}} write";
+                expr = "sum by (instance) (rate(node_disk_written_bytes_total{${hostJobSelector},${wholeDisks}}[$__rate_interval]))";
+                legend = "{{instance}} write";
               }
             ];
             unit = viz.units.bytesPerSecond;
@@ -1243,8 +1290,8 @@ let
             title = "Failed systemd units by host";
             w = 24;
             h = 7;
-            expr = ''max by (job) (node_systemd_units{${hostJobSelector},state="failed"})'';
-            legend = "{{job}}";
+            expr = ''max by (instance) (node_systemd_units{${hostJobSelector},state="failed"})'';
+            legend = "{{instance}}";
             unit = viz.units.none;
             min = 0;
             decimals = 0;
@@ -1268,26 +1315,26 @@ let
         "provisioned"
         "fleet"
       ];
-      description = "Host health for Link, iot, and marin. Use the host filter to inspect one node exporter at a time.";
+      description = "Host health for the registered node exporters. Use the host filter to inspect one at a time.";
       templating.list = [
         {
-          name = "node_job";
+          name = "node";
           label = "Host";
           type = "query";
           datasource = {
             type = "prometheus";
             uid = "prometheus";
           };
-          query = "label_values(node_uname_info{job=~\"(link|iot|marin)-node\"}, job)";
-          definition = "label_values(node_uname_info{job=~\"(link|iot|marin)-node\"}, job)";
+          query = "label_values(node_uname_info{${hostJobSelector}}, instance)";
+          definition = "label_values(node_uname_info{${hostJobSelector}}, instance)";
           refresh = 1;
           sort = 1;
           multi = false;
           includeAll = false;
           current = {
             selected = true;
-            text = "link-node";
-            value = "link-node";
+            text = "link";
+            value = "link";
           };
           options = [ ];
         }
@@ -1302,7 +1349,8 @@ let
             h = 7;
             # avg() over the idle series normalises across cores without a
             # separate core-count divisor.
-            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{job="$node_job",mode="idle"}[$__rate_interval])))'';
+            expr = ''100 * (1 - avg(rate(node_cpu_seconds_total{instance="$node",mode="idle"}[$__rate_interval])))'';
+            legend = "$node";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -1330,7 +1378,8 @@ let
             h = 7;
             # MemAvailable, not MemFree: page cache is reclaimable and
             # counting it as "used" makes every Linux box look full.
-            expr = ''clamp_min((1 - (node_memory_MemAvailable_bytes{job="$node_job"} / node_memory_MemTotal_bytes{job="$node_job"})) * 100, 0)'';
+            expr = ''clamp_min((1 - (node_memory_MemAvailable_bytes{instance="$node"} / node_memory_MemTotal_bytes{instance="$node"})) * 100, 0)'';
+            legend = "$node";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -1357,7 +1406,8 @@ let
             w = 4;
             h = 7;
             description = "Root filesystem use on the selected NixOS host.";
-            expr = ''(1 - (node_filesystem_avail_bytes{job="$node_job",mountpoint="/"} / node_filesystem_size_bytes{job="$node_job",mountpoint="/"})) * 100'';
+            expr = ''(1 - (node_filesystem_avail_bytes{instance="$node",mountpoint="/"} / node_filesystem_size_bytes{instance="$node",mountpoint="/"})) * 100'';
+            legend = "$node";
             unit = viz.units.percent;
             min = 0;
             max = 100;
@@ -1383,7 +1433,8 @@ let
             type = "stat";
             w = 4;
             h = 7;
-            expr = ''node_time_seconds{job="$node_job"} - node_boot_time_seconds{job="$node_job"}'';
+            expr = ''node_time_seconds{instance="$node"} - node_boot_time_seconds{instance="$node"}'';
+            legend = "$node";
             unit = viz.units.duration;
             thresholds = [ { color = "text"; } ];
             options = {
@@ -1396,7 +1447,8 @@ let
             type = "stat";
             w = 4;
             h = 7;
-            expr = ''node_systemd_units{job="$node_job",state="failed"}'';
+            expr = ''node_systemd_units{instance="$node",state="failed"}'';
+            legend = "$node";
             unit = viz.units.none;
             decimals = 0;
             noValue = "0";
@@ -1419,7 +1471,7 @@ let
             h = 7;
             # `up` has 37 series; a bare stat of it rendered 37 anonymous
             # "1"s. The count of failures is the number worth showing.
-            expr = ''count(up{job="$node_job"} == 0) or vector(0)'';
+            expr = ''count(up{instance="$node",job=~"${nodeJobRegex}"} == 0) or vector(0)'';
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -1443,17 +1495,17 @@ let
             h = 8;
             targets = [
               {
-                expr = ''up{job="$node_job"}'';
+                expr = ''up{instance="$node",job=~"${nodeJobRegex}"}'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''scrape_duration_seconds{job="$node_job"}'';
+                expr = ''scrape_duration_seconds{instance="$node",job=~"${nodeJobRegex}"}'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''scrape_samples_scraped{job="$node_job"}'';
+                expr = ''scrape_samples_scraped{instance="$node",job=~"${nodeJobRegex}"}'';
                 instant = true;
                 format = "table";
               }
@@ -1478,6 +1530,8 @@ let
                     "__name__ 1" = true;
                     "__name__ 2" = true;
                     "__name__ 3" = true;
+                    job = true;
+                    "job 1" = true;
                     "job 2" = true;
                     "job 3" = true;
                     endpoint = true;
@@ -1485,9 +1539,7 @@ let
                     slo_class = true;
                   };
                   renameByName = {
-                    instance = "Target";
-                    job = "Job";
-                    "job 1" = "Job";
+                    instance = "Host";
                     "Value #A" = "Up";
                     "Value #B" = "Scrape duration";
                     "Value #C" = "Samples";
@@ -1547,7 +1599,7 @@ let
             targets =
               map
                 (mode: {
-                  expr = ''sum(rate(node_cpu_seconds_total{job="$node_job",mode="${mode}"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{job="$node_job"}) by (cpu)))'';
+                  expr = ''sum(rate(node_cpu_seconds_total{instance="$node",mode="${mode}"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance="$node"}) by (cpu)))'';
                   legend = mode;
                 })
                 [
@@ -1583,23 +1635,23 @@ let
             h = 8;
             targets = [
               {
-                expr = ''node_memory_MemTotal_bytes{job="$node_job"}'';
+                expr = ''node_memory_MemTotal_bytes{instance="$node"}'';
                 legend = "Total";
               }
               {
-                expr = ''node_memory_MemTotal_bytes{job="$node_job"} - node_memory_MemFree_bytes{job="$node_job"} - (node_memory_Cached_bytes{job="$node_job"} + node_memory_Buffers_bytes{job="$node_job"} + node_memory_SReclaimable_bytes{job="$node_job"})'';
+                expr = ''node_memory_MemTotal_bytes{instance="$node"} - node_memory_MemFree_bytes{instance="$node"} - (node_memory_Cached_bytes{instance="$node"} + node_memory_Buffers_bytes{instance="$node"} + node_memory_SReclaimable_bytes{instance="$node"})'';
                 legend = "Used";
               }
               {
-                expr = ''node_memory_Cached_bytes{job="$node_job"} + node_memory_Buffers_bytes{job="$node_job"} + node_memory_SReclaimable_bytes{job="$node_job"}'';
+                expr = ''node_memory_Cached_bytes{instance="$node"} + node_memory_Buffers_bytes{instance="$node"} + node_memory_SReclaimable_bytes{instance="$node"}'';
                 legend = "Cache + buffers";
               }
               {
-                expr = ''node_memory_MemFree_bytes{job="$node_job"}'';
+                expr = ''node_memory_MemFree_bytes{instance="$node"}'';
                 legend = "Free";
               }
               {
-                expr = ''node_memory_SwapTotal_bytes{job="$node_job"} - node_memory_SwapFree_bytes{job="$node_job"}'';
+                expr = ''node_memory_SwapTotal_bytes{instance="$node"} - node_memory_SwapFree_bytes{instance="$node"}'';
                 legend = "Swap used";
               }
             ];
@@ -1644,19 +1696,19 @@ let
             h = 7;
             targets = [
               {
-                expr = ''node_load1{job="$node_job"}'';
+                expr = ''node_load1{instance="$node"}'';
                 legend = "1m";
               }
               {
-                expr = ''node_load5{job="$node_job"}'';
+                expr = ''node_load5{instance="$node"}'';
                 legend = "5m";
               }
               {
-                expr = ''node_load15{job="$node_job"}'';
+                expr = ''node_load15{instance="$node"}'';
                 legend = "15m";
               }
               {
-                expr = ''count(count(node_cpu_seconds_total{job="$node_job"}) by (cpu))'';
+                expr = ''count(count(node_cpu_seconds_total{instance="$node"}) by (cpu))'';
                 legend = "Cores";
               }
             ];
@@ -1695,7 +1747,7 @@ let
             title = "Temperatures";
             w = 12;
             h = 7;
-            expr = ''node_hwmon_temp_celsius{job="$node_job"}'';
+            expr = ''node_hwmon_temp_celsius{instance="$node"}'';
             legend = "{{chip}} / {{sensor}}";
             unit = viz.units.celsius;
             custom.fillOpacity = 0;
@@ -1711,7 +1763,7 @@ let
             h = 8;
             targets = [
               {
-                expr = ''1 - (node_filesystem_avail_bytes{job="$node_job",${realFilesystems}} / node_filesystem_size_bytes{job="$node_job",${realFilesystems}})'';
+                expr = ''1 - (node_filesystem_avail_bytes{instance="$node",${realFilesystems}} / node_filesystem_size_bytes{instance="$node",${realFilesystems}})'';
                 legend = "{{mountpoint}}";
                 instant = true;
               }
@@ -1736,7 +1788,7 @@ let
             title = "Filesystem free";
             w = 12;
             h = 8;
-            expr = ''node_filesystem_avail_bytes{job="$node_job",${realFilesystems}}'';
+            expr = ''node_filesystem_avail_bytes{instance="$node",${realFilesystems}}'';
             legend = "{{mountpoint}}";
             unit = viz.units.bytes;
             min = 0;
@@ -1750,11 +1802,11 @@ let
             h = 7;
             targets = [
               {
-                expr = ''rate(node_disk_read_bytes_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
+                expr = ''rate(node_disk_read_bytes_total{instance="$node",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} read";
               }
               {
-                expr = ''rate(node_disk_written_bytes_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
+                expr = ''rate(node_disk_written_bytes_total{instance="$node",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} write";
               }
             ];
@@ -1772,11 +1824,11 @@ let
             targets = [
               {
                 # The `* 8` is what makes the `bps` bit-rate unit correct.
-                expr = ''rate(node_network_receive_bytes_total{job="$node_job",${realInterfaces}}[$__rate_interval]) * 8'';
+                expr = ''rate(node_network_receive_bytes_total{instance="$node",${realInterfaces}}[$__rate_interval]) * 8'';
                 legend = "{{device}} in";
               }
               {
-                expr = ''rate(node_network_transmit_bytes_total{job="$node_job",${realInterfaces}}[$__rate_interval]) * 8'';
+                expr = ''rate(node_network_transmit_bytes_total{instance="$node",${realInterfaces}}[$__rate_interval]) * 8'';
                 legend = "{{device}} out";
               }
             ];
@@ -1795,11 +1847,11 @@ let
             h = 7;
             targets = [
               {
-                expr = ''rate(node_disk_reads_completed_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
+                expr = ''rate(node_disk_reads_completed_total{instance="$node",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} read";
               }
               {
-                expr = ''rate(node_disk_writes_completed_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
+                expr = ''rate(node_disk_writes_completed_total{instance="$node",${wholeDisks}}[$__rate_interval])'';
                 legend = "{{device}} write";
               }
             ];
@@ -1811,7 +1863,7 @@ let
             title = "Disk busy";
             w = 8;
             h = 7;
-            expr = ''rate(node_disk_io_time_seconds_total{job="$node_job",${wholeDisks}}[$__rate_interval])'';
+            expr = ''rate(node_disk_io_time_seconds_total{instance="$node",${wholeDisks}}[$__rate_interval])'';
             legend = "{{device}}";
             unit = viz.units.percentunit;
             min = 0;
@@ -1824,15 +1876,15 @@ let
             description = "Share of wall-clock time tasks spent stalled waiting for CPU, memory or IO.";
             targets = [
               {
-                expr = ''rate(node_pressure_cpu_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
+                expr = ''rate(node_pressure_cpu_waiting_seconds_total{instance="$node"}[$__rate_interval])'';
                 legend = "CPU";
               }
               {
-                expr = ''rate(node_pressure_memory_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
+                expr = ''rate(node_pressure_memory_waiting_seconds_total{instance="$node"}[$__rate_interval])'';
                 legend = "Memory";
               }
               {
-                expr = ''rate(node_pressure_io_waiting_seconds_total{job="$node_job"}[$__rate_interval])'';
+                expr = ''rate(node_pressure_io_waiting_seconds_total{instance="$node"}[$__rate_interval])'';
                 legend = "IO";
               }
             ];
@@ -1850,7 +1902,7 @@ let
             targets =
               map
                 (state: {
-                  expr = ''node_systemd_units{job="$node_job",state="${state}"}'';
+                  expr = ''node_systemd_units{instance="$node",state="${state}"}'';
                   legend = state;
                 })
                 [
@@ -1898,7 +1950,7 @@ let
             h = 7;
             targets = [
               {
-                expr = ''node_systemd_unit_state{state="failed"} == 1'';
+                expr = ''node_systemd_unit_state{${hostJobSelector},state="failed"} == 1'';
                 instant = true;
                 format = "table";
               }
@@ -1929,7 +1981,7 @@ let
             type = "state-timeline";
             w = 12;
             h = 6;
-            expr = "openclaw_gateway_active";
+            expr = ''openclaw_gateway_active{instance="link"}'';
             legend = "gateway";
             mappings = viz.boolMapping {
               falseText = "INACTIVE";
@@ -1943,15 +1995,15 @@ let
             h = 6;
             targets = [
               {
-                expr = "openclaw_gateway_memory_bytes";
+                expr = ''openclaw_gateway_memory_bytes{instance="link"}'';
                 legend = "Memory";
               }
               {
-                expr = "rate(openclaw_gateway_cpu_seconds_total[$__rate_interval])";
+                expr = ''rate(openclaw_gateway_cpu_seconds_total{instance="link"}[$__rate_interval])'';
                 legend = "CPU";
               }
               {
-                expr = "openclaw_gateway_restarts_total";
+                expr = ''openclaw_gateway_restarts_total{instance="link"}'';
                 legend = "Restarts";
               }
             ];
@@ -1999,7 +2051,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = "sum(probe_success) / count(probe_success)";
+            expr = ''sum(min by (endpoint) (probe_success{endpoint!=""})) / count(min by (endpoint) (probe_success{endpoint!=""}))'';
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
@@ -2024,7 +2076,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = "count(probe_success == 0) or vector(0)";
+            expr = ''count(min by (endpoint) (probe_success{endpoint!=""}) == 0) or vector(0)'';
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -2044,7 +2096,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = "max(probe_duration_seconds)";
+            expr = ''max(probe_duration_seconds{endpoint!=""})'';
             legend = "slowest";
             unit = viz.units.seconds;
             thresholds = [
@@ -2064,7 +2116,7 @@ let
             type = "stat";
             w = 6;
             h = 6;
-            expr = "min(probe_ssl_earliest_cert_expiry - time())";
+            expr = ''min(probe_ssl_earliest_cert_expiry{endpoint!=""} - time())'';
             unit = viz.units.duration;
             thresholds = [
               { color = "red"; }
@@ -2089,12 +2141,12 @@ let
             h = 6;
             targets = [
               {
-                expr = ''count(probe_success{scope="internal"})'';
+                expr = ''count(count by (endpoint) (probe_success{endpoint!="",scope="internal"}))'';
                 legend = "Internal";
               }
             ]
             ++ lib.optional (!localCutover) {
-              expr = ''count(probe_success{scope="private"})'';
+              expr = ''count(count by (endpoint) (probe_success{endpoint!="",scope="private"}))'';
               legend = "Private (TLS)";
             };
             unit = viz.units.none;
@@ -2114,30 +2166,30 @@ let
             type = "table";
             w = 24;
             h = 12;
-            description = "One row per probe. Sorted so anything down floats to the top.";
+            description = "One row per logical endpoint. Resolver-level probes are collapsed to their worst result.";
             targets = [
               {
-                expr = "probe_success";
+                expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "avg_over_time(probe_success[$__range])";
+                expr = ''min by (endpoint) (avg_over_time(probe_success{endpoint!=""}[$__range]))'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "probe_duration_seconds";
+                expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""})'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "probe_http_status_code";
+                expr = ''max by (endpoint) (probe_http_status_code{endpoint!=""})'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = "probe_ssl_earliest_cert_expiry - time()";
+                expr = ''min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()'';
                 instant = true;
                 format = "table";
               }
@@ -2146,9 +2198,7 @@ let
               {
                 id = "joinByField";
                 options = {
-                  byField = "instance";
-                  # Tabular instant data can repeat a join value; `outer`
-                  # silently drops those rows, `outerTabular` keeps them.
+                  byField = "endpoint";
                   mode = "outerTabular";
                 };
               }
@@ -2168,33 +2218,9 @@ let
                     "__name__ 3" = true;
                     "__name__ 4" = true;
                     "__name__ 5" = true;
-                    job = true;
-                    "job 1" = true;
-                    "job 2" = true;
-                    "job 3" = true;
-                    "job 4" = true;
-                    "job 5" = true;
-                    "endpoint 2" = true;
-                    "endpoint 3" = true;
-                    "endpoint 4" = true;
-                    "endpoint 5" = true;
-                    "scope 2" = true;
-                    "scope 3" = true;
-                    "scope 4" = true;
-                    "scope 5" = true;
-                    slo_class = true;
-                    "slo_class 1" = true;
-                    "slo_class 2" = true;
-                    "slo_class 3" = true;
-                    "slo_class 4" = true;
-                    "slo_class 5" = true;
                   };
                   renameByName = {
                     endpoint = "Endpoint";
-                    "endpoint 1" = "Endpoint";
-                    scope = "Scope";
-                    "scope 1" = "Scope";
-                    instance = "Target";
                     "Value #A" = "Status";
                     "Value #B" = "Uptime (range)";
                     "Value #C" = "Latency";
@@ -2393,8 +2419,8 @@ let
             w = 24;
             h = 14;
             description = "Green bands are healthy runs; the red slivers are the outages.";
-            expr = "probe_success";
-            legend = "{{endpoint}} ({{scope}})";
+            expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
+            legend = "{{endpoint}}";
             mappings = viz.boolMapping { };
             options = {
               # 29 probe series would otherwise paginate at Grafana's
@@ -2410,8 +2436,8 @@ let
             title = "Probe duration";
             w = 12;
             h = 8;
-            expr = "probe_duration_seconds";
-            legend = "{{endpoint}} ({{scope}})";
+            expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""})'';
+            legend = "{{endpoint}}";
             unit = viz.units.seconds;
             min = 0;
             custom.fillOpacity = 0;
@@ -2432,7 +2458,7 @@ let
             w = 12;
             h = 8;
             description = "HTTP phases are additive, so stacking them shows the total and the split at once.";
-            expr = "avg by (phase) (probe_http_duration_seconds)";
+            expr = ''avg by (phase) (probe_http_duration_seconds{endpoint!=""})'';
             legend = "{{phase}}";
             unit = viz.units.seconds;
             min = 0;
@@ -2454,12 +2480,12 @@ let
             description = "One point per probe over the ${observability.slo.window} window. Bottom-right is healthy; anything drifting left or down is slow, flaky, or both.";
             targets = [
               {
-                expr = "endpoint:latency_p95_7d";
+                expr = "max by (endpoint) (endpoint:latency_p95_7d)";
                 instant = true;
                 format = "table";
               }
               {
-                expr = "endpoint:availability_7d";
+                expr = "min by (endpoint) (endpoint:availability_7d)";
                 instant = true;
                 format = "table";
               }
@@ -2483,7 +2509,7 @@ let
               {
                 id = "joinByField";
                 options = {
-                  byField = "instance";
+                  byField = "endpoint";
                   mode = "outerTabular";
                 };
               }
@@ -2548,8 +2574,8 @@ let
             description = "How probe latency is actually distributed, rather than just its average. Scaled to milliseconds because the bucket size is an integer.";
             # The panel buckets raw values client-side, so it wants the plain
             # series rather than a pre-bucketed histogram.
-            expr = "probe_duration_seconds * 1000";
-            legend = "{{scope}}";
+            expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""}) * 1000'';
+            legend = "{{endpoint}}";
             unit = viz.units.milliseconds;
             custom = {
               fillOpacity = 70;
@@ -2567,7 +2593,7 @@ let
             h = 8;
             targets = [
               {
-                expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400";
+                expr = ''(min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()) / 86400'';
                 legend = "{{endpoint}}";
                 instant = true;
               }
@@ -2597,7 +2623,7 @@ let
             title = "Certificate expiry over time";
             w = 12;
             h = 8;
-            expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400";
+            expr = ''(min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()) / 86400'';
             legend = "{{endpoint}}";
             unit = "d";
             min = 0;
@@ -2734,8 +2760,8 @@ let
             description = "1.0 means the budget is untouched; 0 means it is spent; negative means the ${toString sloTargetPercent}% objective is already breached.";
             targets = [
               {
-                expr = "endpoint:error_budget_remaining_7d";
-                legend = "{{endpoint}} ({{scope}})";
+                expr = "min by (endpoint) (endpoint:error_budget_remaining_7d)";
+                legend = "{{endpoint}}";
                 instant = true;
               }
             ];
@@ -2763,8 +2789,8 @@ let
             h = 12;
             targets = [
               {
-                expr = "endpoint:availability_7d";
-                legend = "{{endpoint}} ({{scope}})";
+                expr = "min by (endpoint) (endpoint:availability_7d)";
+                legend = "{{endpoint}}";
                 instant = true;
               }
             ];
@@ -2794,7 +2820,7 @@ let
             title = "Error budget burn-down";
             w = 12;
             h = 8;
-            expr = "endpoint:error_budget_remaining_7d";
+            expr = "min by (endpoint) (endpoint:error_budget_remaining_7d)";
             legend = "{{endpoint}}";
             unit = viz.units.percentunit;
             max = 1;
@@ -2816,8 +2842,8 @@ let
             title = "p95 latency";
             w = 12;
             h = 8;
-            expr = "endpoint:latency_p95_7d";
-            legend = "{{endpoint}} ({{scope}})";
+            expr = "max by (endpoint) (endpoint:latency_p95_7d)";
+            legend = "{{endpoint}}";
             unit = viz.units.seconds;
             min = 0;
             custom = {
@@ -2986,8 +3012,8 @@ let
           label = "Resolver";
           type = "query";
           datasource.uid = "prometheus";
-          query = "label_values(blocky_query_total, resolver)";
-          definition = "label_values(blocky_query_total, resolver)";
+          query = ''label_values(blocky_query_total{instance=~"${resolverHostRegex}"}, resolver)'';
+          definition = ''label_values(blocky_query_total{instance=~"${resolverHostRegex}"}, resolver)'';
           multi = true;
           includeAll = true;
           allValue = ".*";
@@ -3006,6 +3032,7 @@ let
             w = 4;
             h = 5;
             expr = ''min by (resolver) (blocky_blocking_enabled{resolver=~"$resolver"})'';
+            legend = "{{resolver}}";
             mappings = viz.boolMapping {
               falseText = "DISABLED";
               trueText = "ENABLED";
@@ -3089,12 +3116,12 @@ let
             h = 5;
             targets = [
               {
-                expr = ''blocky_denylist_cache_entries{resolver=~"$resolver"}'';
-                legend = "Blocked domains";
+                expr = ''blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} blocked domains";
               }
               {
-                expr = ''blocky_cache_entries{resolver=~"$resolver"}'';
-                legend = "Cached answers";
+                expr = ''blocky_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} cached answers";
               }
             ];
             unit = viz.units.short;
@@ -3259,12 +3286,12 @@ let
             h = 7;
             targets = [
               {
-                expr = ''blocky_cache_entries{resolver=~"$resolver"}'';
-                legend = "Entries";
+                expr = ''blocky_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} entries";
               }
               {
-                expr = ''blocky_prefetch_domain_name_cache_entries{resolver=~"$resolver"}'';
-                legend = "Prefetch candidates";
+                expr = ''blocky_prefetch_domain_name_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} prefetch candidates";
               }
             ];
             unit = viz.units.short;
@@ -3382,7 +3409,8 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "prometheus_tsdb_head_series";
+            expr = ''prometheus_tsdb_head_series{instance="link"}'';
+            legend = "Series";
             unit = viz.units.short;
             thresholds = [ { color = "blue"; } ];
           })
@@ -3392,7 +3420,8 @@ let
             w = 4;
             h = 5;
             description = "Compared against the 2 GB logical retention limit, which is not a filesystem quota.";
-            expr = "prometheus_tsdb_storage_blocks_bytes";
+            expr = ''prometheus_tsdb_storage_blocks_bytes{instance="link"}'';
+            legend = "Storage";
             unit = viz.units.bytes;
             thresholds = [
               { color = "green"; }
@@ -3411,7 +3440,8 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "sum(rate(prometheus_tsdb_head_samples_appended_total[$__rate_interval]))";
+            expr = ''sum(rate(prometheus_tsdb_head_samples_appended_total{instance="link"}[$__rate_interval]))'';
+            legend = "Samples/s";
             unit = viz.units.ops;
             decimals = 0;
             thresholds = [ { color = "blue"; } ];
@@ -3422,6 +3452,7 @@ let
             w = 4;
             h = 5;
             expr = "max(scrape_duration_seconds)";
+            legend = "Duration";
             unit = viz.units.seconds;
             decimals = 3;
             thresholds = [
@@ -3441,7 +3472,8 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "prometheus_config_last_reload_successful";
+            expr = ''prometheus_config_last_reload_successful{instance="link"}'';
+            legend = "Reload";
             mappings = viz.boolMapping {
               falseText = "FAILED";
               trueText = "OK";
@@ -3456,7 +3488,8 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "sum(increase(prometheus_rule_evaluation_failures_total[$__range])) or vector(0)";
+            expr = ''sum(increase(prometheus_rule_evaluation_failures_total{instance="link"}[$__range])) or vector(0)'';
+            legend = "Failures";
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -3508,11 +3541,11 @@ let
             h = 7;
             targets = [
               {
-                expr = "prometheus_tsdb_head_series";
+                expr = ''prometheus_tsdb_head_series{instance="link"}'';
                 legend = "Series";
               }
               {
-                expr = "prometheus_tsdb_head_chunks";
+                expr = ''prometheus_tsdb_head_chunks{instance="link"}'';
                 legend = "Chunks";
               }
             ];
@@ -3525,11 +3558,11 @@ let
             h = 7;
             targets = [
               {
-                expr = "sum(rate(prometheus_tsdb_head_series_created_total[$__rate_interval]))";
+                expr = ''sum(rate(prometheus_tsdb_head_series_created_total{instance="link"}[$__rate_interval]))'';
                 legend = "Created";
               }
               {
-                expr = "sum(rate(prometheus_tsdb_head_series_removed_total[$__rate_interval]))";
+                expr = ''sum(rate(prometheus_tsdb_head_series_removed_total{instance="link"}[$__rate_interval]))'';
                 legend = "Removed";
               }
             ];
@@ -3539,7 +3572,7 @@ let
             title = "Rule evaluation";
             w = 8;
             h = 7;
-            expr = "max by (rule_group) (prometheus_rule_group_last_duration_seconds)";
+            expr = ''max by (rule_group) (prometheus_rule_group_last_duration_seconds{instance="link"})'';
             legend = "{{rule_group}}";
             unit = viz.units.seconds;
             min = 0;
@@ -3553,7 +3586,8 @@ let
             w = 6;
             h = 5;
             description = "Alloy's own count of entries accepted by Loki. A flat zero here means the write path is broken, not that the box is quiet.";
-            expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+            expr = ''sum(rate(loki_write_sent_entries_total{instance="link"}[$__rate_interval]))'';
+            legend = "Lines/s";
             unit = viz.units.ops;
             decimals = 2;
             thresholds = [
@@ -3570,7 +3604,8 @@ let
             type = "stat";
             w = 6;
             h = 5;
-            expr = "sum(increase(loki_write_dropped_entries_total[$__range])) or vector(0)";
+            expr = ''sum(increase(loki_write_dropped_entries_total{instance="link"}[$__range])) or vector(0)'';
+            legend = "Dropped";
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -3590,7 +3625,8 @@ let
             type = "stat";
             w = 6;
             h = 5;
-            expr = "sum(rate(loki_distributor_bytes_received_total[$__rate_interval]))";
+            expr = ''sum(rate(loki_distributor_bytes_received_total{instance="link"}[$__rate_interval]))'';
+            legend = "Bytes/s";
             unit = viz.units.bytesPerSecond;
             thresholds = [ { color = "blue"; } ];
           })
@@ -3599,7 +3635,8 @@ let
             type = "stat";
             w = 6;
             h = 5;
-            expr = "sum(loki_ingester_memory_streams) or vector(0)";
+            expr = ''sum(loki_ingester_memory_streams{instance="link"}) or vector(0)'';
+            legend = "Streams";
             unit = viz.units.short;
             decimals = 0;
             thresholds = [ { color = "blue"; } ];
@@ -3612,15 +3649,15 @@ let
             h = 8;
             targets = [
               {
-                expr = "sum(rate(loki_write_sent_entries_total[$__rate_interval]))";
+                expr = ''sum(rate(loki_write_sent_entries_total{instance="link"}[$__rate_interval]))'';
                 legend = "Sent";
               }
               {
-                expr = "sum by (reason) (rate(loki_write_dropped_entries_total[$__rate_interval]))";
+                expr = ''sum by (reason) (rate(loki_write_dropped_entries_total{instance="link"}[$__rate_interval]))'';
                 legend = "Dropped ({{reason}})";
               }
               {
-                expr = "sum(rate(loki_source_journal_target_lines_total[$__rate_interval]))";
+                expr = ''sum(rate(loki_source_journal_target_lines_total{instance="link"}[$__rate_interval]))'';
                 legend = "Journal lines read";
               }
             ];
@@ -3643,7 +3680,7 @@ let
             h = 8;
             targets = [
               {
-                expr = "histogram_quantile(0.99, sum by (le, route) (rate(loki_request_duration_seconds_bucket[$__rate_interval])))";
+                expr = ''histogram_quantile(0.99, sum by (le, route) (rate(loki_request_duration_seconds_bucket{instance="link"}[$__rate_interval])))'';
                 legend = "p99 {{route}}";
               }
             ];
@@ -3657,7 +3694,7 @@ let
             title = "Loki responses by status";
             w = 12;
             h = 7;
-            expr = "sum by (status_code) (rate(loki_request_duration_seconds_count[$__rate_interval]))";
+            expr = ''sum by (status_code) (rate(loki_request_duration_seconds_count{instance="link"}[$__rate_interval]))'';
             legend = "{{status_code}}";
             unit = viz.units.reqps;
             custom = {
@@ -3685,7 +3722,7 @@ let
             h = 7;
             targets = [
               {
-                expr = ''process_resident_memory_bytes{job=~"prometheus|loki|alloy|blackbox|link-node"}'';
+                expr = ''max by (job) (process_resident_memory_bytes{job=~"prometheus|loki|alloy|blackbox|link-node",instance="link"})'';
                 legend = "{{job}} RSS";
               }
             ];
@@ -3728,7 +3765,29 @@ in
         ;
 
       yaml = pkgs.formats.yaml { };
-
+      nodeScrapeConfigs = map (target: {
+        job_name = "${target.hostName}-node";
+        static_configs = [
+          {
+            targets = [ "${target.scrapeAddress}:${toString node.port}" ];
+            labels.instance = target.hostName;
+          }
+        ];
+      }) nodeEntries;
+      blockyScrapeTargets = map (
+        resolver:
+        let
+          scrapeAddress =
+            if resolver.registryName == observability.hubHost then blocky.backendAddress else resolver.lan;
+        in
+        {
+          targets = [ "${scrapeAddress}:${toString blocky.port}" ];
+          labels = {
+            instance = resolver.hostName;
+            resolver = resolver.hostName;
+          };
+        }
+      ) resolverEntries;
       blackboxConfig = yaml.generate "blackbox-observability.yaml" {
         modules = {
           http_internal = {
@@ -3768,6 +3827,7 @@ in
           name,
           module,
           targets,
+          instanceLabel ? "endpoint",
         }:
         {
           job_name = "blackbox-${name}";
@@ -3780,7 +3840,10 @@ in
               target_label = "__param_target";
             }
             {
-              source_labels = [ "__param_target" ];
+              # Keep transport addresses out of Prometheus's public identity
+              # label. Dashboards and alerts should name the logical endpoint
+              # (or resolver), never its current IP/port/URL.
+              source_labels = [ instanceLabel ];
               target_label = "instance";
             }
             {
@@ -3789,6 +3852,33 @@ in
             }
           ];
         };
+
+      safeInstanceName =
+        value:
+        builtins.isString value
+        && builtins.match "[A-Za-z0-9][A-Za-z0-9.-]*" value != null
+        && builtins.match "([0-9]{1,3}\\.){3}[0-9]{1,3}" value == null;
+      scrapeHasSafeInstance =
+        scrape:
+        let
+          staticConfigs = scrape.static_configs or [ ];
+          explicitInstancesSafe = lib.all (
+            static:
+            let
+              instance = static.labels.instance or null;
+            in
+            instance != null && safeInstanceName instance
+          ) staticConfigs;
+          derivedInstanceSafe = lib.any (
+            rule:
+            (rule.target_label or null) == "instance"
+            && lib.elem (rule.source_labels or [ ]) [
+              [ "endpoint" ]
+              [ "resolver" ]
+            ]
+          ) (scrape.relabel_configs or [ ]);
+        in
+        explicitInstancesSafe || derivedInstanceSafe;
 
       recordingAndAlertRules = yaml.generate "observability-rules.yaml" {
         groups = [
@@ -3800,7 +3890,9 @@ in
                 record = "endpoint:availability_7d";
                 # A removed probe otherwise keeps producing a rolling value
                 # until its last sample ages out of the range vector.
-                expr = "avg_over_time(probe_success[${observability.slo.window}]) and probe_success";
+                # Resolver/path copies are implementation details: one endpoint
+                # gets one conservative SLO series, using its worst view.
+                expr = "min by (endpoint, slo_class) (avg_over_time(probe_success{endpoint!=\"\"}[${observability.slo.window}]) and probe_success{endpoint!=\"\"})";
               }
               {
                 record = "endpoint:error_budget_remaining_7d";
@@ -3808,7 +3900,7 @@ in
               }
               {
                 record = "endpoint:latency_p95_7d";
-                expr = "quantile_over_time(0.95, probe_duration_seconds[${observability.slo.window}]) and probe_duration_seconds";
+                expr = "max by (endpoint, slo_class) (quantile_over_time(0.95, probe_duration_seconds{endpoint!=\"\"}[${observability.slo.window}]) and probe_duration_seconds{endpoint!=\"\"})";
               }
             ];
           }
@@ -3818,21 +3910,21 @@ in
             rules = [
               {
                 alert = "NixOSHostExporterDown";
-                expr = ''up{job=~"(link|impa|iot|marin)-node"} == 0'';
+                expr = "up{${requiredNodeJobSelector}} == 0";
                 for = "5m";
                 labels.severity = "critical";
-                annotations.summary = "Node exporter {{ $labels.job }} at {{ $labels.instance }} is unreachable";
+                annotations.summary = "Node exporter on {{ $labels.instance }} is unreachable";
               }
               {
                 alert = "PrometheusScrapeTargetDown";
-                expr = ''up{job!~"blackbox-.*|(link|impa|iot|marin|zelda|hylia)-node|scraparr|tautulli-exporter"} == 0'';
+                expr = ''up{job!~"blackbox-.*|${nodeJobRegex}|scraparr|tautulli-exporter"} == 0'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
               }
               {
                 alert = "DnsResolverUnavailable";
-                expr = ''probe_success{job="blackbox-dns"} == 0'';
+                expr = ''min by (resolver) (probe_success{job="blackbox-dns"}) == 0'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "DNS resolver {{ $labels.resolver }} is unavailable";
@@ -3846,7 +3938,7 @@ in
               }
               {
                 alert = "DnsInternalRecordMismatch";
-                expr = ''probe_success{job="blackbox-dns"} == 0 and on (resolver) up{job="blocky"} == 1'';
+                expr = ''min by (resolver) (probe_success{job="blackbox-dns"}) == 0 and on (resolver) max by (resolver) (up{job="blocky"}) == 1'';
                 for = "2m";
                 labels.severity = "critical";
                 annotations.summary = "Generated internal DNS fixture mismatches on {{ $labels.resolver }}";
@@ -3867,49 +3959,49 @@ in
               }
               {
                 alert = "EndpointDown";
-                expr = ''probe_success{job!="blackbox-tautulli-ready"} == 0'';
+                expr = ''min by (endpoint, slo_class) (probe_success{endpoint!="",job!="blackbox-tautulli-ready"}) == 0'';
                 for = "5m";
                 labels.severity = "critical";
-                annotations.summary = "{{ $labels.scope }} endpoint {{ $labels.endpoint }} is down";
+                annotations.summary = "Endpoint {{ $labels.endpoint }} is down";
               }
               {
                 alert = "SystemdUnitFailed";
-                expr = ''node_systemd_unit_state{job=~"(link|iot|marin)-node",state="failed"} == 1'';
+                expr = ''node_systemd_unit_state{${requiredNodeJobSelector},state="failed"} == 1'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Systemd unit {{ $labels.name }} is failed on {{ $labels.instance }}";
               }
               {
                 alert = "OpenClawGatewayDown";
-                expr = "openclaw_gateway_active != 1";
+                expr = ''openclaw_gateway_active{instance="link"} != 1'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "OpenClaw gateway service health is degraded";
               }
               {
                 alert = "RootDiskPressure";
-                expr = ''node_filesystem_avail_bytes{job=~"(link|iot|marin)-node",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job=~"(link|iot|marin)-node",mountpoint="/",fstype!~"tmpfs|overlay"} < 0.15'';
+                expr = ''node_filesystem_avail_bytes{${requiredNodeJobSelector},mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{${requiredNodeJobSelector},mountpoint="/",fstype!~"tmpfs|overlay"} < 0.15'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Root filesystem on {{ $labels.instance }} has less than 15% free";
               }
               {
                 alert = "TelemetryStorageGrowth";
-                expr = ''predict_linear(node_filesystem_avail_bytes{job="link-node",mountpoint="/",fstype!~"tmpfs|overlay"}[6h], 7 * 24 * 3600) < 0'';
+                expr = ''predict_linear(node_filesystem_avail_bytes{job="link-node",instance="link",mountpoint="/",fstype!~"tmpfs|overlay"}[6h], 7 * 24 * 3600) < 0'';
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Current filesystem growth projects Link root exhaustion within seven days";
               }
               {
                 alert = "PrometheusLogicalRetentionNearLimit";
-                expr = "prometheus_tsdb_storage_blocks_bytes > 1800000000";
+                expr = ''prometheus_tsdb_storage_blocks_bytes{instance="link"} > 1800000000'';
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus blocks exceed 1.8 GB; the 2 GB setting is logical retention, not a filesystem quota";
               }
               {
                 alert = "ObservabilityTlsExpiring";
-                expr = ''probe_ssl_earliest_cert_expiry{scope="private"} - time() < 21 * 24 * 3600'';
+                expr = ''min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time() < 21 * 24 * 3600'';
                 for = "1h";
                 labels.severity = "warning";
                 annotations.summary = "TLS certificate for {{ $labels.endpoint }} expires within 21 days";
@@ -3934,7 +4026,7 @@ in
                 # same live probe at the far edge of the window also prevents
                 # newly added targets from exhausting their budget during
                 # their first week.
-                expr = "endpoint:error_budget_remaining_7d < 0 and probe_success offset ${observability.slo.window}";
+                expr = "endpoint:error_budget_remaining_7d < 0 and on (endpoint, slo_class) min by (endpoint, slo_class) (probe_success{endpoint!=\"\"} offset ${observability.slo.window})";
                 for = "15m";
                 labels.severity = "critical";
                 annotations.summary = "{{ $labels.endpoint }} exhausted its 99% seven-day error budget";
@@ -4140,6 +4232,25 @@ in
         {
           assertion = lib.all (endpoint: endpoint.backendAddress == "127.0.0.1") endpointList;
           message = "All Phase 1 application backends must be IPv4 loopback-only.";
+        }
+        {
+          assertion =
+            nodeEntries != [ ]
+            && requiredNodeHostNames != [ ]
+            && lib.length nodeHostNames == lib.length (lib.unique nodeHostNames);
+          message = "The observability node registry must contain unique host identities and at least one required node.";
+        }
+        {
+          assertion =
+            resolverEntries != [ ]
+            && lib.all (
+              resolver: resolver.registryName == observability.hubHost || resolver.lan != null
+            ) resolverEntries;
+          message = "Every remote internal-DNS-capable host needs a LAN address for Blocky scraping.";
+        }
+        {
+          assertion = lib.all scrapeHasSafeInstance config.services.prometheus.scrapeConfigs;
+          message = "Every Prometheus scrape must expose a hostname/FQDN instance label, never a transport address.";
         }
         {
           assertion = !telegramContactRouted;
@@ -4384,79 +4495,69 @@ in
         retentionTime = observability.retention.prometheusTime;
         extraFlags = [ "--storage.tsdb.retention.size=${observability.retention.prometheusSize}" ];
         ruleFiles = [ recordingAndAlertRules ];
-        scrapeConfigs = [
-          {
-            job_name = "link-node";
-            static_configs = [ { targets = [ "${node.backendAddress}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "impa-node";
-            static_configs = [ { targets = [ "${remoteNodeTargets.impa}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "iot-node";
-            static_configs = [ { targets = [ "${remoteNodeTargets.iot}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "marin-node";
-            static_configs = [ { targets = [ "${remoteNodeTargets.marin}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "zelda-node";
-            static_configs = [ { targets = [ "${remoteNodeTargets.zelda}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "hylia-node";
-            static_configs = [ { targets = [ "${remoteNodeTargets.hylia}:${toString node.port}" ]; } ];
-          }
-          {
-            job_name = "prometheus";
-            static_configs = [ { targets = [ "${prometheus.backendAddress}:${toString prometheus.port}" ]; } ];
-          }
-          {
-            job_name = "loki";
-            static_configs = [ { targets = [ "${loki.backendAddress}:${toString loki.port}" ]; } ];
-          }
-          {
-            job_name = "alloy";
-            static_configs = [ { targets = [ "${alloy.backendAddress}:${toString alloy.port}" ]; } ];
-          }
-          {
-            job_name = "blackbox";
-            static_configs = [ { targets = [ "${blackbox.backendAddress}:${toString blackbox.port}" ]; } ];
-          }
-          {
-            job_name = "blocky";
-            static_configs = [
-              {
-                targets = [ "${blocky.backendAddress}:${toString blocky.port}" ];
-                labels.resolver = "link";
-              }
-              {
-                targets = [ "${remoteNodeTargets.impa}:${toString blocky.port}" ];
-                labels.resolver = "impa";
-              }
-            ];
-          }
-          (mkBlackboxScrape {
-            name = "dns";
-            module = "dns";
-            targets = map (resolver: {
-              targets = [ "${hostRegistry.${resolver}.homeAddress}:53" ];
-              labels = { inherit resolver; };
-            }) publicationSite.internalDnsHosts;
-          })
-          (mkBlackboxScrape {
-            name = "internal";
-            module = internalProbeModule;
-            targets = internalProbes;
-          })
-        ]
-        ++ lib.optional (!localCutover) (mkBlackboxScrape {
-          name = "private";
-          module = "https_internal";
-          targets = privateProbes;
-        });
+        scrapeConfigs =
+          nodeScrapeConfigs
+          ++ [
+            {
+              job_name = "prometheus";
+              static_configs = [
+                {
+                  targets = [ "${prometheus.backendAddress}:${toString prometheus.port}" ];
+                  labels.instance = "link";
+                }
+              ];
+            }
+            {
+              job_name = "loki";
+              static_configs = [
+                {
+                  targets = [ "${loki.backendAddress}:${toString loki.port}" ];
+                  labels.instance = "link";
+                }
+              ];
+            }
+            {
+              job_name = "alloy";
+              static_configs = [
+                {
+                  targets = [ "${alloy.backendAddress}:${toString alloy.port}" ];
+                  labels.instance = "link";
+                }
+              ];
+            }
+            {
+              job_name = "blackbox";
+              static_configs = [
+                {
+                  targets = [ "${blackbox.backendAddress}:${toString blackbox.port}" ];
+                  labels.instance = "link";
+                }
+              ];
+            }
+            {
+              job_name = "blocky";
+              static_configs = blockyScrapeTargets;
+            }
+            (mkBlackboxScrape {
+              name = "dns";
+              module = "dns";
+              instanceLabel = "resolver";
+              targets = map (resolver: {
+                targets = [ "${hostRegistry.${resolver}.homeAddress}:53" ];
+                labels = { inherit resolver; };
+              }) publicationSite.internalDnsHosts;
+            })
+            (mkBlackboxScrape {
+              name = "internal";
+              module = internalProbeModule;
+              targets = internalProbes;
+            })
+          ]
+          ++ lib.optional (!localCutover) (mkBlackboxScrape {
+            name = "private";
+            module = "https_internal";
+            targets = privateProbes;
+          });
         exporters = {
           node = {
             enable = true;

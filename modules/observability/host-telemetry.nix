@@ -1,25 +1,22 @@
 { config, lib, ... }:
 let
-  telemetryHosts = [
-    "impa"
-    "iot"
-    "marin"
-  ];
-  exporterPort = 9100;
-  linkAddress = config.hosts.link.homeAddress;
+  telemetryNodes = lib.filterAttrs (_: node: node.provisionExporter) config.observability.nodes;
+  exporterPort = config.observability.endpoints.node.port;
+  hubHostName = config.observability.hubHost;
+  hubAddress = config.hosts.${hubHostName}.homeAddress;
 
   hostModule =
-    hostName:
+    hostName: node:
     let
-      hostAddress = config.hosts.${hostName}.homeAddress;
+      hostAddress = node.scrapeAddress;
       chain = "nixos-host-telemetry";
     in
     { config, ... }:
     {
       assertions = [
         {
-          assertion = hostAddress != null && linkAddress != null;
-          message = "${hostName} telemetry requires LAN addresses for both ${hostName} and link";
+          assertion = hostAddress != null && hubAddress != null;
+          message = "${hostName} telemetry requires LAN addresses for both ${hostName} and ${hubHostName}";
         }
         {
           assertion =
@@ -43,7 +40,7 @@ let
       networking.firewall = {
         extraCommands = ''
           iptables -w -N ${chain} 2>/dev/null || iptables -w -F ${chain}
-          iptables -w -A ${chain} -s ${linkAddress}/32 -j nixos-fw-accept
+          iptables -w -A ${chain} -s ${hubAddress}/32 -j nixos-fw-accept
           iptables -w -A ${chain} -j nixos-fw-refuse
           iptables -w -I nixos-fw 1 -p tcp --dport ${toString exporterPort} -j ${chain}
         '';
@@ -56,7 +53,7 @@ let
     };
 in
 {
-  configurations.nixos = lib.genAttrs telemetryHosts (hostName: {
-    module = hostModule hostName;
-  });
+  configurations.nixos = lib.mapAttrs (hostName: node: {
+    module = hostModule hostName node;
+  }) telemetryNodes;
 }

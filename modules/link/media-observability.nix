@@ -72,7 +72,7 @@ let
     datasource.uid = "prometheus";
     query = {
       qryType = 1;
-      query = "label_values(scraparr_services_up, alias)";
+      query = ''label_values(scraparr_services_up{instance="link"}, alias)'';
       refId = "PrometheusVariableQueryEditor-VariableQuery";
     };
     includeAll = true;
@@ -92,7 +92,7 @@ let
     {
       key = "seerr";
       label = "Seerr";
-      expr = ''min(scraparr_services_up{scraparr_services="seerr"})'';
+      expr = ''min(scraparr_services_up{instance="link",scraparr_services="seerr"})'';
       left = 15;
       top = 64;
       to = [
@@ -103,7 +103,7 @@ let
     {
       key = "radarr";
       label = "Radarr";
-      expr = ''min(scraparr_services_up{scraparr_services="radarr"})'';
+      expr = ''min(scraparr_services_up{instance="link",scraparr_services="radarr"})'';
       left = 170;
       top = 22;
       to = [ "nzbhydra2" ];
@@ -111,7 +111,7 @@ let
     {
       key = "sonarr";
       label = "Sonarr";
-      expr = ''min(scraparr_services_up{scraparr_services="sonarr"})'';
+      expr = ''min(scraparr_services_up{instance="link",scraparr_services="sonarr"})'';
       left = 170;
       top = 106;
       to = [ "nzbhydra2" ];
@@ -129,7 +129,7 @@ let
     {
       key = "sabnzbd";
       label = "SABnzbd";
-      expr = ''min(scraparr_services_up{scraparr_services="sabnzbd"})'';
+      expr = ''min(scraparr_services_up{instance="link",scraparr_services="sabnzbd"})'';
       left = 480;
       top = 64;
       to = [ "alexandria" ];
@@ -137,7 +137,7 @@ let
     {
       key = "bazarr";
       label = "Bazarr";
-      expr = ''min(scraparr_services_up{scraparr_services="bazarr"})'';
+      expr = ''min(scraparr_services_up{instance="link",scraparr_services="bazarr"})'';
       left = 480;
       top = 148;
       to = [ "alexandria" ];
@@ -304,6 +304,7 @@ let
             w = 4;
             h = 5;
             expr = "media:plex_streams";
+            legend = "Streams";
             unit = viz.units.none;
             noValue = "0";
             decimals = 0;
@@ -318,6 +319,7 @@ let
             w = 4;
             h = 5;
             expr = "media:plex_transcodes";
+            legend = "Transcodes";
             unit = viz.units.none;
             noValue = "0";
             decimals = 0;
@@ -343,6 +345,7 @@ let
             # second and rendered with a bit-rate unit rather than a bare
             # five-digit number.
             expr = "media:plex_bandwidth_kbps * 1000";
+            legend = "Bandwidth";
             unit = viz.units.bitsPerSecond;
             noValue = "0";
             thresholds = [ { color = "blue"; } ];
@@ -354,6 +357,7 @@ let
             w = 4;
             h = 5;
             expr = "media:sab_queue_rate_bytes";
+            legend = "Rate";
             unit = viz.units.bytesPerSecond;
             noValue = "0";
             thresholds = [ { color = "purple"; } ];
@@ -365,6 +369,7 @@ let
             w = 4;
             h = 5;
             expr = "media:arr_queue_items";
+            legend = "Items";
             unit = viz.units.none;
             noValue = "0";
             decimals = 0;
@@ -377,6 +382,7 @@ let
             w = 4;
             h = 5;
             expr = "media:sab_queue_remaining_bytes";
+            legend = "Remaining";
             unit = viz.units.bytes;
             noValue = "0";
             thresholds = [ { color = "text"; } ];
@@ -692,6 +698,7 @@ let
             w = 8;
             h = 7;
             expr = "media:sab_queue_paused";
+            legend = "State";
             mappings = viz.boolMapping {
               falseText = "Downloading";
               trueText = "Paused";
@@ -712,19 +719,19 @@ let
             h = 7;
             targets = [
               {
-                expr = "plex_active_streams_total";
+                expr = ''plex_active_streams_total{instance="link"}'';
                 legend = "Total streams";
               }
               {
-                expr = "plex_active_streams_direct_play";
+                expr = ''plex_active_streams_direct_play{instance="link"}'';
                 legend = "Direct play";
               }
               {
-                expr = "plex_active_streams_direct_stream";
+                expr = ''plex_active_streams_direct_stream{instance="link"}'';
                 legend = "Direct stream";
               }
               {
-                expr = "plex_active_streams_transcode";
+                expr = ''plex_active_streams_transcode{instance="link"}'';
                 legend = "Transcode";
               }
             ];
@@ -762,15 +769,15 @@ let
             h = 7;
             targets = [
               {
-                expr = "plex_bandwidth_total_kbps * 1000";
+                expr = ''plex_bandwidth_total_kbps{instance="link"} * 1000'';
                 legend = "Total";
               }
               {
-                expr = "plex_bandwidth_lan_kbps * 1000";
+                expr = ''plex_bandwidth_lan_kbps{instance="link"} * 1000'';
                 legend = "LAN";
               }
               {
-                expr = "plex_bandwidth_wan_kbps * 1000";
+                expr = ''plex_bandwidth_wan_kbps{instance="link"} * 1000'';
                 legend = "WAN";
               }
             ];
@@ -785,15 +792,15 @@ let
             h = 6;
             targets = [
               {
-                expr = "plex_transcode_video_sessions";
+                expr = ''plex_transcode_video_sessions{instance="link"}'';
                 legend = "Video";
               }
               {
-                expr = "plex_transcode_audio_sessions";
+                expr = ''plex_transcode_audio_sessions{instance="link"}'';
                 legend = "Audio";
               }
               {
-                expr = "plex_transcode_container_sessions";
+                expr = ''plex_transcode_container_sessions{instance="link"}'';
                 legend = "Container";
               }
             ];
@@ -828,8 +835,8 @@ let
             # one giant "1" per probed endpoint. A ratio answers the
             # question the panel is actually asking.
             expr = ''
-              sum(probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})
-              / count(probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})'';
+              sum(min by (endpoint) (probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}))
+              / count(min by (endpoint) (probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}))'';
             legend = "Reachable";
             unit = viz.units.percentunit;
             min = 0;
@@ -859,7 +866,7 @@ let
             # Naming the broken endpoint beats colouring a number.
             targets = [
               {
-                expr = ''probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"} == 0'';
+                expr = ''min by (endpoint) (probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}) == 0'';
                 instant = true;
                 format = "table";
               }
@@ -878,8 +885,6 @@ let
                   };
                   renameByName = {
                     endpoint = "Endpoint";
-                    instance = "Target";
-                    scope = "Scope";
                   };
                 };
               }
@@ -892,8 +897,8 @@ let
             type = "state-timeline";
             w = 24;
             h = 10;
-            expr = ''probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}'';
-            legend = "{{endpoint}} ({{scope}})";
+            expr = ''min by (endpoint) (probe_success{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})'';
+            legend = "{{endpoint}}";
             mappings = viz.boolMapping { };
             options.legend.showLegend = false;
           })
@@ -904,8 +909,8 @@ let
             title = "Probe duration";
             w = 12;
             h = 7;
-            expr = ''probe_duration_seconds{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"}'';
-            legend = "{{endpoint}} ({{scope}})";
+            expr = ''max by (endpoint) (probe_duration_seconds{job=~"blackbox-internal|blackbox-private",endpoint=~"${mediaEndpointRegex}"})'';
+            legend = "{{endpoint}}";
             unit = viz.units.seconds;
           })
           (viz.panel {
@@ -934,15 +939,15 @@ let
             h = 5;
             targets = [
               {
-                expr = ''up{job="scraparr"}'';
+                expr = ''up{job="scraparr",instance="link"}'';
                 legend = "Scraparr";
               }
               {
-                expr = ''up{job="tautulli-exporter"}'';
+                expr = ''up{job="tautulli-exporter",instance="link"}'';
                 legend = "Tautulli exporter";
               }
               {
-                expr = ''probe_success{job="blackbox-tautulli-ready"}'';
+                expr = ''probe_success{job="blackbox-tautulli-ready",instance="tautulli-exporter-ready"}'';
                 legend = "Tautulli readiness";
               }
             ];
@@ -1022,23 +1027,23 @@ let
             h = 7;
             targets = [
               {
-                expr = "radarr_scrape_duration";
+                expr = ''radarr_scrape_duration{instance="link"}'';
                 legend = "Radarr";
               }
               {
-                expr = "sonarr_scrape_duration";
+                expr = ''sonarr_scrape_duration{instance="link"}'';
                 legend = "Sonarr";
               }
               {
-                expr = "bazarr_scrape_duration";
+                expr = ''bazarr_scrape_duration{instance="link"}'';
                 legend = "Bazarr";
               }
               {
-                expr = "sabnzbd_scrape_duration";
+                expr = ''sabnzbd_scrape_duration{instance="link"}'';
                 legend = "SABnzbd";
               }
               {
-                expr = "seerr_scrape_duration";
+                expr = ''seerr_scrape_duration{instance="link"}'';
                 legend = "Seerr";
               }
             ];
@@ -1051,7 +1056,7 @@ let
             type = "state-timeline";
             w = 24;
             h = 6;
-            expr = ''node_systemd_unit_state{name=~"podman-(scraparr|tautulli-exporter)\\.service",state="active"}'';
+            expr = ''node_systemd_unit_state{instance="link",name=~"podman-(scraparr|tautulli-exporter)\\.service",state="active"}'';
             legend = "{{name}}";
             mappings = viz.boolMapping {
               falseText = "INACTIVE";
@@ -1092,7 +1097,7 @@ let
             h = 5;
             targets = [
               {
-                expr = ''time() - max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_last_scrape",alias=~"$service"})'';
+                expr = ''time() - max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_last_scrape",instance="link",alias=~"$service"})'';
                 legend = "{{alias}}";
                 instant = true;
               }
@@ -1118,7 +1123,7 @@ let
             h = 5;
             targets = [
               {
-                expr = ''max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_scrape_duration",alias=~"$service"})'';
+                expr = ''max by (alias) ({__name__=~"(radarr|sonarr|bazarr|sabnzbd|seerr)_scrape_duration",instance="link",alias=~"$service"})'';
                 legend = "{{alias}}";
                 instant = true;
               }
@@ -1134,15 +1139,15 @@ let
             h = 7;
             targets = [
               {
-                expr = ''{__name__=~"(radarr|sonarr)_queue_count",alias=~"$service"}'';
+                expr = ''{__name__=~"(radarr|sonarr)_queue_count",instance="link",alias=~"$service"}'';
                 legend = "{{alias}} queued";
               }
               {
-                expr = ''{__name__=~"(radarr|sonarr)_queue_warning",alias=~"$service"}'';
+                expr = ''{__name__=~"(radarr|sonarr)_queue_warning",instance="link",alias=~"$service"}'';
                 legend = "{{alias}} warnings";
               }
               {
-                expr = ''{__name__=~"(radarr|sonarr)_queue_error",alias=~"$service"}'';
+                expr = ''{__name__=~"(radarr|sonarr)_queue_error",instance="link",alias=~"$service"}'';
                 legend = "{{alias}} errors";
               }
             ];
@@ -1166,15 +1171,15 @@ let
             h = 7;
             targets = [
               {
-                expr = ''{__name__=~"radarr_(movies|monitored_movies|missing_movies)_total",alias=~"$service"}'';
+                expr = ''{__name__=~"radarr_(movies|monitored_movies|missing_movies)_total",instance="link",alias=~"$service"}'';
                 legend = "{{__name__}}";
               }
               {
-                expr = ''{__name__=~"sonarr_(series|episodes|monitored_series|missing_episodes)_total",alias=~"$service"}'';
+                expr = ''{__name__=~"sonarr_(series|episodes|monitored_series|missing_episodes)_total",instance="link",alias=~"$service"}'';
                 legend = "{{__name__}}";
               }
               {
-                expr = ''{__name__=~"bazarr_(series|movies|wanted_episodes|wanted_movies)_total",alias=~"$service"}'';
+                expr = ''{__name__=~"bazarr_(series|movies|wanted_episodes|wanted_movies)_total",instance="link",alias=~"$service"}'';
                 legend = "{{__name__}}";
               }
             ];
@@ -1187,7 +1192,7 @@ let
             title = "Storage consumed";
             w = 12;
             h = 7;
-            expr = ''{__name__=~"(radarr|sonarr)_disk_size_total",alias=~"$service"}'';
+            expr = ''{__name__=~"(radarr|sonarr)_disk_size_total",instance="link",alias=~"$service"}'';
             legend = "{{alias}}";
             unit = viz.units.bytes;
             custom.fillOpacity = 20;
@@ -1198,15 +1203,15 @@ let
             h = 7;
             targets = [
               {
-                expr = ''sabnzbd_disk_space_bytes{alias=~"$service"}'';
+                expr = ''sabnzbd_disk_space_bytes{instance="link",alias=~"$service"}'';
                 legend = "Free";
               }
               {
-                expr = ''sabnzbd_disk_space_total_bytes{alias=~"$service"}'';
+                expr = ''sabnzbd_disk_space_total_bytes{instance="link",alias=~"$service"}'';
                 legend = "Total";
               }
               {
-                expr = ''sabnzbd_history_total_bytes{alias=~"$service"}'';
+                expr = ''sabnzbd_history_total_bytes{instance="link",alias=~"$service"}'';
                 legend = "Downloaded (lifetime)";
               }
             ];
@@ -1466,66 +1471,66 @@ in
             rules = [
               {
                 record = "media:connector_up";
-                expr = "max by (alias, scraparr_services) (scraparr_services_up)";
+                expr = ''max by (alias, scraparr_services) (scraparr_services_up{instance="link"})'';
               }
               {
                 record = "media:radarr_queue_problems";
-                expr = "sum(radarr_queue_warning) + sum(radarr_queue_error)";
+                expr = ''sum(radarr_queue_warning{instance="link"}) + sum(radarr_queue_error{instance="link"})'';
               }
               {
                 record = "media:sonarr_queue_problems";
-                expr = "sum(sonarr_queue_warning) + sum(sonarr_queue_error)";
+                expr = ''sum(sonarr_queue_warning{instance="link"}) + sum(sonarr_queue_error{instance="link"})'';
               }
               {
                 record = "media:library_items";
-                expr = "sum(radarr_movies_total) + sum(sonarr_series_total)";
+                expr = ''sum(radarr_movies_total{instance="link"}) + sum(sonarr_series_total{instance="link"})'';
               }
               {
                 record = "media:missing_items";
-                expr = "sum(radarr_missing_movies_total) + sum(sonarr_missing_episodes_total)";
+                expr = ''sum(radarr_missing_movies_total{instance="link"}) + sum(sonarr_missing_episodes_total{instance="link"})'';
               }
               {
                 record = "media:arr_queue_items";
-                expr = "sum(radarr_queue_count) + sum(sonarr_queue_count)";
+                expr = ''sum(radarr_queue_count{instance="link"}) + sum(sonarr_queue_count{instance="link"})'';
               }
               {
                 record = "media:plex_streams";
-                expr = "sum(plex_active_streams_total)";
+                expr = ''sum(plex_active_streams_total{instance="link"})'';
               }
               {
                 record = "media:plex_transcodes";
-                expr = "sum(plex_active_streams_transcode)";
+                expr = ''sum(plex_active_streams_transcode{instance="link"})'';
               }
               {
                 record = "media:plex_bandwidth_kbps";
-                expr = "sum(plex_bandwidth_total_kbps)";
+                expr = ''sum(plex_bandwidth_total_kbps{instance="link"})'';
               }
               {
                 record = "media:seerr_requests_by_status";
-                expr = "sum by (status) (seerr_request_status)";
+                expr = ''sum by (status) (seerr_request_status{instance="link"})'';
               }
               {
                 # Scraparr exposes only a total for issues, never a per-status
                 # breakdown, so the old `sum by (status) (seerr_issue_status)`
                 # rule recorded nothing.
                 record = "media:seerr_issues_total";
-                expr = "sum(seerr_issue_total)";
+                expr = ''sum(seerr_issue_total{instance="link"})'';
               }
               {
                 record = "media:sab_queue_rate_bytes";
-                expr = "sum(sabnzbd_queue_speed_bytes)";
+                expr = ''sum(sabnzbd_queue_speed_bytes{instance="link"})'';
               }
               {
                 record = "media:sab_queue_size_bytes";
-                expr = "sum(sabnzbd_queue_size_bytes)";
+                expr = ''sum(sabnzbd_queue_size_bytes{instance="link"})'';
               }
               {
                 record = "media:sab_queue_remaining_bytes";
-                expr = "sum(sabnzbd_queue_remaining_bytes)";
+                expr = ''sum(sabnzbd_queue_remaining_bytes{instance="link"})'';
               }
               {
                 record = "media:sab_queue_paused";
-                expr = "max(sabnzbd_queue_paused)";
+                expr = ''max(sabnzbd_queue_paused{instance="link"})'';
               }
             ];
           }
@@ -1535,14 +1540,14 @@ in
             rules = [
               {
                 alert = "MediaApplicationScrapeFailed";
-                expr = "scraparr_services_up == 0";
+                expr = ''scraparr_services_up{instance="link"} == 0'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Scraparr cannot scrape {{ $labels.scraparr_services }}";
               }
               {
                 alert = "MediaExporterTargetDown";
-                expr = ''up{job=~"scraparr|tautulli-exporter"} == 0'';
+                expr = ''up{job=~"scraparr|tautulli-exporter",instance="link"} == 0'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Media exporter {{ $labels.job }} is unreachable";
@@ -1563,7 +1568,7 @@ in
               }
               {
                 alert = "TautulliExporterCannotReachTautulli";
-                expr = ''probe_success{job="blackbox-tautulli-ready"} == 0'';
+                expr = ''min(probe_success{job="blackbox-tautulli-ready",instance="tautulli-exporter-ready"}) == 0'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Tautulli exporter readiness probe is failing";
@@ -1700,7 +1705,12 @@ in
           {
             job_name = "scraparr";
             scrape_interval = "60s";
-            static_configs = [ { targets = [ "127.0.0.1:${toString exporterPorts.scraparr}" ]; } ];
+            static_configs = [
+              {
+                targets = [ "127.0.0.1:${toString exporterPorts.scraparr}" ];
+                labels.instance = "link";
+              }
+            ];
             metric_relabel_configs = [
               (metricDrop scraparrSensitiveMetrics)
               (metricKeep scraparrAllowedMetrics)
@@ -1709,7 +1719,12 @@ in
           {
             job_name = "tautulli-exporter";
             scrape_interval = "30s";
-            static_configs = [ { targets = [ "127.0.0.1:${toString exporterPorts.tautulli}" ]; } ];
+            static_configs = [
+              {
+                targets = [ "127.0.0.1:${toString exporterPorts.tautulli}" ];
+                labels.instance = "link";
+              }
+            ];
             metric_relabel_configs = [ (metricKeep tautulliAllowedMetrics) ];
           }
           {
@@ -1732,7 +1747,7 @@ in
                 target_label = "__param_target";
               }
               {
-                source_labels = [ "__param_target" ];
+                source_labels = [ "endpoint" ];
                 target_label = "instance";
               }
               {
