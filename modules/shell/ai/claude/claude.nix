@@ -8,10 +8,10 @@
 }:
 {
   flake-file.inputs = {
-    caveman = {
-      url = "github:JuliusBrussee/caveman";
-      flake = false;
-    };
+    # caveman = {
+    #   url = "github:JuliusBrussee/caveman";
+    #   flake = false;
+    # };
     claude-code-src = {
       url = "github:anthropics/claude-code";
       flake = false;
@@ -82,7 +82,7 @@
         enableMcpIntegration = true;
         plugins = {
           # ralph-wiggum = "${ralph-wiggum-plugin}";
-          caveman = "${inputs.caveman}/plugins/caveman";
+          # caveman = "${inputs.caveman}/plugins/caveman";
           commit-commands = "${inputs.claude-code-src}/plugins/commit-commands";
           # feature-dev = "${inputs.claude-code-src}/plugins/feature-dev";
           # pr-review-toolkit = "${inputs.claude-code-src}/plugins/pr-review-toolkit";
