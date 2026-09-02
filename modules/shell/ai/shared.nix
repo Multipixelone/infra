@@ -39,7 +39,7 @@
       '';
     };
 
-    # Populate programs.mcp.servers so both claude-code and opencode can use
+    # Populate programs.mcp.servers so claude-code, codex, and opencode can use
     # enableMcpIntegration = true without duplicating server definitions.
     flake.modules.homeManager.base =
       hmArgs@{ pkgs, ... }:
