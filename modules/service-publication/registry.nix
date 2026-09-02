@@ -468,7 +468,7 @@ in
         grafana = {
           site = "nyc";
           homepage = {
-            group = "Observability";
+            group = "Infrastructure";
             description = "Metrics, logs, alerts, and SLO drill-down";
             icon = "grafana";
           };
@@ -516,6 +516,58 @@ in
             health = {
               path = "/";
               expectedStatuses = [ 200 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+
+        dsm = {
+          site = "nyc";
+          homepage = {
+            name = "DSM";
+            group = "Infrastructure";
+            description = "Synology NAS system dashboard";
+            icon = "synology";
+          };
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 5000;
+            };
+            health = {
+              # DSM unauthenticated entry points are served as login UI entry
+              # points (e.g., /webman/login.cgi). Avoid URL fragments such
+              # as #/signin: they are client-side and must not become proxy
+              # paths.
+              path = "/webman/login.cgi";
+              expectedStatuses = [
+                200
+                302
+              ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
+
+        notifiarr = {
+          site = "nyc";
+          homepage = {
+            name = "Notifiarr";
+            group = "Media";
+            description = "Media automation notifications and integrations";
+            icon = "notifiarr";
+          };
+          routes.root = {
+            backend = {
+              host = "alexandria";
+              port = 5454;
+            };
+            health = {
+              path = "/";
+              expectedStatuses = [
+                200
+                302
+              ];
               timeoutSeconds = 8;
             };
           };
