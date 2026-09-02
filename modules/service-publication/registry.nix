@@ -395,12 +395,10 @@ in
           "192.168.6.0/24"
         ];
         networkInventoryConfirmed = true;
-        # Impa is declared but not yet cut over: nothing answers on its LAN
-        # address, so naming it here pointed every internal record and every
-        # generated vhost at a host that is not there. Ingress, resolution and
-        # proxying stay on Link until the cutover in
-        # docs/impa-edge-bootstrap-cutover.md is actually performed. Impa stays
-        # a connector host so the planned overlap step needs no further edit.
+        # Impa is enrolled for the overlap stage but not yet cut over. Ingress,
+        # advertised resolution, and proxying stay on Link until the cutover in
+        # docs/impa-edge-bootstrap-cutover.md is performed. Both Tunnel
+        # connectors run during validation.
         publicIngressHost = "link";
         internalDnsHosts = [ "link" ];
         connectorHosts = [

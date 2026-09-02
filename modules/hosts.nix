@@ -152,9 +152,9 @@ in
     };
     impa = {
       isNixOS = true;
-      # The secret-free bootstrap is installed. Keep Impa out of the hive until
-      # its SSH host key is enrolled as an agenix recipient and pinned below.
-      deployable = false;
+      # The host key is enrolled in nix-secrets and pinned below. Ingress and
+      # DNS cutover remain separately gated by the service-publication registry.
+      deployable = true;
       roles = [
         "server"
         "edge"
