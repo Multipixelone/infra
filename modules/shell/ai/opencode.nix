@@ -48,6 +48,7 @@
           # is deliberately the high-volume worker; its 128k, text-only window
           # makes it a poor orchestrator or observer despite its speed.
           sol = "openai/gpt-5.6-sol";
+          terra = "openai/gpt-5.6-terra";
           spark = "openai/gpt-5.3-codex-spark";
 
           # opencode go
@@ -127,12 +128,14 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Sol owns orchestration, Spark handles bounded text/code work, and Go
-        # supplies vision, model diversity, and quota-independent fallbacks.
+        # Terra handles the interactive coordinator and implementation lanes,
+        # Sol remains the deep-reasoning oracle, and Spark handles bounded
+        # lookup work. Go supplies model diversity and quota-independent
+        # fallbacks.
         presetGoCodex = mkPreset {
           orchestrator = {
-            model = "sol";
-            variant = "medium";
+            model = "terra";
+            variant = "xhigh";
           };
           oracle = {
             model = "sol";
@@ -147,12 +150,12 @@
             variant = "low";
           };
           designer = {
-            model = "kimi";
-            variant = "max";
+            model = "terra";
+            variant = "medium";
           };
           fixer = {
-            model = "spark";
-            variant = "medium";
+            model = "terra";
+            variant = "high";
           };
           observer.model = "mimo";
           # Council has no per-agent fallback slot. Kimi K3 is retained as the
@@ -207,9 +210,10 @@
         agentFallbacks = {
           orchestrator = {
             model = [
-              (modelVariant "medium" models.sol)
-              (modelVariant "medium" models.luna)
-              (modelVariant "medium" models.spark)
+              (modelVariant "xhigh" models.terra)
+              (modelVariant "xhigh" models.sol)
+              (modelVariant "xhigh" models.luna)
+              (modelVariant "xhigh" models.spark)
             ];
           };
           oracle = {
@@ -235,17 +239,19 @@
           };
           designer = {
             model = [
+              (modelVariant "medium" models.terra)
               (modelVariant "max" models.kimi)
-              (modelVariant "max" models.sol)
+              (modelVariant "medium" models.sol)
               (modelVariant "max" models.glm)
               (modelVariant "max" models.qwen)
             ];
           };
           fixer = {
             model = [
-              (modelVariant "medium" models.spark)
-              (modelVariant "medium" models.sol)
-              (modelVariant "medium" models.luna)
+              (modelVariant "high" models.terra)
+              (modelVariant "high" models.spark)
+              (modelVariant "high" models.sol)
+              (modelVariant "high" models.luna)
             ];
           };
           # Spark is text-only. Keep the complete observer chain multimodal.
@@ -407,15 +413,17 @@
             permission = "allow";
             showCompression = false;
             summaryBuffer = true;
-            # Spark's 128k window minus headroom for the system prompt and next
-            # reply. This is also the conservative fallback for unknown models.
+            # Conservative fallback for models without an explicit override.
             maxContextLimit = 96000;
             minContextLimit = 64000;
-            # OpenCode caps Codex-OAuth Sol at 400k; Go models are exposed as
-            # 256k-class configurations. Keep roughly 75% ceilings with ample
-            # room for the next tool/reasoning turn.
+            # Sol and Terra have 1.05M context windows (922k input + 128k
+            # output), while Spark has 128k total. Prune around 75% and
+            # compress to roughly 45% for Sol/Terra; Spark needs more
+            # headroom, so compresses to 31%. Go models remain 256k-class.
             modelMaxLimits = {
-              ${models.sol} = 300000;
+              ${models.sol} = 780000;
+              ${models.terra} = 780000;
+              ${models.spark} = 80000;
               ${models.luna} = 192000;
               ${models.kimi} = 192000;
               ${models.deepseek-flash} = 192000;
@@ -425,7 +433,9 @@
               ${models.mimo-pro} = 192000;
             };
             modelMinLimits = {
-              ${models.sol} = 200000;
+              ${models.sol} = 470000;
+              ${models.terra} = 470000;
+              ${models.spark} = 40000;
               ${models.luna} = 128000;
               ${models.kimi} = 128000;
               ${models.deepseek-flash} = 128000;
@@ -437,8 +447,8 @@
             # nudgeFrequency counts fetches between nudges above the ceiling,
             # so higher = quieter. nudgeForce "soft" (the upstream default)
             # makes post-user-message compression less likely than "strong".
-            nudgeFrequency = 8;
-            iterationNudgeThreshold = 25;
+            nudgeFrequency = 6;
+            iterationNudgeThreshold = 16;
             nudgeForce = "soft";
             protectedTools = [
               "task"
@@ -523,6 +533,25 @@
               "openai"
               "opencode-go"
             ];
+            provider.openai.models = {
+              "gpt-5.6-sol".limit = {
+                context = 1050000;
+                input = 922000;
+                output = 128000;
+              };
+              "gpt-5.6-terra".limit = {
+                context = 1050000;
+                input = 922000;
+                output = 128000;
+              };
+              # OpenCode's models.dev catalog exposes Spark as 128k for each
+              # required limit field.
+              "gpt-5.3-codex-spark".limit = {
+                context = 128000;
+                input = 128000;
+                output = 128000;
+              };
+            };
             model = models.sol;
             small_model = models.luna;
             autoupdate = false;
