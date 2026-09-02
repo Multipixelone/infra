@@ -38,39 +38,29 @@
 
     # Populate programs.mcp.servers so claude-code, codex, and opencode can use
     # enableMcpIntegration = true without duplicating server definitions.
-    flake.modules.homeManager.base =
-      hmArgs@{ pkgs, ... }:
-      {
-        imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
-        age.secrets."tavily".file = "${inputs.secrets}/ai/tavily.age";
-        programs.mcp.enable = true;
-        mcp-servers.programs = {
-          context7.enable = true;
-          github = {
-            enable = true;
-            envFile = hmArgs.config.age.secrets."gh".path;
-          };
-          nixos.enable = true;
+    flake.modules.homeManager.base = hmArgs: {
+      imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
+      age.secrets."tavily".file = "${inputs.secrets}/ai/tavily.age";
+      programs.mcp.enable = true;
+      mcp-servers.programs = {
+        context7.enable = true;
+        github = {
+          enable = true;
+          envFile = hmArgs.config.age.secrets."gh".path;
         };
-        mcp-servers.settings.servers = {
-          grep_app = {
-            type = "http";
-            url = "https://mcp.grep.app";
-          };
-          websearch =
-            let
-              tavily = inputs.mcp-servers-nix.packages.${pkgs.stdenv.hostPlatform.system}.tavily-mcp;
-              wrapped = pkgs.writeShellScriptBin "tavily-mcp" ''
-                export $(${pkgs.coreutils}/bin/cat ${hmArgs.config.age.secrets."tavily".path} \
-                  | ${pkgs.gnugrep}/bin/grep -v '^#' \
-                  | ${pkgs.findutils}/bin/xargs -d '\n')
-                exec ${lib.getExe tavily} "$@"
-              '';
-            in
-            {
-              command = lib.getExe wrapped;
-            };
+        nixos.enable = true;
+      };
+      mcp-servers.settings.servers = {
+        grep_app = {
+          type = "http";
+          url = "https://mcp.grep.app";
+        };
+        websearch = {
+          type = "http";
+          url = "https://search.parallel.ai/mcp";
+          headers.Authorization = "Bearer \${PARALLEL_API_KEY}";
         };
       };
+    };
   };
 }
