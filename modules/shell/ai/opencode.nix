@@ -134,8 +134,8 @@
         # fallbacks.
         presetGoCodex = mkPreset {
           orchestrator = {
-            model = "terra";
-            variant = "xhigh";
+            model = "sol";
+            variant = "high";
           };
           oracle = {
             model = "sol";
@@ -210,8 +210,8 @@
         agentFallbacks = {
           orchestrator = {
             model = [
-              (modelVariant "xhigh" models.terra)
               (modelVariant "xhigh" models.sol)
+              (modelVariant "xhigh" models.terra)
               (modelVariant "xhigh" models.luna)
               (modelVariant "xhigh" models.spark)
             ];
@@ -233,8 +233,8 @@
           explorer = {
             model = [
               (modelVariant "low" models.spark)
-              (modelVariant "low" models.deepseek-flash)
               (modelVariant "low" models.luna)
+              (modelVariant "low" models.deepseek-flash)
             ];
           };
           designer = {
@@ -473,7 +473,6 @@
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
           multiplexer.type = "zellij";
           preset = "go-codex";
-          websearch.provider = "tavily";
           council = councilConfig;
           fallback = fallbackConfig;
           agents = agentFallbacks;
@@ -498,16 +497,15 @@
           ''
           # fish
           ''
-            # oh-my-opencode-slim's tavily provider reads TAVILY_API_KEY from the
-            # process env at plugin init and FATALs without it, killing the whole
-            # plugin. Export it session-wide so every opencode launch inherits it
-            # (oc, ocd, bare `opencode`), not just ones wrapped by `ocd`.
+            # The hosted Parallel Search MCP expands PARALLEL_API_KEY from the
+            # process environment. Export it session-wide so every opencode launch
+            # inherits it (oc, ocd, bare `opencode`), not just ones wrapped by `ocd`.
             # `set -gx`, never `-Ux`: universal variables persist to
             # fish_variables on disk — don't leak the secret there.
-            set -l tavily_env ${hmArgs.config.age.secrets.tavily.path}
-            if test -r $tavily_env
-              set -l key (string match -rg '^TAVILY_API_KEY=(.+)$' < $tavily_env)
-              test -n "$key"; and set -gx TAVILY_API_KEY $key
+            set -l parallel_env ${hmArgs.config.age.secrets.tavily.path}
+            if test -r $parallel_env
+              set -l key (string match -rg '^PARALLEL_API_KEY=(.+)$' < $parallel_env)
+              test -n "$key"; and set -gx PARALLEL_API_KEY $key
             end
           ''
         ];
@@ -576,9 +574,8 @@
           set -l root (git rev-parse --show-toplevel 2>/dev/null; or echo $PWD)
           cd $root; or return
 
-          # oh-my-opencode-slim's tavily provider reads TAVILY_API_KEY
-          # directly from env; the tavily-mcp wrapper only injects it into
-          # its own subprocess. Forward the agenix env-file via `env`.
+          # Forward the agenix env-file via `env` so external MCP credentials
+          # are available to this opencode process.
           set -l envfile ${hmArgs.config.age.secrets.tavily.path}
 
           # Pick a free port so the oh-my-opencode-slim multiplexer (zellij)
