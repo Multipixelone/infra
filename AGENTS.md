@@ -80,11 +80,11 @@ Consume in home-manager: `withSystem pkgs.stdenv.hostPlatform.system (ps: ps.con
 
 ## Hosts
 
-Zelda characters. NixOS: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server), `minish` (NixOS-WSL under Windows), `impa` (NYC edge server — **declared and evaluating, not yet installed on hardware**; see [`docs/impa-edge-bootstrap-cutover.md`](docs/impa-edge-bootstrap-cutover.md)). Also `hylia` (nix-darwin) and `alexandria` (Synology NAS, standalone home-manager).
+Zelda characters. NixOS: `link` (desktop), `zelda` (laptop), `marin` (server), `iot` (server), `minish` (NixOS-WSL under Windows), `impa` (NYC edge server — installed secret-free and awaiting agenix enrollment; see [`docs/impa-edge-bootstrap-cutover.md`](docs/impa-edge-bootstrap-cutover.md)). Also `hylia` (nix-darwin) and `alexandria` (Synology NAS, standalone home-manager).
 
 Registry: `modules/hosts.nix` — one entry per host, including non-NixOS devices. `roles` there is a closed enum that both injects modules (`modules/roles.nix`) and becomes colmena tags (`modules/deployment-tags.nix`).
 
-Per-host files under `modules/<host>/`: `imports.nix`, `hostname.nix`, `state-version.nix`, and `facter.nix` (+ its generated `facter.json`), plus `hardware-configuration.nix` on the bare-metal hosts — `minish` gets its hardware from NixOS-WSL instead. `impa` carries neither yet: it has `disko.nix`, a declarative layout gated on an installer-supplied `/dev/disk/by-id` path, and an architecture-only bootstrap `facter.nix` to be replaced by a real report at install time.
+Per-host files under `modules/<host>/`: `imports.nix`, `hostname.nix`, `state-version.nix`, and `facter.nix` (+ its generated `facter.json`), plus `hardware-configuration.nix` on legacy bare-metal hosts — `minish` gets its hardware from NixOS-WSL instead, while `impa` uses its declarative `disko.nix` layout and generated facter report.
 
 ## Secrets
 

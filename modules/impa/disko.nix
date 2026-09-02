@@ -5,9 +5,9 @@
     {
       options.impa.install.diskDevice = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
-        default = null;
+        default = "/dev/disk/by-id/nvme-WDS100T1X0E-00AFY0_21466S803759";
         example = "/dev/disk/by-id/ata-DEVICE_FROM_INSTALLER_DISCOVERY";
-        description = "Installer-supplied physical disk path. Intentionally unset until Impa hardware discovery.";
+        description = "Persistent physical disk path discovered on Impa before installation.";
       };
 
       config = lib.mkIf (config.impa.install.diskDevice != null) {

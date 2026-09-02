@@ -152,9 +152,8 @@ in
     };
     impa = {
       isNixOS = true;
-      # Hardware is not installed yet: modules/impa/facter.nix is a hand-written
-      # bootstrap placeholder and impa.install.diskDevice is unset, so the disko
-      # layout produces no root filesystem. Keep it out of the hive until then.
+      # The secret-free bootstrap is installed. Keep Impa out of the hive until
+      # its SSH host key is enrolled as an agenix recipient and pinned below.
       deployable = false;
       roles = [
         "server"
@@ -165,6 +164,7 @@ in
       desktopWindowManager = "None";
       homeAddress = "192.168.6.50";
       notes = "DNS and ingress edge";
+      sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJjgsvsNKNY+L9y/icxluHnY4uDmNEkvkAHZsmqcTiVx root@impa";
     };
     zelda = {
       isNixOS = true;
