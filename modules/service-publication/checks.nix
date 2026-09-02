@@ -307,6 +307,9 @@ in
               (.sites.nyc.internalDnsHosts == ["link"]) and
               (.sites.nyc.publicIngressHost == "link") and
               (.cloudflare.tunnel.connectorHosts.nyc == ["link", "impa"]) and
+              (.hosts.link.deployedByColmena == true) and
+              (.hosts.impa.deployedByColmena == false) and
+              (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 1) and
               (.cloudflare.dnsRecords | keys == ["seerr"]) and

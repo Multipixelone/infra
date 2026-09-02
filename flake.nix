@@ -83,10 +83,6 @@
       url = "github:catppuccin/helix";
       flake = false;
     };
-    caveman = {
-      url = "github:JuliusBrussee/caveman";
-      flake = false;
-    };
     claude-code-pkg.url = "github:ryoppippi/nix-claude-code";
     claude-code-src = {
       url = "github:anthropics/claude-code";

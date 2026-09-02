@@ -61,7 +61,10 @@ writeShellApplication {
 
     # The same predicate deployment-tags.nix uses to build the colmena tag this
     # flow deploys, so the hosts checked here are the hosts that carry a
-    # generated /etc/service-publication/revision.
+    # generated /etc/service-publication/revision. deployedByColmena carries
+    # that module's hive-membership filter into the registry: a host declared
+    # ahead of its install answers no SSH and is deployed by nothing, so
+    # checking it would block every deploy until the hardware exists.
     publication_hosts() {
       jq -r '
         [(.routes // {})[].backend.host] as $backends
@@ -70,6 +73,7 @@ writeShellApplication {
         | . as $host
         | select(
             $host.value.managedByNixOS
+            and $host.value.deployedByColmena
             and (
               $host.value.capabilities.reverseProxy
               or $host.value.capabilities.internalDns

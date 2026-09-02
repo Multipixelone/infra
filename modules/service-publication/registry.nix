@@ -221,6 +221,11 @@ let
         default = [ ];
         description = "Proxy hosts explicitly able to reach this host's declared LAN backends.";
       };
+      deployedByColmena = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Whether colmena deploys this host, so it is expected to carry a generated /etc/service-publication/revision. False while a host is declared but not yet installed.";
+      };
     };
   };
 
@@ -259,6 +264,19 @@ let
       };
     };
   };
+
+  # deployment-tags.nix only puts a host in the colmena hive when hosts.nix says
+  # it is an installed, reachable NixOS host, and nixos.nix only writes
+  # /etc/service-publication/revision on hosts carrying the resulting tag. That
+  # extra condition reads hosts.nix alone, so projecting it here stays clear of
+  # the inventory the tag itself is derived from, and lets the deploy wrapper
+  # tell a host that is merely declared from one that should have answered.
+  colmenaDeploys =
+    name:
+    let
+      host = config.hosts.${name} or null;
+    in
+    host != null && host.isNixOS && host.deployable && host.deployAddress != null;
 
   registry = config.servicePublication;
   inventory = publicationLib.resolve registry;
@@ -392,7 +410,7 @@ in
         defaultProxyHosts = [ "link" ];
       };
 
-      hosts = {
+      hosts = lib.mapAttrs (name: host: host // { deployedByColmena = colmenaDeploys name; }) {
         link = {
           site = "nyc";
           addresses.lan = config.hosts.link.homeAddress;
