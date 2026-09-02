@@ -204,7 +204,6 @@
 
         fallbackConfig = {
           enabled = true;
-          timeoutMs = 15000;
         };
 
         agentFallbacks = {
