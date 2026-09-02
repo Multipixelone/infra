@@ -31,9 +31,6 @@
         ## Rules
         System config: Nix only in `/home/tunnel/Documents/Git/infra`. Read repo `CLAUDE.md` / `AGENTS.md` before edits.
 
-        ## CLI (load `cli-tools` first)
-        `qmd get file:line -l N` lines | `ast-grep` AST rewrite | `semgrep` structural match | `fastmod --accept-all --fixed-strings` literal | `rtk gain`/`discover` meta
-
         ## Env
         Nix-managed NixOS+HM. Shell-scripts: prefer fish (no bash syntax). Terminal: foot+zellij. Bash tool: zsh, not fish — prefix `eval "$(direnv export zsh 2>/dev/null)"` when needed.
       '';
