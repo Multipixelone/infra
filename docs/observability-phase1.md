@@ -70,11 +70,13 @@ forecasting remains scoped to Link because Link owns the telemetry store.
 Each service-publication route contributes one internal HTTPS probe to the
 endpoint dashboards and rolling SLO. The direct backend check used before the
 local cutover is not retained as a second `private` series for the same logical
-endpoint. `SloErrorBudgetExhausted` also requires the live probe to have a
-sample at the far edge of the seven-day window, so a new target cannot fire a
-seven-day-budget alert from only a partial first week of data. Dashboard and
-SLO queries collapse resolver-level copies to the logical endpoint FQDN using
-the worst availability/latency result.
+endpoint. The recorded effective probe status treats either a completed-probe
+failure or a failed Prometheus scrape of the Blackbox job as downtime.
+Seven-day budget and latency alerts also require the live probe to have a sample
+at the far edge of the window, so a new target cannot fire a full-window alert
+from only a partial first week of data. Dashboard and SLO queries collapse
+resolver-level copies to the logical endpoint FQDN using the worst
+availability/latency result.
 
 ## Privacy boundary
 
@@ -100,11 +102,12 @@ unauthenticated health target; neither Plex nor either exporter receives public
 DNS, Tunnel ingress, nginx publication, or a firewall opening.
 
 Scraparr and Tautulli exporter bind only to `127.0.0.1:7100` and
-`127.0.0.1:8000`. Prometheus scrapes those loopback endpoints and probes the
-Tautulli exporter's `/ready` endpoint through the existing local Blackbox
-Exporter. Metric relabeling is a strict aggregate allowlist: user, title,
-request, issue, path, provider, server, quality, genre, and per-item series are
-dropped before ingestion. The dashboards use only aggregate service labels.
+`127.0.0.1:8000`. Prometheus scrapes those loopback endpoints; exporter-process
+health comes from Prometheus `up`, while Tautulli API collection health comes
+from the exporter's `plex_up` metric. Metric relabeling is a strict aggregate
+allowlist: user, title, request, issue, path, provider, server, quality, genre,
+and per-item series are dropped before ingestion. The dashboards use only
+aggregate service labels.
 Alexandria storage, Node Exporter, Kometa, Watchtower, SAB failed-job alerting,
 Tube Archivist, and qBittorrent remain deferred or excluded because Link has no
 reliable bounded signal for them.

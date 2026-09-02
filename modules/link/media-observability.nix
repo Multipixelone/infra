@@ -7,7 +7,6 @@
 let
   inventory = config.flake.servicePublicationInventory;
   serviceApplications = config.servicePublication.applications;
-  blackboxPort = config.observability.endpoints.blackbox.port;
   routeKeys = [
     "plex/root"
     "radarr/root"
@@ -947,8 +946,8 @@ let
                 legend = "Tautulli exporter";
               }
               {
-                expr = ''probe_success{job="blackbox-tautulli-ready",instance="tautulli-exporter-ready"}'';
-                legend = "Tautulli readiness";
+                expr = ''plex_up{job="tautulli-exporter",instance="link"}'';
+                legend = "Tautulli API";
               }
             ];
             mappings = viz.boolMapping { };
@@ -1449,6 +1448,9 @@ in
         "plex_active_streams_(total|direct|direct_play|direct_stream|transcode)"
         "plex_transcode_(video|audio|container)_sessions"
         "plex_bandwidth_(total|lan|wan)_kbps"
+        "plex_up"
+        "plex_last_successful_scrape_timestamp_seconds"
+        "plex_scrape_failures_total"
         "process_(cpu_seconds_total|resident_memory_bytes|virtual_memory_bytes|open_fds|max_fds|start_time_seconds)"
         "python_gc_(objects_collected_total|objects_uncollectable_total|collections_total)"
       ];
@@ -1475,11 +1477,11 @@ in
               }
               {
                 record = "media:radarr_queue_problems";
-                expr = ''sum(radarr_queue_warning{instance="link"}) + sum(radarr_queue_error{instance="link"})'';
+                expr = ''(sum(radarr_queue_warning{instance="link"}) or vector(0)) + (sum(radarr_queue_error{instance="link"}) or vector(0))'';
               }
               {
                 record = "media:sonarr_queue_problems";
-                expr = ''sum(sonarr_queue_warning{instance="link"}) + sum(sonarr_queue_error{instance="link"})'';
+                expr = ''(sum(sonarr_queue_warning{instance="link"}) or vector(0)) + (sum(sonarr_queue_error{instance="link"}) or vector(0))'';
               }
               {
                 record = "media:library_items";
@@ -1568,10 +1570,16 @@ in
               }
               {
                 alert = "TautulliExporterCannotReachTautulli";
-                expr = ''min(probe_success{job="blackbox-tautulli-ready",instance="tautulli-exporter-ready"}) == 0'';
+                # `up` owns exporter-process health. `plex_up` reports whether
+                # its last Tautulli API collection succeeded; the `unless`
+                # branch also catches an exporter schema regression without
+                # duplicating the target-down alert.
+                expr = ''
+                  plex_up{job="tautulli-exporter",instance="link"} == 0
+                  or (up{job="tautulli-exporter",instance="link"} == 1 unless on (job, instance) plex_up{job="tautulli-exporter",instance="link"})'';
                 for = "5m";
                 labels.severity = "warning";
-                annotations.summary = "Tautulli exporter readiness probe is failing";
+                annotations.summary = "Tautulli exporter cannot collect from the Tautulli API";
               }
             ];
           }
@@ -1644,7 +1652,7 @@ in
         };
         tautulli-exporter = {
           autoStart = true;
-          image = "docker.io/mm404/tautulli-exporter:0.2.2@sha256:1420c72b0c856df48dee6961be9890d0caf434a8b295ba8a8cbebdd020f357c7";
+          image = "docker.io/mm404/tautulli-exporter:0.2.7@sha256:ce9a727eef89be8ef597874064f0443721d86d65ef7326b28e647a7b80cc7f9f";
           environmentFiles = [ mediaEnvironment ];
           ports = [ "127.0.0.1:${toString exporterPorts.tautulli}:8000" ];
           environment = {
@@ -1726,35 +1734,6 @@ in
               }
             ];
             metric_relabel_configs = [ (metricKeep tautulliAllowedMetrics) ];
-          }
-          {
-            job_name = "blackbox-tautulli-ready";
-            metrics_path = "/probe";
-            params.module = [ "http_internal" ];
-            static_configs = [
-              {
-                targets = [ "http://127.0.0.1:${toString exporterPorts.tautulli}/ready" ];
-                labels = {
-                  endpoint = "tautulli-exporter-ready";
-                  scope = "internal";
-                  slo_class = "internal";
-                };
-              }
-            ];
-            relabel_configs = [
-              {
-                source_labels = [ "__address__" ];
-                target_label = "__param_target";
-              }
-              {
-                source_labels = [ "endpoint" ];
-                target_label = "instance";
-              }
-              {
-                target_label = "__address__";
-                replacement = "127.0.0.1:${toString blackboxPort}";
-              }
-            ];
           }
         ];
       };
@@ -1891,6 +1870,8 @@ in
             && lib.hasInfix "RadarrQueueProblem" mediaRulesJson
             && lib.hasInfix "SonarrQueueProblem" mediaRulesJson
             && lib.hasInfix "TautulliExporterCannotReachTautulli" mediaRulesJson
+            && lib.hasInfix "plex_up" mediaRulesJson
+            && !(lib.hasInfix "blackbox-tautulli-ready" mediaRulesJson)
             && lib.hasInfix ''"for":"5m"'' mediaRulesJson
             && lib.hasInfix ''"for":"15m"'' mediaRulesJson
             && !(lib.hasInfix "keep_firing_for" mediaRulesJson)

@@ -169,6 +169,15 @@ let
   # Partitions duplicate their parent disk's counters.
   wholeDisks = ''device=~"nvme[0-9]+n[0-9]+|sd[a-z]|mmcblk[0-9]+"'';
   sloTargetPercent = observability.slo.availability * 100;
+  # Only the generated service-publication probes represent user-facing
+  # endpoints. Other blackbox jobs may also carry an `endpoint` label (for
+  # example the Tautulli exporter's readiness check), but folding those into
+  # the rolling SLO makes an observability component consume a service's
+  # availability budget.
+  sloProbeSelector = ''job=~"blackbox-internal|blackbox-private",endpoint!=""'';
+  effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and on (job, instance) (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
+  endpointProbeSuccess = "min by (endpoint, slo_class) (${effectiveProbeSuccess})";
+  sloWindowEligibility = "min by (endpoint, slo_class) ((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
   # migration than leak transport addresses back into a host legend.
@@ -3892,7 +3901,10 @@ in
                 # until its last sample ages out of the range vector.
                 # Resolver/path copies are implementation details: one endpoint
                 # gets one conservative SLO series, using its worst view.
-                expr = "min by (endpoint, slo_class) (avg_over_time(probe_success{endpoint!=\"\"}[${observability.slo.window}]) and probe_success{endpoint!=\"\"})";
+                # The subquery evaluates one effective status per minute. Its
+                # `up` fallback counts a failed Blackbox scrape as downtime
+                # instead of letting absent probe samples improve the average.
+                expr = "min by (endpoint, slo_class) (avg_over_time(${effectiveProbeSuccess}[${observability.slo.window}:1m]) and ${effectiveProbeSuccess})";
               }
               {
                 record = "endpoint:error_budget_remaining_7d";
@@ -3900,7 +3912,7 @@ in
               }
               {
                 record = "endpoint:latency_p95_7d";
-                expr = "max by (endpoint, slo_class) (quantile_over_time(0.95, probe_duration_seconds{endpoint!=\"\"}[${observability.slo.window}]) and probe_duration_seconds{endpoint!=\"\"})";
+                expr = "max by (endpoint, slo_class) (quantile_over_time(0.95, probe_duration_seconds{${sloProbeSelector}}[${observability.slo.window}]) and probe_duration_seconds{${sloProbeSelector}})";
               }
             ];
           }
@@ -3923,25 +3935,21 @@ in
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
               }
               {
-                alert = "DnsResolverUnavailable";
-                expr = ''min by (resolver) (probe_success{job="blackbox-dns"}) == 0'';
+                alert = "DnsProbeFailed";
+                expr = ''min by (resolver) ((probe_success{job="blackbox-dns"} and on (job, instance) (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"}) == 0'';
                 for = "5m";
                 labels.severity = "warning";
-                annotations.summary = "DNS resolver {{ $labels.resolver }} is unavailable";
+                annotations.summary = "DNS validation probe failed through {{ $labels.resolver }}";
               }
               {
-                alert = "BothDnsResolversUnavailable";
-                expr = ''sum(probe_success{job="blackbox-dns"} == 0) == 2'';
+                alert = "AllDnsProbesFailed";
+                # Inventory cardinality must not be part of the failure
+                # condition: this remains correct when resolvers are added or
+                # removed.
+                expr = ''max(min by (resolver) ((probe_success{job="blackbox-dns"} and on (job, instance) (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"})) == 0'';
                 for = "1m";
                 labels.severity = "critical";
-                annotations.summary = "Both NYC internal DNS resolvers are unavailable";
-              }
-              {
-                alert = "DnsInternalRecordMismatch";
-                expr = ''min by (resolver) (probe_success{job="blackbox-dns"}) == 0 and on (resolver) max by (resolver) (up{job="blocky"}) == 1'';
-                for = "2m";
-                labels.severity = "critical";
-                annotations.summary = "Generated internal DNS fixture mismatches on {{ $labels.resolver }}";
+                annotations.summary = "Every NYC internal DNS probe is failing";
               }
               {
                 alert = "DnsBlockingStopped";
@@ -3959,7 +3967,7 @@ in
               }
               {
                 alert = "EndpointDown";
-                expr = ''min by (endpoint, slo_class) (probe_success{endpoint!="",job!="blackbox-tautulli-ready"}) == 0'';
+                expr = "${endpointProbeSuccess} == 0";
                 for = "5m";
                 labels.severity = "critical";
                 annotations.summary = "Endpoint {{ $labels.endpoint }} is down";
@@ -4001,21 +4009,21 @@ in
               }
               {
                 alert = "ObservabilityTlsExpiring";
-                expr = ''min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time() < 21 * 24 * 3600'';
+                expr = "min by (endpoint) (probe_ssl_earliest_cert_expiry{${sloProbeSelector}}) - time() < 21 * 24 * 3600";
                 for = "1h";
                 labels.severity = "warning";
                 annotations.summary = "TLS certificate for {{ $labels.endpoint }} expires within 21 days";
               }
               {
                 alert = "InternalSloLatencyHigh";
-                expr = ''endpoint:latency_p95_7d{slo_class="internal"} > ${toString observability.slo.latencySeconds.internal}'';
+                expr = ''endpoint:latency_p95_7d{slo_class="internal"} > ${toString observability.slo.latencySeconds.internal} and on (endpoint, slo_class) ${sloWindowEligibility}'';
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Internal endpoint p95 latency exceeds one second";
               }
               {
                 alert = "PublicSloLatencyHigh";
-                expr = ''endpoint:latency_p95_7d{slo_class="public"} > ${toString observability.slo.latencySeconds.public}'';
+                expr = ''endpoint:latency_p95_7d{slo_class="public"} > ${toString observability.slo.latencySeconds.public} and on (endpoint, slo_class) ${sloWindowEligibility}'';
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Public endpoint p95 latency exceeds two seconds";
@@ -4026,7 +4034,7 @@ in
                 # same live probe at the far edge of the window also prevents
                 # newly added targets from exhausting their budget during
                 # their first week.
-                expr = "endpoint:error_budget_remaining_7d < 0 and on (endpoint, slo_class) min by (endpoint, slo_class) (probe_success{endpoint!=\"\"} offset ${observability.slo.window})";
+                expr = "endpoint:error_budget_remaining_7d < 0 and on (endpoint, slo_class) ${sloWindowEligibility}";
                 for = "15m";
                 labels.severity = "critical";
                 annotations.summary = "{{ $labels.endpoint }} exhausted its 99% seven-day error budget";
