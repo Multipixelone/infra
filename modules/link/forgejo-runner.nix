@@ -100,13 +100,18 @@ in
             # redirecting host is a bad bet. Blocky resolves this to impa's LAN
             # address, so the runner still never leaves the network.
             url = "https://git.finnrut.is";
-            # REPLACE when the runner is registered: the POST to
-            # /api/v1/repos/Multipixelone/infra/actions/runners returns both a
-            # uuid and a token. The uuid is an identifier, not an
-            # authenticator, so it belongs in the store; the token does not.
-            # The module has no uuid_url yet (upstream FIXME), so this is
-            # literal by necessity.
-            uuid = "00000000-0000-0000-0000-000000000000";
+            # From `forgejo forgejo-cli actions register` on impa. Forgejo
+            # splits the 40-hex shared secret: the first 16 characters are the
+            # runner's identity, ASCII-hex-encoded into this uuid, and the
+            # remaining 24 are the authenticator. So the uuid is safe in the
+            # store and the secret is not — which is just as well, because the
+            # module has no uuid_url yet (upstream FIXME) and this has to be
+            # literal.
+            #
+            # Registered globally rather than scoped: `--scope` needs an
+            # existing owner or repo, and at registration time the instance had
+            # neither. Narrow it once Multipixelone/infra exists on the forge.
+            uuid = "32666636-3033-3433-3461-636265643664";
           };
         };
         secrets.server.connections.default.token_url = config.age.secrets."forgejo-runner-link".path;
