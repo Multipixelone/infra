@@ -4442,6 +4442,7 @@ in
                 type = "prometheus";
                 access = "proxy";
                 url = "http://${prometheus.backendAddress}:${toString prometheus.port}";
+                jsonData.timeInterval = "60s";
                 isDefault = true;
                 editable = false;
               }
