@@ -7,8 +7,7 @@
       # secrets flake instead of being written here. commutecompass' [origin]
       # is the same address and sunwait only resolves sunrise/sunset to the
       # minute, so reuse that datum rather than adding a second copy.
-      origin =
-        (builtins.fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml")).origin;
+      inherit ((fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml"))) origin;
       degrees =
         value: positive: negative:
         if value < 0 then "${toString (-value)}${negative}" else "${toString value}${positive}";
