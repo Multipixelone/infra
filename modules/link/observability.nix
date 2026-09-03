@@ -3125,7 +3125,7 @@ let
             h = 5;
             targets = [
               {
-                expr = ''blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                expr = ''sum by (resolver) (blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
                 legend = "{{resolver}} blocked domains";
               }
               {
@@ -3354,19 +3354,50 @@ let
           })
           (viz.panel {
             title = "Denylist size by group";
-            type = "bargauge";
+            type = "table";
             w = 8;
-            h = 5;
+            h = 8;
+            description = "Entries per denylist group, per resolver. Near-static: it moves only when a list refreshes, so a group collapsing toward zero means a failed download. A bar gauge is wrong here because the groups span two orders of magnitude and Grafana has no log scale for it.";
             targets = [
               {
-                expr = "sum by (group) (blocky_denylist_cache_entries)";
-                legend = "{{group}}";
+                expr = ''sum by (resolver, group) (blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
                 instant = true;
+                format = "table";
               }
             ];
             unit = viz.units.short;
             decimals = 0;
-            color.mode = "continuous-BlPu";
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName.Time = true;
+                  indexByName = {
+                    resolver = 0;
+                    group = 1;
+                    Value = 2;
+                  };
+                  renameByName = {
+                    resolver = "Resolver";
+                    group = "Group";
+                    Value = "Entries";
+                  };
+                };
+              }
+              {
+                id = "sortBy";
+                options = {
+                  fields = { };
+                  sort = [
+                    {
+                      field = "Entries";
+                      desc = true;
+                    }
+                  ];
+                };
+              }
+            ];
+            options.cellHeight = "sm";
           })
           (viz.panel {
             title = "Resolver errors";
