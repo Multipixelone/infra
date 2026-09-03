@@ -6,11 +6,12 @@ let
   webPort = 3000;
   sshPort = 2222;
 
-  # Canonical name for a private application is <name>.<site.internalZone>
-  # (lib/service-publication.nix:65). Flipping `public` later would move the
-  # canonical to the apps.finnrut.is zone, so ROOT_URL and this binding have to
-  # move together.
-  domain = "forgejo.nyc.finnrut.is";
+  # Published, so the canonical is publicHostname and forgejo.nyc.finnrut.is
+  # becomes an alias that nginx answers with a 308 to this name
+  # (modules/service-publication/nixos.nix). Everything that has to agree with
+  # the canonical — ROOT_URL, DOMAIN, SSH_DOMAIN, and the runner's server URL
+  # in modules/link/forgejo-runner.nix — points here.
+  domain = "git.finnrut.is";
 
   adminSecret = "${inputs.secrets}/forgejo/admin-password.age";
   # Guarded the way modules/service-publication/nixos.nix guards its own
@@ -20,15 +21,30 @@ let
   hasAdminSecret = builtins.pathExists adminSecret;
 in
 {
-  # Internal only, deliberately. Git-over-HTTPS talks to /<owner>/<repo>.git,
-  # /…/git-upload-pack and /…/git-receive-pack — paths that are not a fixed
-  # prefix, so no route-level Access bypass can carve them out of a published
-  # hostname, and a bypass at / would simply make the forge public. The Actions
-  # runner cannot pass an interactive Access login either. LAN and WireGuard
-  # clients are inside sites.nyc.trustedClientCidrs and reach it directly
-  # through the generated nginx ACL.
+  # Published at git.finnrut.is behind Access, which gates the *external* path
+  # only: blockyRecords maps the canonical to impa's LAN address, so on the LAN
+  # and over WireGuard this resolves straight to 192.168.6.50 and Cloudflare is
+  # never in the path. That is what keeps the Actions runner, git over SSH and
+  # every local clone working exactly as they did while this was internal.
+  #
+  # What Access genuinely costs is git-over-HTTPS from outside: it answers with
+  # an interactive login redirect that git cannot satisfy. There is no fix via
+  # bypass — git's smart-HTTP paths are /<owner>/<repo>.git/git-receive-pack and
+  # friends, which are not a fixed prefix, so a bypass narrow enough to carve
+  # them out does not exist and a bypass at / would simply unpublish the gate.
+  # The supported escape hatch is a Cloudflare service token sent as
+  # CF-Access-Client-Id/Secret via git's http.extraHeader; from outside the
+  # house, WireGuard is the simpler answer.
+  #
+  # finn-only rather than family: a forge holds CI secrets, deploy keys and push
+  # access to this repo, where family exists for media requests and includes an
+  # external address. Note finn-only also requires geo US, so Access denies from
+  # abroad even with the right identity.
   servicePublication.applications.forgejo = {
     site = "nyc";
+    public = true;
+    publicHostname = domain;
+    access.policy = "finn-only";
     homepage = {
       group = "Development";
       description = "Self-hosted Git forge and CI";

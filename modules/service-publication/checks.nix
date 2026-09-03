@@ -303,6 +303,7 @@ let
           "copyparty"
           "copyparty/assets"
           "copyparty/share"
+          "forgejo"
           "grafana"
           "seerr"
         ]
@@ -315,6 +316,7 @@ let
           "copyparty"
           "copyparty/assets"
           "copyparty/share"
+          "forgejo"
           "grafana"
           "grafana/api"
           "seerr"
@@ -364,9 +366,11 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["copyparty", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
+              (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and
+              (.cloudflare.accessApplications.forgejo.access.policy == "finn-only") and
               ([paths(strings) as $p | getpath($p) | select(endswith(".home.finnrut.is"))] | length == 0)
             ' registry.json >/dev/null
             touch "$out"
