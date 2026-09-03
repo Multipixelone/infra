@@ -23,6 +23,28 @@ in
       isObservabilityHub = config.networking.hostName == observability.hubHost;
       isImpa = config.networking.hostName == "impa";
       lanAddress = (hostRegistry.${config.networking.hostName} or { homeAddress = null; }).homeAddress;
+
+      # Every address a registry host can send DNS queries from, keyed by its
+      # registry name. Feeds `clientLookup.clients` below.
+      registryClientNames = lib.mapAttrs (
+        _: host:
+        lib.optional (host.homeAddress != null) host.homeAddress
+        ++ lib.optional (host.iotAddress != null) host.iotAddress
+        ++ lib.optional (host.wireguard.ipv4Address != null) host.wireguard.ipv4Address
+      ) hostRegistry;
+
+      # Loopback is this resolver's own processes, whichever host that is, so
+      # it belongs to the local hostname rather than to a fixed entry.
+      blockyClientNames = lib.filterAttrs (_: addresses: addresses != [ ]) (
+        registryClientNames
+        // {
+          ${config.networking.hostName} = [
+            "127.0.0.1"
+            "::1"
+          ]
+          ++ (registryClientNames.${config.networking.hostName} or [ ]);
+        }
+      );
     in
     {
       # Disable systemd-resolved to allow blocky to bind to port 53
@@ -118,6 +140,26 @@ in
             customTTL = "5m";
             mapping = privateDnsRecords;
           };
+
+          # Names for the query log and the `client` Prometheus label. Without
+          # this blocky falls back to reverse DNS, which here produces two
+          # unhelpful results:
+          #
+          #   * loopback -- by far the largest single source of queries on the
+          #     hub -- has no PTR record, so it stays a bare "127.0.0.1";
+          #   * the hub's LAN address reverse-resolves to *every* private
+          #     service name at once, because customDNS points all of them at
+          #     it, and blocky joins them into one 400-character label whose
+          #     order is nondeterministic. Every restart therefore mints a
+          #     brand-new Prometheus series for the same client.
+          #
+          # A static map is the highest-priority name source in blocky, ahead
+          # of both the in-memory customDNS reverse entries and any rDNS
+          # upstream, so it wins in every case. Nothing here is keyed on a
+          # client name -- `clientGroupsBlock` defines only `default` and there
+          # is a single `upstreams.groups.default` -- so renaming clients
+          # cannot change what gets blocked or which upstream is used.
+          clientLookup.clients = blockyClientNames;
 
           prometheus.enable = isObservabilityHub || isImpa;
 

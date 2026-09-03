@@ -3620,7 +3620,7 @@ let
             title = "Query rate by client";
             w = 12;
             h = 8;
-            description = "The hub's own address reverse-resolves to every custom DNS name at once and blocky joins them into a single comma-separated client label whose order is nondeterministic, so each restart mints a fresh 400-character series. Rewriting any comma-bearing label to one bucket is the only remedy that neither truncates, drops traffic, nor collides: label_replace runs on the raw series, which still carry distinct type labels, so the outer sum merges them cleanly.";
+            description = "clientLookup.clients in the blocky config now names every registry host, so current data carries real hostnames. The label_replace stays for the retention window: series older than that deploy still carry the comma-joined reverse-DNS labels blocky used to mint fresh on every restart. It rewrites only comma-bearing labels, and runs on the raw series -- which still carry distinct type labels -- so the outer sum merges them without colliding.";
             expr = ''sum by (client) (label_replace(rate(blocky_query_total{resolver=~"$resolver"}[$__rate_interval]), "client", "internal services", "client", ".*,.*"))'';
             legend = "{{client}}";
             unit = viz.units.reqps;
