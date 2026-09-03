@@ -326,9 +326,21 @@ The successful registry revision is recorded outside the repository at
 `/var/lib/service-publication/last-successful-revision`. The next deployment
 uses it to distinguish additions from removals, and refuses to do so while any
 tagged host's `/etc/service-publication/revision` disagrees with it. A proxy/connector move is not
-automated: use the accepted overlap procedure, keep the old connector healthy,
-verify both paths, then change the role and retire the old instance only after
-the separately agreed observation interval.
+automated except for the reviewed Link-to-Impa cutover. After independently
+attesting that Link and Impa connectors are both healthy, the ledger describes
+Link ingress, and the generated registry is exactly the reviewed Link-to-Impa
+transition, run:
+
+```bash
+SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa just deploy-services
+```
+
+The token is a human attestation, not live connector verification and not a
+general move bypass: the deploy accepts only `seerr/root` from Link
+(`192.168.6.6`) to Impa (`192.168.6.50`), NYC ingress from Link to Impa, and a
+current Link+Impa connector set. It otherwise retains the normal refusal and
+all deployment gates. Keep the Link connector running for 48 clean hours after
+cutover; only then follow the separately authorized retirement procedure.
 
 Because the flow applies the working tree but can only record a commit, the
 apply mode refuses to start while tracked files are modified or staged: commit
