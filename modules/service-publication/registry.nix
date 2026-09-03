@@ -402,13 +402,16 @@ in
         # advertised resolution, and proxying stay on Link until the cutover in
         # docs/impa-edge-bootstrap-cutover.md is performed. Both Tunnel
         # connectors run during validation.
-        publicIngressHost = "link";
-        internalDnsHosts = [ "link" ];
+        publicIngressHost = "impa";
+        internalDnsHosts = [
+          "link"
+          "impa"
+        ];
         connectorHosts = [
           "link"
           "impa"
         ];
-        defaultProxyHosts = [ "link" ];
+        defaultProxyHosts = [ "impa" ];
       };
 
       hosts = lib.mapAttrs (name: host: host // { deployedByColmena = colmenaDeploys name; }) {
