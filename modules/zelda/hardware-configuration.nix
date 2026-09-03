@@ -241,8 +241,11 @@
               publicKey = "VsMThxcXgr5nNNDQ6rSKlQQ9T6rWkedULuTHE4/jA24=";
               presharedKeyFile = config.age.secrets."psk".path;
               allowedIPs = [ "0.0.0.0/0" ];
-              endpoint = "frwgq.duckdns.org:443";
-              # endpoint = "68.237.124.182:51628";
+              # A record published by services.cloudflare-dyndns on link.
+              # wg-quick resolves this once at interface up and caches the
+              # address, so a bring-up that predates a WAN IP change keeps
+              # sending to the old one until the interface is cycled.
+              endpoint = "wg.finnrut.is:443";
               persistentKeepalive = 25;
             }
           ];
