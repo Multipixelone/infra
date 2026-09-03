@@ -434,39 +434,87 @@ let
           })
           (viz.panel {
             title = "Load and uptime";
-            type = "stat";
-            # Three targets per host; this was the cramped tile in the row,
-            # and DNS moving to its own row freed the columns.
+            # A table, not a stat: three metrics across every host is a grid,
+            # and a `stat` renders a grid as one big labelled number per
+            # series. At four hosts that was twelve numbers in a third of a
+            # row. A table puts the host in a column and scrolls when the
+            # fleet grows, which a stat cannot.
+            type = "table";
             w = 8;
             h = 7;
             targets = [
               {
                 expr = "max by (instance) (node_load1{${hostJobSelector}})";
-                legend = "{{instance}} load 1m";
+                instant = true;
+                format = "table";
               }
               {
                 expr = "count by (instance) (count by (instance, cpu) (node_cpu_seconds_total{${hostJobSelector}}))";
-                legend = "{{instance}} cores";
+                instant = true;
+                format = "table";
               }
               {
                 expr = "max by (instance) (node_time_seconds{${hostJobSelector}} - node_boot_time_seconds{${hostJobSelector}})";
-                legend = "{{instance}} uptime";
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              # Each table frame carries its own Time column; after the join
+              # they would collide into "Time 1".."Time 3".
+              {
+                id = "filterFieldsByName";
+                options.include.pattern = "instance|Value #.*";
+              }
+              {
+                id = "joinByField";
+                options = {
+                  byField = "instance";
+                  mode = "outer";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = { };
+                  indexByName = { };
+                  renameByName = {
+                    instance = "Host";
+                    "Value #A" = "Load 1m";
+                    "Value #B" = "Cores";
+                    "Value #C" = "Uptime";
+                  };
+                };
               }
             ];
             unit = viz.units.short;
-            decimals = 1;
-            thresholds = [ { color = "text"; } ];
+            decimals = 2;
             options = {
-              graphMode = "none";
-              colorMode = "none";
-              textMode = "value_and_name";
-              orientation = "horizontal";
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Load 1m";
+                  desc = true;
+                }
+              ];
             };
             overrides = [
-              (viz.overrideByRegexp "/ uptime$/" [
+              (viz.overrideByName "Host" [ viz.pillCell ])
+              (viz.overrideByName "Cores" [
+                {
+                  id = "decimals";
+                  value = 0;
+                }
+              ])
+              (viz.overrideByName "Uptime" [
                 {
                   id = "unit";
                   value = viz.units.duration;
+                }
+                {
+                  id = "decimals";
+                  value = 0;
                 }
               ])
             ];
@@ -4188,41 +4236,78 @@ let
           })
           (viz.panel {
             title = "Blocky process";
-            type = "stat";
+            # Three metrics per resolver is a grid, and a `stat` renders a
+            # grid as one big labelled number per series -- six of them here,
+            # in a quarter of a row. Same reason "Load and uptime" on the home
+            # dashboard is a table.
+            type = "table";
             w = 6;
             h = 5;
             description = "Restart detection. A blocky that restarted minutes ago explains an otherwise alarming cache hit rate, and nothing else on this dashboard would tell you. A climbing goroutine count is the classic leak signal; RSS tracks denylist size.";
             targets = [
               {
                 expr = ''sum by (resolver) (process_resident_memory_bytes{job="blocky"})'';
-                legend = "{{resolver}} RSS";
+                instant = true;
+                format = "table";
               }
               {
                 expr = ''sum by (resolver) (go_goroutines{job="blocky"})'';
-                legend = "{{resolver}} goroutines";
+                instant = true;
+                format = "table";
               }
               {
                 expr = ''time() - max by (resolver) (process_start_time_seconds{job="blocky"})'';
-                legend = "{{resolver}} uptime";
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "filterFieldsByName";
+                options.include.pattern = "resolver|Value #.*";
+              }
+              {
+                id = "joinByField";
+                options = {
+                  byField = "resolver";
+                  mode = "outer";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = { };
+                  indexByName = { };
+                  renameByName = {
+                    resolver = "Resolver";
+                    "Value #A" = "RSS";
+                    "Value #B" = "Goroutines";
+                    "Value #C" = "Uptime";
+                  };
+                };
               }
             ];
             unit = viz.units.short;
             decimals = 0;
-            thresholds = [ { color = "text"; } ];
             options = {
-              graphMode = "none";
-              colorMode = "none";
-              textMode = "value_and_name";
-              orientation = "horizontal";
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Uptime";
+                  desc = false;
+                }
+              ];
             };
             overrides = [
-              (viz.overrideByRegexp "/ RSS$/" [
+              (viz.overrideByName "Resolver" [ viz.pillCell ])
+              (viz.overrideByName "RSS" [
                 {
                   id = "unit";
                   value = viz.units.bytes;
                 }
               ])
-              (viz.overrideByRegexp "/ uptime$/" [
+              (viz.overrideByName "Uptime" [
                 {
                   id = "unit";
                   value = viz.units.duration;
