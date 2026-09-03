@@ -158,10 +158,11 @@ writeShellApplication {
       previous_canonical='{}'
     else
       assert_hosts_match_ledger "$previous_revision"
-      previous_public=$(git show "$previous_revision:$registry" | jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort')
-      previous_origins=$(git show "$previous_revision:$registry" | jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)')
-      previous_ingress=$(git show "$previous_revision:$registry" | jq -c '.cloudflare.tunnel.ingressHost')
-      previous_canonical=$(git show "$previous_revision:$registry" | jq -c '.applications | map_values(.canonical)')
+      previous_registry=$(git show "$previous_revision:$registry")
+      previous_public=$(printf '%s' "$previous_registry" | jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort')
+      previous_origins=$(printf '%s' "$previous_registry" | jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)')
+      previous_ingress=$(printf '%s' "$previous_registry" | jq -c '.cloudflare.tunnel.ingressHost')
+      previous_canonical=$(printf '%s' "$previous_registry" | jq -c '.applications | map_values(.canonical)')
     fi
     current_public=$(jq -c '[.routes | to_entries[] | select(.value.public) | .key] | sort' "$registry")
     current_origins=$(jq -c '.routes | with_entries(select(.value.public)) | map_values(.proxy)' "$registry")
@@ -186,8 +187,10 @@ writeShellApplication {
       [$old | keys[] as $key | select($new[$key] != null and $new[$key] != $old[$key])] | length
     ')
     if ((origin_moves > 0)) || [[ $previous_ingress != '{}' && $previous_ingress != "$current_ingress" ]]; then
-      echo "proxy/connector moves require the runbook's explicit overlap, dual-connector verification, and observation interval" >&2
-      exit 1
+      if ! printf '%s\n' "$previous_registry" | bash ${./move-guard.bash} "$registry"; then
+        echo "proxy/connector moves require the runbook's explicit overlap, dual-connector verification, and observation interval" >&2
+        exit 1
+      fi
     fi
 
     # Publishing a new application adds a SAN, so the switch queues a fresh

@@ -583,6 +583,60 @@ args@{
             touch "$out"
           '';
 
+      checks.service-publication-move-guard =
+        pkgs.runCommand "service-publication-move-guard-check"
+          {
+            guard = ../../pkgs/service-publication-deploy/move-guard.bash;
+            nativeBuildInputs = [
+              pkgs.bash
+              pkgs.jq
+            ];
+          }
+          ''
+            set -euo pipefail
+
+            previous=previous.json
+            current=current.json
+            printf '%s\n' \
+              '{"routes":{"seerr/root":{"public":true,"proxy":{"host":"link","lanAddress":"192.168.6.6"}}},"cloudflare":{"tunnel":{"ingressHost":{"nyc":"link"}}},"hosts":{"link":{"site":"nyc","addresses":{"lan":"192.168.6.6"},"managedByNixOS":true,"capabilities":{"reverseProxy":true,"publicConnector":true}}}}' \
+              > "$previous"
+            printf '%s\n' \
+              '{"routes":{"seerr/root":{"public":true,"proxy":{"host":"impa","lanAddress":"192.168.6.50"}}},"cloudflare":{"tunnel":{"ingressHost":{"nyc":"impa"},"connectorHosts":{"nyc":["link","impa"]}}},"hosts":{"link":{"site":"nyc","addresses":{"lan":"192.168.6.6"},"managedByNixOS":true,"capabilities":{"reverseProxy":true,"publicConnector":true}},"impa":{"site":"nyc","addresses":{"lan":"192.168.6.50"},"managedByNixOS":true,"capabilities":{"reverseProxy":true,"publicConnector":true}}}}' \
+              > "$current"
+
+            rejects() {
+              label=$1
+              old=$2
+              new=$3
+              if SERVICE_PUBLICATION_APPROVE_MOVE="''${SERVICE_PUBLICATION_APPROVE_MOVE-}" \
+                bash "$guard" "$new" < "$old"; then
+                echo "$label unexpectedly authorized a move" >&2
+                exit 1
+              fi
+            }
+
+            rejects no-token "$previous" "$current"
+            SERVICE_PUBLICATION_APPROVE_MOVE=wrong-token rejects wrong-token "$previous" "$current"
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa bash "$guard" "$current" < "$previous" \
+              > accepted.out 2>&1
+            grep -Fq 'SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa accepted' accepted.out
+
+            jq '.routes["seerr/root"].proxy.lanAddress = "192.168.6.51"' "$current" > altered-destination.json
+            rejects altered-destination "$previous" altered-destination.json
+            jq '.routes["seerr/root"].proxy.host = "not-link"' "$previous" > altered-source.json
+            rejects altered-source altered-source.json "$current"
+            jq '.cloudflare.tunnel.ingressHost.nyc = "not-impa"' "$current" > altered-ingress.json
+            rejects altered-ingress "$previous" altered-ingress.json
+            jq '.cloudflare.tunnel.connectorHosts.nyc = ["impa"]' "$current" > missing-link-connector.json
+            rejects missing-link-connector "$previous" missing-link-connector.json
+            jq '.cloudflare.tunnel.connectorHosts.nyc = ["link"]' "$current" > missing-impa-connector.json
+            rejects missing-impa-connector "$previous" missing-impa-connector.json
+            jq '.routes["another/root"] = {"public": true, "proxy": {"host": "impa", "lanAddress": "192.168.6.50"}}' "$current" > unrelated-origin.json
+            rejects unrelated-origin "$previous" unrelated-origin.json
+
+            touch "$out"
+          '';
+
       # Building writeShellApplication runs its generated-script shellcheck.
       checks.shell-applications = pkgs.linkFarm "shell-applications-check" [
         {
@@ -1069,6 +1123,8 @@ args@{
             "service-publication-plan-only"
             "service-publication-applied-revision"
             "service-publication-deploy-revision-state"
+            "service-publication-move-guard"
+            "service-publication-operator-credentials"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
             "service-publication-tunnel-ingress-guard"

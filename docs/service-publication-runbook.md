@@ -96,8 +96,9 @@ no compatibility aliases are generated.
 
 ## Runtime secrets and declarative bootstrap values
 
-The Link NixOS configuration conditionally references these encrypted files in
-the private secrets input:
+The Link NixOS configuration conditionally references the two OpenTofu operator
+files below, independently of the public-ingress host. The connector token is
+separately shared by the overlap connector hosts:
 
 | Encrypted source                                  | Runtime path                                        | Contract                                                                                                                                 |
 | ------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -106,7 +107,7 @@ the private secrets input:
 | `aws/service-publication-state-credentials.age`   | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
 
 The two OpenTofu runtime files declared in
-`modules/service-publication/runtime.nix` are owned by the repository operator
+`modules/service-publication/runtime.nix` are Link-only, owned by `tunnel:users`,
 and installed with mode `0400`. The separately managed connector token is
 declared by `modules/service-publication/nixos.nix` and remains readable only
 by `cloudflared`.
@@ -326,9 +327,21 @@ The successful registry revision is recorded outside the repository at
 `/var/lib/service-publication/last-successful-revision`. The next deployment
 uses it to distinguish additions from removals, and refuses to do so while any
 tagged host's `/etc/service-publication/revision` disagrees with it. A proxy/connector move is not
-automated: use the accepted overlap procedure, keep the old connector healthy,
-verify both paths, then change the role and retire the old instance only after
-the separately agreed observation interval.
+automated except for the reviewed Link-to-Impa cutover. After independently
+attesting that Link and Impa connectors are both healthy, the ledger describes
+Link ingress, and the generated registry is exactly the reviewed Link-to-Impa
+transition, run:
+
+```bash
+SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa just deploy-services
+```
+
+The token is a human attestation, not live connector verification and not a
+general move bypass: the deploy accepts only `seerr/root` from Link
+(`192.168.6.6`) to Impa (`192.168.6.50`), NYC ingress from Link to Impa, and a
+current Link+Impa connector set. It otherwise retains the normal refusal and
+all deployment gates. Keep the Link connector running for 48 clean hours after
+cutover; only then follow the separately authorized retirement procedure.
 
 Because the flow applies the working tree but can only record a commit, the
 apply mode refuses to start while tracked files are modified or staged: commit

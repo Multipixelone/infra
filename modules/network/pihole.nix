@@ -23,6 +23,13 @@ in
       isObservabilityHub = config.networking.hostName == observability.hubHost;
       isImpa = config.networking.hostName == "impa";
       lanAddress = (hostRegistry.${config.networking.hostName} or { homeAddress = null; }).homeAddress;
+      blockGroups = [
+        "ads"
+        "security"
+        "bypass"
+        "fakenews"
+        "gambling"
+      ];
 
       # Every address a registry host can send DNS queries from, keyed by its
       # registry name. Feeds `clientLookup.clients` below.
@@ -156,9 +163,10 @@ in
           # A static map is the highest-priority name source in blocky, ahead
           # of both the in-memory customDNS reverse entries and any rDNS
           # upstream, so it wins in every case. Nothing here is keyed on a
-          # client name -- `clientGroupsBlock` defines only `default` and there
-          # is a single `upstreams.groups.default` -- so renaming clients
-          # cannot change what gets blocked or which upstream is used.
+          # client name -- `clientGroupsBlock` maps only `default`, which every
+          # client matches whatever it is called, and there is a single
+          # `upstreams.groups.default` -- so renaming clients cannot change
+          # what gets blocked or which upstream is used.
           clientLookup.clients = blockyClientNames;
 
           prometheus.enable = isObservabilityHub || isImpa;
@@ -191,6 +199,22 @@ in
               ads = [
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
                 "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/pro.txt"
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/popupads.txt"
+              ];
+              # Malware, phishing, C2 and cryptojacking. The medium feed is the
+              # low-false-positive cut of TIF; the full list is 2.2M entries and
+              # blocks aggressively enough to catch legitimate sites.
+              security = [
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/tif.medium.txt"
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/fake.txt"
+              ];
+              # A client speaking DoH resolves around the port 53 redirect in
+              # the firewall rules below, so the edge can't keep it on this
+              # resolver. DoH endpoints only — the combined
+              # doh-vpn-proxy-bypass list would also take out VPN and proxy
+              # providers we use deliberately.
+              bypass = [
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/doh.txt"
               ];
               fakenews = [
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-only/hosts"
@@ -199,11 +223,15 @@ in
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts"
               ];
             };
-            clientGroupsBlock.default = [
-              "ads"
-              "fakenews"
-              "gambling"
-            ];
+
+            # Hagezi's own false-positive fix: the referral and cashback
+            # domains that pro.txt breaks. Blocky scopes an allowlist to its
+            # own group, so every denylist group needs its own copy.
+            allowlists = lib.genAttrs blockGroups (_: [
+              "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/whitelist-referral-onlydomains.txt"
+            ]);
+
+            clientGroupsBlock.default = blockGroups;
             blockType = "zeroIp";
             blockTTL = "1m";
           };

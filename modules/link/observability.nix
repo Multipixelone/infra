@@ -3799,7 +3799,7 @@ let
           (viz.panel {
             title = "Top blocked domains";
             type = "table";
-            w = 8;
+            w = 7;
             h = 9;
             datasource = "loki";
             description = "Prometheus has no domain label anywhere -- by design, for cardinality -- so this is only derivable from the query log. Must stay an instant query: grouping by question_name over a range trips Loki's 500-series limit.";
@@ -3849,7 +3849,7 @@ let
           (viz.panel {
             title = "Top matched blocklist rules";
             type = "table";
-            w = 8;
+            w = 7;
             h = 9;
             datasource = "loki";
             description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard.";
@@ -3919,21 +3919,65 @@ let
           })
           (viz.panel {
             title = "Denylist size by group";
-            type = "bargauge";
-            w = 4;
+            # A bargauge is wrong here: the groups span two orders of
+            # magnitude -- security is in the hundreds of thousands next to
+            # fakenews in the low thousands -- and Grafana has no log scale
+            # for it, so the small groups render as unreadable slivers.
+            # Per-series max overrides would fix the fill and destroy
+            # cross-group comparability. Splitting by resolver rather than
+            # taking `max` also keeps it honest when the two stop agreeing,
+            # which is exactly when a failed download matters.
+            type = "table";
+            w = 6;
             h = 9;
-            description = "`max by`, not `sum by`: every resolver carries byte-identical lists, so summing reports one multiple of the real list size per resolver.";
+            description = "Entries per denylist group, per resolver. Near-static: it moves only when a list refreshes, so a group collapsing toward zero means a failed download.";
             targets = [
               {
-                expr = ''max by (group) (blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
-                legend = "{{group}}";
+                expr = ''sum by (resolver, group) (blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
                 instant = true;
+                format = "table";
               }
             ];
             unit = viz.units.short;
             decimals = 0;
-            color.mode = "continuous-BlPu";
-            options.namePlacement = "top";
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName.Time = true;
+                  indexByName = {
+                    resolver = 0;
+                    group = 1;
+                    Value = 2;
+                  };
+                  renameByName = {
+                    resolver = "Resolver";
+                    group = "Group";
+                    Value = "Entries";
+                  };
+                };
+              }
+              {
+                id = "sortBy";
+                options = {
+                  fields = { };
+                  sort = [
+                    {
+                      field = "Entries";
+                      desc = true;
+                    }
+                  ];
+                };
+              }
+            ];
+            options = {
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+            };
+            overrides = [
+              (viz.overrideByName "Resolver" [ viz.pillCell ])
+              (viz.overrideByName "Group" [ viz.pillCell ])
+            ];
           })
         ]
         [ (viz.row "Latency") ]
