@@ -81,7 +81,7 @@ iso:
 # `./facter.json`; nixos-anywhere writes the report this recipe names.
 [doc("Install NixOS on a machine already booted into the installer.")]
 install host ssh_target:
-  nix run github:nix-community/nixos-anywhere -- \
+  nix run .#nixos-anywhere -- \
     --flake .#{{host}} \
     --generate-hardware-config nixos-facter modules/{{host}}/facter.json \
     root@{{ssh_target}}
