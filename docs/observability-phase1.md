@@ -1,6 +1,6 @@
 # Central observability on Link
 
-Link remains the only Prometheus, Grafana, Loki, Alloy, Homepage, and alert-evaluation host. Link, Impa, IoT, and Marin are always-on; Zelda and Hylia are opportunistic WireGuard exporters whose absence never alerts. Darwin is never evaluated for systemd faults. Link directly probes both resolvers and scrapes Blocky with stable `resolver=link|impa` labels; cache gauges remain per resolver.
+Link remains the only Prometheus, Grafana, Loki, Alloy, Homepage, and alert-evaluation host. Link, Impa, IoT, and Marin are always-on and are the only scrape targets; the laptops Zelda and Hylia are deliberately not scraped, because a target that is off the network most of the time is down by design and reports nothing when it is. Darwin is never evaluated for systemd faults. Link directly probes both resolvers and scrapes Blocky with stable `resolver=link|impa` labels; cache gauges remain per resolver.
 
 Phase 1 designates `link` as the observability hub without changing its
 `desktop` role. It provisions Grafana, Prometheus, Loki, Alloy, Blackbox
@@ -63,8 +63,8 @@ Prometheus target normalizes its public `instance` label to a hostname or
 endpoint FQDN; transport IP addresses, ports, and URLs remain scrape
 implementation details and must not appear as dashboard names. The 15%-free
 `RootDiskPressure` warning
-applies independently to every required registered host; portable best-effort
-nodes remain visible without paging when they are offline. Prometheus storage-growth
+applies independently to every registered host, all of which are always-on.
+Prometheus storage-growth
 forecasting remains scoped to Link because Link owns the telemetry store.
 
 Each service-publication route contributes one internal HTTPS probe to the

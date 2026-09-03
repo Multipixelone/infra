@@ -207,6 +207,10 @@ in
           description = "Private DNS metrics";
         };
       };
+      # Only always-on hosts are scrape targets. Zelda and Hylia are laptops
+      # that hold a WireGuard address but are off it most of the time, so a
+      # target for them is down by design: it can never mean anything, and it
+      # sat in every "scrape targets down" count as permanent noise.
       nodes = {
         link.scrapeAddress = config.observability.endpoints.node.backendAddress;
       }
@@ -220,16 +224,6 @@ in
           (hostName: {
             scrapeAddress = config.hosts.${hostName}.homeAddress;
             provisionExporter = true;
-          })
-      //
-        lib.genAttrs
-          [
-            "zelda"
-            "hylia"
-          ]
-          (hostName: {
-            scrapeAddress = config.hosts.${hostName}.wireguard.ipv4Address;
-            alertOnDown = false;
           });
     };
 
