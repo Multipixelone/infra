@@ -115,7 +115,20 @@ let
         deployable = lib.mkOption {
           type = lib.types.bool;
           default = config.isNixOS;
-          description = "Whether colmena may deploy to this host. False while a host is declared but not yet installed.";
+          description = "Whether colmena may deploy to this host. False while a host is declared but not yet installed, or when it is installed but managed outside colmena.";
+        };
+        inHive = lib.mkOption {
+          type = lib.types.bool;
+          readOnly = true;
+          default = config.isNixOS && config.deployable && config.deployAddress != null;
+          description = ''
+            Whether colmena manages this host, and the only spelling of that test:
+            modules/deployment-tags.nix writes `deployment` for exactly these hosts,
+            modules/configurations/colmena.nix builds the hive from them, and
+            modules/ssh.nix emits the `colmena.<name>` alias for them. False means
+            the host keeps its nixosConfiguration and its check, but colmena never
+            sees it.
+          '';
         };
         sshHostKey = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
@@ -222,6 +235,11 @@ in
     };
     minish = {
       isNixOS = true;
+      # WSL has no address of its own on either network, so colmena cannot dial
+      # it; it is rebuilt from inside Windows. Saying so keeps deployable and
+      # deployAddress consistent instead of relying on the missing address to
+      # quietly drop the host out of the hive.
+      deployable = false;
       roles = [ "wsl" ];
       description = "NixOS-WSL instance on Windows";
       manufacturer = "Microsoft";

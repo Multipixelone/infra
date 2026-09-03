@@ -13,7 +13,7 @@ Two facts govern the whole sequence and explain most of its ordering:
 - **agenix enrolment must precede the first secret-bearing deploy.** A host that
   is in no recipient list still deploys successfully and then half-activates:
   `age --decrypt` fails, the activation script's `ERR` trap sets status 1, and
-  Colmena reports the failure only *after* the system profile has already been
+  Colmena reports the failure only _after_ the system profile has already been
   switched. The host is left running a generation whose secrets are absent.
   Enrol the key first; do not "deploy and fix it after".
 
@@ -39,6 +39,15 @@ being built, so a bare `just colmena-apply` cannot reach a machine that has no
 secrets yet. It is the option that makes the rest of this procedure safe to
 perform in stages.
 
+`deployable` is the knob you set; `hosts.<name>.inHive` is the answer it feeds.
+That derived field — `isNixOS && deployable && deployAddress != null` — is the
+single membership test every projection reads, so a host is either in the hive
+everywhere or nowhere. Setting it is not optional on an address-less host:
+`deployable` defaults to `isNixOS`, so declaring a NixOS host before its address
+exists without also writing `deployable = false` fails that host's own
+`configurations/nixos/<name>` check rather than silently dropping it from the
+hive.
+
 `roles` is a closed enum and drives module injection (`modules/roles.nix`) as
 well as the deployment tags, so a role you do not want the modules for does not
 belong in the list.
@@ -50,7 +59,7 @@ One concern per file, matching the existing hosts:
 - `hostname.nix` — `networking.hostName` (and `networking.domain` if the host is
   not on the default one).
 - `state-version.nix` — `system.stateVersion`, pinned to the release the machine
-  is *first installed from* and never bumped afterwards.
+  is _first installed from_ and never bumped afterwards.
 - `imports.nix` — `imports = with config.flake.modules.nixos; [ … ];` for the
   shared modules the role map does not already inject, plus
   `inputs.disko.nixosModules.disko`, without which the `disko.devices` options
@@ -166,7 +175,7 @@ top. It happens in the private `nix-secrets` repository, not here.
 
 ## 6. Pin the host key for `known_hosts`
 
-Record the *same* public key from step 5.1 in the registry:
+Record the _same_ public key from step 5.1 in the registry:
 
 ```nix
 newhost.sshHostKey = "ssh-ed25519 AAAA… root@newhost";

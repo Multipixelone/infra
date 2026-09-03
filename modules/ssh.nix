@@ -1,22 +1,38 @@
 { lib, config, ... }:
 let
-  # `iso` is a nixosConfiguration with no entry in the host registry, so every
-  # lookup here has to tolerate a missing host.
-  hostKey = name: config.hosts.${name}.sshHostKey or null;
-  hostAddress = name: config.hosts.${name}.deployAddress or null;
+  # Both sets below are projections of the host registry, so every host fact is
+  # reached by a static submodule path: a renamed or deleted `hosts` entry is an
+  # eval error instead of a null that silently deletes an ssh block. `iso` is a
+  # nixosConfiguration with no registry entry and is never an ssh target, so it
+  # is simply absent here rather than a missing host every lookup has to
+  # tolerate.
 
-  reachableNixoss =
-    config.flake.nixosConfigurations
+  # A pinned host key is what makes a host safe to dial, so it is the real
+  # filter. The domain test is a guard, not a filter: nixpkgs' networking.fqdn
+  # *throws* when domain is null, and modules/network/domain.nix sets it
+  # fleet-wide, so dropping the test would let one unresolvable host abort every
+  # other host's eval instead of just losing its own pin.
+  pinnedHosts =
+    config.hosts
     |> lib.filterAttrs (
-      name: nixos:
-      !(lib.any isNull [
-        nixos.config.networking.domain
-        nixos.config.networking.hostName
-        (hostKey name)
-      ])
+      name: host:
+      host.isNixOS
+      && host.sshHostKey != null
+      && config.flake.nixosConfigurations.${name}.config.networking.domain != null
     );
 
-  colmenaHosts = lib.filterAttrs (_: cfg: cfg.deployment != null) config.configurations.nixos;
+  # hosts.<name>.inHive is the one spelling of hive membership, so an alias
+  # cannot outlive the node it deploys to. Reading
+  # `configurations.nixos.<name>.deployment` back instead was a two-hop
+  # indirection into a lazyAttrsOf that any module may extend.
+  hiveHosts = lib.filterAttrs (_: host: host.inHive) config.hosts;
+
+  # The one datum the registry does not own: only the NixOS eval concatenates
+  # hostName with domain. modules/roles.nix mints a configurations.nixos entry
+  # for every isNixOS host, so this index cannot miss for a member of
+  # pinnedHosts; it stays un-`or`ed so it would fail loudly rather than drop a
+  # pin if that ever changed.
+  fqdn = name: config.flake.nixosConfigurations.${name}.config.networking.fqdn;
 in
 {
   flake.modules = {
@@ -61,14 +77,14 @@ in
         # `colmena.<name>` alias whose HostName is the bare deploy address, so the
         # fqdn pin alone would never apply.
         programs.ssh.knownHosts =
-          reachableNixoss
+          pinnedHosts
           |> lib.mapAttrs (
-            name: nixos: {
+            name: host: {
               hostNames = [
-                nixos.config.networking.fqdn
+                (fqdn name)
               ]
-              ++ lib.optional (hostAddress name != null) (hostAddress name);
-              publicKey = hostKey name;
+              ++ lib.optional (host.deployAddress != null) host.deployAddress;
+              publicKey = host.sshHostKey;
             }
           );
       };
@@ -80,20 +96,22 @@ in
         enableDefaultConfig = false;
         includes = [ "${args.config.home.homeDirectory}/.ssh/hosts/*" ];
         settings =
-          reachableNixoss
+          pinnedHosts
           |> lib.mapAttrsToList (
-            _name: nixos: {
-              "${nixos.config.networking.fqdn}" = {
+            name: _host: {
+              "${fqdn name}" = {
                 IdentityFile = "~/.ssh/keys/id_ed25519";
               };
             }
           )
           |> lib.concat (
-            colmenaHosts
+            hiveHosts
             |> lib.mapAttrsToList (
-              name: _: {
+              name: host: {
                 "colmena.${name}" = {
-                  HostName = hostAddress name;
+                  # Non-null by construction: hosts.<name>.inHive filters on it,
+                  # so this alias can never render with an absent HostName.
+                  HostName = host.deployAddress;
                   User = "root";
                   IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
                   IdentitiesOnly = true;
@@ -103,8 +121,13 @@ in
           )
           |> lib.concat [
             {
+              # DSM: reachable and worth an alias, but not a NixOS host and not a
+              # colmena node, so it stays hand-written. The static path is what
+              # matters - `config.hosts.alexandria.deployAddress or null` used to
+              # degrade a renamed entry into a HostName-less block, leaving ssh to
+              # resolve the literal string "alexandria" against DNS.
               "alexandria" = {
-                HostName = hostAddress "alexandria";
+                HostName = config.hosts.alexandria.deployAddress;
                 User = config.flake.meta.owner.username;
                 IdentityFile = "${args.config.home.homeDirectory}/.ssh/colmena";
                 IdentitiesOnly = true;

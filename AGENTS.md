@@ -84,6 +84,8 @@ Zelda characters. NixOS: `link` (desktop), `zelda` (laptop), `marin` (server), `
 
 Registry: `modules/hosts.nix` — one entry per host, including non-NixOS devices. `roles` there is a closed enum that both injects modules (`modules/roles.nix`) and becomes colmena tags (`modules/deployment-tags.nix`).
 
+Hive membership is the derived `hosts.<name>.inHive` (`isNixOS && deployable && deployAddress != null`) and is read from there by every consumer — `deployment-tags.nix`, `configurations/colmena.nix`, `ssh.nix`, and `service-publication/registry.nix`. Do not re-derive it, and do not set `configurations.nixos.<name>.deployment` by hand: `deployment-tags.nix` is its sole writer, and `configurations/colmena.nix` asserts the two sets agree.
+
 Per-host files under `modules/<host>/`: `imports.nix`, `hostname.nix`, `state-version.nix`, and `facter.nix` (+ its generated `facter.json`), plus `hardware-configuration.nix` on legacy bare-metal hosts — `minish` gets its hardware from NixOS-WSL instead, while `impa` uses its declarative `disko.nix` layout and generated facter report.
 
 ## Secrets

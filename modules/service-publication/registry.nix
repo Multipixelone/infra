@@ -267,16 +267,17 @@ let
 
   # deployment-tags.nix only puts a host in the colmena hive when hosts.nix says
   # it is an installed, reachable NixOS host, and nixos.nix only writes
-  # /etc/service-publication/revision on hosts carrying the resulting tag. That
-  # extra condition reads hosts.nix alone, so projecting it here stays clear of
-  # the inventory the tag itself is derived from, and lets the deploy wrapper
-  # tell a host that is merely declared from one that should have answered.
+  # /etc/service-publication/revision on hosts carrying the resulting tag.
+  # hosts.<name>.inHive is that membership test at its source, so reading it here
+  # stays clear of the inventory the tag itself is derived from - reading the tag
+  # back would be circular - and lets the deploy wrapper tell a host that is
+  # merely declared from one that should have answered. A publication host with
+  # no registry entry is a naming mistake, not a non-colmena host, so say so
+  # instead of quietly reporting false.
   colmenaDeploys =
     name:
-    let
-      host = config.hosts.${name} or null;
-    in
-    host != null && host.isNixOS && host.deployable && host.deployAddress != null;
+    config.hosts.${name}.inHive
+      or (throw "servicePublication.hosts.${name} has no entry in the host registry (modules/hosts.nix); every publication host must be registered there so deployedByColmena is derived rather than assumed false");
 
   registry = config.servicePublication;
   inventory = publicationLib.resolve registry;
