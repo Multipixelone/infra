@@ -6,7 +6,12 @@
   # bot API. Same delivery path as the deadman switch (modules/link/deadman.nix)
   # and deliberately independent of openclaw — the alert must not depend on
   # anything it might be reporting about.
-  flake.modules.nixos.pc =
+  # On `base`, not `pc`: the headless hosts are the ones with nobody watching a
+  # screen, so an `onFailure` there is worth more than on the desktop. While
+  # this sat on `pc` it silently reached only link and zelda, and any
+  # onFailure = [ "notify-telegram@%n.service" ] written on impa, iot or marin
+  # would have pointed at a unit that does not exist on that host.
+  flake.modules.nixos.base =
     { pkgs, config, ... }:
     let
       notify-telegram = pkgs.writeShellApplication {
@@ -34,9 +39,9 @@
       # declaration on installer media rather than left dangling.
       config = lib.mkIf (!config.infra.installerMedia) {
         # Env file with TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID. Moved here from
-        # modules/link/deadman.nix so all pc hosts (link + zelda) can alert; the
-        # .age is already encrypted to every system key. deadman.nix still
-        # references it by name.
+        # modules/link/deadman.nix so every NixOS host can alert; the .age is
+        # already encrypted to every system key, so widening the tier needed no
+        # rekey. deadman.nix still references it by name.
         age.secrets."telegram-deadman" = {
           file = "${inputs.secrets}/ai/telegram-deadman.age";
           owner = "tunnel";
