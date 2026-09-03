@@ -23,6 +23,13 @@ in
       isObservabilityHub = config.networking.hostName == observability.hubHost;
       isImpa = config.networking.hostName == "impa";
       lanAddress = (hostRegistry.${config.networking.hostName} or { homeAddress = null; }).homeAddress;
+      blockGroups = [
+        "ads"
+        "security"
+        "bypass"
+        "fakenews"
+        "gambling"
+      ];
     in
     {
       # Disable systemd-resolved to allow blocky to bind to port 53
@@ -149,6 +156,22 @@ in
               ads = [
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
                 "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/pro.txt"
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/popupads.txt"
+              ];
+              # Malware, phishing, C2 and cryptojacking. The medium feed is the
+              # low-false-positive cut of TIF; the full list is 2.2M entries and
+              # blocks aggressively enough to catch legitimate sites.
+              security = [
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/tif.medium.txt"
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/fake.txt"
+              ];
+              # A client speaking DoH resolves around the port 53 redirect in
+              # the firewall rules below, so the edge can't keep it on this
+              # resolver. DoH endpoints only — the combined
+              # doh-vpn-proxy-bypass list would also take out VPN and proxy
+              # providers we use deliberately.
+              bypass = [
+                "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/doh.txt"
               ];
               fakenews = [
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-only/hosts"
@@ -157,11 +180,15 @@ in
                 "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts"
               ];
             };
-            clientGroupsBlock.default = [
-              "ads"
-              "fakenews"
-              "gambling"
-            ];
+
+            # Hagezi's own false-positive fix: the referral and cashback
+            # domains that pro.txt breaks. Blocky scopes an allowlist to its
+            # own group, so every denylist group needs its own copy.
+            allowlists = lib.genAttrs blockGroups (_: [
+              "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/whitelist-referral-onlydomains.txt"
+            ]);
+
+            clientGroupsBlock.default = blockGroups;
             blockType = "zeroIp";
             blockTTL = "1m";
           };
