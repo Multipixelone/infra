@@ -20,6 +20,7 @@ let
     imap0
     imap1
     optionalAttrs
+    recursiveUpdate
     ;
 
   # Grafana refuses to scale a value it has no unit for, so every numeric panel
@@ -204,6 +205,35 @@ let
         hideZeros = false;
       };
     };
+    # A barchart's x axis is categorical, which is exactly what a bargauge
+    # stops coping with past ~10 rows. It had no entry here at all, so every
+    # barchart shipped `options = {}` -- Grafana's implicit fallbacks, which is
+    # the failure this table exists to prevent.
+    barchart = {
+      orientation = "auto";
+      stacking = "none";
+      showValue = "auto";
+      barWidth = 0.97;
+      groupWidth = 0.7;
+      barRadius = 0;
+      fullHighlight = false;
+      # Long category labels are the usual reason a barchart is unreadable.
+      # Rotating is lossless where `xTickLabelMaxLength` truncation is not, so
+      # default to no rotation and let the caller dial it in.
+      xTickLabelRotation = 0;
+      xTickLabelSpacing = 0;
+      legend = {
+        showLegend = false;
+        displayMode = "list";
+        placement = "bottom";
+        calcs = [ ];
+      };
+      tooltip = {
+        mode = "single";
+        sort = "none";
+        hideZeros = false;
+      };
+    };
     "state-timeline" = {
       mergeValues = true;
       showValue = "never";
@@ -376,7 +406,26 @@ let
 
   customDefaults = {
     timeseries = timeseriesCustom;
-    barchart = timeseriesCustom;
+    # Not `timeseriesCustom`: a bar has no line interpolation, no point
+    # rendering and no null-spanning, and it does need a fill.
+    barchart = {
+      lineWidth = 1;
+      fillOpacity = 80;
+      gradientMode = "none";
+      axisPlacement = "auto";
+      axisLabel = "";
+      axisColorMode = "text";
+      axisBorderShow = false;
+      axisCenteredZero = false;
+      axisSoftMin = 0;
+      scaleDistribution.type = "linear";
+      thresholdsStyle.mode = "off";
+      hideFrom = {
+        legend = false;
+        tooltip = false;
+        viz = false;
+      };
+    };
     "state-timeline" = {
       lineWidth = 0;
       fillOpacity = 80;
@@ -488,6 +537,10 @@ let
       }
       // optionalAttrs (target ? legend) { legendFormat = target.legend; }
       // optionalAttrs (target ? format) { inherit (target) format; }
+      # Loki's query model carries `queryType` alongside the legacy
+      # instant/range booleans. Opt-in per target, so Prometheus targets --
+      # for which it is meaningless -- never grow one.
+      // optionalAttrs (target ? queryType) { inherit (target) queryType; }
       // optionalAttrs (target ? interval) { inherit (target) interval; }
     ) targets;
 in
@@ -657,6 +710,98 @@ rec {
       neonSegmented = neon // {
         segmentCount = 10;
         segmentSpacing = 0.15;
+      };
+    };
+
+  # A Prometheus classic histogram in a heatmap panel. Every part of this is
+  # load-bearing and every way of getting it wrong fails *silently* -- the
+  # panel still renders, just from the wrong numbers:
+  #
+  #   * `format = "heatmap"` on the TARGET is required. De-accumulating the
+  #     cumulative `le` buckets happens in the Prometheus datasource's
+  #     frontend `transformV2`, gated on `target.format === "heatmap"`. With
+  #     "time_series" the panel draws cumulative, unsorted bucket counts.
+  #   * `legendFormat` must be `{{le}}` (or absent). Row names come from
+  #     `config.displayNameFromDS`; any other legend gives every bucket row
+  #     the same name and they collapse into one.
+  #   * `calculate = false`. `true` means "these are raw x/y samples, bin them
+  #     yourself", which produces nonsense from already-bucketed frames.
+  #   * The expression must aggregate away every dimension except `le`.
+  #     `sum by (le, response_type)` emits several `heatmap-rows` frames and
+  #     `prepareHeatmapData` keeps only the LAST one; the rest vanish with no
+  #     warning. That includes `sum by (le, resolver)` under a multi-value
+  #     resolver variable.
+  #   * The y-axis unit belongs in `options.yAxis.unit`, not in `fieldConfig`:
+  #     in ordinal mode the panel hard-sets the y field's own unit to "short".
+  #   * `filterValues.le = 1e-9` (from `optionDefaults.heatmap`) hides
+  #     zero-count cells and pairs with the transform's own `< 1e-9 -> 0`
+  #     clamp. Setting it null paints every empty cell and the chart becomes a
+  #     solid block.
+  #
+  # Returns `{ targets; options; }`, which `//` folds into a `panel` argument
+  # set; `options` is then deep-merged over `optionDefaults.heatmap`.
+  heatmapBuckets =
+    {
+      expr,
+      unit ? units.seconds,
+      # Latency buckets are exponentially spaced, so an ordinal axis (evenly
+      # spaced rows) misrepresents them. `fields.ts` reads `yBucketScale`
+      # unconditionally on the data path; only its *editor* is gated behind
+      # the `heatmapRowsAxisOptions` feature toggle.
+      logAxis ? true,
+      # Must be an exact d3 scheme name (Turbo, Spectral, Viridis, ...); an
+      # unrecognised string silently falls back to Spectral.
+      scheme ? "Turbo",
+      value ? "Requests",
+    }:
+    {
+      targets = [
+        {
+          inherit expr;
+          legend = "{{le}}";
+          format = "heatmap";
+        }
+      ];
+      options = {
+        calculate = false;
+        yAxis = {
+          inherit unit;
+          axisPlacement = "left";
+          decimals = 0;
+          reverse = false;
+        };
+        # "le" names the y field `yMax`, so a cell is drawn BELOW its tick,
+        # which is what `le` means.
+        rowsFrame = {
+          layout = "le";
+          inherit value;
+        }
+        // optionalAttrs logAxis {
+          yBucketScale = {
+            type = "log";
+            log = 2;
+          };
+        };
+        cellValues = {
+          unit = units.short;
+          decimals = 0;
+        };
+        color = {
+          mode = "scheme";
+          inherit scheme;
+          steps = 64;
+          reverse = false;
+          exponent = 0.5;
+          fill = "dark-orange";
+        };
+        # The heatmap uses its own `HeatmapLegend { show }`; a `showLegend`
+        # here is a silent no-op.
+        legend.show = true;
+        tooltip = {
+          mode = "single";
+          yHistogram = true;
+          showColorScale = true;
+        };
       };
     };
 
@@ -886,7 +1031,14 @@ rec {
 
       baseCustom = customDefaults.${type} or { };
       baseOptions = optionDefaults.${type} or { };
-      mergedCustom = baseCustom // custom;
+      # `//` is shallow, so `options.legend.placement = "right"` used to drop
+      # every other key in `legend` and silently fall back to Grafana's own
+      # defaults for them. Nested option groups (legend, tooltip,
+      # reduceOptions, the heatmap's color/yAxis/rowsFrame) are the normal
+      # thing a caller wants to amend one key of, so merge recursively. Lists
+      # still replace wholesale, which is what `calcs` and `displayLabels`
+      # want.
+      mergedCustom = recursiveUpdate baseCustom custom;
     in
     {
       inherit title type;
@@ -931,7 +1083,7 @@ rec {
         // optionalAttrs (mergedCustom != { }) { custom = mergedCustom; };
         inherit overrides;
       };
-      options = baseOptions // options;
+      options = recursiveUpdate baseOptions options;
       pluginVersion = grafanaVersion;
     }
     // optionalAttrs (transformations != null) { inherit transformations; }

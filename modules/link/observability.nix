@@ -435,7 +435,9 @@ let
           (viz.panel {
             title = "Load and uptime";
             type = "stat";
-            w = 6;
+            # Three targets per host; this was the cramped tile in the row,
+            # and DNS moving to its own row freed the columns.
+            w = 8;
             h = 7;
             targets = [
               {
@@ -470,15 +472,11 @@ let
             ];
           })
           (viz.panel {
-            title = "DNS and media";
+            title = "Media";
             type = "stat";
-            w = 6;
+            w = 4;
             h = 7;
             targets = [
-              {
-                expr = "sum(rate(blocky_query_total[$__rate_interval]))";
-                legend = "DNS q/s";
-              }
               {
                 expr = "media:plex_streams or vector(0)";
                 legend = "Plex streams";
@@ -489,7 +487,8 @@ let
               }
             ];
             unit = viz.units.short;
-            decimals = 1;
+            # Streams and queued items are integers.
+            decimals = 0;
             thresholds = [ { color = "text"; } ];
             options = {
               graphMode = "none";
@@ -497,6 +496,171 @@ let
               textMode = "value_and_name";
               orientation = "horizontal";
             };
+          })
+        ]
+        [ (viz.row "DNS") ]
+        [
+          (viz.panel {
+            title = "DNS query rate";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = "sum(rate(blocky_query_total[$__rate_interval]))";
+            unit = viz.units.reqps;
+            decimals = 1;
+            thresholds = [ { color = "blue"; } ];
+            options = {
+              graphMode = "area";
+              showPercentChange = true;
+            };
+            links = [
+              (viz.dataLink {
+                title = "Open the DNS dashboard";
+                url = "/d/dns/dns?\${__url_time_range}";
+              })
+            ];
+          })
+          (viz.panel {
+            title = "Blocked";
+            type = "stat";
+            w = 4;
+            h = 6;
+            expr = ''sum(rate(blocky_response_total{response_type="BLOCKED"}[$__rate_interval])) / sum(rate(blocky_response_total[$__rate_interval]))'';
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 1;
+            thresholds = [ { color = "purple"; } ];
+            options.graphMode = "area";
+            links = [
+              (viz.dataLink {
+                title = "Open the DNS dashboard";
+                url = "/d/dns/dns?\${__url_time_range}";
+              })
+            ];
+          })
+          (viz.panel {
+            title = "Cache hit rate";
+            type = "gauge";
+            w = 4;
+            h = 6;
+            expr = "sum(rate(blocky_cache_hits_total[$__rate_interval])) / (sum(rate(blocky_cache_hits_total[$__rate_interval])) + sum(rate(blocky_cache_misses_total[$__rate_interval])))";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 2;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.6;
+              }
+              {
+                color = "green";
+                value = 0.85;
+              }
+            ];
+            options = viz.gaugePresets.segmented;
+          })
+          (viz.panel {
+            title = "Upstream p95";
+            type = "stat";
+            w = 4;
+            h = 6;
+            description = "95th percentile for queries that actually leave the box. The all-traffic p95 is ~5ms regardless of upstream health, because most requests are answered from cache or a blocklist.";
+            expr = ''histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED"}[$__rate_interval])))'';
+            unit = viz.units.seconds;
+            decimals = 2;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 0.3;
+              }
+              {
+                color = "red";
+                value = 1.0;
+              }
+            ];
+            options = {
+              graphMode = "area";
+              showPercentChange = true;
+              percentChangeColorMode = "inverted";
+            };
+          })
+          (viz.panel {
+            title = "DNS traffic";
+            w = 8;
+            h = 6;
+            description = "The shape four scalars cannot give you: a fat orange BLOCKED layer or any visible red err layer is legible from across the room.";
+            expr = "sum by (response_type) (rate(blocky_request_duration_seconds_count[$__rate_interval]))";
+            legend = "{{response_type}}";
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 1;
+            custom = {
+              fillOpacity = 55;
+              lineWidth = 0;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+              insertNulls = 90000;
+            };
+            options = {
+              # A six-row calc table would eat the whole tile at this height.
+              legend = {
+                showLegend = true;
+                displayMode = "list";
+                placement = "bottom";
+                calcs = [ ];
+              };
+              tooltip.hideZeros = true;
+            };
+            overrides = [
+              (viz.overrideByRegexp "/(?i)err/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "red";
+                  };
+                }
+              ])
+              (viz.overrideByRegexp "/(?i)blocked/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "orange";
+                  };
+                }
+              ])
+              (viz.overrideByRegexp "/(?i)cached/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "green";
+                  };
+                }
+              ])
+              (viz.overrideByRegexp "/(?i)resolved/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "blue";
+                  };
+                }
+              ])
+            ];
+            links = [
+              (viz.dataLink {
+                title = "Open the DNS dashboard";
+                url = "/d/dns/dns?\${__url_time_range}";
+              })
+            ];
           })
         ]
         [ (viz.row "Everything else") ]
@@ -3014,13 +3178,18 @@ let
         "provisioned"
         "dns"
       ];
-      description = "Private resolver: query volume, what is being blocked, cache behaviour and resolution latency.";
+      description = "Blocky across every internal resolver: volume, what is blocked and by which rule, cache and prefetch behaviour, and the upstream latency that is the only part of the path that is actually slow. Prometheus panels honour the resolver picker; the Loki panels are link-only, because impa's journal is not shipped.";
+      # Nothing here updates faster than the 60s scrape.
+      refresh = "1m";
       templating.list = [
         {
           name = "resolver";
           label = "Resolver";
           type = "query";
           datasource.uid = "prometheus";
+          # Scoped to the registry's resolver hosts on purpose: a bare
+          # `label_values(resolver)` also surfaces long-dead instances on any
+          # window wider than the scrape retention.
           query = ''label_values(blocky_query_total{instance=~"${resolverHostRegex}"}, resolver)'';
           definition = ''label_values(blocky_query_total{instance=~"${resolverHostRegex}"}, resolver)'';
           multi = true;
@@ -3033,14 +3202,15 @@ let
         }
       ];
       rows = [
-        [ (viz.row "Overview") ]
+        [ (viz.row "Service level") ]
         [
           (viz.panel {
             title = "Blocking";
             type = "stat";
             w = 4;
             h = 5;
-            expr = ''min by (resolver) (blocky_blocking_enabled{resolver=~"$resolver"})'';
+            # `min by` so either resolver disabling filtering turns this red.
+            expr = ''min by (resolver) (blocky_blocking_enabled{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
             legend = "{{resolver}}";
             mappings = viz.boolMapping {
               falseText = "DISABLED";
@@ -3058,115 +3228,333 @@ let
             type = "stat";
             w = 4;
             h = 5;
-            expr = "sum(rate(blocky_query_total[$__rate_interval]))";
+            expr = ''sum(rate(blocky_query_total{resolver=~"$resolver"}[$__rate_interval]))'';
             unit = viz.units.reqps;
             decimals = 1;
             thresholds = [ { color = "blue"; } ];
+            options = {
+              graphMode = "area";
+              showPercentChange = true;
+            };
           })
           (viz.panel {
             title = "Blocked";
             type = "stat";
             w = 4;
             h = 5;
-            expr = ''sum(increase(blocky_response_total{response_type=~"BLOCKED|REBIND"}[$__range])) / sum(increase(blocky_query_total[$__range]))'';
+            # Numerator and denominator must be the same counter. Dividing
+            # `blocky_response_total` by `blocky_query_total` compares two
+            # different populations: the response counter is only incremented
+            # when resolution succeeded, so it omits errors entirely.
+            expr = ''sum(rate(blocky_response_total{response_type="BLOCKED",resolver=~"$resolver"}[$__rate_interval])) / sum(rate(blocky_response_total{resolver=~"$resolver"}[$__rate_interval]))'';
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
             decimals = 1;
             thresholds = [ { color = "purple"; } ];
-            options.graphMode = "none";
+            options.graphMode = "area";
           })
           (viz.panel {
             title = "Cache hit rate";
             type = "stat";
             w = 4;
             h = 5;
-            expr = "sum(rate(blocky_cache_hits_total[$__rate_interval])) / (sum(rate(blocky_cache_hits_total[$__rate_interval])) + sum(rate(blocky_cache_misses_total[$__rate_interval])))";
+            expr = ''sum(rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) / (sum(rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) + sum(rate(blocky_cache_misses_total{resolver=~"$resolver"}[$__rate_interval])))'';
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
             decimals = 1;
+            # Steady state here is ~0.93, so the old 0.3/0.6 steps could never
+            # fire. These are set where a real regression would show.
             thresholds = [
               { color = "red"; }
+              {
+                color = "orange";
+                value = 0.6;
+              }
+              {
+                color = "green";
+                value = 0.85;
+              }
+            ];
+            options.graphMode = "area";
+          })
+          (viz.panel {
+            title = "Upstream p95";
+            type = "stat";
+            w = 4;
+            h = 5;
+            description = "95th percentile for queries that actually leave the box. The all-traffic p95 is ~5ms no matter how bad upstream gets, because ~97% of requests are answered from cache or a blocklist and land in the first histogram bucket.";
+            expr = ''histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
+            unit = viz.units.seconds;
+            decimals = 2;
+            thresholds = [
+              { color = "green"; }
               {
                 color = "orange";
                 value = 0.3;
               }
               {
-                color = "green";
-                value = 0.6;
+                color = "red";
+                value = 1.0;
               }
             ];
+            options = {
+              graphMode = "area";
+              showPercentChange = true;
+              # Slower is worse, so a rising delta must read red.
+              percentChangeColorMode = "inverted";
+            };
           })
           (viz.panel {
-            title = "p95 resolution";
+            title = "Upstream failures";
             type = "stat";
             w = 4;
             h = 5;
-            expr = "histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket[$__rate_interval])))";
-            unit = viz.units.seconds;
-            decimals = 3;
+            description = "Resolution failures in the visible window. Never plot the raw counter: it accumulates across restarts and a single upstream stall pushes it into the tens of thousands, after which it reads catastrophic forever.";
+            expr = ''sum(increase(blocky_error_total{resolver=~"$resolver"}[$__range])) or vector(0)'';
+            unit = viz.units.none;
+            decimals = 0;
             thresholds = [
               { color = "green"; }
               {
                 color = "orange";
-                value = 0.1;
+                value = 1;
               }
               {
                 color = "red";
-                value = 0.5;
+                value = 100;
               }
             ];
+            options = {
+              graphMode = "none";
+              colorMode = "background";
+            };
+          })
+        ]
+        [ (viz.row "Resolver health") ]
+        [
+          (viz.panel {
+            title = "Resolver reachability";
+            type = "state-timeline";
+            w = 10;
+            h = 6;
+            description = "Deliberately not scoped to the resolver picker: you want to see a resolver disappear even when it is filtered out of every other panel.";
+            expr = ''up{job="blocky"}'';
+            legend = "{{resolver}}";
+            mappings = viz.boolMapping {
+              falseText = "UNREACHABLE";
+              trueText = "UP";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+              legend.showLegend = true;
+            };
           })
           (viz.panel {
-            title = "Denylist entries";
-            type = "stat";
-            w = 4;
-            h = 5;
+            title = "Resolver comparison";
+            type = "table";
+            w = 14;
+            h = 6;
+            description = "Six metrics against every resolver. `List age` is each host's own 4h refresh timer, so the two numbers differ normally; one climbing past a few hours on its own is a stale blocklist.";
             targets = [
               {
-                expr = ''blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
-                legend = "{{resolver}} blocked domains";
+                expr = ''sum by (resolver) (rate(blocky_query_total{resolver=~"$resolver"}[$__rate_interval]))'';
+                instant = true;
+                format = "table";
               }
               {
-                expr = ''blocky_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
-                legend = "{{resolver}} cached answers";
+                # The zero-fill is required: a resolver that has blocked
+                # nothing selects an empty set and would drop out of the
+                # table entirely rather than showing 0%.
+                expr = ''(sum by (resolver) (increase(blocky_response_total{response_type="BLOCKED",resolver=~"$resolver"}[$__range])) or (sum by (resolver) (increase(blocky_response_total{resolver=~"$resolver"}[$__range])) * 0)) / sum by (resolver) (increase(blocky_response_total{resolver=~"$resolver"}[$__range]))'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''sum by (resolver) (rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) / (sum by (resolver) (rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) + sum by (resolver) (rate(blocky_cache_misses_total{resolver=~"$resolver"}[$__rate_interval])))'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''histogram_quantile(0.95, sum by (le, resolver) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''max by (resolver) (time() - blocky_last_list_group_refresh_timestamp_seconds{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
+                instant = true;
+                format = "table";
+              }
+              {
+                expr = ''sum by (resolver) (increase(blocky_error_total{resolver=~"$resolver"}[$__range]))'';
+                instant = true;
+                format = "table";
+              }
+            ];
+            transformations = [
+              # Every table-format frame carries its own Time column; after a
+              # join they collide into "Time 1".."Time 6". Drop them first.
+              {
+                id = "filterFieldsByName";
+                options.include.pattern = "resolver|Value #.*";
+              }
+              {
+                id = "joinByField";
+                options = {
+                  byField = "resolver";
+                  mode = "outer";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = { };
+                  indexByName = { };
+                  renameByName = {
+                    resolver = "Resolver";
+                    "Value #A" = "Queries/s";
+                    "Value #B" = "Blocked";
+                    "Value #C" = "Cache hit";
+                    "Value #D" = "Upstream p95";
+                    "Value #E" = "List age";
+                    "Value #F" = "Errors";
+                  };
+                };
               }
             ];
             unit = viz.units.short;
-            decimals = 0;
-            thresholds = [ { color = "text"; } ];
+            decimals = 2;
             options = {
-              graphMode = "none";
-              colorMode = "none";
-              textMode = "value_and_name";
-              orientation = "horizontal";
+              cellHeight = "sm";
+              showHeader = true;
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Queries/s";
+                  desc = true;
+                }
+              ];
             };
+            # Matchers use the renamed columns: overrides run after
+            # transformations.
+            overrides = [
+              (viz.overrideByName "Resolver" [ viz.pillCell ])
+              (viz.overrideByName "Queries/s" [
+                {
+                  id = "unit";
+                  value = viz.units.reqps;
+                }
+              ])
+              (viz.overrideByName "Blocked" [
+                {
+                  id = "unit";
+                  value = viz.units.percentunit;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 1;
+                }
+                (viz.gaugeCell { mode = "gradient"; })
+              ])
+              (viz.overrideByName "Cache hit" [
+                {
+                  id = "unit";
+                  value = viz.units.percentunit;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 1;
+                }
+                (viz.gaugeCell { mode = "gradient"; })
+              ])
+              (viz.overrideByName "Upstream p95" [
+                {
+                  id = "unit";
+                  value = viz.units.seconds;
+                }
+              ])
+              (viz.overrideByName "List age" [
+                {
+                  id = "unit";
+                  value = viz.units.duration;
+                }
+              ])
+              (viz.overrideByName "Errors" [
+                {
+                  id = "unit";
+                  value = viz.units.none;
+                }
+                {
+                  id = "decimals";
+                  value = 0;
+                }
+                (viz.colorBackgroundCell { mode = "basic"; })
+                {
+                  id = "thresholds";
+                  value = {
+                    mode = "absolute";
+                    steps = viz.thresholdSteps [
+                      { color = "green"; }
+                      {
+                        color = "red";
+                        value = 1;
+                      }
+                    ];
+                  };
+                }
+              ])
+            ];
           })
         ]
         [ (viz.row "Traffic") ]
         [
           (viz.panel {
-            title = "Queries by outcome";
+            title = "Answers by outcome";
             w = 16;
             h = 8;
-            expr = "sum by (response_type) (rate(blocky_response_total[$__rate_interval]))";
+            description = "Counted from the latency histogram, not from blocky_response_total: the histogram is observed unconditionally, while the response counter is only incremented when resolution succeeded. The response counter therefore has no `err` series at all and structurally cannot show failures.";
+            expr = ''sum by (response_type) (rate(blocky_request_duration_seconds_count{resolver=~"$resolver"}[$__rate_interval]))'';
             legend = "{{response_type}}";
             unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
             custom = {
               fillOpacity = 50;
               stacking = {
                 mode = "normal";
                 group = "A";
               };
+              # Draw a visible gap when a 60s scrape is missed instead of a
+              # straight line through the hole.
+              insertNulls = 90000;
             };
+            options.tooltip.hideZeros = true;
             overrides = [
-              (viz.overrideByRegexp "/(?i)blocked/" [
+              (viz.overrideByRegexp "/(?i)err/" [
                 {
                   id = "color";
                   value = {
                     mode = "fixed";
                     fixedColor = "red";
+                  };
+                }
+              ])
+              (viz.overrideByRegexp "/(?i)blocked/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "orange";
                   };
                 }
               ])
@@ -3179,187 +3567,317 @@ let
                   };
                 }
               ])
+              (viz.overrideByRegexp "/(?i)resolved/" [
+                {
+                  id = "color";
+                  value = {
+                    mode = "fixed";
+                    fixedColor = "blue";
+                  };
+                }
+              ])
             ];
           })
           (viz.panel {
             title = "Record types";
-            type = "piechart";
+            type = "barchart";
             w = 8;
             h = 8;
+            description = "A dozen record types is well past the point a pie chart stays readable. `ceil(increase(...))` keeps the labels whole query counts rather than extrapolated fractions.";
             targets = [
               {
-                # `ceil(increase(...))` so the slice labels read as whole
-                # query counts rather than extrapolated fractions.
-                expr = "sum by (type) (ceil(increase(blocky_query_total[$__range])))";
-                legend = "{{type}}";
+                expr = ''sum by (type) (ceil(increase(blocky_query_total{resolver=~"$resolver"}[$__range])))'';
                 instant = true;
+                format = "table";
               }
             ];
-            unit = viz.units.short;
-            decimals = 0;
-          })
-        ]
-        [
-          (viz.panel {
-            title = "Top clients";
-            type = "bargauge";
-            w = 8;
-            h = 9;
-            targets = [
+            # Mandatory: a barchart needs a string x-field and refuses the
+            # Time column that `format = "table"` brings along.
+            transformations = [
               {
-                expr = "topk(10, sum by (client) (ceil(increase(blocky_query_total[$__range]))))";
-                legend = "{{client}}";
-                instant = true;
+                id = "organize";
+                options = {
+                  excludeByName.Time = true;
+                  indexByName = { };
+                  renameByName.Value = "Queries";
+                };
               }
             ];
             unit = viz.units.short;
             decimals = 0;
             color.mode = "continuous-BlPu";
+            options = {
+              xField = "type";
+              orientation = "horizontal";
+              showValue = "auto";
+              legend.showLegend = false;
+            };
           })
+        ]
+        [ (viz.row "Clients") ]
+        [
           (viz.panel {
             title = "Query rate by client";
-            w = 8;
-            h = 9;
-            expr = "topk(10, sum by (client) (rate(blocky_query_total[$__rate_interval])))";
+            w = 12;
+            h = 8;
+            description = "The hub's own address reverse-resolves to every custom DNS name at once and blocky joins them into a single comma-separated client label whose order is nondeterministic, so each restart mints a fresh 400-character series. Rewriting any comma-bearing label to one bucket is the only remedy that neither truncates, drops traffic, nor collides: label_replace runs on the raw series, which still carry distinct type labels, so the outer sum merges them cleanly.";
+            expr = ''sum by (client) (label_replace(rate(blocky_query_total{resolver=~"$resolver"}[$__rate_interval]), "client", "internal services", "client", ".*,.*"))'';
             legend = "{{client}}";
             unit = viz.units.reqps;
-            custom.fillOpacity = 20;
-            options.legend.placement = "right";
+            min = 0;
+            decimals = 2;
+            custom = {
+              fillOpacity = 30;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            options = {
+              legend = {
+                displayMode = "table";
+                placement = "right";
+                calcs = [
+                  "mean"
+                  "max"
+                ];
+              };
+              tooltip.hideZeros = true;
+            };
           })
           (viz.panel {
-            title = "Top block reasons";
-            type = "bargauge";
-            w = 8;
-            h = 9;
+            title = "Client detail";
+            type = "table";
+            w = 12;
+            h = 8;
+            datasource = "loki";
+            description = "From blocky's query log via Loki, so `client_ip` is the real source address with none of the comma-joined PTR mess the Prometheus client label carries. Per-client blocked counts do not exist in Prometheus at all. link only: impa's journal is not shipped.";
             targets = [
               {
-                expr = ''topk(10, sum by (reason) (ceil(increase(blocky_response_total{response_type=~"BLOCKED|REBIND"}[$__range]))))'';
-                legend = "{{reason}}";
+                expr = ''sum by (client_ip) (count_over_time({unit="blocky.service"} | logfmt | client_ip != "" [$__range]))'';
+                instant = true;
+                queryType = "instant";
+                format = "table";
+              }
+              {
+                expr = ''sum by (client_ip) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | logfmt | client_ip != "" [$__range]))'';
+                instant = true;
+                queryType = "instant";
+                format = "table";
+              }
+              {
+                expr = ''sum by (client_ip) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | logfmt | client_ip != "" [$__range])) / sum by (client_ip) (count_over_time({unit="blocky.service"} | logfmt | client_ip != "" [$__range]))'';
+                instant = true;
+                queryType = "instant";
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "filterFieldsByName";
+                options.include.pattern = "client_ip|Value #.*";
+              }
+              {
+                id = "joinByField";
+                options = {
+                  byField = "client_ip";
+                  mode = "outer";
+                };
+              }
+              {
+                id = "organize";
+                options = {
+                  excludeByName = { };
+                  indexByName = { };
+                  renameByName = {
+                    client_ip = "Client";
+                    "Value #A" = "Queries";
+                    "Value #B" = "Blocked";
+                    "Value #C" = "Blocked share";
+                  };
+                };
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            options = {
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Queries";
+                  desc = true;
+                }
+              ];
+            };
+            overrides = [
+              (viz.overrideByName "Client" [ viz.pillCell ])
+              (viz.overrideByName "Blocked share" [
+                {
+                  id = "unit";
+                  value = viz.units.percentunit;
+                }
+                {
+                  id = "min";
+                  value = 0;
+                }
+                {
+                  id = "max";
+                  value = 1;
+                }
+                {
+                  id = "decimals";
+                  value = 1;
+                }
+                (viz.gaugeCell { mode = "gradient"; })
+              ])
+              (viz.overrideByName "Queries" [
+                {
+                  id = "custom.footer";
+                  value.reducers = [ "sum" ];
+                }
+              ])
+              (viz.overrideByName "Blocked" [
+                {
+                  id = "custom.footer";
+                  value.reducers = [ "sum" ];
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "What is being blocked") ]
+        [
+          (viz.panel {
+            title = "Top blocked domains";
+            type = "table";
+            w = 8;
+            h = 9;
+            datasource = "loki";
+            description = "Prometheus has no domain label anywhere -- by design, for cardinality -- so this is only derivable from the query log. Must stay an instant query: grouping by question_name over a range trips Loki's 500-series limit.";
+            targets = [
+              {
+                expr = ''topk(15, sum by (question_name) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | logfmt | question_name != "" [$__range])))'';
+                instant = true;
+                queryType = "instant";
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName.Time = true;
+                  indexByName = { };
+                  renameByName = {
+                    question_name = "Domain";
+                    Value = "Blocked";
+                  };
+                };
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            options = {
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Blocked";
+                  desc = true;
+                }
+              ];
+            };
+            overrides = [
+              (viz.overrideByName "Blocked" [
+                (viz.gaugeCell { mode = "gradient"; })
+                {
+                  id = "custom.width";
+                  value = 160;
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Top matched blocklist rules";
+            type = "table";
+            w = 8;
+            h = 9;
+            datasource = "loki";
+            description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard.";
+            targets = [
+              {
+                expr = ''topk(15, sum by (rule) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | regexp "response_reason=BLOCKED \\((?P<rule>[^)]*)\\)" | rule != "" [$__range])))'';
+                instant = true;
+                queryType = "instant";
+                format = "table";
+              }
+            ];
+            transformations = [
+              {
+                id = "organize";
+                options = {
+                  excludeByName.Time = true;
+                  indexByName = { };
+                  renameByName = {
+                    rule = "Rule";
+                    Value = "Hits";
+                  };
+                };
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            options = {
+              cellHeight = "sm";
+              frozenColumns.left = 1;
+              sortBy = [
+                {
+                  displayName = "Hits";
+                  desc = true;
+                }
+              ];
+            };
+            overrides = [
+              (viz.overrideByName "Hits" [
+                (viz.gaugeCell { mode = "gradient"; })
+                {
+                  id = "custom.width";
+                  value = 160;
+                }
+              ])
+            ];
+          })
+          (viz.panel {
+            title = "Blocked by denylist group";
+            type = "bargauge";
+            w = 4;
+            h = 9;
+            description = "The raw reason label mixes which list matched with how it matched (BLOCKED / BLOCKED CNAME / BLOCKED IP). The optional middle branch folds all three into the group name.";
+            targets = [
+              {
+                # The capture must be non-empty: label_replace deletes the
+                # label outright when the capture is empty, which is what
+                # collapses the naive form into one unlabelled series.
+                expr = ''sum by (list_group) (label_replace(increase(blocky_response_total{response_type="BLOCKED",resolver=~"$resolver"}[$__range]), "list_group", "$1", "reason", "BLOCKED(?: [A-Z]+)? \\((.*)\\)"))'';
+                legend = "{{list_group}}";
                 instant = true;
               }
             ];
             unit = viz.units.short;
             decimals = 0;
             color.mode = "continuous-YlRd";
-          })
-        ]
-        [ (viz.row "Latency and cache") ]
-        [
-          (viz.panel {
-            title = "Resolution latency distribution";
-            type = "heatmap";
-            w = 12;
-            h = 9;
-            targets = [
-              {
-                expr = "sum by (le) (increase(blocky_request_duration_seconds_bucket[$__rate_interval]))";
-                legend = "{{le}}";
-                format = "heatmap";
-              }
-            ];
-            # The series are already bucketed, so Grafana must not
-            # re-bucket them, and the unit belongs on the y-axis.
-            options = {
-              calculate = false;
-              yAxis = {
-                unit = viz.units.seconds;
-                axisPlacement = "left";
-                reverse = false;
-              };
-            };
-          })
-          (viz.panel {
-            title = "Resolution percentiles";
-            w = 12;
-            h = 9;
-            targets =
-              map
-                (quantile: {
-                  expr = "histogram_quantile(0.${quantile}, sum by (le) (rate(blocky_request_duration_seconds_bucket[$__rate_interval])))";
-                  legend = "p${quantile}";
-                })
-                [
-                  "50"
-                  "90"
-                  "99"
-                ];
-            unit = viz.units.seconds;
-            min = 0;
-            custom.fillOpacity = 10;
-          })
-        ]
-        [
-          (viz.panel {
-            title = "Cache";
-            w = 12;
-            h = 7;
-            targets = [
-              {
-                expr = ''blocky_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
-                legend = "{{resolver}} entries";
-              }
-              {
-                expr = ''blocky_prefetch_domain_name_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
-                legend = "{{resolver}} prefetch candidates";
-              }
-            ];
-            unit = viz.units.short;
-            decimals = 0;
-          })
-          (viz.panel {
-            title = "Cache and prefetch rates";
-            w = 12;
-            h = 7;
-            targets = [
-              {
-                expr = "sum(rate(blocky_cache_hits_total[$__rate_interval]))";
-                legend = "Hits";
-              }
-              {
-                expr = "sum(rate(blocky_cache_misses_total[$__rate_interval]))";
-                legend = "Misses";
-              }
-              {
-                expr = "sum(rate(blocky_prefetches_total[$__rate_interval]))";
-                legend = "Prefetches";
-              }
-              {
-                expr = "sum(rate(blocky_prefetch_hits_total[$__rate_interval]))";
-                legend = "Prefetch hits";
-              }
-            ];
-            unit = viz.units.reqps;
-          })
-        ]
-        [
-          (viz.panel {
-            title = "Blocklist freshness";
-            type = "stat";
-            w = 8;
-            h = 5;
-            expr = "time() - max(blocky_last_list_group_refresh_timestamp_seconds)";
-            unit = viz.units.duration;
-            thresholds = [
-              { color = "green"; }
-              {
-                color = "orange";
-                value = 26 * 3600;
-              }
-              {
-                color = "red";
-                value = 72 * 3600;
-              }
-            ];
-            options.graphMode = "none";
+            options.namePlacement = "top";
           })
           (viz.panel {
             title = "Denylist size by group";
             type = "bargauge";
-            w = 8;
-            h = 5;
+            w = 4;
+            h = 9;
+            description = "`max by`, not `sum by`: every resolver carries byte-identical lists, so summing reports one multiple of the real list size per resolver.";
             targets = [
               {
-                expr = "sum by (group) (blocky_denylist_cache_entries)";
+                expr = ''max by (group) (blocky_denylist_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
                 legend = "{{group}}";
                 instant = true;
               }
@@ -3367,35 +3885,429 @@ let
             unit = viz.units.short;
             decimals = 0;
             color.mode = "continuous-BlPu";
+            options.namePlacement = "top";
           })
+        ]
+        [ (viz.row "Latency") ]
+        [
+          (viz.panel (
+            {
+              title = "Upstream latency distribution";
+              type = "heatmap";
+              w = 12;
+              h = 9;
+              description = "Only response_type=RESOLVED. Roughly 97% of all requests are answered from cache or a blocklist and land in the first 5ms bucket, so an unscoped heatmap is a single solid band.";
+            }
+            // viz.heatmapBuckets {
+              expr = ''sum by (le) (increase(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval]))'';
+              unit = viz.units.seconds;
+              scheme = "Turbo";
+              value = "Resolutions";
+            }
+          ))
           (viz.panel {
-            title = "Resolver errors";
-            type = "stat";
-            w = 8;
-            h = 5;
+            title = "Upstream percentiles";
+            w = 12;
+            h = 9;
+            description = "No p99: the histogram's top bucket is le=2.0, so p99 and above are pinned to the bucket edge and draw a flat line that carries no information. The mean is the only one of these four that is not bucket-quantised. See 'Slower than 2s' for the real tail.";
             targets = [
               {
-                expr = "sum(increase(blocky_error_total[$__range])) or vector(0)";
-                legend = "Errors";
+                expr = ''histogram_quantile(0.50, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
+                legend = "p50";
               }
               {
-                expr = "sum(increase(blocky_failed_downloads_total[$__range])) or vector(0)";
-                legend = "Failed list downloads";
+                expr = ''histogram_quantile(0.90, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
+                legend = "p90";
+              }
+              {
+                expr = ''histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
+                legend = "p95";
+              }
+              {
+                expr = ''sum(rate(blocky_request_duration_seconds_sum{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])) / sum(rate(blocky_request_duration_seconds_count{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "mean";
               }
             ];
-            unit = viz.units.none;
+            unit = viz.units.seconds;
+            min = 0;
+            decimals = 3;
+            custom = {
+              fillOpacity = 10;
+              # Draw the objective lines on the chart rather than only
+              # tinting a number somewhere else.
+              thresholdsStyle.mode = "dashed";
+            };
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 0.3;
+              }
+              {
+                color = "red";
+                value = 1.0;
+              }
+            ];
+          })
+        ]
+        [ (viz.row "Latency detail") ]
+        [
+          (viz.panel {
+            title = "p95 by outcome";
+            w = 10;
+            h = 7;
+            description = "The log-10 y-axis is mandatory: cached, blocked, custom-DNS and special-use answers all sit near 5ms while upstream resolution sits near 1s, and a linear axis flattens five of the six series onto the baseline. Aggregating by (le, response_type) is safe here because this is a timeseries; the multi-frame trap is heatmap-specific.";
+            expr = ''histogram_quantile(0.95, sum by (le, response_type) (rate(blocky_request_duration_seconds_bucket{resolver=~"$resolver"}[$__rate_interval])))'';
+            legend = "{{response_type}}";
+            unit = viz.units.seconds;
+            min = 0;
+            decimals = 3;
+            custom = {
+              fillOpacity = 0;
+              scaleDistribution = {
+                type = "log";
+                log = 10;
+              };
+            };
+            options.tooltip.hideZeros = true;
+          })
+          (viz.panel {
+            title = "Slower than 2s";
+            type = "stat";
+            w = 4;
+            h = 7;
+            description = "Resolutions past the histogram's top bucket. These are invisible to every quantile on this dashboard, so a count of what fell off the end is the only truthful statement about the tail. The le=\"2.0\" string is exact: le=\"2\" selects nothing.";
+            expr = ''sum(rate(blocky_request_duration_seconds_count{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])) - sum(rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",le="2.0",resolver=~"$resolver"}[$__rate_interval]))'';
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 3;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 0.001;
+              }
+              {
+                color = "red";
+                value = 0.01;
+              }
+            ];
+            options = {
+              graphMode = "area";
+              colorMode = "value";
+            };
+          })
+          (viz.panel {
+            title = "External view (blackbox probe)";
+            w = 10;
+            h = 7;
+            description = "An off-box view of blocky answering. phase=request is the real wire time; probe_dns_lookup_time_seconds is NOT DNS latency -- it is the resolve phase for a literal IP and reads microseconds of noise. probe_dns_query_succeeded rather than probe_success, because probe_success also folds in an answer-RR regex assertion that can read 0 while every query is being answered correctly.";
+            targets = [
+              {
+                expr = ''probe_dns_duration_seconds{job="blackbox-dns",phase="request"}'';
+                legend = "{{resolver}} request";
+              }
+              {
+                expr = ''min by (resolver) (probe_dns_query_succeeded{job="blackbox-dns"})'';
+                legend = "{{resolver}} answered";
+              }
+            ];
+            unit = viz.units.seconds;
+            min = 0;
+            decimals = 4;
+            overrides = [
+              (viz.overrideByRegexp "/answered$/" [
+                {
+                  id = "unit";
+                  value = viz.units.none;
+                }
+                {
+                  id = "max";
+                  value = 1;
+                }
+                {
+                  id = "custom.axisPlacement";
+                  value = "right";
+                }
+                {
+                  id = "custom.lineInterpolation";
+                  value = "stepAfter";
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "Cache and prefetch") ]
+        [
+          (viz.panel {
+            title = "Cache hit ratio";
+            w = 8;
+            h = 7;
+            description = "A ratio that sits at ~93% and drops to ~70% after a restart is a shape, not a number; the stat tile at the top of this dashboard cannot show the recovery curve.";
+            expr = ''sum(rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) / (sum(rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval])) + sum(rate(blocky_cache_misses_total{resolver=~"$resolver"}[$__rate_interval])))'';
+            legend = "Cache hit ratio";
+            unit = viz.units.percentunit;
+            min = 0;
+            max = 1;
+            decimals = 2;
+            custom = {
+              fillOpacity = 20;
+              thresholdsStyle.mode = "dashed";
+            };
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 0.6;
+              }
+              {
+                color = "green";
+                value = 0.85;
+              }
+            ];
+          })
+          (viz.panel {
+            title = "Cache and prefetch rates";
+            w = 8;
+            h = 7;
+            description = "Misses are mirrored below the axis so the hit/miss balance reads at a glance instead of as four stacked lines.";
+            targets = [
+              {
+                expr = ''sum(rate(blocky_cache_hits_total{resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "Hits";
+              }
+              {
+                expr = ''sum(rate(blocky_cache_misses_total{resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "Misses";
+              }
+              {
+                expr = ''sum(rate(blocky_prefetches_total{resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "Prefetches";
+              }
+              {
+                expr = ''sum(rate(blocky_prefetch_hits_total{resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "Prefetch hits";
+              }
+            ];
+            unit = viz.units.reqps;
+            decimals = 2;
+            custom.fillOpacity = 20;
+            overrides = [ (viz.negativeY "/^Misses$/") ];
+          })
+          (viz.panel {
+            title = "Cache size";
+            w = 8;
+            h = 7;
+            description = "prefetch_domain_name_cache_entries is the number of names blocky is WATCHING to decide whether they qualify for prefetching, not the number it has prefetched. It is normally the larger of the two.";
+            targets = [
+              {
+                expr = ''blocky_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} cached answers";
+              }
+              {
+                expr = ''blocky_prefetch_domain_name_cache_entries{instance=~"${resolverHostRegex}",resolver=~"$resolver"}'';
+                legend = "{{resolver}} names watched";
+              }
+            ];
+            unit = viz.units.short;
+            min = 0;
+            decimals = 0;
+            custom.fillOpacity = 10;
+          })
+        ]
+        [ (viz.row "Resolver internals") ]
+        [
+          (viz.panel {
+            title = "Prefetch effectiveness";
+            type = "stat";
+            w = 6;
+            h = 5;
+            description = "Cache hits served per prefetch issued. clamp_min prevents a divide-by-zero while the prefetcher is idle.";
+            expr = ''sum(rate(blocky_prefetch_hits_total{resolver=~"$resolver"}[$__rate_interval])) / clamp_min(sum(rate(blocky_prefetches_total{resolver=~"$resolver"}[$__rate_interval])), 0.0001)'';
+            displayName = "hits per prefetch";
+            unit = viz.units.short;
+            decimals = 1;
+            thresholds = [
+              { color = "red"; }
+              {
+                color = "orange";
+                value = 2;
+              }
+              {
+                color = "green";
+                value = 5;
+              }
+            ];
+            options.graphMode = "area";
+          })
+          (viz.panel {
+            title = "Cache miss to upstream";
+            type = "stat";
+            w = 6;
+            h = 5;
+            description = "Share of cache misses that actually cost an upstream trip. Below 1 means prefetch, customDNS or blocking satisfied them without leaving the box; a move toward 100% means prefetching stopped working.";
+            expr = ''sum(increase(blocky_response_total{response_type="RESOLVED",resolver=~"$resolver"}[$__range])) / sum(increase(blocky_cache_misses_total{resolver=~"$resolver"}[$__range]))'';
+            unit = viz.units.percentunit;
+            min = 0;
             decimals = 0;
             thresholds = [
               { color = "green"; }
               {
+                color = "orange";
+                value = 0.98;
+              }
+            ];
+            options.graphMode = "none";
+          })
+          (viz.panel {
+            title = "Blocklist freshness";
+            type = "stat";
+            w = 6;
+            h = 5;
+            description = "Per resolver, because each host refreshes on its own timer. 5h means one refresh has been missed.";
+            expr = ''max by (resolver) (time() - blocky_last_list_group_refresh_timestamp_seconds{instance=~"${resolverHostRegex}",resolver=~"$resolver"})'';
+            legend = "{{resolver}}";
+            unit = viz.units.duration;
+            decimals = 0;
+            thresholds = [
+              { color = "green"; }
+              {
+                color = "orange";
+                value = 5 * 3600;
+              }
+              {
                 color = "red";
-                value = 1;
+                value = 26 * 3600;
               }
             ];
             options = {
               graphMode = "none";
               textMode = "value_and_name";
               orientation = "horizontal";
+            };
+          })
+          (viz.panel {
+            title = "Blocky process";
+            type = "stat";
+            w = 6;
+            h = 5;
+            description = "Restart detection. A blocky that restarted minutes ago explains an otherwise alarming cache hit rate, and nothing else on this dashboard would tell you. A climbing goroutine count is the classic leak signal; RSS tracks denylist size.";
+            targets = [
+              {
+                expr = ''sum by (resolver) (process_resident_memory_bytes{job="blocky"})'';
+                legend = "{{resolver}} RSS";
+              }
+              {
+                expr = ''sum by (resolver) (go_goroutines{job="blocky"})'';
+                legend = "{{resolver}} goroutines";
+              }
+              {
+                expr = ''time() - max by (resolver) (process_start_time_seconds{job="blocky"})'';
+                legend = "{{resolver}} uptime";
+              }
+            ];
+            unit = viz.units.short;
+            decimals = 0;
+            thresholds = [ { color = "text"; } ];
+            options = {
+              graphMode = "none";
+              colorMode = "none";
+              textMode = "value_and_name";
+              orientation = "horizontal";
+            };
+            overrides = [
+              (viz.overrideByRegexp "/ RSS$/" [
+                {
+                  id = "unit";
+                  value = viz.units.bytes;
+                }
+              ])
+              (viz.overrideByRegexp "/ uptime$/" [
+                {
+                  id = "unit";
+                  value = viz.units.duration;
+                }
+              ])
+            ];
+          })
+        ]
+        [ (viz.row "Query mix and dead names") ]
+        [
+          (viz.panel {
+            title = "Query type mix";
+            w = 12;
+            h = 7;
+            description = "Drift, not a snapshot. AAAA share tracks IPv6 readiness, HTTPS+SVCB share tracks ECH/HTTP3 adoption, and PTR is largely blocky's own client-name lookups. Percent stacking is the only way a dozen series of wildly different magnitude stay legible together.";
+            expr = ''sum by (type) (rate(blocky_query_total{resolver=~"$resolver"}[$__rate_interval]))'';
+            legend = "{{type}}";
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
+            custom = {
+              fillOpacity = 60;
+              lineWidth = 0;
+              stacking = {
+                mode = "percent";
+                group = "A";
+              };
+            };
+            options = {
+              tooltip.hideZeros = true;
+              legend = {
+                displayMode = "table";
+                placement = "right";
+                calcs = [ "mean" ];
+              };
+            };
+          })
+          (viz.panel {
+            title = "NXDOMAIN by outcome";
+            w = 12;
+            h = 7;
+            description = "NXDOMAIN arrives from three unrelated places, and lumping them into one rate conflates negative cache hits, special-use domains, blocking side-effects and real upstream NXDOMAIN. With blockType=zeroIp a blocked A/AAAA answers NOERROR with 0.0.0.0, so BLOCKED+NXDOMAIN only appears for record types the zero-IP handler cannot synthesise. The interesting series is RESOLVED: genuine dead names your network keeps asking for.";
+            expr = ''sum by (response_type) (rate(blocky_response_total{response_code="NXDOMAIN",resolver=~"$resolver"}[$__rate_interval]))'';
+            legend = "{{response_type}}";
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 3;
+            custom = {
+              fillOpacity = 30;
+              stacking = {
+                mode = "normal";
+                group = "A";
+              };
+            };
+            options.tooltip.hideZeros = true;
+          })
+        ]
+        [ (viz.row "Logs (link only)") ]
+        [
+          (viz.panel {
+            title = "Upstream failures";
+            type = "logs";
+            w = 12;
+            h = 9;
+            datasource = "loki";
+            description = "Pairs with the 'Upstream failures' tile at the top. Do NOT filter on level: Loki classifies every one of blocky's lines as info, including these, because the error text sits inside a multi-line message. Reading 'No logs found' is the correct healthy state.";
+            expr = ''{unit="blocky.service"} |~ "ERROR error on processing"'';
+            options = {
+              sortOrder = "Descending";
+              wrapLogMessage = true;
+              enableInfiniteScrolling = true;
+            };
+          })
+          (viz.panel {
+            title = "Blocklist refresh audit";
+            type = "logs";
+            w = 12;
+            h = 9;
+            datasource = "loki";
+            description = "Everything blocky says that is not the query-log firehose: per-source list import counts, group totals, startup. Catches a blocklist source that silently started returning a shorter list.";
+            expr = ''{unit="blocky.service"} != "queryLog"'';
+            options = {
+              sortOrder = "Descending";
+              wrapLogMessage = true;
+              showTime = true;
             };
           })
         ]
@@ -4442,7 +5354,29 @@ in
                 type = "prometheus";
                 access = "proxy";
                 url = "http://${prometheus.backendAddress}:${toString prometheus.port}";
-                jsonData.timeInterval = "60s";
+                jsonData = {
+                  # Every scrape job in this deployment runs at 60s. Without
+                  # this key Grafana assumes 15s, `$__rate_interval` resolves
+                  # to 1m, and `rate(x[1m])` over 60s-scraped data has fewer
+                  # than two samples per window and returns *zero series* --
+                  # the panel reads "No data" with no error anywhere. With it,
+                  # `$__rate_interval` = max($__interval + 1m, 4 x 1m), i.e.
+                  # never below 4m, which is four samples per window and
+                  # survives a missed scrape.
+                  timeInterval = "60s";
+                  # POST keeps the long `label_replace(...)` expressions on
+                  # the DNS dashboard off the URL line.
+                  httpMethod = "POST";
+                  # Lets Grafana enable the PromQL features this server
+                  # actually has rather than probing for them on every
+                  # dashboard load.
+                  prometheusType = "Prometheus";
+                  prometheusVersion = "3.14.0";
+                  # Generated dashboards ship raw PromQL; never bounce the
+                  # panel editor into the visual builder, which cannot
+                  # round-trip these expressions.
+                  defaultEditor = "code";
+                };
                 isDefault = true;
                 editable = false;
               }
@@ -4452,6 +5386,12 @@ in
                 type = "loki";
                 access = "proxy";
                 url = "http://${loki.backendAddress}:${toString loki.port}";
+                # The default is 1000, which truncates the blocklist-refresh
+                # audit panel on any window wider than a few hours. There is
+                # deliberately no `timeInterval` here: LogQL step selection
+                # comes from the panel, so the Prometheus rate-interval bug
+                # has no Loki equivalent.
+                jsonData.maxLines = 5000;
                 editable = false;
               }
             ];

@@ -58,6 +58,18 @@ let
   # failure mode this work set out to remove: point those at a table, a
   # state-timeline or a bargauge instead.
   statMultiSeriesAllowance = 4;
+
+  # Panel types fed a Prometheus classic histogram straight into a cell grid.
+  # Getting that shape wrong renders without erroring, so the shape is
+  # asserted here instead.
+  histogramPanelTypes = [ "heatmap" ];
+
+  # A rate/increase window narrower than 4x the scrape interval has fewer than
+  # four samples, and at exactly 1x returns *zero series*: the panel reads "No
+  # data" and nothing errors. Everything here is scraped at 60s, so any
+  # literal window below 4m is a bug. This is the rule that would have caught
+  # the entire "No data" class the DNS dashboard rebuild started from.
+  minimumRateWindowSeconds = 240;
 in
 {
   perSystem =
@@ -72,11 +84,13 @@ in
           inherit knownUnits;
           inherit numericPanelTypes;
           inherit statMultiSeriesAllowance;
+          inherit histogramPanelTypes;
+          inherit minimumRateWindowSeconds;
           targetlessPanelTypes = viz.targetlessTypes;
         }
       );
       validator = pkgs.writeText "validate-grafana-dashboards.py" ''
-        import json, sys
+        import json, re, sys
 
         dashboards = json.load(open(sys.argv[1]))
         config = json.load(open(sys.argv[2]))
@@ -84,6 +98,19 @@ in
         numeric_types = set(config["numericPanelTypes"])
         stat_allowance = config["statMultiSeriesAllowance"]
         targetless_types = set(config["targetlessPanelTypes"])
+        histogram_types = set(config["histogramPanelTypes"])
+        min_rate_window = config["minimumRateWindowSeconds"]
+
+        # PromQL duration suffixes, in seconds.
+        RANGE_UNITS = {
+            "ms": 0.001,
+            "s": 1,
+            "m": 60,
+            "h": 3600,
+            "d": 86400,
+            "w": 604800,
+            "y": 31536000,
+        }
         problems = []
 
 
@@ -176,6 +203,37 @@ in
                     if target.get("instant") and target.get("range"):
                         fail(name, f"{title}: target cannot be both instant and range")
 
+                    # The bug this rule exists for: `rate(x[1m])` over
+                    # 60s-scraped data has one sample per window and returns
+                    # ZERO series. The panel says "No data" and nothing
+                    # errors. Only `$__rate_interval` (>= 4m once the
+                    # datasource declares timeInterval), `$__range`, `$__auto`
+                    # or an explicit window of at least 4m is safe.
+                    expr = target.get("expr", "")
+                    if re.search(r"\b(rate|irate|increase|delta|idelta)\s*\(", expr):
+                        # Strip string literals first. A label matcher like
+                        # `device=~"[a-z]+[0-9]+"` contains brackets that are
+                        # character classes, not range windows; a range
+                        # window never appears inside a quoted string.
+                        bare = re.sub(r"\"[^\"]*\"|'[^']*'", '""', expr)
+                        for window in re.findall(r"\[([^\]]*)\]", bare):
+                            # Subquery `[10m:1m]`: the range is the first half.
+                            window = window.split(":")[0].strip()
+                            if not window or window.startswith("$"):
+                                continue
+                            match = re.fullmatch(r"(\d+)(ms|s|m|h|d|w|y)", window)
+                            if not match:
+                                fail(name, f"{title}: unparseable range window [{window}]")
+                                continue
+                            seconds = int(match.group(1)) * RANGE_UNITS[match.group(2)]
+                            if seconds < min_rate_window:
+                                fail(
+                                    name,
+                                    f"{title}: rate window [{window}] is below "
+                                    f"{min_rate_window}s; at a 60s scrape this "
+                                    "returns no series at all",
+                                )
+
                 if ptype == "stat":
                     reduce = panel.get("options", {}).get("reduceOptions")
                     if not reduce or not reduce.get("calcs"):
@@ -190,6 +248,49 @@ in
                             f"{title}: stat with {len(targets)} targets must use "
                             "textMode value_and_name so the tiles are labelled",
                         )
+
+                # A heatmap fed a classic histogram fails silently in four
+                # distinct ways. Assert the three that are visible in the JSON.
+                if ptype in histogram_types:
+                    options = panel.get("options", {})
+                    if options.get("calculate") is not False:
+                        fail(
+                            name,
+                            f"{title}: heatmap must set options.calculate=false "
+                            "or it re-bins already-bucketed data",
+                        )
+                    if not options.get("yAxis", {}).get("unit"):
+                        fail(
+                            name,
+                            f"{title}: heatmap needs options.yAxis.unit; the y "
+                            "field's own unit is forced to 'short'",
+                        )
+                    for target in targets:
+                        if target.get("format") != "heatmap":
+                            fail(
+                                name,
+                                f"{title}: heatmap target must set format='heatmap' "
+                                "or the datasource never de-accumulates the buckets",
+                            )
+                        legend = target.get("legendFormat")
+                        if legend not in (None, "{{le}}"):
+                            fail(
+                                name,
+                                f"{title}: heatmap legendFormat must be "
+                                f"'{{{{le}}}}', not {legend!r}",
+                            )
+                        # More than one non-`le` dimension emits several
+                        # heatmap-rows frames and the panel keeps only the
+                        # last, dropping the rest with no warning.
+                        for by in re.findall(r"\bby\s*\(([^)]*)\)", target.get("expr", "")):
+                            labels = [lab.strip() for lab in by.split(",") if lab.strip()]
+                            if "le" in labels and labels != ["le"]:
+                                fail(
+                                    name,
+                                    f"{title}: heatmap target aggregates by "
+                                    f"({by.strip()}); only `by (le)` renders -- "
+                                    "extra dimensions silently drop frames",
+                                )
 
                 if ptype in ("state-timeline", "status-history"):
                     if not defaults.get("mappings") and not thresholds:
