@@ -1056,8 +1056,27 @@ rec {
           color =
             if color != null then
               color
-            else if thresholds != null || mappings != [ ] then
+            else if thresholds != null then
               { mode = "thresholds"; }
+            # Mappings carry their own colours, so threshold mode buys nothing
+            # here -- and on a state-timeline it is actively destructive.
+            # Grafana's `prepareTimelineFields` does:
+            #
+            #   if (mergeValues && field.config.color?.mode === Thresholds)
+            #     mergeThresholdValues(field, theme)
+            #
+            # which REPLACES the field's values with threshold buckets.
+            # `optionDefaults."state-timeline"` sets mergeValues, so any mapped
+            # boolean panel took that branch, threw its real 0/1 values away
+            # and never ran the mappings. With only the implicit base step
+            # below, that is a single bucket -- `getThresholdItems` labels a
+            # lone -Infinity step "-∞+" -- so every cell in every row rendered
+            # gray and identical.
+            else if mappings != [ ] then
+              {
+                mode = "fixed";
+                fixedColor = "text";
+              }
             else
               { mode = "palette-classic"; };
         }
