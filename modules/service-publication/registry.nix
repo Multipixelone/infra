@@ -392,7 +392,10 @@ in
         ];
         dnsClientCidrs = [
           "192.168.3.0/24"
+          "192.168.5.0/24"
           "192.168.6.0/24"
+          "192.168.7.0/24"
+          "192.168.8.0/24"
         ];
         networkInventoryConfirmed = true;
         # Impa is enrolled for the overlap stage but not yet cut over. Ingress,
