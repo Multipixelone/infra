@@ -61,13 +61,9 @@ in
       inherit backend;
       health = {
         path = "/";
-        # Anonymous holds no permission here, so this is copyparty's login
-        # surface rather than a listing. Narrow to the single observed status
-        # once the service has run once.
-        expectedStatuses = [
-          200
-          401
-        ];
+        # copyparty serves its login surface as a 200 rather than challenging
+        # with a 401; observed against the running service on link.
+        expectedStatuses = [ 200 ];
         timeoutSeconds = 8;
       };
     };
@@ -83,7 +79,13 @@ in
       };
       health = {
         path = "/share/";
-        expectedStatuses = [ 200 ];
+        # The share mountpoint itself is not listable by anonymous, so copyparty
+        # answers 403. That is the point of probing it: a 403 proves the bypass
+        # carried the request all the way to copyparty, where an Access
+        # challenge would have been a 302 to cloudflareaccess.com instead.
+        # Probing an individual share would tie the health contract to a share
+        # that can be revoked.
+        expectedStatuses = [ 403 ];
         timeoutSeconds = 8;
       };
     };
