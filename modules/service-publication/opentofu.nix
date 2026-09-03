@@ -1124,6 +1124,7 @@ args@{
             "service-publication-applied-revision"
             "service-publication-deploy-revision-state"
             "service-publication-move-guard"
+            "service-publication-operator-credentials"
             "service-publication-tofu-credentials"
             "service-publication-tofu-declarative-config"
             "service-publication-tunnel-ingress-guard"

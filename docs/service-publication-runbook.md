@@ -96,8 +96,9 @@ no compatibility aliases are generated.
 
 ## Runtime secrets and declarative bootstrap values
 
-The Link NixOS configuration conditionally references these encrypted files in
-the private secrets input:
+The Link NixOS configuration conditionally references the two OpenTofu operator
+files below, independently of the public-ingress host. The connector token is
+separately shared by the overlap connector hosts:
 
 | Encrypted source                                  | Runtime path                                        | Contract                                                                                                                                 |
 | ------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -106,7 +107,7 @@ the private secrets input:
 | `aws/service-publication-state-credentials.age`   | `/run/agenix/service-publication-state-credentials` | shell assignments for `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; sourced and exported by the OpenTofu wrapper without logging them |
 
 The two OpenTofu runtime files declared in
-`modules/service-publication/runtime.nix` are owned by the repository operator
+`modules/service-publication/runtime.nix` are Link-only, owned by `tunnel:users`,
 and installed with mode `0400`. The separately managed connector token is
 declared by `modules/service-publication/nixos.nix` and remains readable only
 by `cloudflared`.
