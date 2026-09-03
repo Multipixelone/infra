@@ -399,10 +399,9 @@ in
           "192.168.8.0/24"
         ];
         networkInventoryConfirmed = true;
-        # Impa is enrolled for the overlap stage but not yet cut over. Ingress,
-        # advertised resolution, and proxying stay on Link until the cutover in
-        # docs/impa-edge-bootstrap-cutover.md is performed. Both Tunnel
-        # connectors run during validation.
+        # Impa now carries public ingress and the default proxy. Link and Impa
+        # both provide internal DNS during the migration, while both Tunnel
+        # connectors remain active.
         publicIngressHost = "impa";
         internalDnsHosts = [
           "link"
