@@ -95,7 +95,11 @@ in
           cache.enabled = false;
           host.workdir_parent = "/var/lib/forgejo-runner/link/work";
           server.connections.default = {
-            url = "https://forgejo.nyc.finnrut.is";
+            # The canonical name, not forgejo.nyc.finnrut.is — that alias is now
+            # a vhost returning 308, and pointing the Actions API at a
+            # redirecting host is a bad bet. Blocky resolves this to impa's LAN
+            # address, so the runner still never leaves the network.
+            url = "https://git.finnrut.is";
             # REPLACE when the runner is registered: the POST to
             # /api/v1/repos/Multipixelone/infra/actions/runners returns both a
             # uuid and a token. The uuid is an identifier, not an
