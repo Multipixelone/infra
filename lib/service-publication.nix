@@ -199,6 +199,7 @@ let
               {
                 name = canonical;
                 kind = "proxy";
+                application = applicationName;
                 routes = appRoutes;
               }
             ]
@@ -349,14 +350,17 @@ let
           routePairs = concatMap (
             outer: map (inner: { inherit outer inner; }) (filter (inner: inner.key != outer.key) appRoutes)
           ) appRoutes;
+          # A narrower bypass inside a protected parent is the supported shape,
+          # not a conflict: Cloudflare resolves the most specific path-scoped
+          # Access application first and inherits nothing from the parent, so
+          # /share can bypass while / stays gated. Only the reverse direction is
+          # unsafe, and bypassWideningPairs below is what rejects it.
           conflictingPairs = filter (
             pair:
             pathContains pair.outer.pathPrefix pair.inner.pathPrefix
             && pair.outer.pathPrefix != pair.inner.pathPrefix
-            && (
-              (!pair.outer.public && pair.inner.public)
-              || (!pair.outer.access.bypassAccess && pair.inner.access.bypassAccess)
-            )
+            && !pair.outer.public
+            && pair.inner.public
           ) routePairs;
           bypassWideningPairs = filter (
             pair:

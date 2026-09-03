@@ -122,6 +122,10 @@ let
                 ];
                 onlySSL = true;
                 useACMEHost = acmeCertificateName;
+                # Server level, so a service that needs nginx tuning its routes
+                # cannot express (upload body size, request buffering) gets it
+                # without any route's generated ACL becoming overridable.
+                extraConfig = registry.applications.${vhost.application}.nginx.extraConfig;
                 locations = lib.listToAttrs (
                   map (route: lib.nameValuePair route.pathPrefix (mkLocation route)) vhost.routes
                 );

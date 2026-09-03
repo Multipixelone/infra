@@ -93,6 +93,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     commutecompass.url = "github:Multipixelone/commutecompass";
+    copyparty = {
+      url = "github:9001/copyparty";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
     disko = {
       url = "github:nix-community/disko";

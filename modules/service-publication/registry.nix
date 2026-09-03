@@ -149,6 +149,11 @@ let
           type = accessType;
           default = { };
         };
+        nginx.extraConfig = mkOption {
+          type = types.lines;
+          default = "";
+          description = "Extra nginx configuration for this application's generated vhost. Applied at server level so it covers every route location without touching their generated ACLs. The inventory projection drops it, so it never reaches registry.json or OpenTofu.";
+        };
         routes = mkOption {
           type = types.attrsOf routeType;
           description = "Routes keyed by stable route identity for ${name}.";

@@ -97,7 +97,19 @@ writeShellApplication {
           exit 1
           ;;
         esac
-        if [[ -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
+        if [[ $(jq -r '.access.bypassAccess' <<<"$route") == true ]]; then
+          # A reviewed bypass is anonymous on purpose, so there is no Access
+          # challenge to assert and demanding one would fail the deploy. Hold the
+          # route to its own health contract instead, which is what still proves
+          # the bypass reaches the origin rather than a Cloudflare error page.
+          status=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
+            --resolve "$hostname:443:$edge" \
+            --write-out '%{http_code}' "https://$hostname$path")
+          jq -e --argjson status "$status" '.expectedStatuses | index($status) != null' <<<"$route" >/dev/null || {
+            echo "$key: bypassed external health returned $status" >&2
+            exit 1
+          }
+        elif [[ -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
           challenge=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
             --resolve "$hostname:443:$edge" \
             --write-out '%{http_code} %{redirect_url}' "https://$hostname$path")

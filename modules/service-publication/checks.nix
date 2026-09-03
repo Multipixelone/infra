@@ -109,6 +109,42 @@ let
     }
   );
 
+  # The supported inverse of wideningBypass: a narrower bypass nested inside a
+  # protected parent. Cloudflare resolves the most specific path-scoped Access
+  # application first and inherits nothing from the parent, so this is how an
+  # anonymous share prefix coexists with a gated root.
+  innerBypass = publicationLib.resolve (
+    registry
+    // {
+      accessPolicies = registry.accessPolicies // {
+        finn-only = registry.accessPolicies.finn-only // {
+          cloudflareImportKey = "finn-only";
+          include = [ { email.email = "placeholder@example.invalid"; } ];
+        };
+      };
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // {
+            policy = "finn-only";
+          };
+          routes = registry.applications.grafana.routes // {
+            share = registry.applications.grafana.routes.root // {
+              match.pathPrefix = "/share/";
+              access = registry.applications.grafana.routes.root.access // {
+                bypassAccess = true;
+                bypassJustification = "anonymous share links";
+              };
+              health = registry.applications.grafana.routes.root.health // {
+                path = "/share/";
+              };
+            };
+          };
+        };
+      };
+    }
+  );
+
   publicFixture = publicationLib.resolve (
     registry
     // {
@@ -244,6 +280,16 @@ let
       "managed-zone canonical hostname validation regressed";
     assert lib.assertMsg (hasError "narrow the bypass route pathPrefix" wideningBypass)
       "outer-route bypass widening validation regressed";
+    # Asserted by property rather than by a full attrNames list: the fixture
+    # resolves against the real registry, so every published application would
+    # otherwise have to be restated here each time one is added.
+    assert lib.assertMsg (
+      innerBypass.errors == [ ]
+      &&
+        innerBypass.cloudflare.accessApplications."grafana/share".domain == "grafana.apps.finnrut.is/share/"
+      && innerBypass.cloudflare.accessApplications."grafana/share".access.bypassAccess
+      && !innerBypass.cloudflare.accessApplications.grafana.access.bypassAccess
+    ) "a bypass nested inside a protected route must resolve and keep its own Access application";
     assert lib.assertMsg (publicFixture.errors == [ ]) "valid public application fixture must resolve";
     assert lib.assertMsg (
       publicFixture.cloudflare.dnsRecords.grafana.accessDependency == "grafana"
@@ -254,6 +300,9 @@ let
       applicationServiceToken.errors == [ ]
       &&
         builtins.attrNames applicationServiceToken.cloudflare.accessApplications == [
+          "copyparty"
+          "copyparty/assets"
+          "copyparty/share"
           "grafana"
           "seerr"
         ]
@@ -263,6 +312,9 @@ let
       routeAccessOverride.errors == [ ]
       &&
         builtins.attrNames routeAccessOverride.cloudflare.accessApplications == [
+          "copyparty"
+          "copyparty/assets"
+          "copyparty/share"
           "grafana"
           "grafana/api"
           "seerr"
@@ -312,7 +364,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["copyparty", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               ([paths(strings) as $p | getpath($p) | select(endswith(".home.finnrut.is"))] | length == 0)
