@@ -228,6 +228,11 @@ in
       readmeRole = "Laptop";
       desktopWindowManager = "macOS";
       notes = "nix-darwin host";
+      # Roams between the home LAN and WireGuard. Prometheus still scrapes it
+      # over WireGuard -- observability/registry.nix pins the wg address for
+      # this host -- and deployAddress still prefers wireguard. This is here so
+      # blocky's clientLookup gives it the same name on either network.
+      homeAddress = "192.168.3.133";
       wireguard = {
         ipv4Address = "10.100.0.3";
         publicKey = "CdJg4znt9L9e/vnDNDuu0wMnRcXMKZeMSeOPEr+4HCk=";
@@ -279,6 +284,10 @@ in
       manufacturer = "Apple";
       model = "iPhone";
       readmeRole = "Mobile";
+      # Home wifi address, so blocky names it the same whether it is on the LAN
+      # or on WireGuard. Not deployable and not scraped, so nothing else reads
+      # this.
+      homeAddress = "192.168.3.116";
       wireguard = {
         ipv4Address = "10.100.0.100";
         publicKey = "ORnW9c/rVHqOdaawcHJlpeTtg7pPvPxICtN2kXTlc3I=";
