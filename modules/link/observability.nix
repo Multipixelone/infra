@@ -4873,7 +4873,12 @@ in
                 # The subquery evaluates one effective status per minute. Its
                 # `up` fallback counts a failed Blackbox scrape as downtime
                 # instead of letting absent probe samples improve the average.
-                expr = "min by (endpoint, slo_class) (avg_over_time(${effectiveProbeSuccess}[${observability.slo.window}:1m]) and ${effectiveProbeSuccess})";
+                # That collapse has to happen *inside* the subquery: the two
+                # fallback branches differ only in `__name__`, which
+                # `avg_over_time` drops, so any window holding both aborts the
+                # rule with "vector cannot contain metrics with the same
+                # labelset" and the whole dashboard reads NO DATA.
+                expr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and ${endpointProbeSuccess}";
               }
               {
                 record = "endpoint:error_budget_remaining_7d";
