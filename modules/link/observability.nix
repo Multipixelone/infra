@@ -3852,10 +3852,10 @@ let
             w = 7;
             h = 9;
             datasource = "loki";
-            description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard.";
+            description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard. The optional middle branch keeps the BLOCKED CNAME and BLOCKED IP variants, which a bare 'BLOCKED \\(' would drop; it matches the sibling 'Blocked by denylist group' panel.";
             targets = [
               {
-                expr = ''topk(15, sum by (rule) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | regexp "response_reason=BLOCKED \\((?P<rule>[^)]*)\\)" | rule != "" [$__range])))'';
+                expr = ''topk(15, sum by (rule) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | regexp "response_reason=BLOCKED(?: [A-Z]+)? \\((?P<rule>[^)]*)\\)" | rule != "" [$__range])))'';
                 instant = true;
                 queryType = "instant";
                 format = "table";
