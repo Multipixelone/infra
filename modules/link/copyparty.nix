@@ -25,9 +25,9 @@ in
   # prefixes they touch:
   #
   #   /        gated by the family policy — the browser and admin surface
-  #   /share/  copyparty's share mountpoint, anonymous by design
+  #   /s/      copyparty's share mountpoint, anonymous by design
   #   /.cpr/   the web UI's static assets, which a share page loads and which
-  #            do not live under /share/, so a gated /.cpr/ renders every
+  #            do not live under /s/, so a gated /.cpr/ renders every
   #            anonymous share unstyled and broken
   #
   # Cloudflare resolves the most specific path-scoped Access application first
@@ -37,7 +37,7 @@ in
   # The bypass is a routing decision, not an authorization one: copyparty's own
   # README is emphatic that reverse-proxy rules are not sufficient. Anonymous
   # holds no permission on the volume below, and shares grant their own access
-  # by mounting themselves under /share/ at runtime.
+  # by mounting themselves under /s/ at runtime.
   servicePublication.applications.copyparty = {
     site = "nyc";
     public = true;
@@ -61,29 +61,31 @@ in
       inherit backend;
       health = {
         path = "/";
-        # Anonymous holds no permission here, so this is copyparty's login
-        # surface rather than a listing. Narrow to the single observed status
-        # once the service has run once.
-        expectedStatuses = [
-          200
-          401
-        ];
+        # copyparty serves its login surface as a 200 rather than challenging
+        # with a 401; observed against the running service on link.
+        expectedStatuses = [ 200 ];
         timeoutSeconds = 8;
       };
     };
     routes.share = {
       # Trailing slash on purpose: an nginx prefix location is unanchored, so
-      # /share would also capture /shared-secret. The Tunnel ingress regex is
+      # /s would also capture /something-else. The Tunnel ingress regex is
       # anchored separately in infra/service-publication/main.tf.
-      match.pathPrefix = "/share/";
+      match.pathPrefix = "/s/";
       inherit backend;
       access = {
         bypassAccess = true;
         bypassJustification = "anonymous share links must resolve without an Access login; copyparty grants the access per share, not per path";
       };
       health = {
-        path = "/share/";
-        expectedStatuses = [ 200 ];
+        path = "/s/";
+        # The share mountpoint itself is not listable by anonymous, so copyparty
+        # answers 403. That is the point of probing it: a 403 proves the bypass
+        # carried the request all the way to copyparty, where an Access
+        # challenge would have been a 302 to cloudflareaccess.com instead.
+        # Probing an individual share would tie the health contract to a share
+        # that can be revoked.
+        expectedStatuses = [ 403 ];
         timeoutSeconds = 8;
       };
     };
@@ -140,21 +142,25 @@ in
           # no-reload default in place would gate the feature this host exists
           # for.
           no-reload = false;
-          # Mounts shares under /share/. copyparty validates this to be a single
+          # Mounts shares under /s/. copyparty validates this to be a single
           # toplevel segment and refuses to start otherwise, which is what makes
-          # the prefix stable enough for an Access bypass to match.
-          shr = "/share";
+          # the prefix stable enough for an Access bypass to match. Kept short
+          # because it is the one path strangers actually see.
+          shr = "/s";
           # Base URL used when minting share links. Without it copyparty mints
           # them from the request Host, which is the internal alias for a
           # LAN-origin request.
           shr-site = "https://files.finnrut.is/";
-          # The chain is Cloudflare edge -> cloudflared -> nginx on impa ->
-          # here. Only the edge sets CF-Connecting-IP and it cannot be spoofed
-          # past it, so trust that single-value header rather than the appended
-          # X-Forwarded-For chain. Getting this wrong does not fail loudly:
-          # copyparty falls back to the TCP address, disables unpost, and the
-          # auto-ban system starts banning the proxy, i.e. everyone at once.
-          xff-hdr = "cf-connecting-ip";
+          # Must name a header nginx sets on EVERY request. copyparty reads the
+          # protocol and host only inside `if zso:`, the branch it enters after
+          # finding this header (httpcli.py), so pointing it at a header that is
+          # only present on Cloudflare-originated requests -- CF-Connecting-IP
+          # -- left is_https false for LAN requests, and copyparty then rejected
+          # its own https origin as cross-site with "rejected by cors-check".
+          #
+          # X-Forwarded-For is always set here. Leftmost is the real client in
+          # both paths: cloudflared puts the client first and nginx appends the
+          # connector, while a LAN request carries just the one address.
           xff-src = "lan";
           rproxy = 1;
           # nginx is https-only, and a missing X-Forwarded-Proto would otherwise

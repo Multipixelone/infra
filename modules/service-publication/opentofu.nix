@@ -622,17 +622,17 @@ args@{
             grep -Fq 'SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa accepted' accepted.out
 
             jq '.routes["seerr/root"].proxy.lanAddress = "192.168.6.51"' "$current" > altered-destination.json
-            rejects altered-destination "$previous" altered-destination.json
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects altered-destination "$previous" altered-destination.json
             jq '.routes["seerr/root"].proxy.host = "not-link"' "$previous" > altered-source.json
-            rejects altered-source altered-source.json "$current"
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects altered-source altered-source.json "$current"
             jq '.cloudflare.tunnel.ingressHost.nyc = "not-impa"' "$current" > altered-ingress.json
-            rejects altered-ingress "$previous" altered-ingress.json
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects altered-ingress "$previous" altered-ingress.json
             jq '.cloudflare.tunnel.connectorHosts.nyc = ["impa"]' "$current" > missing-link-connector.json
-            rejects missing-link-connector "$previous" missing-link-connector.json
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects missing-link-connector "$previous" missing-link-connector.json
             jq '.cloudflare.tunnel.connectorHosts.nyc = ["link"]' "$current" > missing-impa-connector.json
-            rejects missing-impa-connector "$previous" missing-impa-connector.json
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects missing-impa-connector "$previous" missing-impa-connector.json
             jq '.routes["another/root"] = {"public": true, "proxy": {"host": "impa", "lanAddress": "192.168.6.50"}}' "$current" > unrelated-origin.json
-            rejects unrelated-origin "$previous" unrelated-origin.json
+            SERVICE_PUBLICATION_APPROVE_MOVE=link-to-impa rejects unrelated-origin "$previous" unrelated-origin.json
 
             touch "$out"
           '';

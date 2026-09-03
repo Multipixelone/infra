@@ -16,9 +16,12 @@ let
   grafanaVersion = "13.1.3";
 
   inherit (lib)
+    elemAt
     foldl'
     imap0
     imap1
+    listToAttrs
+    nameValuePair
     optionalAttrs
     recursiveUpdate
     ;
@@ -964,6 +967,49 @@ rec {
 
   # Override one named series, e.g. to pin a colour or give a single field its
   # own unit on an otherwise-uniform panel.
+  # The three transformations that turn N instant query frames into one table
+  # keyed by a shared label.
+  #
+  # Grafana names each frame's value column "Value #<refId>", and mkTargets
+  # hands out refIds positionally from the same `refIds` list, so the Nth entry
+  # of `columns` always renames the Nth target. Deriving both from one ordered
+  # list is the whole point: a hand-written "Value #A"/"Value #B" rename map
+  # drifts the moment a target is inserted in the middle, and the panel then
+  # renders one metric's numbers under another's heading -- wrong, and wrong in
+  # a way that still looks plausible.
+  joinedInstantTable =
+    {
+      keyField,
+      keyLabel,
+      columns,
+    }:
+    [
+      # Each frame carries its own Time column; after the join they would
+      # collide into "Time 1".."Time N".
+      {
+        id = "filterFieldsByName";
+        options.include.pattern = "${keyField}|Value #.*";
+      }
+      {
+        id = "joinByField";
+        options = {
+          byField = keyField;
+          mode = "outer";
+        };
+      }
+      {
+        id = "organize";
+        options = {
+          excludeByName = { };
+          indexByName = { };
+          renameByName = {
+            ${keyField} = keyLabel;
+          }
+          // listToAttrs (imap0 (index: name: nameValuePair "Value #${elemAt refIds index}" name) columns);
+        };
+      }
+    ];
+
   overrideByName = name: properties: {
     matcher = {
       id = "byName";

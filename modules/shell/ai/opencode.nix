@@ -501,7 +501,7 @@
             # inherits it (oc, ocd, bare `opencode`), not just ones wrapped by `ocd`.
             # `set -gx`, never `-Ux`: universal variables persist to
             # fish_variables on disk — don't leak the secret there.
-            set -l parallel_env ${hmArgs.config.age.secrets.tavily.path}
+            set -l parallel_env ${hmArgs.config.age.secrets.parallel.path}
             if test -r $parallel_env
               set -l key (string match -rg '^PARALLEL_API_KEY=(.+)$' < $parallel_env)
               test -n "$key"; and set -gx PARALLEL_API_KEY $key
@@ -575,7 +575,7 @@
 
           # Forward the agenix env-file via `env` so external MCP credentials
           # are available to this opencode process.
-          set -l envfile ${hmArgs.config.age.secrets.tavily.path}
+          set -l envfile ${hmArgs.config.age.secrets.parallel.path}
 
           # Pick a free port so the oh-my-opencode-slim multiplexer (zellij)
           # can reach opencode's HTTP API. Starting at 4096 and scanning

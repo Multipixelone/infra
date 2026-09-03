@@ -459,34 +459,15 @@ let
                 format = "table";
               }
             ];
-            transformations = [
-              # Each table frame carries its own Time column; after the join
-              # they would collide into "Time 1".."Time 3".
-              {
-                id = "filterFieldsByName";
-                options.include.pattern = "instance|Value #.*";
-              }
-              {
-                id = "joinByField";
-                options = {
-                  byField = "instance";
-                  mode = "outer";
-                };
-              }
-              {
-                id = "organize";
-                options = {
-                  excludeByName = { };
-                  indexByName = { };
-                  renameByName = {
-                    instance = "Host";
-                    "Value #A" = "Load 1m";
-                    "Value #B" = "Cores";
-                    "Value #C" = "Uptime";
-                  };
-                };
-              }
-            ];
+            transformations = viz.joinedInstantTable {
+              keyField = "instance";
+              keyLabel = "Host";
+              columns = [
+                "Load 1m"
+                "Cores"
+                "Uptime"
+              ];
+            };
             unit = viz.units.short;
             decimals = 2;
             options = {
@@ -3441,37 +3422,18 @@ let
                 format = "table";
               }
             ];
-            transformations = [
-              # Every table-format frame carries its own Time column; after a
-              # join they collide into "Time 1".."Time 6". Drop them first.
-              {
-                id = "filterFieldsByName";
-                options.include.pattern = "resolver|Value #.*";
-              }
-              {
-                id = "joinByField";
-                options = {
-                  byField = "resolver";
-                  mode = "outer";
-                };
-              }
-              {
-                id = "organize";
-                options = {
-                  excludeByName = { };
-                  indexByName = { };
-                  renameByName = {
-                    resolver = "Resolver";
-                    "Value #A" = "Queries/s";
-                    "Value #B" = "Blocked";
-                    "Value #C" = "Cache hit";
-                    "Value #D" = "Upstream p95";
-                    "Value #E" = "List age";
-                    "Value #F" = "Errors";
-                  };
-                };
-              }
-            ];
+            transformations = viz.joinedInstantTable {
+              keyField = "resolver";
+              keyLabel = "Resolver";
+              columns = [
+                "Queries/s"
+                "Blocked"
+                "Cache hit"
+                "Upstream p95"
+                "List age"
+                "Errors"
+              ];
+            };
             unit = viz.units.short;
             decimals = 2;
             options = {
@@ -3720,32 +3682,15 @@ let
                 format = "table";
               }
             ];
-            transformations = [
-              {
-                id = "filterFieldsByName";
-                options.include.pattern = "client_ip|Value #.*";
-              }
-              {
-                id = "joinByField";
-                options = {
-                  byField = "client_ip";
-                  mode = "outer";
-                };
-              }
-              {
-                id = "organize";
-                options = {
-                  excludeByName = { };
-                  indexByName = { };
-                  renameByName = {
-                    client_ip = "Client";
-                    "Value #A" = "Queries";
-                    "Value #B" = "Blocked";
-                    "Value #C" = "Blocked share";
-                  };
-                };
-              }
-            ];
+            transformations = viz.joinedInstantTable {
+              keyField = "client_ip";
+              keyLabel = "Client";
+              columns = [
+                "Queries"
+                "Blocked"
+                "Blocked share"
+              ];
+            };
             unit = viz.units.short;
             decimals = 0;
             options = {
@@ -3852,10 +3797,10 @@ let
             w = 7;
             h = 9;
             datasource = "loki";
-            description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard.";
+            description = "Answers 'which of my blocklists is actually doing anything'. The regexp parser is required: logfmt truncates response_reason at the first space and yields a bare BLOCKED for every line, losing the matched wildcard. The optional middle branch keeps the BLOCKED CNAME and BLOCKED IP variants, which a bare 'BLOCKED \\(' would drop; it matches the sibling 'Blocked by denylist group' panel.";
             targets = [
               {
-                expr = ''topk(15, sum by (rule) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | regexp "response_reason=BLOCKED \\((?P<rule>[^)]*)\\)" | rule != "" [$__range])))'';
+                expr = ''topk(15, sum by (rule) (count_over_time({unit="blocky.service"} |= "response_type=BLOCKED" | regexp "response_reason=BLOCKED(?: [A-Z]+)? \\((?P<rule>[^)]*)\\)" | rule != "" [$__range])))'';
                 instant = true;
                 queryType = "instant";
                 format = "table";
@@ -4305,32 +4250,15 @@ let
                 format = "table";
               }
             ];
-            transformations = [
-              {
-                id = "filterFieldsByName";
-                options.include.pattern = "resolver|Value #.*";
-              }
-              {
-                id = "joinByField";
-                options = {
-                  byField = "resolver";
-                  mode = "outer";
-                };
-              }
-              {
-                id = "organize";
-                options = {
-                  excludeByName = { };
-                  indexByName = { };
-                  renameByName = {
-                    resolver = "Resolver";
-                    "Value #A" = "RSS";
-                    "Value #B" = "Goroutines";
-                    "Value #C" = "Uptime";
-                  };
-                };
-              }
-            ];
+            transformations = viz.joinedInstantTable {
+              keyField = "resolver";
+              keyLabel = "Resolver";
+              columns = [
+                "RSS"
+                "Goroutines"
+                "Uptime"
+              ];
+            };
             unit = viz.units.short;
             decimals = 0;
             options = {

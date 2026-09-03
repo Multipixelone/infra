@@ -40,7 +40,14 @@
     # enableMcpIntegration = true without duplicating server definitions.
     flake.modules.homeManager.base = hmArgs: {
       imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
-      age.secrets."tavily".file = "${inputs.secrets}/ai/tavily.age";
+      # Holds PARALLEL_API_KEY, consumed by the websearch MCP server below and
+      # by opencode.nix's fish exporter. The ciphertext is still filed under the
+      # old ai/tavily.age name in the secrets repo -- websearch moved from Tavily
+      # to Parallel and the file was reused rather than re-created. Renaming it
+      # there means an agenix re-encrypt plus a lock bump, so the key is named
+      # for its contents here and the stale path is called out rather than left
+      # to be discovered by decrypting it.
+      age.secrets."parallel".file = "${inputs.secrets}/ai/tavily.age";
       programs.mcp.enable = true;
       mcp-servers.programs = {
         context7.enable = true;
