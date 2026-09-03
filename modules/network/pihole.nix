@@ -177,6 +177,7 @@ in
       networking.firewall = lib.mkIf (lanAddress != null) {
         extraCommands = ''
           iptables -w -N nixos-edge-dns 2>/dev/null || iptables -w -F nixos-edge-dns
+          iptables -w -A nixos-edge-dns -i lo -s 127.0.0.0/8 -j nixos-fw-accept
           ${lib.concatMapStringsSep "\n" (cidr: "iptables -w -A nixos-edge-dns -s ${cidr} -j nixos-fw-accept")
             (
               publication.sites.nyc.dnsClientCidrs
