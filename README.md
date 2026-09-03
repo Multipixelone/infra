@@ -164,6 +164,7 @@ The following files in this repository are generated and checked
 using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 
 - `.envrc`
+- `.forgejo/workflows/build.yaml`
 - `.github/renovate.json5`
 - `.github/workflows/build.yaml`
 - `.github/workflows/eval.yaml`
