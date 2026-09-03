@@ -8,7 +8,6 @@ let
   # anything both forges must agree on lives there rather than here.
   ci = import ../lib/ci.nix { inherit lib; };
   inherit (ci)
-    dispatchOnlyChecks
     ids
     matrixParam
     nixArgs
