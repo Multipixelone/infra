@@ -103,8 +103,10 @@ DNS, Tunnel ingress, nginx publication, or a firewall opening.
 
 Scraparr and Tautulli exporter bind only to `127.0.0.1:7100` and
 `127.0.0.1:8000`. Prometheus scrapes those loopback endpoints; exporter-process
-health comes from Prometheus `up`, while Tautulli API collection health comes
-from the exporter's `plex_up` metric. Metric relabeling is a strict aggregate
+health comes from Prometheus `up`. Tautulli API collection health has no signal:
+the exporter emits no `plex_up` or scrape-failure metric and keeps serving the
+last value of its `plex_*` gauges when a collection fails, so nothing separates a
+stalled collector from an idle Plex. Metric relabeling is a strict aggregate
 allowlist: user, title, request, issue, path, provider, server, quality, genre,
 and per-item series are dropped before ingestion. The dashboards use only
 aggregate service labels.

@@ -5592,7 +5592,10 @@ in
           ExecStart = lib.getExe openclawMetrics;
           NoNewPrivileges = true;
           PrivateTmp = true;
-          ProtectHome = true;
+          # `true` also masks /run/user, which hides the user bus that the
+          # `systemctl --user` probe needs: every metric then reads 0 and
+          # OpenClawGatewayDown fires while the gateway is running fine.
+          ProtectHome = "read-only";
           ProtectSystem = "strict";
           ReadWritePaths = [ "/var/lib/prometheus-node-exporter-text-files" ];
         };

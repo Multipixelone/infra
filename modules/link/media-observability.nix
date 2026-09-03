@@ -945,10 +945,6 @@ let
                 expr = ''up{job="tautulli-exporter",instance="link"}'';
                 legend = "Tautulli exporter";
               }
-              {
-                expr = ''plex_up{job="tautulli-exporter",instance="link"}'';
-                legend = "Tautulli API";
-              }
             ];
             mappings = viz.boolMapping { };
             options = {
@@ -1449,9 +1445,6 @@ in
         "plex_active_streams_(total|direct|direct_play|direct_stream|transcode)"
         "plex_transcode_(video|audio|container)_sessions"
         "plex_bandwidth_(total|lan|wan)_kbps"
-        "plex_up"
-        "plex_last_successful_scrape_timestamp_seconds"
-        "plex_scrape_failures_total"
         "process_(cpu_seconds_total|resident_memory_bytes|virtual_memory_bytes|open_fds|max_fds|start_time_seconds)"
         "python_gc_(objects_collected_total|objects_uncollectable_total|collections_total)"
       ];
@@ -1569,19 +1562,13 @@ in
                 labels.severity = "warning";
                 annotations.summary = "Sonarr queue contains warning or error items";
               }
-              {
-                alert = "TautulliExporterCannotReachTautulli";
-                # `up` owns exporter-process health. `plex_up` reports whether
-                # its last Tautulli API collection succeeded; the `unless`
-                # branch also catches an exporter schema regression without
-                # duplicating the target-down alert.
-                expr = ''
-                  plex_up{job="tautulli-exporter",instance="link"} == 0
-                  or (up{job="tautulli-exporter",instance="link"} == 1 unless on (job, instance) plex_up{job="tautulli-exporter",instance="link"})'';
-                for = "5m";
-                labels.severity = "warning";
-                annotations.summary = "Tautulli exporter cannot collect from the Tautulli API";
-              }
+              # Tautulli API collection health has no alert: mm404/tautulli-exporter
+              # exports no `plex_up`, `plex_scrape_failures_total`, or
+              # last-successful-scrape gauge, and its `plex_*` gauges keep serving
+              # their last value when a collection fails, so nothing here separates
+              # a stalled collector from an idle Plex. `MediaExporterTargetDown`
+              # keeps owning exporter-process health. An alert built on a metric the
+              # exporter never emits fires forever instead of never.
             ];
           }
         ];
@@ -1870,8 +1857,10 @@ in
             && lib.hasInfix "MediaExporterTargetDown" mediaRulesJson
             && lib.hasInfix "RadarrQueueProblem" mediaRulesJson
             && lib.hasInfix "SonarrQueueProblem" mediaRulesJson
-            && lib.hasInfix "TautulliExporterCannotReachTautulli" mediaRulesJson
-            && lib.hasInfix "plex_up" mediaRulesJson
+            # No alert may rest on a metric mm404/tautulli-exporter never emits:
+            # the `unless` form of such a rule fires permanently.
+            && !(lib.hasInfix "TautulliExporterCannotReachTautulli" mediaRulesJson)
+            && !(lib.hasInfix "plex_up" mediaRulesJson)
             && !(lib.hasInfix "blackbox-tautulli-ready" mediaRulesJson)
             && lib.hasInfix ''"for":"5m"'' mediaRulesJson
             && lib.hasInfix ''"for":"15m"'' mediaRulesJson
