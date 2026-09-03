@@ -3634,14 +3634,14 @@ let
               };
             };
             options = {
-              legend = {
-                displayMode = "table";
-                placement = "right";
-                calcs = [
-                  "mean"
-                  "max"
-                ];
-              };
+              # Bottom, like every other timeseries here. A right-placed
+              # legend on a half-width panel spends more of the panel on
+              # names than on the plot, which is what made the old version of
+              # this panel render as a sliver.
+              legend.calcs = [
+                "mean"
+                "max"
+              ];
               tooltip.hideZeros = true;
             };
           })
