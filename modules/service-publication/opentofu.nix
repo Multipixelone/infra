@@ -400,6 +400,7 @@ args@{
                   hosts = {
                     link = {
                       managedByNixOS = true;
+                      deployedByColmena = true;
                       capabilities = {
                         reverseProxy = true;
                         internalDns = true;
@@ -408,6 +409,7 @@ args@{
                     };
                     iot = {
                       managedByNixOS = true;
+                      deployedByColmena = false;
                       capabilities = {
                         reverseProxy = false;
                         internalDns = false;
