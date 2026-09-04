@@ -266,6 +266,26 @@ let
   effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and on (job, instance) (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
   endpointProbeSuccess = "min by (endpoint, slo_class) (${effectiveProbeSuccess})";
   endpointAvailabilityExpr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and on (endpoint, slo_class) ${endpointProbeSuccess}";
+  # Blackbox records the full timeout as a probe's *duration* when it gives up,
+  # so percentiling the raw series turns every outage into a latency
+  # regression: actual.nyc.finnrut.is reported a p95 of 1.95s while every
+  # request it actually served came back in 28ms -- all 77 "slow" samples were
+  # 8s timeouts sitting inside its 229 failed probes. That is the same incident
+  # EndpointDown and the error budget already report, so the latency alert only
+  # duplicated them, and the artifact buried the slow-*success* regression this
+  # SLI exists to catch. Condition on success first. No `on (...)`: both series
+  # come from the same probe and carry an identical label set (job, instance,
+  # endpoint, path, resolver, scope, slo_class), so the default full-label
+  # match is the correct one.
+  sloProbeDurationOk = "(probe_duration_seconds{${sloProbeSelector}} and probe_success{${sloProbeSelector}} == 1)";
+  # A subquery, not a plain range, because the success filter has to be applied
+  # per scrape before the quantile ever sees the sample. Recording the filtered
+  # series in a first stage would evaluate faster but would need a seven-day
+  # warm-up before this SLI meant anything -- the sparse-window trap that
+  # produced the false alarm in the first place. The trailing `and` is the
+  # liveness gate: a removed probe must stop reporting instead of coasting on
+  # history still inside the range.
+  endpointLatencyExpr = "max by (endpoint, slo_class) (quantile_over_time(0.95, ${sloProbeDurationOk}[${observability.slo.window}:1m]) and probe_duration_seconds{${sloProbeSelector}})";
   sloWindowEligibility = "min by (endpoint, slo_class) ((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
@@ -4818,9 +4838,11 @@ in
       # Keep this small enough for promtool's in-memory test engine while
       # preserving the transition that caused the production failure: the
       # fallback switches from probe_success to up and back inside one range.
-      testExpr =
-        builtins.replaceStrings [ "[${observability.slo.window}:1m]" ] [ "[3m:1m]" ]
-          endpointAvailabilityExpr;
+      # Both SLIs are subqueries over the same window, so one substitution
+      # shrinks both.
+      shrinkSloWindow = builtins.replaceStrings [ "[${observability.slo.window}:1m]" ] [ "[3m:1m]" ];
+      testExpr = shrinkSloWindow endpointAvailabilityExpr;
+      testLatencyExpr = shrinkSloWindow endpointLatencyExpr;
       testRules = pkgs.writeText "observability-slo-test-rules.json" (
         builtins.toJSON {
           groups = [
@@ -4831,6 +4853,10 @@ in
                 {
                   record = "endpoint:availability_7d";
                   expr = testExpr;
+                }
+                {
+                  record = "endpoint:latency_p95_7d";
+                  expr = testLatencyExpr;
                 }
               ];
             }
@@ -4912,6 +4938,60 @@ in
                     {
                       labels = ''endpoint:availability_7d{endpoint="one.example",slo_class="internal"}'';
                       value = 1;
+                    }
+                  ];
+                }
+              ];
+            }
+            # A probe that times out records the full timeout as its duration,
+            # so an unfiltered percentile reports an outage as a latency
+            # regression. Only successful probes may reach the quantile.
+            # `timeout.example` answers in 50ms whenever it answers at all and
+            # has to read 50ms even though an 8s timeout sits inside the
+            # window; `slow.example` proves a genuinely slow *success* is still
+            # counted, so the filter cannot be mistaken for a ceiling; and
+            # `down.example`, failing throughout, has to leave the latency SLI
+            # entirely rather than report 8s -- availability already owns it.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="timeout.example",endpoint="timeout.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.05 0.05 8 0.05 0.05";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="timeout.example",endpoint="timeout.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 0 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="slow.example",endpoint="slow.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1.5 1.5 1.5 1.5 1.5";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="slow.example",endpoint="slow.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="down.example",endpoint="down.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "8 8 8 8 8";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="down.example",endpoint="down.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0 0 0 0 0";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:latency_p95_7d";
+                  eval_time = "4m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="slow.example",slo_class="internal"}'';
+                      value = 1.5;
+                    }
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="timeout.example",slo_class="internal"}'';
+                      value = 0.05;
                     }
                   ];
                 }
@@ -5136,7 +5216,7 @@ in
               }
               {
                 record = "endpoint:latency_p95_7d";
-                expr = "max by (endpoint, slo_class) (quantile_over_time(0.95, probe_duration_seconds{${sloProbeSelector}}[${observability.slo.window}]) and probe_duration_seconds{${sloProbeSelector}})";
+                expr = endpointLatencyExpr;
               }
             ];
           }
