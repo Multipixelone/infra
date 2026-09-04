@@ -97,7 +97,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (39)</summary>
+<summary>Packages exposed by this flake (40)</summary>
 
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
@@ -107,6 +107,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
 - `convert-mpc` · `nix run github:Multipixelone/infra#convert-mpc`
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
+- [`forgejo-check-status`](https://github.com/Multipixelone/infra/blob/main/modules/ci/status.nix) — Report each flake check as its own Forgejo commit status from one nix-fast-build run · `nix run github:Multipixelone/infra#forgejo-check-status`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
 - [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`
@@ -150,7 +151,13 @@ This repository follows the [dendritic](https://github.com/mightyiam/dendritic) 
 ## Running checks
 
 Checks run on a self-hosted Forgejo Actions runner and push their results
-to an Attic cache. A job is spawned for each flake check, dynamically.
+to an Attic cache. One job builds the whole check set with a single
+`nix-fast-build`, and reports each check as its own commit status — so
+every check still gets an individual green light on the commit and in the
+pull request, and branch protection can require them by glob.
+
+`configurations/*`, `files:*` and `treefmt` turn the job red. Everything
+else reports a yellow warning instead: visible, but not a merge blocker.
 
 GitHub Actions is kept for one thing the runner cannot do: `aarch64-linux`.
 Every host in this repo is x86_64 and nothing here enables binfmt
