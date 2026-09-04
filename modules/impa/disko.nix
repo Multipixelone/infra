@@ -54,6 +54,17 @@
                         "noatime"
                       ];
                     };
+                    # Holds the swapfile declared in swap.nix. Its own
+                    # subvolume rather than a directory on @root because a
+                    # btrfs subvolume carrying an active swapfile cannot be
+                    # snapshotted, and pinning @root that way is a cost with no
+                    # upside. No `compress`: the file is NODATACOW by
+                    # construction, so the option would be inert here and
+                    # misleading to read.
+                    "@swap" = {
+                      mountpoint = "/swap";
+                      mountOptions = [ "noatime" ];
+                    };
                   };
                 };
               };
