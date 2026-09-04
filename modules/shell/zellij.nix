@@ -91,6 +91,41 @@
         inherit (hmArgs.config.home.shell) enableFishIntegration;
         enable = true;
       };
+
+      # Sessions that have exited leave a resurrection entry behind forever;
+      # zellij never expires them, so the list grows without bound (link had
+      # accumulated 90 of them). Purging them is pure cache cleanup - nothing
+      # running is touched, because `delete-all-sessions` only acts on entries
+      # whose server is already gone.
+      #
+      # Deliberately NOT a reaper for live-but-detached sessions. zellij
+      # exposes `connected_clients` and `creation_time` and nothing else -
+      # there is no last-activity timestamp, so a detached session running a
+      # multi-hour agent is indistinguishable from one abandoned days ago. An
+      # age-based timer would eventually kill real work unattended. Killing
+      # those stays manual; the scroll_buffer_size cap above is what keeps
+      # their cost bounded in the meantime.
+      systemd.user.services.zellij-prune-exited = {
+        Unit.Description = "Purge zellij's exited-session resurrection entries";
+        Service = {
+          Type = "oneshot";
+          # XDG_CACHE_HOME is redirected to ~/.local/cache (modules/xdg/mimeo.nix)
+          # and a systemd user unit does not inherit the login shell's copy of
+          # it. Without this zellij looks in ~/.cache, finds nothing, and the
+          # timer silently succeeds while cleaning nothing.
+          Environment = [ "XDG_CACHE_HOME=${hmArgs.config.xdg.cacheHome}" ];
+          ExecStart = "${hmArgs.config.programs.zellij.package}/bin/zellij delete-all-sessions --yes";
+        };
+      };
+      systemd.user.timers.zellij-prune-exited = {
+        Unit.Description = "Purge zellij's exited-session resurrection entries";
+        Timer = {
+          OnCalendar = "daily";
+          Persistent = true;
+          RandomizedDelaySec = "1h";
+        };
+        Install.WantedBy = [ "timers.target" ];
+      };
       xdg.configFile = {
         "zellij/config.kdl".text = ''
           themes {
@@ -117,6 +152,19 @@
           default_shell "${pkgs.fish}/bin/fish"
           default_layout "zjstatus"
           pane_frames false
+          // Default is 10000 lines *per pane*, and zellij stores every cell as
+          // a styled struct rather than a byte - so an idle detached server
+          // settles around half a gig, and a pane that has emitted very long
+          // lines blows well past that (zellij-org/zellij#2104, still open).
+          // With dozens of long-lived sessions that is tens of gigabytes of
+          // RAM held by terminals nobody is looking at, which is what drove
+          // link into the OOM killer. This is the only supported bound on it;
+          // there is no idle-session cleanup in zellij to lean on instead.
+          //
+          // The cost is real: `Alt e` (EditScrollback) now reaches back 2000
+          // lines instead of 10000. Raise it if that bites, but know that the
+          // memory scales with it and with the number of panes.
+          scroll_buffer_size 2000
           show_startup_tips false
           plugins {
               zjstatus location="file://${zjstatus}/bin/zjstatus.wasm"
