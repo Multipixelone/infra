@@ -41,7 +41,7 @@
         },
         {
           "name": "nix-fast-build",
-          "run": "set -uo pipefail\n\nrc=0\n# removeSuffix: the shared recipe ends in a newline, which\n# would put the pipe on a line of its own — a syntax error,\n# not a pipeline.\nnix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 3072 \\\n  --retries 2 \\\n  --stream-json-lines \\\n  --select \"$CI_SELECT\" \\\n  --flake '.#checks.x86_64-linux' | \"$CI_STATUS_BIN\" consume || rc=$?\necho \"NFB_RC=$rc\" >> \"$GITHUB_ENV\"\n"
+          "run": "set -uo pipefail\n\nrc=0\n# removeSuffix: the shared recipe ends in a newline, which\n# would put the pipe on a line of its own — a syntax error,\n# not a pipeline.\nnix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  --push-build-closure \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 3072 \\\n  --retries 2 \\\n  --stream-json-lines \\\n  --select \"$CI_SELECT\" \\\n  --flake '.#checks.x86_64-linux' | \"$CI_STATUS_BIN\" consume || rc=$?\necho \"NFB_RC=$rc\" >> \"$GITHUB_ENV\"\n"
         },
         {
           "if": "always()",

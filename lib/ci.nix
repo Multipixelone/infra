@@ -81,6 +81,13 @@ rec {
 
   # Shared nix-fast-build invocation.
   #
+  # `--push-build-closure` pushes every intermediate derivation as soon as its
+  # builder exits, rather than only the outputs of attributes that finished
+  # green. Without it a cell that dies three hours in uploads nothing at all
+  # for the attribute that failed, and the re-run after the fix rebuilds that
+  # attribute's whole dependency tree from source -- the local store on the
+  # self-hosted runner is the only thing that saved us, and only until GC.
+  #
   # There is deliberately no `|| retry-without-attic` fallback: it fired on ANY
   # non-zero exit, so an eval error or a failed NixOS assertion was reported as
   # "Attic upload failed" and then re-run to produce the identical failure.
@@ -111,6 +118,7 @@ rec {
         --skip-cached \
         --no-nom \
         --attic-cache system \
+        --push-build-closure \
         -j ${toString jobs} \
         --eval-workers ${toString evalWorkers} \
         --eval-max-memory-size ${toString evalMaxMemory} \
