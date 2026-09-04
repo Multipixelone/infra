@@ -5,7 +5,13 @@
   },
   "jobs": {
     "check": {
-      "needs": "get-check-names",
+      "env": {
+        "FORGE_API": "https://git.finnrut.is/api/v1",
+        "FORGE_REPO": "${{ github.repository }}",
+        "FORGE_SHA": "${{ github.sha }}",
+        "FORGE_TARGET_URL": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}",
+        "FORGE_TOKEN": "${{ secrets.FORGE_TOKEN }}"
+      },
       "runs-on": "nix",
       "steps": [
         {
@@ -30,86 +36,20 @@
           "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
-          "continue-on-error": true,
-          "name": "nix-fast-build",
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 4 \\\n  --eval-workers 4 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
-        }
-      ],
-      "strategy": {
-        "fail-fast": false,
-        "matrix": {
-          "checks": "${{ fromJson(needs.get-check-names.outputs.checks) }}"
-        }
-      },
-      "timeout-minutes": 180
-    },
-    "check-nixos": {
-      "needs": "get-check-names",
-      "runs-on": "nix",
-      "steps": [
-        {
-          "uses": "https://data.forgejo.org/actions/checkout@v4",
-          "with": {
-            "submodules": true
-          }
-        },
-        {
-          "env": {
-            "SSH_PRIVATE_KEY": "${{ secrets.SSH_PRIVATE_KEY }}"
-          },
-          "name": "Install SSH key",
-          "run": "set -euo pipefail\n\ndir=\"$(mktemp -d)\"\nchmod 700 \"$dir\"\n# printf, not echo: the key must end in a newline or ssh rejects it as\n# malformed, and a secret that already ends in one is unharmed by the\n# extra blank line.\nprintf '%s\\n' \"$SSH_PRIVATE_KEY\" > \"$dir/id\"\nchmod 600 \"$dir/id\"\n\n# Same trust-on-first-use as the action this replaces.\nssh-keyscan github.com > \"$dir/known_hosts\" 2>/dev/null\n\necho \"GIT_SSH_COMMAND=ssh -i $dir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts\" >> \"$GITHUB_ENV\"\n"
-        },
-        {
-          "name": "Authenticate private GitHub inputs",
-          "run": "{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n\n# Appended, not assigned: the runner unit already exports NIX_CONFIG\n# with max-jobs and cores, and a plain NIX_CONFIG= here would silently\n# drop those and let CI build at full width. Heredoc form because the\n# value is multi-line.\n{\n  echo \"NIX_CONFIG<<__NIX_CONFIG_EOF__\"\n  printf '%s\\n' \"${NIX_CONFIG:-}\"\n  echo \"access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\"\n  echo \"__NIX_CONFIG_EOF__\"\n} >> \"$GITHUB_ENV\"\n"
-        },
-        {
-          "name": "Login to attic",
-          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+          "name": "Seed pending statuses",
+          "run": "set -euo pipefail\n\n# Resolved once, into $GITHUB_ENV, so the pipe consumer in the\n# next step is a plain exec rather than a third `nix run`.\nCI_STATUS_BIN=\"$(nix --accept-flake-config build --no-link --print-out-paths .#forgejo-check-status)/bin/forgejo-check-status\"\necho \"CI_STATUS_BIN=$CI_STATUS_BIN\" >> \"$GITHUB_ENV\"\n\n# The seeded list and the evaluator's --select have to agree,\n# or a check is either seeded and never resolved or resolved\n# and never seeded. Both come off dispatchOnlyChecks here.\nif [ \"${{ github.event_name }}\" = workflow_dispatch ]; then\n  skip='[]'\n  echo 'CI_SELECT=cs: cs' >> \"$GITHUB_ENV\"\nelse\n  skip='[\"configurations/nixos/iso\"]'\n  echo 'CI_SELECT=cs: builtins.removeAttrs cs [\"configurations/nixos/iso\"]' >> \"$GITHUB_ENV\"\nfi\n\nnix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames \\\n  | jq -c --argjson skip \"$skip\" 'map(select(IN($skip[]) | not))' \\\n  | \"$CI_STATUS_BIN\" seed\n"
         },
         {
           "name": "nix-fast-build",
-          "run": "nix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 4 \\\n  --eval-workers 4 \\\n  --eval-max-memory-size 2048 \\\n  --retries 2 \\\n  --no-link \\\n  --flake '.#checks.x86_64-linux.\"${{ matrix.checks }}\"'\n"
+          "run": "set -uo pipefail\n\nrc=0\n# removeSuffix: the shared recipe ends in a newline, which\n# would put the pipe on a line of its own — a syntax error,\n# not a pipeline.\nnix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  -j 2 \\\n  --eval-workers 2 \\\n  --eval-max-memory-size 3072 \\\n  --retries 2 \\\n  --stream-json-lines \\\n  --select \"$CI_SELECT\" \\\n  --flake '.#checks.x86_64-linux' | \"$CI_STATUS_BIN\" consume || rc=$?\necho \"NFB_RC=$rc\" >> \"$GITHUB_ENV\"\n"
+        },
+        {
+          "if": "always()",
+          "name": "Report verdict",
+          "run": "\"$CI_STATUS_BIN\" finish \"${NFB_RC:-1}\""
         }
       ],
-      "strategy": {
-        "fail-fast": false,
-        "matrix": {
-          "checks": "${{ fromJson(needs.get-check-names.outputs.checks-nixos) }}"
-        }
-      },
-      "timeout-minutes": 350
-    },
-    "get-check-names": {
-      "outputs": {
-        "checks": "${{ steps.get-check-names.outputs.checks }}",
-        "checks-nixos": "${{ steps.get-check-names.outputs.checks-nixos }}"
-      },
-      "runs-on": "nix",
-      "steps": [
-        {
-          "uses": "https://data.forgejo.org/actions/checkout@v4",
-          "with": {
-            "submodules": true
-          }
-        },
-        {
-          "env": {
-            "SSH_PRIVATE_KEY": "${{ secrets.SSH_PRIVATE_KEY }}"
-          },
-          "name": "Install SSH key",
-          "run": "set -euo pipefail\n\ndir=\"$(mktemp -d)\"\nchmod 700 \"$dir\"\n# printf, not echo: the key must end in a newline or ssh rejects it as\n# malformed, and a secret that already ends in one is unharmed by the\n# extra blank line.\nprintf '%s\\n' \"$SSH_PRIVATE_KEY\" > \"$dir/id\"\nchmod 600 \"$dir/id\"\n\n# Same trust-on-first-use as the action this replaces.\nssh-keyscan github.com > \"$dir/known_hosts\" 2>/dev/null\n\necho \"GIT_SSH_COMMAND=ssh -i $dir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts\" >> \"$GITHUB_ENV\"\n"
-        },
-        {
-          "name": "Authenticate private GitHub inputs",
-          "run": "{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n\n# Appended, not assigned: the runner unit already exports NIX_CONFIG\n# with max-jobs and cores, and a plain NIX_CONFIG= here would silently\n# drop those and let CI build at full width. Heredoc form because the\n# value is multi-line.\n{\n  echo \"NIX_CONFIG<<__NIX_CONFIG_EOF__\"\n  printf '%s\\n' \"${NIX_CONFIG:-}\"\n  echo \"access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\"\n  echo \"__NIX_CONFIG_EOF__\"\n} >> \"$GITHUB_ENV\"\n"
-        },
-        {
-          "id": "get-check-names",
-          "run": "all_checks=\"$(nix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames)\"\nnixos_checks=\"$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\"))]')\"\nif [ \"${{ github.event_name }}\" != workflow_dispatch ]; then\n  nixos_checks=\"$(echo \"$nixos_checks\" | jq -c --argjson skip '[\"configurations/nixos/iso\"]' 'map(select(IN($skip[]) | not))')\"\nfi\necho \"checks=$(echo \"$all_checks\" | jq -c '[.[] | select(startswith(\"configurations/nixos/\") | not)]')\" >> $GITHUB_OUTPUT\necho \"checks-nixos=$nixos_checks\" >> $GITHUB_OUTPUT\n"
-        }
-      ]
+      "timeout-minutes": 420
     }
   },
   "name": "Build",

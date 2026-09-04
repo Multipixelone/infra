@@ -1,7 +1,7 @@
 { config, lib, ... }:
 let
   ci = import ../../lib/ci.nix { inherit lib; };
-  inherit (ci) ids matrixParam nixArgs;
+  inherit (ci) ids nixArgs;
   inherit (config.flake.meta) owner repo;
 
   buildFilePath = ".forgejo/workflows/build.yaml";
@@ -126,12 +126,28 @@ let
     steps.githubTokenRewrite
   ];
 
-  # link is a 5800X with a warm store, so it gets more than the hosted runners'
-  # two workers — but stays inside ci.slice's memory ceiling.
+  # One invocation for the whole check set, so the ~50 s of scaffolding a
+  # matrix cell used to pay — checkout, key material, an attic login, fetching
+  # nix-fast-build and evaluating the entire flake to resolve ONE attribute —
+  # is paid once instead of 86 times.
+  #
+  # Two eval workers at 3 GiB rather than the old four at 2 GiB: the ceiling
+  # that matters is ci.slice's MemoryHigh=8G, and 2×3 GiB sits under it where
+  # the old 4×2 GiB sat exactly on it — twice over, since `capacity = 2` let
+  # two of these run at once. Consolidation removes the second evaluator
+  # outright. Fewer, larger workers also restart less often, and a restart
+  # re-pays the whole-set evaluation.
+  #
+  # `-j 2` multiplies with the runner unit's own `NIX_CONFIG = max-jobs = 3`
+  # (modules/link/forgejo-runner.nix), so up to six derivations build at once.
   fastBuild = ci.mkNixFastBuild {
     flakeSystem = runner.system;
-    jobs = 4;
-    evalWorkers = 4;
+    jobs = 2;
+    evalWorkers = 2;
+    evalMaxMemory = 3072;
+    streamJsonLines = true;
+    # Resolved inside the job: the dispatch-only set depends on the event.
+    select = "\"$CI_SELECT\"";
   };
 
   updateBranch = "update_flake_lock_action";
@@ -156,69 +172,103 @@ in
             group = "build-\${{ github.ref }}";
             cancel-in-progress = true;
           };
-          jobs = {
-            ${ids.jobs.getCheckNames} = {
-              runs-on = runner.name;
-              outputs = {
-                ${ids.outputs.jobs.getCheckNames} =
-                  "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
-                ${ids.outputs.jobs.getCheckNamesNixos} =
-                  "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
-              };
-              steps = sharedPreSteps ++ [
-                {
-                  id = ids.steps.getCheckNames;
-                  # No aarch64System: nothing here can build it.
-                  run = ci.mkCheckNamesScript { inherit (runner) system; };
-                }
-              ];
+          # One job, not a matrix.
+          #
+          # The fan-out existed to pace the work across GitHub-hosted runners.
+          # On a self-hosted runner with `capacity = 2` it is pure loss: 86
+          # cells serialise two at a time, and each one evaluates the whole
+          # flake just to look up its own attribute. Per-check reporting is
+          # what the matrix was really buying, and commit statuses provide
+          # that without a runner slot per check — a cached check now gets a
+          # green light too, where before it cost a full job to discover
+          # there was nothing to do.
+          jobs.${ids.jobs.check} = {
+            runs-on = runner.name;
+            # Under the 480 minutes that both the runner
+            # (settings.runner.timeout in modules/link/forgejo-runner.nix) and
+            # the server (actions.timeout.DEFAULT in modules/impa/forgejo.nix)
+            # allow, so the job's own timeout fires first and Forgejo records a
+            # clean timeout instead of reaping a zombie task ten minutes later.
+            timeout-minutes = 420;
+            env = {
+              FORGE_API = "https://${forge.domain}/api/v1";
+              FORGE_REPO = "\${{ github.repository }}";
+              FORGE_SHA = "\${{ github.sha }}";
+              # The same PAT the update-lock workflow pushes with. The run's
+              # automatic token also carries repo write, but this one is known
+              # to work against this instance's API and needs no experiment.
+              FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+              # Every status points at this one job. Per-check drill-down comes
+              # from nix-fast-build's `::group::` markers instead, which the
+              # runner rewrites to `##[group]` and Forgejo's log viewer folds.
+              FORGE_TARGET_URL = "\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_number }}";
             };
+            steps = sharedPreSteps ++ [
+              steps.loginToAttic
+              {
+                name = "Seed pending statuses";
+                # One extra whole-flake `nix eval`, and worth it twice over: it
+                # puts a pending dot on every check before the first build
+                # starts, and it is the ground truth the final sweep needs — a
+                # failure to evaluate the root emits no per-attribute rows at
+                # all, only a non-zero exit, so without a seeded list those
+                # checks would be indistinguishable from checks that passed.
+                run = ''
+                  set -euo pipefail
 
-            ${ids.jobs.check} = {
-              needs = ids.jobs.getCheckNames;
-              runs-on = runner.name;
-              timeout-minutes = 180;
-              strategy = {
-                fail-fast = false;
-                matrix.${matrixParam} =
-                  "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
-              };
-              steps = sharedPreSteps ++ [
-                steps.loginToAttic
-                {
-                  name = "nix-fast-build";
-                  # Step level, not job level: Forgejo ignores
-                  # continue-on-error on a job, so the advisory-package
-                  # behaviour the GitHub workflow gets from the job key has to
-                  # ride on the step here or a flaky package turns the run red.
-                  continue-on-error = true;
-                  run = fastBuild;
-                }
-              ];
-            };
+                  # Resolved once, into $GITHUB_ENV, so the pipe consumer in the
+                  # next step is a plain exec rather than a third `nix run`.
+                  CI_STATUS_BIN="$(nix ${nixArgs} build --no-link --print-out-paths .#forgejo-check-status)/bin/forgejo-check-status"
+                  echo "CI_STATUS_BIN=$CI_STATUS_BIN" >> "$GITHUB_ENV"
 
-            ${ids.jobs.checkNixos} = {
-              needs = ids.jobs.getCheckNames;
-              runs-on = runner.name;
-              # Both Forgejo and the runner otherwise cap a job at 3h, which
-              # would kill this matrix at the same wall-clock every time. The
-              # server side is actions.timeout.DEFAULT in modules/impa/forgejo.nix
-              # and the runner side is settings.runner.timeout in
-              # modules/link/forgejo-runner.nix; all three have to agree.
-              timeout-minutes = 350;
-              strategy = {
-                fail-fast = false;
-                matrix.${matrixParam} =
-                  "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
-              };
-              steps = sharedPreSteps ++ [
-                steps.loginToAttic
-                {
-                  name = "nix-fast-build";
-                  run = fastBuild;
-                }
-              ];
-            };
+                  # The seeded list and the evaluator's --select have to agree,
+                  # or a check is either seeded and never resolved or resolved
+                  # and never seeded. Both come off dispatchOnlyChecks here.
+                  if [ "''${{ github.event_name }}" = workflow_dispatch ]; then
+                    skip='[]'
+                    echo 'CI_SELECT=${ci.mkSelectExpr [ ]}' >> "$GITHUB_ENV"
+                  else
+                    skip='${builtins.toJSON ci.dispatchOnlyChecks}'
+                    echo 'CI_SELECT=${ci.mkSelectExpr ci.dispatchOnlyChecks}' >> "$GITHUB_ENV"
+                  fi
+
+                  nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames \
+                    | jq -c --argjson skip "$skip" 'map(select(IN($skip[]) | not))' \
+                    | "$CI_STATUS_BIN" seed
+                '';
+              }
+              {
+                name = "nix-fast-build";
+                # No `continue-on-error` anywhere any more. It could only ever
+                # make the WHOLE step advisory, which is why `files:*` and
+                # `treefmt` could not fail a run — and why `treefmt` sat red on
+                # main unnoticed. The verdict now comes from the per-check
+                # ledger in the next step, against lib/ci.nix's
+                # gatingCheckPatterns.
+                #
+                # stdout is JSON Lines and nothing else; the human-readable
+                # build log is on stderr and still reaches the job log.
+                run = ''
+                  set -uo pipefail
+
+                  rc=0
+                  # removeSuffix: the shared recipe ends in a newline, which
+                  # would put the pipe on a line of its own — a syntax error,
+                  # not a pipeline.
+                  ${lib.removeSuffix "\n" fastBuild} | "$CI_STATUS_BIN" consume || rc=$?
+                  echo "NFB_RC=$rc" >> "$GITHUB_ENV"
+                '';
+              }
+              {
+                name = "Report verdict";
+                # `always()` so a failed build still reconciles its statuses
+                # rather than leaving them pending. `''${NFB_RC:-1}`: if the
+                # step above died before writing it, that must not read as
+                # success.
+                "if" = "always()";
+                run = ''"$CI_STATUS_BIN" finish "''${NFB_RC:-1}"'';
+              }
+            ];
           };
         };
 
@@ -226,125 +276,123 @@ in
         # only thing that writes to this repo. While both forges ran it, each
         # opened its own pull request from the same branch name and the GitHub
         # copy had to be merged back by hand.
-        ${updateLockFilePath}.source =
-          pkgs.writers.writeJSON "forgejo-actions-workflow-update-lock.yaml"
-            {
-              name = "Update flake inputs";
-              on = {
-                workflow_dispatch = { };
-                # Forgejo only honours `schedule` on the default branch, which
-                # is where this is generated, so the cadence matches the GitHub
-                # workflow it replaces: every third day.
-                schedule = [ { cron = "0 0 1-31/3 * *"; } ];
-              };
-              jobs.update-flake-lock = {
-                runs-on = runner.name;
-                # Nothing here builds a host closure — `flake update` is pure
-                # input resolution and the addon generator is one small
-                # derivation — so this stays well inside the runner's slice
-                # even while a build matrix is running beside it.
-                timeout-minutes = 60;
-                steps = sharedPreSteps ++ [
-                  {
-                    name = "Update flake.lock";
-                    run = "nix ${nixArgs} flake update";
-                  }
-                  {
-                    # Mirror `just update`: keep the pinned Firefox addons in
-                    # lockstep with the flake bump so the automated PR doesn't
-                    # drift from a manual update.
-                    name = "Update Firefox addons";
-                    run = ''
-                      nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
-                        --option allow-import-from-derivation true \
-                        -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
-                    '';
-                  }
-                  {
-                    # peter-evans/create-pull-request is GitHub-API-only, so
-                    # the branch and the pull request are made by hand here.
-                    #
-                    # No build step first, on purpose: pushing the branch
-                    # triggers the Build workflow, which is the real gate.
-                    # That is also why this pushes with a PAT rather than the
-                    # run's automatic token — Forgejo suppresses workflow
-                    # triggers for pushes made with the automatic token, so
-                    # the bumped branch would never get built.
-                    name = "Open pull request";
-                    env = {
-                      FORGE_USER = forge.owner;
-                      FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
-                    };
-                    run = ''
-                      set -euo pipefail
+        ${updateLockFilePath}.source = pkgs.writers.writeJSON "forgejo-actions-workflow-update-lock.yaml" {
+          name = "Update flake inputs";
+          on = {
+            workflow_dispatch = { };
+            # Forgejo only honours `schedule` on the default branch, which
+            # is where this is generated, so the cadence matches the GitHub
+            # workflow it replaces: every third day.
+            schedule = [ { cron = "0 0 1-31/3 * *"; } ];
+          };
+          jobs.update-flake-lock = {
+            runs-on = runner.name;
+            # Nothing here builds a host closure — `flake update` is pure
+            # input resolution and the addon generator is one small
+            # derivation — so this stays well inside the runner's slice
+            # even while a build matrix is running beside it.
+            timeout-minutes = 60;
+            steps = sharedPreSteps ++ [
+              {
+                name = "Update flake.lock";
+                run = "nix ${nixArgs} flake update";
+              }
+              {
+                # Mirror `just update`: keep the pinned Firefox addons in
+                # lockstep with the flake bump so the automated PR doesn't
+                # drift from a manual update.
+                name = "Update Firefox addons";
+                run = ''
+                  nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
+                    --option allow-import-from-derivation true \
+                    -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
+                '';
+              }
+              {
+                # peter-evans/create-pull-request is GitHub-API-only, so
+                # the branch and the pull request are made by hand here.
+                #
+                # No build step first, on purpose: pushing the branch
+                # triggers the Build workflow, which is the real gate.
+                # That is also why this pushes with a PAT rather than the
+                # run's automatic token — Forgejo suppresses workflow
+                # triggers for pushes made with the automatic token, so
+                # the bumped branch would never get built.
+                name = "Open pull request";
+                env = {
+                  FORGE_USER = forge.owner;
+                  FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+                };
+                run = ''
+                  set -euo pipefail
 
-                      paths="flake.lock pkgs/firefox-addons/generated.nix"
+                  paths="flake.lock pkgs/firefox-addons/generated.nix"
 
-                      if git diff --quiet -- $paths; then
-                        echo "Inputs and addon pins are already current; nothing to open."
-                        exit 0
-                      fi
+                  if git diff --quiet -- $paths; then
+                    echo "Inputs and addon pins are already current; nothing to open."
+                    exit 0
+                  fi
 
-                      git config user.name  "${owner.name}"
-                      git config user.email "${owner.email}"
+                  git config user.name  "${owner.name}"
+                  git config user.email "${owner.email}"
 
-                      git switch -C "${updateBranch}"
-                      git add -- $paths
-                      git commit -m "⚙️ bump flake.lock"
+                  git switch -C "${updateBranch}"
+                  git add -- $paths
+                  git commit -m "⚙️ bump flake.lock"
 
-                      # checkout@v4 leaves an Authorization header pinned to the
-                      # run's automatic token in the local config, and it wins
-                      # over any credential helper. Drop it so the PAT below is
-                      # what actually authenticates the push.
-                      git config --local --unset-all \
-                        'http.https://${forge.domain}/.extraheader' || true
+                  # checkout@v4 leaves an Authorization header pinned to the
+                  # run's automatic token in the local config, and it wins
+                  # over any credential helper. Drop it so the PAT below is
+                  # what actually authenticates the push.
+                  git config --local --unset-all \
+                    'http.https://${forge.domain}/.extraheader' || true
 
-                      # Via a credential file rather than a URL so the token
-                      # never lands in git's argv on a machine the owner also
-                      # uses interactively.
-                      creds="$(mktemp)"
-                      trap 'rm -f "$creds"' EXIT
-                      printf 'https://%s:%s@${forge.domain}\n' "$FORGE_USER" "$FORGE_TOKEN" > "$creds"
-                      git config --local credential.helper "store --file=$creds"
+                  # Via a credential file rather than a URL so the token
+                  # never lands in git's argv on a machine the owner also
+                  # uses interactively.
+                  creds="$(mktemp)"
+                  trap 'rm -f "$creds"' EXIT
+                  printf 'https://%s:%s@${forge.domain}\n' "$FORGE_USER" "$FORGE_TOKEN" > "$creds"
+                  git config --local credential.helper "store --file=$creds"
 
-                      git push --force origin "HEAD:refs/heads/${updateBranch}"
+                  git push --force origin "HEAD:refs/heads/${updateBranch}"
 
-                      body="$(mktemp)"
-                      code="$(curl -sS -o "$body" -w '%{http_code}' \
-                        -X POST "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls" \
-                        -H "Authorization: token $FORGE_TOKEN" \
-                        -H 'Content-Type: application/json' \
-                        -d '${
-                          builtins.toJSON {
-                            head = updateBranch;
-                            base = repo.defaultBranch;
-                            title = "chore: update flake.lock";
-                            body = "Scheduled bump of `flake.lock` and the generated Firefox addon pins.";
-                            assignees = [ owner.username ];
-                          }
-                        }')"
+                  body="$(mktemp)"
+                  code="$(curl -sS -o "$body" -w '%{http_code}' \
+                    -X POST "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls" \
+                    -H "Authorization: token $FORGE_TOKEN" \
+                    -H 'Content-Type: application/json' \
+                    -d '${
+                      builtins.toJSON {
+                        head = updateBranch;
+                        base = repo.defaultBranch;
+                        title = "chore: update flake.lock";
+                        body = "Scheduled bump of `flake.lock` and the generated Firefox addon pins.";
+                        assignees = [ owner.username ];
+                      }
+                    }')"
 
-                      case "$code" in
-                        201)
-                          echo "Opened $(jq -r '.html_url' "$body")"
-                          ;;
-                        409)
-                          # The previous run's pull request is still open and
-                          # now points at the branch we just force-pushed,
-                          # which is the intended end state.
-                          echo "Pull request already open; updated its head instead."
-                          ;;
-                        *)
-                          echo "Unexpected HTTP $code from the pulls API:" >&2
-                          cat "$body" >&2
-                          exit 1
-                          ;;
-                      esac
-                    '';
-                  }
-                ];
-              };
-            };
+                  case "$code" in
+                    201)
+                      echo "Opened $(jq -r '.html_url' "$body")"
+                      ;;
+                    409)
+                      # The previous run's pull request is still open and
+                      # now points at the branch we just force-pushed,
+                      # which is the intended end state.
+                      echo "Pull request already open; updated its head instead."
+                      ;;
+                    *)
+                      echo "Unexpected HTTP $code from the pulls API:" >&2
+                      cat "$body" >&2
+                      exit 1
+                      ;;
+                  esac
+                '';
+              }
+            ];
+          };
+        };
       };
 
       treefmt.settings.global.excludes = [

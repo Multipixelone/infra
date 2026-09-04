@@ -10,7 +10,6 @@ let
   inherit (ci)
     ids
     matrixParam
-    nixArgs
     ;
 
   # Heavy check-nixos closures (crane, tree-sitter-grammars, etc.) were
@@ -147,8 +146,20 @@ let
   };
 
   # The hosted runners are 2-core/7 GB, hence the conservative job and
-  # eval-worker counts; the self-hosted runner passes its own.
-  mkNixFastBuild = flakeSystem: ci.mkNixFastBuild { inherit flakeSystem; };
+  # eval-worker counts the shared helper defaults to; the self-hosted runner
+  # passes its own.
+  #
+  # Still one attribute per invocation, unlike the forge. This leg keeps its
+  # matrix on purpose: GitHub's ARM runners are free and genuinely concurrent
+  # (`max-parallel: 5`), so there is no capacity-2 serialisation to collapse,
+  # and job-level `continue-on-error` actually works there — which is how the
+  # whole leg stays advisory without a per-check ledger.
+  mkNixFastBuild =
+    flakeSystem:
+    ci.mkNixFastBuild {
+      inherit flakeSystem;
+      attr = "\${{ matrix.${matrixParam} }}";
+    };
 
   ciFilename = "ci.yml";
   ciFilePath = ".github/workflows/${ciFilename}";
@@ -191,7 +202,13 @@ in
       ## Running checks
 
       Checks run on a self-hosted Forgejo Actions runner and push their results
-      to an Attic cache. A job is spawned for each flake check, dynamically.
+      to an Attic cache. One job builds the whole check set with a single
+      `nix-fast-build`, and reports each check as its own commit status — so
+      every check still gets an individual green light on the commit and in the
+      pull request, and branch protection can require them by glob.
+
+      `configurations/*`, `files:*` and `treefmt` turn the job red. Everything
+      else reports a yellow warning instead: visible, but not a merge blocker.
 
       GitHub Actions is kept for one thing the runner cannot do: `aarch64-linux`.
       Every host in this repo is x86_64 and nothing here enables binfmt
