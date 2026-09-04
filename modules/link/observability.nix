@@ -110,11 +110,88 @@ let
   sloClassFor =
     application:
     if (serviceInventory.applications.${application}.public or false) then "public" else "internal";
+  # Blackbox reads `valid_status_codes` and `timeout` only from a module -- it
+  # accepts neither as a URL parameter -- so a route whose health contract is
+  # not "any 2xx" cannot be expressed by labelling its target. Every generated
+  # internal probe shared one 2xx-only module, which permanently scored down
+  # any route that answers something else by design (copyparty's `/s/` answers
+  # 403: proof that the Access bypass carried the request all the way to
+  # copyparty, where a challenge would have been a 302). The contract was in
+  # the registry the whole time and simply never reached the exporter.
+  #
+  # Derive one module per distinct contract actually present in the registry
+  # and let each target name its own. Nothing here knows about a particular
+  # service: a new contract mints a new module on its own.
+  internalProbeContract = probe: {
+    statuses = lib.sort (a: b: a < b) (lib.unique probe.expectedStatuses);
+    inherit (probe) timeoutSeconds;
+  };
+  internalProbeModuleName =
+    contract:
+    "https_internal_${
+      lib.concatMapStringsSep "_" toString contract.statuses
+    }_${toString contract.timeoutSeconds}s";
+  internalProbeModules = lib.listToAttrs (
+    map (
+      contract:
+      lib.nameValuePair (internalProbeModuleName contract) {
+        prober = "http";
+        timeout = "${toString contract.timeoutSeconds}s";
+        http = {
+          preferred_ip_protocol = "ip4";
+          follow_redirects = true;
+          fail_if_not_ssl = true;
+          valid_status_codes = contract.statuses;
+        };
+      }
+    ) (lib.unique (map internalProbeContract serviceInventory.internalProbes))
+  );
+  blackboxModules = {
+    http_internal = {
+      prober = "http";
+      timeout = "5s";
+      http = {
+        preferred_ip_protocol = "ip4";
+        follow_redirects = true;
+      };
+    };
+    # The generic pre-cutover HTTPS module: no per-route contract exists on
+    # that path, so it keeps Blackbox's 2xx default.
+    https_internal = {
+      prober = "http";
+      timeout = "8s";
+      http = {
+        preferred_ip_protocol = "ip4";
+        follow_redirects = true;
+        fail_if_not_ssl = true;
+      };
+    };
+    dns = {
+      prober = "dns";
+      timeout = "5s";
+      dns = {
+        preferred_ip_protocol = "ip4";
+        query_name = "grafana.nyc.finnrut.is";
+        query_type = "A";
+        validate_answer_rrs.fail_if_not_matches_regexp = [
+          "^grafana\\.nyc\\.finnrut\\.is.*192\\.168\\.6\\.50$"
+        ];
+      };
+    };
+  }
+  // internalProbeModules;
   # After the service-publication cutover, its generated internal HTTPS probe
   # is the user-visible health check. Keeping the old direct-backend probe as
   # well made every logical endpoint appear once as internal and once as
   # private, and counted both copies independently in the SLO.
-  internalProbeModule = if localCutover then "https_internal" else "http_internal";
+  #
+  # Before the cutover every internal probe shares one module, named by the
+  # job. After it each target selects its own through `__probe_module`, which
+  # a relabel rule turns into `__param_module`; the `__` prefix is what keeps
+  # the selector out of the final label set, so the series are exactly the
+  # ones the per-route `path` label already defines.
+  internalProbeModule = if localCutover then null else "http_internal";
+  internalProbeModuleLabel = if localCutover then "__probe_module" else null;
   # One canonical host can publish several routes (copyparty answers on `/`,
   # `/s/` and `/.cpr/ui.css`). Without a per-route label every one of those
   # targets carried an identical label set, so Prometheus folded them into a
@@ -131,6 +208,7 @@ let
         labels = {
           endpoint = probe.canonical;
           inherit (probe) path;
+          __probe_module = internalProbeModuleName (internalProbeContract probe);
           scope = "internal";
           slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
           resolver = probe.resolverHost;
@@ -4850,6 +4928,22 @@ in
             promtool test rules ${testSuite}
             touch "$out"
           '';
+
+      # The per-route probe modules are generated from the registry, so a
+      # contract nobody has written by hand still has to be something the
+      # exporter accepts. Hand the whole generated module set to Blackbox's own
+      # config check rather than trusting the shape.
+      checks.blackbox-probe-modules =
+        let
+          yaml = pkgs.formats.yaml { };
+        in
+        pkgs.runCommand "blackbox-probe-modules-check"
+          { nativeBuildInputs = [ pkgs.prometheus-blackbox-exporter ]; }
+          ''
+            blackbox_exporter --config.check \
+              --config.file=${yaml.generate "blackbox-observability.yaml" { modules = blackboxModules; }}
+            touch "$out"
+          '';
     };
 
   configurations.nixos.link.module =
@@ -4895,70 +4989,54 @@ in
           };
         }
       ) resolverEntries;
-      blackboxConfig = yaml.generate "blackbox-observability.yaml" {
-        modules = {
-          http_internal = {
-            prober = "http";
-            timeout = "5s";
-            http = {
-              preferred_ip_protocol = "ip4";
-              follow_redirects = true;
-            };
-          };
-          https_internal = {
-            prober = "http";
-            timeout = "8s";
-            http = {
-              preferred_ip_protocol = "ip4";
-              follow_redirects = true;
-              fail_if_not_ssl = true;
-            };
-          };
-          dns = {
-            prober = "dns";
-            timeout = "5s";
-            dns = {
-              preferred_ip_protocol = "ip4";
-              query_name = "grafana.nyc.finnrut.is";
-              query_type = "A";
-              validate_answer_rrs.fail_if_not_matches_regexp = [
-                "^grafana\\.nyc\\.finnrut\\.is.*192\\.168\\.6\\.50$"
-              ];
-            };
-          };
-        };
-      };
+      blackboxConfig = yaml.generate "blackbox-observability.yaml" { modules = blackboxModules; };
 
+      # A job either names one module for every target (`module`) or lets each
+      # target select its own through a label (`moduleLabel`), never both: two
+      # sources for `__param_module` would silently make one of them dead.
       mkBlackboxScrape =
         {
           name,
-          module,
+          module ? null,
+          moduleLabel ? null,
           targets,
           instanceLabel ? "endpoint",
         }:
+        assert (module == null) != (moduleLabel == null);
         {
           job_name = "blackbox-${name}";
           metrics_path = "/probe";
-          params.module = [ module ];
           static_configs = targets;
-          relabel_configs = [
-            {
-              source_labels = [ "__address__" ];
-              target_label = "__param_target";
+          relabel_configs =
+            lib.optional (moduleLabel != null) {
+              # `valid_status_codes` lives in the module, so a per-route status
+              # contract can only reach Blackbox as a module name. The target
+              # carries that name in a `__`-prefixed label, which Prometheus
+              # drops once relabelling is done -- the selector never becomes a
+              # series dimension, and the label set stays what the targets
+              # themselves declare.
+              source_labels = [ moduleLabel ];
+              target_label = "__param_module";
             }
-            {
-              # Keep transport addresses out of Prometheus's public identity
-              # label. Dashboards and alerts should name the logical endpoint
-              # (or resolver), never its current IP/port/URL.
-              source_labels = [ instanceLabel ];
-              target_label = "instance";
-            }
-            {
-              target_label = "__address__";
-              replacement = "${blackbox.backendAddress}:${toString blackbox.port}";
-            }
-          ];
-        };
+            ++ [
+              {
+                source_labels = [ "__address__" ];
+                target_label = "__param_target";
+              }
+              {
+                # Keep transport addresses out of Prometheus's public identity
+                # label. Dashboards and alerts should name the logical endpoint
+                # (or resolver), never its current IP/port/URL.
+                source_labels = [ instanceLabel ];
+                target_label = "instance";
+              }
+              {
+                target_label = "__address__";
+                replacement = "${blackbox.backendAddress}:${toString blackbox.port}";
+              }
+            ];
+        }
+        // lib.optionalAttrs (module != null) { params.module = [ module ]; };
 
       safeInstanceName =
         value:
@@ -4995,10 +5073,40 @@ in
       blackboxScrapeHasDistinctTargets =
         scrape:
         let
-          identities = map (static: static.labels or { }) (scrape.static_configs or [ ]);
+          # Compare only the labels that survive relabelling. A `__`-prefixed
+          # selector such as `__probe_module` is dropped before the sample is
+          # stored, so it cannot be what tells two series apart -- counting it
+          # would let a duplicate label set back in behind a differing module.
+          identities = map (
+            static: lib.filterAttrs (name: _: !lib.hasPrefix "__" name) (static.labels or { })
+          ) (scrape.static_configs or [ ]);
         in
         !(lib.hasPrefix "blackbox-" scrape.job_name)
         || lib.length identities == lib.length (lib.unique identities);
+
+      # Every Blackbox target has to resolve to a module that exists, whether
+      # the job names one for all of them or each target selects its own. An
+      # unknown module name is not a config error the exporter refuses: it
+      # answers every probe with a failure, which reads on a dashboard exactly
+      # like the endpoint being down.
+      blackboxScrapeModuleResolvable =
+        scrape:
+        let
+          moduleSelector = lib.findFirst (rule: (rule.target_label or null) == "__param_module") null (
+            scrape.relabel_configs or [ ]
+          );
+          jobModules = scrape.params.module or [ ];
+          targetModules = map (static: static.labels.${lib.head moduleSelector.source_labels} or null) (
+            scrape.static_configs or [ ]
+          );
+        in
+        !(lib.hasPrefix "blackbox-" scrape.job_name)
+        || (
+          if moduleSelector == null then
+            jobModules != [ ] && lib.all (name: lib.hasAttr name blackboxModules) jobModules
+          else
+            lib.all (name: name != null && lib.hasAttr name blackboxModules) targetModules
+        );
 
       recordingAndAlertRules = yaml.generate "observability-rules.yaml" {
         groups = [
@@ -5381,6 +5489,10 @@ in
           message = "Every Blackbox target needs a distinct label set; duplicates collapse into one series that each scrape overwrites.";
         }
         {
+          assertion = lib.all blackboxScrapeModuleResolvable config.services.prometheus.scrapeConfigs;
+          message = "Every Blackbox target must select a module defined in the exporter config; an unknown module fails every probe and reads as an outage.";
+        }
+        {
           assertion = !telegramContactRouted;
           message = "The Telegram contact point must remain unrouted during the seven-day review.";
         }
@@ -5707,6 +5819,7 @@ in
             (mkBlackboxScrape {
               name = "internal";
               module = internalProbeModule;
+              moduleLabel = internalProbeModuleLabel;
               targets = internalProbes;
             })
           ]
