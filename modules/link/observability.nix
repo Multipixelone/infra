@@ -286,7 +286,43 @@ let
   # liveness gate: a removed probe must stop reporting instead of coasting on
   # history still inside the range.
   endpointLatencyExpr = "max by (endpoint, slo_class) (quantile_over_time(0.95, ${sloProbeDurationOk}[${observability.slo.window}:1m]) and probe_duration_seconds{${sloProbeSelector}})";
-  sloWindowEligibility = "min by (endpoint, slo_class) ((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
+  # Whether an endpoint has a full window of history behind every sub-series
+  # its SLI is built from. The probe series are keyed by (endpoint, slo_class,
+  # resolver, path) while both SLIs collapse them with `max by`/`min by
+  # (endpoint, slo_class)`, so an endpoint can be old while one of its
+  # contributing series is hours old: a new resolver, or a new route minting a
+  # new `path`. The old gate asked `min by (endpoint, slo_class)` of the probe
+  # vector a window back, which the *siblings* answered -- the endpoint read as
+  # eligible and the sparse newcomer went straight to the alert. radarr is the
+  # case in the field: a deploy minted `path="/ping", resolver="impa"`, and with
+  # 17 samples one 1.63s startup probe put its p95 at 1065ms against a 250ms
+  # objective, which `max by` then published as the whole endpoint's latency.
+  # It decayed to 98ms as samples accumulated, so the alert was reporting the
+  # sample count, not the service.
+  #
+  # Re-grouping the old expression by (endpoint, slo_class, resolver, path)
+  # does not fix it: `and on (endpoint, slo_class)` is a set operator, so a
+  # finer-grained right-hand side still matches on the coarse subset and the
+  # mature siblings still supply the sample. The gate has to say *every*
+  # contributing series is old enough, not *some*.
+  #
+  # Cardinality, not identity. Matching each current series against itself a
+  # window back would be the direct statement, but the labels that identify a
+  # sub-series are exactly the ones that churn: `path` landed three commits
+  # ago, `instance` was renormalized from a URL to a hostname, and
+  # `blackbox-private` was retired -- so today an identity match finds nothing
+  # in common and every endpoint would be suppressed. Counting is immune to a
+  # relabel because it never compares labels.
+  #
+  # `<=` and not `==` because a *removed* resolver or route must not suppress
+  # a healthy endpoint. Removal lowers the current count below the historical
+  # one and stays eligible forever; an addition raises it and suppresses only
+  # until the newcomer is itself a window old. A simultaneous add and remove of
+  # equal cardinality is the residual blind spot a count cannot see, and it
+  # buys the permanent-ineligibility failure being avoided here.
+  sloProbePresence = "(probe_success{${sloProbeSelector}} or up{${sloProbeSelector}})";
+  sloProbePresenceAtWindowStart = "((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
+  sloWindowEligibility = "(count by (endpoint, slo_class) (${sloProbePresence}) <= count by (endpoint, slo_class) (${sloProbePresenceAtWindowStart}))";
   # One global latency threshold fits nothing. `latencySeconds` was 1s/2s while
   # every published endpoint answered in 22-163ms, so the alert sat 6-46x above
   # the behaviour it was supposed to watch and could not have caught a tenfold
@@ -335,6 +371,12 @@ let
   sloLatencyBreachExpr =
     sloClass:
     ''endpoint:latency_p95_7d{slo_class="${sloClass}"} > on (endpoint, slo_class) endpoint:latency_objective_seconds'';
+  # The whole alert body, breach joined to the window gate, so the promtool
+  # case exercises the same string the rule ships rather than a reconstruction
+  # of it. Comparison binds tighter than `and`, so the gate's own parentheses
+  # are what keep this from parsing as `(breach and count(...)) <= count(...)`.
+  sloLatencyAlertExpr =
+    sloClass: "${sloLatencyBreachExpr sloClass} and on (endpoint, slo_class) ${sloWindowEligibility}";
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
   # migration than leak transport addresses back into a host legend.
@@ -4901,8 +4943,19 @@ in
       # preserving the transition that caused the production failure: the
       # fallback switches from probe_success to up and back inside one range.
       # Both SLIs are subqueries over the same window, so one substitution
-      # shrinks both.
-      shrinkSloWindow = builtins.replaceStrings [ "[${observability.slo.window}:1m]" ] [ "[3m:1m]" ];
+      # shrinks both. The window gate expresses the same seven days as an
+      # `offset` instead of a range, and it has to shrink by the same factor or
+      # a test series would have to carry a week of samples to be eligible.
+      shrinkSloWindow =
+        builtins.replaceStrings
+          [
+            "[${observability.slo.window}:1m]"
+            "offset ${observability.slo.window}"
+          ]
+          [
+            "[3m:1m]"
+            "offset 3m"
+          ];
       testExpr = shrinkSloWindow endpointAvailabilityExpr;
       testLatencyExpr = shrinkSloWindow endpointLatencyExpr;
       # The registry's own objectives name real endpoints, so the test builds
@@ -4926,6 +4979,28 @@ in
           endpoint = "roomy.example";
           sloClass = "internal";
           seconds = 0.5;
+        }
+        # The window-gate case below breaches every one of these; whether its
+        # alert appears is decided by the gate alone.
+        {
+          endpoint = "mature.example";
+          sloClass = "internal";
+          seconds = 0.25;
+        }
+        {
+          endpoint = "grew.example";
+          sloClass = "internal";
+          seconds = 0.25;
+        }
+        {
+          endpoint = "new.example";
+          sloClass = "internal";
+          seconds = 0.25;
+        }
+        {
+          endpoint = "shrunk.example";
+          sloClass = "internal";
+          seconds = 0.25;
         }
       ];
       testRules = pkgs.writeText "observability-slo-test-rules.json" (
@@ -5141,6 +5216,18 @@ in
                   eval_time = "4m";
                   exp_samples = [
                     {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="grew.example",slo_class="internal"}'';
+                      value = 0.25;
+                    }
+                    {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="mature.example",slo_class="internal"}'';
+                      value = 0.25;
+                    }
+                    {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="new.example",slo_class="internal"}'';
+                      value = 0.25;
+                    }
+                    {
                       labels = ''endpoint:latency_objective_seconds{endpoint="over.example",slo_class="internal"}'';
                       value = 0.25;
                     }
@@ -5149,8 +5236,150 @@ in
                       value = 0.5;
                     }
                     {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="shrunk.example",slo_class="internal"}'';
+                      value = 0.25;
+                    }
+                    {
                       labels = ''endpoint:latency_objective_seconds{endpoint="under.example",slo_class="internal"}'';
                       value = 0.25;
+                    }
+                  ];
+                }
+              ];
+            }
+            # The window gate, which decides whether an endpoint has enough
+            # history to be alerted on at all. All four endpoints here breach
+            # their 250ms objective, so the alert's presence is entirely the
+            # gate's doing. `mature.example` has two sub-series that both span
+            # the window and must alert. `grew.example` is the regression: one
+            # mature route answering in 50ms and one one-minute-old route
+            # whose two samples put the endpoint's `max by` p95 at 1.6s
+            # -- exactly the radarr shape -- and it must stay silent, which the
+            # sibling-satisfied `min by` gate did not do. `new.example` is a
+            # wholly new endpoint and must stay silent as it always has.
+            # `shrunk.example` lost a route six minutes ago and must keep
+            # alerting, because a removal is not a reason to go permanently
+            # blind. Removal also has to leave the SLI itself, which the
+            # latency rule's trailing liveness `and` already does.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="mature.example",endpoint="mature.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="mature.example",endpoint="mature.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1 1 1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="mature.example",endpoint="mature.example",slo_class="internal",scope="internal",resolver="impa",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="mature.example",endpoint="mature.example",slo_class="internal",scope="internal",resolver="impa",path="/"}'';
+                  values = "1 1 1 1 1 1 1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="grew.example",endpoint="grew.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="grew.example",endpoint="grew.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1 1 1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="grew.example",endpoint="grew.example",slo_class="internal",scope="internal",resolver="impa",path="/ping"}'';
+                  values = "_ _ _ _ _ _ _ _ _ 1.6 1.6";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="grew.example",endpoint="grew.example",slo_class="internal",scope="internal",resolver="impa",path="/ping"}'';
+                  values = "_ _ _ _ _ _ _ _ _ 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="new.example",endpoint="new.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "_ _ _ _ _ _ _ _ _ 1.6 1.6";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="new.example",endpoint="new.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "_ _ _ _ _ _ _ _ _ 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="shrunk.example",endpoint="shrunk.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="shrunk.example",endpoint="shrunk.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1 1 1 1 1 1 1";
+                }
+                # Retired at t=4m: past the 5m lookback at evaluation time, so
+                # it is gone from the current vector while still present three
+                # minutes back, which is precisely the shape `==` would have
+                # mistaken for a missing sub-series.
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="shrunk.example",endpoint="shrunk.example",slo_class="internal",scope="internal",resolver="impa",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="shrunk.example",endpoint="shrunk.example",slo_class="internal",scope="internal",resolver="impa",path="/"}'';
+                  values = "1 1 1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                # The gate on its own, because `SloErrorBudgetExhausted` joins
+                # the same expression and is not otherwise covered here. Its
+                # value is the current sub-series count, which is what makes
+                # the two eligible endpoints distinguishable at a glance.
+                {
+                  expr = shrinkSloWindow sloWindowEligibility;
+                  eval_time = "10m";
+                  exp_samples = [
+                    {
+                      labels = ''{endpoint="mature.example",slo_class="internal"}'';
+                      value = 2;
+                    }
+                    {
+                      labels = ''{endpoint="shrunk.example",slo_class="internal"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+                {
+                  expr = shrinkSloWindow (sloLatencyAlertExpr "internal");
+                  eval_time = "10m";
+                  exp_samples = [
+                    {
+                      labels = ''{endpoint="mature.example",slo_class="internal"}'';
+                      value = 0.4;
+                    }
+                    {
+                      labels = ''{endpoint="shrunk.example",slo_class="internal"}'';
+                      value = 0.4;
+                    }
+                  ];
+                }
+                # The SLI the gate is protecting the alert from: `grew.example`
+                # really does read 1.6s here, so the case fails for the right
+                # reason rather than because the breach never happened.
+                {
+                  expr = "endpoint:latency_p95_7d";
+                  eval_time = "10m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="grew.example",slo_class="internal"}'';
+                      value = 1.6;
+                    }
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="mature.example",slo_class="internal"}'';
+                      value = 0.4;
+                    }
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="new.example",slo_class="internal"}'';
+                      value = 1.6;
+                    }
+                    {
+                      labels = ''endpoint:latency_p95_7d{endpoint="shrunk.example",slo_class="internal"}'';
+                      value = 0.4;
                     }
                   ];
                 }
@@ -5506,14 +5735,14 @@ in
                 # true of every endpoint the alert covers -- "exceeds one
                 # second" was already wrong for a service held to 250ms.
                 alert = "InternalSloLatencyHigh";
-                expr = "${sloLatencyBreachExpr "internal"} and on (endpoint, slo_class) ${sloWindowEligibility}";
+                expr = sloLatencyAlertExpr "internal";
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Internal endpoint {{ $labels.endpoint }} p95 latency is {{ $value | humanizeDuration }}, over its objective";
               }
               {
                 alert = "PublicSloLatencyHigh";
-                expr = "${sloLatencyBreachExpr "public"} and on (endpoint, slo_class) ${sloWindowEligibility}";
+                expr = sloLatencyAlertExpr "public";
                 for = "30m";
                 labels.severity = "warning";
                 annotations.summary = "Public endpoint {{ $labels.endpoint }} p95 latency is {{ $value | humanizeDuration }}, over its objective";
