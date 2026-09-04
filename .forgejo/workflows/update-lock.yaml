@@ -1,0 +1,52 @@
+{
+  "jobs": {
+    "update-flake-lock": {
+      "runs-on": "nix",
+      "steps": [
+        {
+          "uses": "https://data.forgejo.org/actions/checkout@v4",
+          "with": {
+            "submodules": true
+          }
+        },
+        {
+          "name": "Install SSH key",
+          "uses": "https://github.com/webfactory/ssh-agent@v0.9.0",
+          "with": {
+            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
+          }
+        },
+        {
+          "name": "Authenticate private GitHub inputs",
+          "run": "{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n\n# Appended, not assigned: the runner unit already exports NIX_CONFIG\n# with max-jobs and cores, and a plain NIX_CONFIG= here would silently\n# drop those and let CI build at full width. Heredoc form because the\n# value is multi-line.\n{\n  echo \"NIX_CONFIG<<__NIX_CONFIG_EOF__\"\n  printf '%s\\n' \"${NIX_CONFIG:-}\"\n  echo \"access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\"\n  echo \"__NIX_CONFIG_EOF__\"\n} >> \"$GITHUB_ENV\"\n"
+        },
+        {
+          "name": "Update flake.lock",
+          "run": "nix --accept-flake-config flake update"
+        },
+        {
+          "name": "Update Firefox addons",
+          "run": "nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \\\n  --option allow-import-from-derivation true \\\n  -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix\n"
+        },
+        {
+          "env": {
+            "FORGE_TOKEN": "${{ secrets.FORGEJO_TOKEN }}",
+            "FORGE_USER": "tunnel"
+          },
+          "name": "Open pull request",
+          "run": "set -euo pipefail\n\npaths=\"flake.lock pkgs/firefox-addons/generated.nix\"\n\nif git diff --quiet -- $paths; then\n  echo \"Inputs and addon pins are already current; nothing to open.\"\n  exit 0\nfi\n\ngit config user.name  \"Finn Rutis\"\ngit config user.email \"me@finnrut.is\"\n\ngit switch -C \"update_flake_lock_action\"\ngit add -- $paths\ngit commit -m \"⚙️ bump flake.lock\"\n\n# checkout@v4 leaves an Authorization header pinned to the\n# run's automatic token in the local config, and it wins\n# over any credential helper. Drop it so the PAT below is\n# what actually authenticates the push.\ngit config --local --unset-all \\\n  'http.https://git.finnrut.is/.extraheader' || true\n\n# Via a credential file rather than a URL so the token\n# never lands in git's argv on a machine the owner also\n# uses interactively.\ncreds=\"$(mktemp)\"\ntrap 'rm -f \"$creds\"' EXIT\nprintf 'https://%s:%s@git.finnrut.is\\n' \"$FORGE_USER\" \"$FORGE_TOKEN\" > \"$creds\"\ngit config --local credential.helper \"store --file=$creds\"\n\ngit push --force origin \"HEAD:refs/heads/update_flake_lock_action\"\n\nbody=\"$(mktemp)\"\ncode=\"$(curl -sS -o \"$body\" -w '%{http_code}' \\\n  -X POST \"https://git.finnrut.is/api/v1/repos/tunnel/infra/pulls\" \\\n  -H \"Authorization: token $FORGE_TOKEN\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"assignees\":[\"tunnel\"],\"base\":\"main\",\"body\":\"Scheduled bump of `flake.lock` and the generated Firefox addon pins.\",\"head\":\"update_flake_lock_action\",\"title\":\"chore: update flake.lock\"}')\"\n\ncase \"$code\" in\n  201)\n    echo \"Opened $(jq -r '.html_url' \"$body\")\"\n    ;;\n  409)\n    # The previous run's pull request is still open and\n    # now points at the branch we just force-pushed,\n    # which is the intended end state.\n    echo \"Pull request already open; updated its head instead.\"\n    ;;\n  *)\n    echo \"Unexpected HTTP $code from the pulls API:\" >&2\n    cat \"$body\" >&2\n    exit 1\n    ;;\nesac\n"
+        }
+      ],
+      "timeout-minutes": 60
+    }
+  },
+  "name": "Update flake inputs",
+  "on": {
+    "schedule": [
+      {
+        "cron": "0 0 1-31/3 * *"
+      }
+    ],
+    "workflow_dispatch": {}
+  }
+}

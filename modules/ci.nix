@@ -46,12 +46,9 @@ let
   buildFilePath = ".github/workflows/${buildFilename}";
   nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
   nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
-  updateLockFilename = "update-lock.yml";
-  updateLockFilePath = ".github/workflows/${updateLockFilename}";
 
   evalWorkflowName = "Eval";
   buildWorkflowName = "Build";
-  updateLockWorkflowName = "Update flake inputs";
 
   runner = {
     name = "ubuntu-latest";
@@ -372,64 +369,6 @@ in
             };
           }
           {
-            # Generated rather than hand-written so the scheduled lock bump
-            # shares the eval/build credential setup. The hand-written version
-            # installed Determinate Nix, which could not fetch the private
-            # `git+https://` inputs however the token was presented, and every
-            # scheduled run from 2026-08-19 onwards died on a prem-tweet 404.
-            path = updateLockFilePath;
-            drv = pkgs.writers.writeJSON "gh-actions-workflow-update-lock.yaml" {
-              name = updateLockWorkflowName;
-              on = {
-                workflow_dispatch = { };
-                schedule = [ { cron = "0 0 1-31/3 * *"; } ];
-              };
-              jobs.update-flake-lock = {
-                runs-on = runner.name;
-                steps = [
-                  steps.removeUnusedSoftware
-                  steps.checkout
-                  steps.createAtticNetrc
-                  steps.nixInstaller
-                  steps.installSshKey
-                  {
-                    name = "Update flake.lock";
-                    run = "nix ${nixArgs} flake update";
-                  }
-                  {
-                    # Mirror `just update`: keep the pinned Firefox addons in
-                    # lockstep with the flake bump so the automated PR doesn't
-                    # drift from a manual update.
-                    name = "Update Firefox addons";
-                    run = ''
-                      nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
-                        --option allow-import-from-derivation true \
-                        -- pkgs/firefox-addons/addons.json pkgs/firefox-addons/generated.nix
-                    '';
-                  }
-                  {
-                    # No build step here on purpose: pushing the branch triggers
-                    # the Build workflow, which is the real gate.
-                    name = "Create pull request";
-                    uses = "peter-evans/create-pull-request@v8";
-                    "with" = {
-                      token = "\${{ secrets.GH_TOKEN_FOR_UPDATES }}";
-                      branch = "update_flake_lock_action";
-                      title = "chore: update flake.lock";
-                      commit-message = "⚙️ bump flake.lock";
-                      assignees = repo.owner;
-                      labels = "automated";
-                      add-paths = ''
-                        flake.lock
-                        pkgs/firefox-addons/generated.nix
-                      '';
-                    };
-                  }
-                ];
-              };
-            };
-          }
-          {
             path = nixpkgsAgeFilePath;
             drv = pkgs.writers.writeJSON "gh-actions-workflow-nixpkgs-age-badge.yaml" {
               name = "Nixpkgs age badge";
@@ -586,7 +525,6 @@ in
         evalFilePath
         buildFilePath
         nixpkgsAgeFilePath
-        updateLockFilePath
         ciFilePath
       ];
     };

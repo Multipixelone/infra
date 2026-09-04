@@ -165,12 +165,12 @@ using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 
 - `.envrc`
 - `.forgejo/workflows/build.yaml`
+- `.forgejo/workflows/update-lock.yaml`
 - `.github/renovate.json5`
 - `.github/workflows/build.yaml`
 - `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.github/workflows/service-publication.yaml`
-- `.github/workflows/update-lock.yml`
 - `.gitignore`
 - `.gitleaks.toml`
 - `README.md`
