@@ -101,13 +101,13 @@ in
         # carries public ingress; the newest minor buys nothing here.
         package = pkgs.forgejo-lts;
 
-        # sqlite3 over postgres deliberately: impa has 8 GiB and no swap while
-        # already running blocky, unbound, dnscrypt-proxy, nginx, ACME and
-        # cloudflared. A second resident database daemon on the box that
-        # resolves DNS for the whole house is the wrong trade for a forge with
-        # one human and one runner. It also keeps the whole of Forgejo's state
-        # inside a single filesystem snapshot, which is what makes the backup
-        # atomic.
+        # sqlite3 over postgres deliberately: impa has 8 GiB and an overflow
+        # swapfile while already running blocky, unbound, dnscrypt-proxy,
+        # nginx, ACME and cloudflared. A second resident database daemon on the
+        # box that resolves DNS for the whole house is the wrong trade for a
+        # forge with one human and one runner. It also keeps the whole of
+        # Forgejo's state inside a single filesystem snapshot, which is what
+        # makes the backup atomic.
         database.type = "sqlite3";
         lfs.enable = true;
 
@@ -201,10 +201,13 @@ in
       # it without leaving the box.
       networking.firewall.allowedTCPPorts = [ sshPort ];
 
-      # impa is 8 GiB with no swap, and it is the house's public ingress and
-      # one of two DNS resolvers. A runaway repack has to degrade into a failed
-      # push, not a DNS outage. git subprocesses inherit this cgroup, so the
-      # bound covers the whole tree rather than just the Go process.
+      # impa is 8 GiB, backed only by an overflow swapfile, and it is the
+      # house's public ingress and one of two DNS resolvers. A runaway repack
+      # has to degrade into a failed push, not a DNS outage — and it must not
+      # get there by paging out the resolvers first, which is what the cgroup
+      # bound below and vm.swappiness in swap.nix each guard from their end.
+      # git subprocesses inherit this cgroup, so the bound covers the whole
+      # tree rather than just the Go process.
       systemd.services.forgejo = {
         onFailure = [ "notify-telegram@%n.service" ];
         serviceConfig = {
