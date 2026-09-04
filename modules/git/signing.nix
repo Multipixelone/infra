@@ -27,6 +27,10 @@
     }:
     let
       signingKey = "59BF38D05371C5E9";
+      # gpg --import-ownertrust keys on the full fingerprint; the long id
+      # above is what git wants, and the two are not interchangeable here.
+      # 6 = ultimate, the trust a locally generated key would have had.
+      ownertrust = pkgs.writeText "gpg-ownertrust" "A6730AC13BDDF8FF95E4517359BF38D05371C5E9:6:\n";
       secretFile = "${inputs.secrets}/gpg/signing-key.age";
       hasSecret = builtins.pathExists secretFile;
     in
@@ -65,6 +69,10 @@
           keyPath="${config.age.secrets."gpg-signing-key".path}"
           if [ -r "$keyPath" ]; then
             $DRY_RUN_CMD ${pkgs.gnupg}/bin/gpg --batch --import "$keyPath" || true
+            # An imported secret key carries no ownertrust, so gpg calls its
+            # own signatures untrusted and `git log --show-signature` reports
+            # `U` instead of a good signature.
+            $DRY_RUN_CMD ${pkgs.gnupg}/bin/gpg --batch --import-ownertrust ${ownertrust} || true
           else
             verboseEcho "gpg signing key not yet decrypted; import deferred to next activation"
           fi
