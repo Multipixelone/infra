@@ -30,7 +30,7 @@
         },
         {
           "env": {
-            "FORGE_TOKEN": "${{ secrets.FORGEJO_TOKEN }}",
+            "FORGE_TOKEN": "${{ secrets.FORGE_TOKEN }}",
             "FORGE_USER": "tunnel"
           },
           "name": "Open pull request",

@@ -246,7 +246,7 @@ in
                     name = "Open pull request";
                     env = {
                       FORGE_USER = forge.owner;
-                      FORGE_TOKEN = "\${{ secrets.FORGEJO_TOKEN }}";
+                      FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
                     };
                     run = ''
                       set -euo pipefail
