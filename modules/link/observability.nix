@@ -115,12 +115,22 @@ let
   # well made every logical endpoint appear once as internal and once as
   # private, and counted both copies independently in the SLO.
   internalProbeModule = if localCutover then "https_internal" else "http_internal";
+  # One canonical host can publish several routes (copyparty answers on `/`,
+  # `/s/` and `/.cpr/ui.css`). Without a per-route label every one of those
+  # targets carried an identical label set, so Prometheus folded them into a
+  # single series that each scrape overwrote in turn -- `probe_success` for the
+  # endpoint flapped between the routes' results instead of reporting any of
+  # them. `path` is the distinguishing label because it is what a reader of a
+  # panel legend or an alert can act on; the route key is an internal name.
+  # Every consumer aggregates with `by (endpoint, ...)`, so this stays one SLO
+  # series per endpoint, taken from its worst route.
   internalProbes =
     if localCutover then
       map (probe: {
         targets = [ "https://${probe.canonical}${probe.path}" ];
         labels = {
           endpoint = probe.canonical;
+          inherit (probe) path;
           scope = "internal";
           slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
           resolver = probe.resolverHost;
@@ -4779,6 +4789,56 @@ in
                 }
               ];
             }
+            # A canonical host with several routes emits one probe series per
+            # path. The rule has to keep collapsing those into a single series
+            # per endpoint -- alerts and dashboards key on `endpoint` alone --
+            # and it has to take the worst route, because a broken `/s/` is a
+            # user-visible failure even while `/` answers.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="one.example",endpoint="one.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="one.example",endpoint="one.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="many.example",endpoint="many.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="many.example",endpoint="many.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="many.example",endpoint="many.example",slo_class="internal",scope="internal",resolver="link",path="/s/"}'';
+                  values = "0 0 0";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="many.example",endpoint="many.example",slo_class="internal",scope="internal",resolver="link",path="/s/"}'';
+                  values = "1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:availability_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:availability_7d{endpoint="many.example",slo_class="internal"}'';
+                      value = 0;
+                    }
+                    {
+                      labels = ''endpoint:availability_7d{endpoint="one.example",slo_class="internal"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+              ];
+            }
           ];
         }
       );
@@ -4926,6 +4986,19 @@ in
           ) (scrape.relabel_configs or [ ]);
         in
         explicitInstancesSafe || derivedInstanceSafe;
+
+      # Blackbox targets are identified only by their static labels: the probe
+      # URL lands in `__param_target` and `__address__` is rewritten to the
+      # exporter, so two targets sharing a label set share a series and
+      # overwrite each other every scrape. Multi-route hosts hit this, which is
+      # why internal probes carry `path`.
+      blackboxScrapeHasDistinctTargets =
+        scrape:
+        let
+          identities = map (static: static.labels or { }) (scrape.static_configs or [ ]);
+        in
+        !(lib.hasPrefix "blackbox-" scrape.job_name)
+        || lib.length identities == lib.length (lib.unique identities);
 
       recordingAndAlertRules = yaml.generate "observability-rules.yaml" {
         groups = [
@@ -5302,6 +5375,10 @@ in
         {
           assertion = lib.all scrapeHasSafeInstance config.services.prometheus.scrapeConfigs;
           message = "Every Prometheus scrape must expose a hostname/FQDN instance label, never a transport address.";
+        }
+        {
+          assertion = lib.all blackboxScrapeHasDistinctTargets config.services.prometheus.scrapeConfigs;
+          message = "Every Blackbox target needs a distinct label set; duplicates collapse into one series that each scrape overwrites.";
         }
         {
           assertion = !telegramContactRouted;
