@@ -210,6 +210,22 @@ in
       # tree rather than just the Go process.
       systemd.services.forgejo = {
         onFailure = [ "notify-telegram@%n.service" ];
+
+        # Forgejo's SSH push mirrors shell out to a real `ssh` binary — it
+        # generates the keypair itself and hands git a GIT_SSH_COMMAND — and the
+        # upstream unit's path carries only forgejo, git and coreutils, so
+        # without this the feature fails at push time rather than at eval.
+        # git links no ssh of its own; it resolves the name from PATH.
+        #
+        # The mirror's own key is Forgejo-generated and lives encrypted in its
+        # database; the client key in modules/forges/forgejo.nix belongs to the
+        # workstations and never reaches this unit.
+        #
+        # github.com's host key is already in /etc/ssh/ssh_known_hosts via
+        # modules/forges/github.nix, which is what lets a non-interactive ssh
+        # get past StrictHostKeyChecking here.
+        path = [ pkgs.openssh ];
+
         serviceConfig = {
           MemoryAccounting = true;
           MemoryHigh = "1500M";
