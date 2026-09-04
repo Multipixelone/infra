@@ -154,9 +154,16 @@ in
       slo = {
         availability = 0.99;
         window = "7d";
+        # Class defaults, not universal truths: an application that needs its
+        # own budget sets `latencyObjectiveSeconds` in the service-publication
+        # registry. Seeded at roughly 3x the measured success-only p95 with a
+        # 250ms floor, because 17 of the 19 published endpoints answer in
+        # 22-58ms and 3x of that is a threshold too tight to be anything but
+        # noise. The previous 1s/2s pair was 6-46x above every endpoint it
+        # covered -- sabnzbd could have got 45 times slower without a word.
         latencySeconds = {
-          internal = 1.0;
-          public = 2.0;
+          internal = 0.25;
+          public = 0.30;
         };
       };
       endpoints = {

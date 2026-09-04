@@ -384,6 +384,13 @@ let
         ++ optional (
           original.public && publicRoutes == [ ]
         ) "application ${application.name}: public application has no effective public route"
+        # Duplicates the option type on purpose. A non-positive objective would
+        # be emitted as `vector(0)` and every probe would sit above it forever,
+        # and `resolve` is called on hand-built fixtures that never go through
+        # the module system, so this list is the only guard on that path.
+        ++ optional (
+          original.latencyObjectiveSeconds != null && original.latencyObjectiveSeconds <= 0
+        ) "application ${application.name}: latencyObjectiveSeconds must be positive"
         ++ optional (
           !original.public && lib.any (route: route.public == true) (attrValues original.routes)
         ) "application ${application.name}: a private application route cannot opt into publication"
@@ -608,7 +615,7 @@ let
       inherit (registry) sites;
       inherit (registry) hosts;
       applications = lib.mapAttrs (applicationName: application: {
-        inherit (application) site public;
+        inherit (application) site public latencyObjectiveSeconds;
         canonical = canonicalFor applicationName application;
         alias = aliasFor applicationName application;
       }) applications;

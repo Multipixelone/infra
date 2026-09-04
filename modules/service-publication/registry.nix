@@ -112,6 +112,11 @@ let
           type = types.nullOr types.str;
           default = null;
         };
+        latencyObjectiveSeconds = mkOption {
+          type = types.nullOr types.numbers.positive;
+          default = null;
+          description = "p95 latency objective for this application's probes, in seconds. Null inherits observability.slo.latencySeconds for the application's class (public or internal).";
+        };
         homepage = mkOption {
           type = types.submodule {
             options = {
@@ -550,6 +555,12 @@ in
 
         dsm = {
           site = "nyc";
+          # Synology's login UI is the slowest thing published here: 163ms p95
+          # against ~30ms for everything else, and it is the page itself, not a
+          # regression. Holding it to the shared 250ms default would leave it
+          # 1.5x from alerting on a normal day, so give it its own budget
+          # rather than raising the default for all nineteen endpoints.
+          latencyObjectiveSeconds = 0.5;
           homepage = {
             name = "DSM";
             group = "Infrastructure";

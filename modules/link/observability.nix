@@ -287,6 +287,54 @@ let
   # history still inside the range.
   endpointLatencyExpr = "max by (endpoint, slo_class) (quantile_over_time(0.95, ${sloProbeDurationOk}[${observability.slo.window}:1m]) and probe_duration_seconds{${sloProbeSelector}})";
   sloWindowEligibility = "min by (endpoint, slo_class) ((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
+  # One global latency threshold fits nothing. `latencySeconds` was 1s/2s while
+  # every published endpoint answered in 22-163ms, so the alert sat 6-46x above
+  # the behaviour it was supposed to watch and could not have caught a tenfold
+  # regression on the fastest services. Publish the objective as a series
+  # instead, one per application, so each endpoint is compared against its own
+  # number and the alert expression stops embedding a constant.
+  #
+  # A recording rule's expression has to be an instant vector, so a scalar
+  # objective travels as `vector(n)` carrying the join labels statically. The
+  # rules are cheap -- 19 constants at the 1m group interval -- and the value
+  # ends up queryable, which is what lets a dashboard draw the objective beside
+  # the SLI per endpoint rather than as one flat line.
+  latencyObjectiveRule =
+    {
+      endpoint,
+      sloClass,
+      seconds,
+    }:
+    {
+      record = "endpoint:latency_objective_seconds";
+      expr = "vector(${toString seconds})";
+      labels = {
+        inherit endpoint;
+        slo_class = sloClass;
+      };
+    };
+  latencyObjectiveRules = lib.mapAttrsToList (
+    applicationName: application:
+    let
+      sloClass = sloClassFor applicationName;
+    in
+    latencyObjectiveRule {
+      endpoint = application.canonical;
+      inherit sloClass;
+      seconds =
+        if application.latencyObjectiveSeconds != null then
+          application.latencyObjectiveSeconds
+        else
+          observability.slo.latencySeconds.${sloClass};
+    }
+  ) serviceInventory.applications;
+  # The join, shared by the alert and by its promtool case so the test cannot
+  # drift from the rule it certifies. `on (endpoint, slo_class)` and not a bare
+  # comparison: the objective series carries only those two labels, while the
+  # SLI is already aggregated to exactly them.
+  sloLatencyBreachExpr =
+    sloClass:
+    ''endpoint:latency_p95_7d{slo_class="${sloClass}"} > on (endpoint, slo_class) endpoint:latency_objective_seconds'';
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
   # migration than leak transport addresses back into a host legend.
@@ -3153,8 +3201,22 @@ let
             title = "p95 latency";
             w = 12;
             h = 8;
-            expr = "max by (endpoint) (endpoint:latency_p95_7d)";
-            legend = "{{endpoint}}";
+            description = "Each endpoint against its own objective. The dashed threshold band is only the class default; the `objective` series is the number the alert actually compares against.";
+            # The threshold below is one flat line, and since the objective is
+            # now per application it is no longer the line every endpoint is
+            # held to. Draw the real objectives from the same series the alert
+            # joins on, so a reader can see which endpoint has room and which
+            # is close.
+            targets = [
+              {
+                expr = "max by (endpoint) (endpoint:latency_p95_7d)";
+                legend = "{{endpoint}}";
+              }
+              {
+                expr = "max by (endpoint) (endpoint:latency_objective_seconds)";
+                legend = "{{endpoint}} objective";
+              }
+            ];
             unit = viz.units.seconds;
             min = 0;
             custom = {
@@ -4843,6 +4905,29 @@ in
       shrinkSloWindow = builtins.replaceStrings [ "[${observability.slo.window}:1m]" ] [ "[3m:1m]" ];
       testExpr = shrinkSloWindow endpointAvailabilityExpr;
       testLatencyExpr = shrinkSloWindow endpointLatencyExpr;
+      # The registry's own objectives name real endpoints, so the test builds
+      # its own through the same helper the rules use. The shape under test is
+      # the join, not the seeded constants: one endpoint over the shared
+      # default, one under it, and one that is over the default yet inside its
+      # own larger objective -- the dsm case, and the only one that can tell a
+      # per-application comparison apart from a global one.
+      testObjectiveRules = map latencyObjectiveRule [
+        {
+          endpoint = "over.example";
+          sloClass = "internal";
+          seconds = 0.25;
+        }
+        {
+          endpoint = "under.example";
+          sloClass = "internal";
+          seconds = 0.25;
+        }
+        {
+          endpoint = "roomy.example";
+          sloClass = "internal";
+          seconds = 0.5;
+        }
+      ];
       testRules = pkgs.writeText "observability-slo-test-rules.json" (
         builtins.toJSON {
           groups = [
@@ -4858,7 +4943,8 @@ in
                   record = "endpoint:latency_p95_7d";
                   expr = testLatencyExpr;
                 }
-              ];
+              ]
+              ++ testObjectiveRules;
             }
           ];
         }
@@ -4992,6 +5078,79 @@ in
                     {
                       labels = ''endpoint:latency_p95_7d{endpoint="timeout.example",slo_class="internal"}'';
                       value = 0.05;
+                    }
+                  ];
+                }
+              ];
+            }
+            # The latency alert no longer embeds a number: it joins the SLI
+            # against a per-endpoint objective series. Three endpoints pin what
+            # the join has to do. `over.example` at 400ms against a 250ms
+            # objective must appear; `under.example` at 200ms against the same
+            # objective must not; and `roomy.example`, also at 400ms but held
+            # to 500ms of its own, must not either -- it is the one case a
+            # single global threshold could not express, and the reason the
+            # objective is a series instead of an interpolated constant.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="over.example",endpoint="over.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="over.example",endpoint="over.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="under.example",endpoint="under.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.2 0.2 0.2 0.2 0.2";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="under.example",endpoint="under.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1";
+                }
+                {
+                  series = ''probe_duration_seconds{job="blackbox-internal",instance="roomy.example",endpoint="roomy.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "0.4 0.4 0.4 0.4 0.4";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="roomy.example",endpoint="roomy.example",slo_class="internal",scope="internal",resolver="link",path="/"}'';
+                  values = "1 1 1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = sloLatencyBreachExpr "internal";
+                  eval_time = "4m";
+                  # No `__name__`: a binary comparison with `on (...)` drops the
+                  # metric name from the result, so the breach arrives as bare
+                  # join labels.
+                  exp_samples = [
+                    {
+                      labels = ''{endpoint="over.example",slo_class="internal"}'';
+                      value = 0.4;
+                    }
+                  ];
+                }
+                # The objectives themselves, so a rule that silently stopped
+                # emitting one would fail here rather than turn the join above
+                # into a quiet no-match.
+                {
+                  expr = "endpoint:latency_objective_seconds";
+                  eval_time = "4m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="over.example",slo_class="internal"}'';
+                      value = 0.25;
+                    }
+                    {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="roomy.example",slo_class="internal"}'';
+                      value = 0.5;
+                    }
+                    {
+                      labels = ''endpoint:latency_objective_seconds{endpoint="under.example",slo_class="internal"}'';
+                      value = 0.25;
                     }
                   ];
                 }
@@ -5188,6 +5347,26 @@ in
             lib.all (name: name != null && lib.hasAttr name blackboxModules) targetModules
         );
 
+      # `on (endpoint, slo_class)` drops any left-hand series with no match on
+      # the right, so an endpoint that is probed but has no objective series is
+      # not a loud failure: the alert simply can never fire for it, and the
+      # dashboard still shows a healthy green SLI. That is the same class of
+      # silent hole the per-application objective exists to close, so refuse to
+      # build rather than ship it. Derived from the probes actually configured,
+      # not from the registry the rules were generated from, so a divergence
+      # between the two is what trips it.
+      probedSloIdentities = lib.unique (
+        map (probe: {
+          inherit (probe.labels) endpoint slo_class;
+        }) internalProbes
+      );
+      objectiveSloIdentities = map (rule: {
+        inherit (rule.labels) endpoint slo_class;
+      }) latencyObjectiveRules;
+      everyProbedEndpointHasObjective = lib.all (
+        identity: lib.elem identity objectiveSloIdentities
+      ) probedSloIdentities;
+
       recordingAndAlertRules = yaml.generate "observability-rules.yaml" {
         groups = [
           {
@@ -5218,7 +5397,8 @@ in
                 record = "endpoint:latency_p95_7d";
                 expr = endpointLatencyExpr;
               }
-            ];
+            ]
+            ++ latencyObjectiveRules;
           }
           {
             name = "observability-alerts";
@@ -5319,18 +5499,24 @@ in
                 annotations.summary = "TLS certificate for {{ $labels.endpoint }} expires within 21 days";
               }
               {
+                # Both names are kept: dashboards key on `alertname`, and the
+                # internal/public split still decides who a slow endpoint is
+                # visible to. Only the threshold moves out of the expression.
+                # The summary must be templated now that no single sentence is
+                # true of every endpoint the alert covers -- "exceeds one
+                # second" was already wrong for a service held to 250ms.
                 alert = "InternalSloLatencyHigh";
-                expr = ''endpoint:latency_p95_7d{slo_class="internal"} > ${toString observability.slo.latencySeconds.internal} and on (endpoint, slo_class) ${sloWindowEligibility}'';
+                expr = "${sloLatencyBreachExpr "internal"} and on (endpoint, slo_class) ${sloWindowEligibility}";
                 for = "30m";
                 labels.severity = "warning";
-                annotations.summary = "Internal endpoint p95 latency exceeds one second";
+                annotations.summary = "Internal endpoint {{ $labels.endpoint }} p95 latency is {{ $value | humanizeDuration }}, over its objective";
               }
               {
                 alert = "PublicSloLatencyHigh";
-                expr = ''endpoint:latency_p95_7d{slo_class="public"} > ${toString observability.slo.latencySeconds.public} and on (endpoint, slo_class) ${sloWindowEligibility}'';
+                expr = "${sloLatencyBreachExpr "public"} and on (endpoint, slo_class) ${sloWindowEligibility}";
                 for = "30m";
                 labels.severity = "warning";
-                annotations.summary = "Public endpoint p95 latency exceeds two seconds";
+                annotations.summary = "Public endpoint {{ $labels.endpoint }} p95 latency is {{ $value | humanizeDuration }}, over its objective";
               }
               {
                 alert = "SloErrorBudgetExhausted";
@@ -5571,6 +5757,10 @@ in
         {
           assertion = lib.all blackboxScrapeModuleResolvable config.services.prometheus.scrapeConfigs;
           message = "Every Blackbox target must select a module defined in the exporter config; an unknown module fails every probe and reads as an outage.";
+        }
+        {
+          assertion = everyProbedEndpointHasObjective;
+          message = "Every probed endpoint needs an endpoint:latency_objective_seconds series; without one the latency alert's join drops it and that endpoint can never alert.";
         }
         {
           assertion = !telegramContactRouted;

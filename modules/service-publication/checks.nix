@@ -266,6 +266,22 @@ let
     }
   );
 
+  # The option type already rejects this, but every fixture above proves that
+  # `resolve` is reachable with attrsets the module system never saw. A
+  # non-positive objective becomes `vector(0)` in the recording rule and pins
+  # the endpoint permanently above its own SLO, so the projection rejects it
+  # too.
+  nonPositiveLatencyObjective = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          latencyObjectiveSeconds = 0;
+        };
+      };
+    }
+  );
+
   checkedInventory =
     assert lib.assertMsg (
       inventory.errors == [ ]
@@ -334,6 +350,9 @@ let
       "non-allow default Access policy validation regressed";
     assert lib.assertMsg (hasError "does not declare reachability" unreachableBackend)
       "remote backend reachability validation regressed";
+    assert lib.assertMsg
+      (hasError "latencyObjectiveSeconds must be positive" nonPositiveLatencyObjective)
+      "latency objective positivity validation regressed";
     inventory;
 in
 {
