@@ -177,6 +177,7 @@ let
   sloProbeSelector = ''job=~"blackbox-internal|blackbox-private",endpoint!=""'';
   effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and on (job, instance) (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
   endpointProbeSuccess = "min by (endpoint, slo_class) (${effectiveProbeSuccess})";
+  endpointAvailabilityExpr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and on (endpoint, slo_class) ${endpointProbeSuccess}";
   sloWindowEligibility = "min by (endpoint, slo_class) ((probe_success{${sloProbeSelector}} offset ${observability.slo.window}) or (up{${sloProbeSelector}} offset ${observability.slo.window}))";
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
@@ -4723,6 +4724,74 @@ in
 {
   flake.grafanaDashboards = dashboards;
 
+  perSystem =
+    { pkgs, ... }:
+    let
+      # Keep this small enough for promtool's in-memory test engine while
+      # preserving the transition that caused the production failure: the
+      # fallback switches from probe_success to up and back inside one range.
+      testExpr =
+        builtins.replaceStrings [ "[${observability.slo.window}:1m]" ] [ "[3m:1m]" ]
+          endpointAvailabilityExpr;
+      testRules = pkgs.writeText "observability-slo-test-rules.json" (
+        builtins.toJSON {
+          groups = [
+            {
+              name = "observability-slo-test";
+              interval = "1m";
+              rules = [
+                {
+                  record = "endpoint:availability_7d";
+                  expr = testExpr;
+                }
+              ];
+            }
+          ];
+        }
+      );
+      testSuite = pkgs.writeText "observability-slo-tests.json" (
+        builtins.toJSON {
+          rule_files = [ testRules ];
+          evaluation_interval = "1m";
+          tests = [
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="x",endpoint="x.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 _ 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="x",endpoint="x.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:availability_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:availability_7d{endpoint="x.example",slo_class="internal"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+              ];
+            }
+          ];
+        }
+      );
+    in
+    {
+      checks.prometheus-slo-rules =
+        pkgs.runCommand "prometheus-slo-rules-check" { nativeBuildInputs = [ pkgs.prometheus.cli ]; }
+          ''
+            promtool test rules ${testSuite}
+            touch "$out"
+          '';
+    };
+
   configurations.nixos.link.module =
     {
       config,
@@ -4878,7 +4947,7 @@ in
                 # `avg_over_time` drops, so any window holding both aborts the
                 # rule with "vector cannot contain metrics with the same
                 # labelset" and the whole dashboard reads NO DATA.
-                expr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and ${endpointProbeSuccess}";
+                expr = endpointAvailabilityExpr;
               }
               {
                 record = "endpoint:error_budget_remaining_7d";
