@@ -17,10 +17,10 @@
     };
     "readwise" = buildMozillaXpiAddon {
       pname = "readwise";
-      version = "3.2.7";
+      version = "3.2.8";
       addonId = "{f7619bc3-ed22-44a3-83ad-e79a78416737}";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4972305/readwise-3.2.7.xpi";
-      sha256 = "664c5b594c2f4afb9b403653287af5c1b3d324b0a59c694adaceb9d4cb7ba6ba";
+      url = "https://addons.mozilla.org/firefox/downloads/file/5002835/readwise-3.2.8.xpi";
+      sha256 = "3b17340f34db3b6f048af9e6d4cbf6b19b27091d256a5b539a407eb0951f9ddf";
       meta = with lib;
       {
         homepage = "https://readwise.io";
@@ -41,10 +41,10 @@
     };
     "tree-style-tab" = buildMozillaXpiAddon {
       pname = "tree-style-tab";
-      version = "4.4.3";
+      version = "4.4.4";
       addonId = "treestyletab@piro.sakura.ne.jp";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4985978/tree_style_tab-4.4.3.xpi";
-      sha256 = "5d4d2a7ec7e3027d8e8e4e0b3d8a0355070267fbda8c927dfaeb0fd3b7cb09c8";
+      url = "https://addons.mozilla.org/firefox/downloads/file/5000082/tree_style_tab-4.4.4.xpi";
+      sha256 = "cc1eecb91204016d44def589e9322f89c4b8c70937e142c21b8e558da2206f78";
       meta = with lib;
       {
         homepage = "http://piro.sakura.ne.jp/xul/_treestyletab.html.en";
