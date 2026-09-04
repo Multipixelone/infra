@@ -40,20 +40,18 @@ let
       max-free = 16106127360
     '';
 
-  evalFilename = "eval.yaml";
-  evalFilePath = ".github/workflows/${evalFilename}";
   buildFilename = "build.yaml";
   buildFilePath = ".github/workflows/${buildFilename}";
   nixpkgsAgeFilename = "nixpkgs-age-badge.yaml";
   nixpkgsAgeFilePath = ".github/workflows/${nixpkgsAgeFilename}";
 
-  evalWorkflowName = "Eval";
-  buildWorkflowName = "Build";
+  buildWorkflowName = "Build (aarch64)";
 
-  runner = {
-    name = "ubuntu-latest";
-    system = "x86_64-linux";
-  };
+  # Only ever hosts `get-check-names`, which evaluates the aarch64 check set
+  # (pure eval, so it does not need an ARM host). Carries no `system`: since
+  # the native matrices moved to the forge, nothing on a GitHub x86 runner
+  # builds a derivation any more.
+  runner.name = "ubuntu-latest";
 
   # Native ARM runner (free on public repos). aarch64 has no host toplevels —
   # the check set is the portable package subset (see modules/package-checks.nix).
@@ -184,23 +182,26 @@ in
       ''
         <div align="center">
 
-        [![Eval](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/${evalFilename}?branch=${defaultBranch}&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/${evalFilename}?query=branch%3A${defaultBranch})
-        [![Build](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/${buildFilename}?branch=${defaultBranch}&style=for-the-badge&logo=github&label=build&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/${buildFilename}?query=branch%3A${defaultBranch})
+        [![aarch64](https://img.shields.io/github/actions/workflow/status/${owner}/${name}/${buildFilename}?branch=${defaultBranch}&style=for-the-badge&logo=github&label=aarch64&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/${buildFilename}?query=branch%3A${defaultBranch})
         [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](${repoUrl}/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3A${defaultBranch})
 
         </div>
       '';
     github-actions = ''
-      ## Running checks on GitHub Actions
+      ## Running checks
 
-      This repository runs checks using GitHub Actions and pushes the results to an Attic cache.
+      Checks run on a self-hosted Forgejo Actions runner and push their results
+      to an Attic cache. A job is spawned for each flake check, dynamically.
 
-      For better visibility, a job is spawned for each flake check.
-      This is done dynamically.
+      GitHub Actions is kept for one thing the runner cannot do: `aarch64-linux`.
+      Every host in this repo is x86_64 and nothing here enables binfmt
+      emulation, so the portable package subset is built on GitHub's free
+      native ARM runners and stays advisory.
 
     ''
     + ''
-      See [`modules/ci.nix`](modules/ci.nix).
+      See [`modules/ci/forgejo.nix`](modules/ci/forgejo.nix) and
+      [`modules/ci.nix`](modules/ci.nix).
 
     '';
   };
@@ -210,41 +211,6 @@ in
     {
       files.file =
         [
-          {
-            path = evalFilePath;
-            drv = pkgs.writers.writeJSON "gh-actions-workflow-eval.yaml" {
-              name = evalWorkflowName;
-              on = {
-                push = { };
-                workflow_call = {
-                  outputs.${ids.outputs.jobs.getCheckNames} = {
-                    description = "JSON array of check names";
-                    value = "\${{ jobs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames} }}";
-                  };
-                };
-              };
-              jobs.${ids.jobs.getCheckNames} = {
-                runs-on = runner.name;
-                outputs.${ids.outputs.jobs.getCheckNames} =
-                  "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
-                steps = [
-                  steps.removeUnusedSoftware
-                  steps.checkout
-                  steps.createAtticNetrc
-                  steps.nixInstaller
-                  steps.installSshKey
-                  steps.loginToAttic
-                  {
-                    id = ids.steps.getCheckNames;
-                    run = ''
-                      checks="$(nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames)"
-                      echo "${ids.outputs.steps.getCheckNames}=$checks" >> $GITHUB_OUTPUT
-                    '';
-                  }
-                ];
-              };
-            };
-          }
           {
             path = buildFilePath;
             drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
@@ -256,14 +222,8 @@ in
               jobs = {
                 ${ids.jobs.getCheckNames} = {
                   runs-on = runner.name;
-                  outputs = {
-                    ${ids.outputs.jobs.getCheckNames} =
-                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNames} }}";
-                    ${ids.outputs.jobs.getCheckNamesNixos} =
-                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesNixos} }}";
-                    ${ids.outputs.jobs.getCheckNamesAarch64} =
-                      "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesAarch64} }}";
-                  };
+                  outputs.${ids.outputs.jobs.getCheckNamesAarch64} =
+                    "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesAarch64} }}";
                   steps = [
                     steps.removeUnusedSoftware
                     steps.checkout
@@ -273,76 +233,19 @@ in
                     steps.loginToAttic
                     {
                       id = ids.steps.getCheckNames;
-                      run = ci.mkCheckNamesScript {
-                        inherit (runner) system;
-                        aarch64System = aarch64Runner.system;
-                      };
-                    }
-                  ];
-                };
-
-                ${ids.jobs.check} = {
-                  # Package cells only. Several are genuinely flaky (upstream
-                  # fetchers, IFD), so they stay advisory; the host toplevels in
-                  # check-nixos are the ones allowed to turn the run red.
-                  continue-on-error = true;
-                  needs = ids.jobs.getCheckNames;
-                  runs-on = runner.name;
-                  timeout-minutes = 180;
-                  strategy = {
-                    fail-fast = false;
-                    max-parallel = 5;
-                    matrix.${matrixParam} =
-                      "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNames}) }}";
-                  };
-                  steps = [
-                    steps.nothingButNix
-                    steps.checkout
-                    steps.createAtticNetrc
-                    steps.nixInstaller
-                    steps.installSshKey
-                    steps.loginToAttic
-                    {
-                      run = mkNixFastBuild runner.system;
-                    }
-                  ];
-                };
-
-                ${ids.jobs.checkNixos} = {
-                  # No continue-on-error: a host toplevel that fails to build is
-                  # the one thing this workflow exists to catch. fail-fast below
-                  # keeps the sibling hosts running anyway, so a red cell is
-                  # per-host rather than a cancelled matrix.
-                  #
-                  # Deliberately NOT gated on the `check` job: queueing 7 host
-                  # closures behind a ~74-entry package matrix at max-parallel 5
-                  # delayed the first host cell by 3.5h and got link and zelda
-                  # cancelled at the timeout without ever reaching attic.
-                  needs = ids.jobs.getCheckNames;
-                  runs-on = runner.name;
-                  timeout-minutes = 350;
-                  strategy = {
-                    fail-fast = false;
-                    max-parallel = 5;
-                    matrix.${matrixParam} =
-                      "\${{ fromJson(needs.${ids.jobs.getCheckNames}.outputs.${ids.outputs.jobs.getCheckNamesNixos}) }}";
-                  };
-                  steps = [
-                    steps.nothingButNix
-                    steps.checkout
-                    steps.createAtticNetrc
-                    steps.nixInstaller
-                    steps.installSshKey
-                    steps.loginToAttic
-                    {
-                      run = mkNixFastBuild runner.system;
+                      # Naming the aarch64 check set from an x86 runner is fine:
+                      # this is `nix eval`, which never builds for the target.
+                      run = ci.mkCheckNamesScript { aarch64System = aarch64Runner.system; };
                     }
                   ];
                 };
 
                 ${ids.jobs.checkAarch64} = {
-                  # Same package subset as `check`, on ARM: portability
-                  # information, not a deployment gate. Stays advisory.
+                  # The portable package subset on ARM, and the only thing
+                  # GitHub Actions still builds. It is portability information
+                  # rather than a deployment gate, so it stays advisory; the
+                  # native x86_64 matrices that do gate deployment live on the
+                  # forge (modules/ci/forgejo.nix).
                   continue-on-error = true;
                   needs = ids.jobs.getCheckNames;
                   runs-on = aarch64Runner.name;
@@ -522,7 +425,6 @@ in
         |> builtins.listToAttrs;
 
       treefmt.settings.global.excludes = [
-        evalFilePath
         buildFilePath
         nixpkgsAgeFilePath
         ciFilePath

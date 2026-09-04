@@ -11,8 +11,7 @@
 
 <div align="center">
 
-[![Eval](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/eval.yaml?branch=main&style=for-the-badge&logo=github&label=eval&color=a6e3a1&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/eval.yaml?query=branch%3Amain)
-[![Build](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/build.yaml?branch=main&style=for-the-badge&logo=github&label=build&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/build.yaml?query=branch%3Amain)
+[![aarch64](https://img.shields.io/github/actions/workflow/status/Multipixelone/infra/build.yaml?branch=main&style=for-the-badge&logo=github&label=aarch64&color=89b4fa&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/build.yaml?query=branch%3Amain)
 [![nixpkgs age](https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fgist.githubusercontent.com%2FMultipixelone%2F6b2a2a693da36488ff3a34274a2047fa%2Fraw%2Fnixpkgs-age.json&logo=nixos&labelColor=313244&logoColor=cdd6f4)](https://github.com/Multipixelone/infra/actions/workflows/nixpkgs-age-badge.yaml?query=branch%3Amain)
 
 </div>
@@ -148,14 +147,18 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 This repository follows the [dendritic](https://github.com/mightyiam/dendritic) pattern with flake-parts modules auto-discovered from `modules/`.
 
 
-## Running checks on GitHub Actions
+## Running checks
 
-This repository runs checks using GitHub Actions and pushes the results to an Attic cache.
+Checks run on a self-hosted Forgejo Actions runner and push their results
+to an Attic cache. A job is spawned for each flake check, dynamically.
 
-For better visibility, a job is spawned for each flake check.
-This is done dynamically.
+GitHub Actions is kept for one thing the runner cannot do: `aarch64-linux`.
+Every host in this repo is x86_64 and nothing here enables binfmt
+emulation, so the portable package subset is built on GitHub's free
+native ARM runners and stays advisory.
 
-See [`modules/ci.nix`](modules/ci.nix).
+See [`modules/ci/forgejo.nix`](modules/ci/forgejo.nix) and
+[`modules/ci.nix`](modules/ci.nix).
 
 
 ## Generated files
@@ -168,7 +171,6 @@ using [the _files_ flake-parts module](https://github.com/mightyiam/files):
 - `.forgejo/workflows/update-lock.yaml`
 - `.github/renovate.json5`
 - `.github/workflows/build.yaml`
-- `.github/workflows/eval.yaml`
 - `.github/workflows/nixpkgs-age-badge.yaml`
 - `.github/workflows/service-publication.yaml`
 - `.gitignore`

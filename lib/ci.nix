@@ -37,8 +37,9 @@ rec {
 
   nixArgs = "--accept-flake-config";
 
-  # Splits the flake's check set into the three matrices the build workflow
-  # fans out over, on $GITHUB_OUTPUT.
+  # Emits the check-name matrices on $GITHUB_OUTPUT. Each leg is independently
+  # optional: pass `system` for the native package/NixOS split, `aarch64System`
+  # for the cross-compiled package subset, or both.
   #
   # Still jq rather than a `nix eval --apply` filter: jq is preinstalled on the
   # GitHub runners, and the self-hosted runner carries it explicitly in
@@ -46,10 +47,10 @@ rec {
   # workflows textually identical in this step.
   mkCheckNamesScript =
     {
-      system,
+      system ? null,
       aarch64System ? null,
     }:
-    ''
+    lib.optionalString (system != null) ''
       all_checks="$(nix ${nixArgs} eval --json .#checks.${system} --apply builtins.attrNames)"
       nixos_checks="$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/"))]')"
       if [ "''${{ github.event_name }}" != workflow_dispatch ]; then
@@ -58,8 +59,10 @@ rec {
       echo "${ids.outputs.steps.getCheckNames}=$(echo "$all_checks" | jq -c '[.[] | select(startswith("configurations/nixos/") | not)]')" >> $GITHUB_OUTPUT
       echo "${ids.outputs.steps.getCheckNamesNixos}=$nixos_checks" >> $GITHUB_OUTPUT
     ''
-    # Each fragment keeps its own trailing newline so the concatenation is
-    # identical whether or not the aarch64 leg is appended.
+    # Each fragment keeps its own trailing newline so any combination of the
+    # two legs concatenates identically. GitHub Actions now asks for the
+    # aarch64 leg alone (modules/ci.nix) and the forge for the native leg
+    # alone (modules/ci/forgejo.nix); nothing currently requests both.
     + lib.optionalString (aarch64System != null) ''
       aarch64_checks="$(nix ${nixArgs} eval --json .#checks.${aarch64System} --apply builtins.attrNames)"
       echo "${ids.outputs.steps.getCheckNamesAarch64}=$aarch64_checks" >> $GITHUB_OUTPUT
