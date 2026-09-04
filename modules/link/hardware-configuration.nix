@@ -28,16 +28,10 @@
 
     nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
-    swapDevices = [ { device = "/swap/swapfile"; } ];
     fileSystems = {
       "/boot/efi" = {
         device = "/dev/disk/by-uuid/9433-A195";
         fsType = "vfat";
-      };
-      "/swap" = {
-        device = "/dev/disk/by-label/Linux";
-        fsType = "btrfs";
-        options = [ "subvol=@swap" ];
       };
       "/" = {
         device = "/dev/disk/by-label/Linux";

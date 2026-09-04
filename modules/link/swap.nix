@@ -16,6 +16,9 @@
   # `btrfs filesystem mkswapfile`, which sets NODATACOW — the only shape btrfs
   # accepts a `swapon` for. The old 6 GiB file on `Linux` is left behind by
   # this change and can be deleted by hand to reclaim that space.
+  #
+  # vm.swappiness is already 10 repo-wide in modules/base.nix, which is the
+  # right value here too: this is overflow, not working memory.
   configurations.nixos.link.module = {
     fileSystems."/swap" = {
       device = "/dev/disk/by-label/4Tera";
@@ -35,9 +38,5 @@
         size = 65536; # MiB
       }
     ];
-
-    # Overflow, not working memory: keep the desktop's resident pages resident
-    # and use the 64 GiB for the bursts that were getting OOM-killed.
-    boot.kernel.sysctl."vm.swappiness" = 10;
   };
 }
