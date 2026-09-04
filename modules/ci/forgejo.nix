@@ -43,10 +43,37 @@ let
     # inputs.secrets is git+ssh://git@github.com/Multipixelone/nix-secrets.git
     # and is needed at eval time, so every `nix eval .#checks` fails without a
     # key that can read it. Same deploy key the GitHub workflows use.
+    #
+    # Done in-shell rather than with webfactory/ssh-agent, which is what the
+    # GitHub workflows use. On a host runner that action is a poor fit: it
+    # writes to ~/.ssh, and this runner's HOME is a single directory shared by
+    # every job, so two concurrent jobs (capacity = 2) race on the same
+    # known_hosts. Writing to a per-job temp directory and exporting
+    # GIT_SSH_COMMAND has no shared state, leaves no agent process behind, and
+    # drops a github.com fetch that data.forgejo.org does not mirror.
+    #
+    # GIT_SSH_COMMAND rather than an agent socket because Nix's git fetcher
+    # spawns git with a sanitized HOME; an explicit -i path is unaffected by
+    # that, and $GITHUB_ENV carries it to every later step in the job.
     installSshKey = {
       name = "Install SSH key";
-      uses = "https://github.com/webfactory/ssh-agent@v0.9.0";
-      "with".ssh-private-key = "\${{ secrets.SSH_PRIVATE_KEY }}";
+      env.SSH_PRIVATE_KEY = "\${{ secrets.SSH_PRIVATE_KEY }}";
+      run = ''
+        set -euo pipefail
+
+        dir="$(mktemp -d)"
+        chmod 700 "$dir"
+        # printf, not echo: the key must end in a newline or ssh rejects it as
+        # malformed, and a secret that already ends in one is unharmed by the
+        # extra blank line.
+        printf '%s\n' "$SSH_PRIVATE_KEY" > "$dir/id"
+        chmod 600 "$dir/id"
+
+        # Same trust-on-first-use as the action this replaces.
+        ssh-keyscan github.com > "$dir/known_hosts" 2>/dev/null
+
+        echo "GIT_SSH_COMMAND=ssh -i $dir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts" >> "$GITHUB_ENV"
+      '';
     };
 
     # link's system nix.conf carries `!include /run/agenix/nix`, which holds the

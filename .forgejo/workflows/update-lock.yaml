@@ -10,11 +10,11 @@
           }
         },
         {
+          "env": {
+            "SSH_PRIVATE_KEY": "${{ secrets.SSH_PRIVATE_KEY }}"
+          },
           "name": "Install SSH key",
-          "uses": "https://github.com/webfactory/ssh-agent@v0.9.0",
-          "with": {
-            "ssh-private-key": "${{ secrets.SSH_PRIVATE_KEY }}"
-          }
+          "run": "set -euo pipefail\n\ndir=\"$(mktemp -d)\"\nchmod 700 \"$dir\"\n# printf, not echo: the key must end in a newline or ssh rejects it as\n# malformed, and a secret that already ends in one is unharmed by the\n# extra blank line.\nprintf '%s\\n' \"$SSH_PRIVATE_KEY\" > \"$dir/id\"\nchmod 600 \"$dir/id\"\n\n# Same trust-on-first-use as the action this replaces.\nssh-keyscan github.com > \"$dir/known_hosts\" 2>/dev/null\n\necho \"GIT_SSH_COMMAND=ssh -i $dir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts\" >> \"$GITHUB_ENV\"\n"
         },
         {
           "name": "Authenticate private GitHub inputs",

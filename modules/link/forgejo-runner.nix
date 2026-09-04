@@ -88,6 +88,11 @@ in
               # Client-side, so CI builds are bounded without slowing the
               # interactive `just rebuild` path on the same machine.
               NIX_CONFIG = "max-jobs = 3\ncores = 4";
+              # Belt and braces with the unit's own HOME below: act_runner
+              # composes a job's environment rather than passing the unit's
+              # through wholesale, so the value has to be stated where the
+              # runner itself injects it.
+              HOME = "/var/lib/forgejo-runner/link";
             };
           };
           # Nix and attic are the cache. The built-in Actions cache would only
@@ -155,6 +160,14 @@ in
 
       systemd.services."forgejo-runner-link" = lib.mkIf hasRunnerSecret {
         onFailure = [ "notify-telegram@%n.service" ];
+        # DynamicUser has no home, so systemd resolves $HOME to `/`. Anything
+        # a job writes under it then lands in the read-only root: the first
+        # symptom was webfactory/ssh-agent doing `mkdir ~/.ssh` and dying with
+        # ENOENT on `//.ssh`, and `attic login` writing ~/.config would have
+        # failed the same way in the build workflow. Point HOME at the unit's
+        # own StateDirectory, which is writable and survives between jobs so
+        # the attic login is not re-done every run.
+        environment.HOME = "/var/lib/forgejo-runner/link";
         serviceConfig = {
           Slice = "ci.slice";
           Nice = 10;

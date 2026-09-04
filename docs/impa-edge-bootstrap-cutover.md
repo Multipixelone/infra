@@ -11,7 +11,7 @@ Enable automatic power-on after AC loss in firmware and disable firmware sleep w
 ## Stage 1: secret-free bootstrap
 
 1. Boot the repository installer ISO. Confirm the disk with `ls -l /dev/disk/by-id` and interface with `ip -br link`.
-2. Supply the reviewed disk path as `impa.install.diskDevice` in an installer-only module, and **commit that module** — nix drops untracked files from a dirty flake source, so an uncommitted installer module leaves `diskDevice` null and configures no Disko layout at all. Then run Disko against Impa. The layout is GPT, a 1 GiB EFI partition, and unencrypted Btrfs `@root`, `@home`, and `@nix`; it has no swap.
+2. Supply the reviewed disk path as `impa.install.diskDevice` in an installer-only module, and **commit that module** — nix drops untracked files from a dirty flake source, so an uncommitted installer module leaves `diskDevice` null and configures no Disko layout at all. Then run Disko against Impa. The layout is GPT, a 1 GiB EFI partition, and unencrypted Btrfs `@root`, `@home`, `@nix`, and `@swap`. `@swap` carries no swapfile at install time; the first boot creates the 16 GiB `/swap/swapfile` declared in `modules/impa/swap.nix`.
 3. Generate and review the Impa `nixos-facter` report and hardware configuration. Commit those facts separately, replacing the architecture-only bootstrap report. Pin the discovered NIC/MAC then if stable matching is required.
 4. Install without agenix secrets. Use `192.168.6.50/24`, gateway `192.168.6.1`, disabled IPv6, and local DNS.
 5. Boot and verify console, network, key-only SSH, Mosh, `impa.hosts.nyc.finnrut.is`, disabled sleep, and the generated SSH host public key. Never copy the private host key into Git.
