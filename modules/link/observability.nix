@@ -115,8 +115,9 @@ let
   # not "any 2xx" cannot be expressed by labelling its target. Every generated
   # internal probe shared one 2xx-only module, which permanently scored down
   # any route that answers something else by design (copyparty's `/s/` answers
-  # 403: proof that the Access bypass carried the request all the way to
-  # copyparty, where a challenge would have been a 302). The contract was in
+  # 401 or 403 depending on the client: proof that the Access bypass carried
+  # the request all the way to copyparty, where a challenge would have been a
+  # 302). The contract was in
   # the registry the whole time and simply never reached the exporter.
   #
   # Derive one module per distinct contract actually present in the registry

@@ -79,13 +79,16 @@ in
       };
       health = {
         path = "/s/";
-        # The share mountpoint itself is not listable by anonymous, so copyparty
-        # answers 403. That is the point of probing it: a 403 proves the bypass
-        # carried the request all the way to copyparty, where an Access
-        # challenge would have been a 302 to cloudflareaccess.com instead.
+        # The share mountpoint itself is not listable by anonymous. Copyparty
+        # answers 401 to blackbox_exporter's Go user agent and 403 to curl; both
+        # prove the bypass carried the request all the way to copyparty, where
+        # an Access challenge would have been a 302 to cloudflareaccess.com.
         # Probing an individual share would tie the health contract to a share
         # that can be revoked.
-        expectedStatuses = [ 403 ];
+        expectedStatuses = [
+          401
+          403
+        ];
         timeoutSeconds = 8;
       };
     };
@@ -97,7 +100,8 @@ in
         bypassJustification = "anonymous share pages load the web UI's static assets from /.cpr/, which is outside the share prefix";
       };
       health = {
-        path = "/.cpr/ui.css";
+        # Canonical packaged web asset used by copyparty's own templates.
+        path = "/.cpr/w/ui.css";
         expectedStatuses = [ 200 ];
         timeoutSeconds = 8;
       };
