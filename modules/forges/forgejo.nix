@@ -38,7 +38,7 @@ in
       };
 
       homeManager.base =
-        hmArgs:
+        hmArgs@{ pkgs, ... }:
         let
           # agenix decrypts into age.secretsDir (modules/security/secrets.nix
           # points that at ~/.secrets) at mode 0400, which is exactly what ssh
@@ -58,11 +58,45 @@ in
             IdentitiesOnly = true;
             User = "git";
           };
+
+          # One wrapper serves both MCP stdio and the human CLI. Read the raw
+          # token rather than sourcing it: the secret is not an environment file.
+          forgejoMcp = pkgs.writeShellApplication {
+            name = "forgejo-mcp";
+            text = ''
+              export FORGEJO_URL=${lib.escapeShellArg "https://${domain}"}
+              FORGEJO_ACCESS_TOKEN="$(< ${lib.escapeShellArg hmArgs.config.age.secrets."forgejo-token".path})"
+              export FORGEJO_ACCESS_TOKEN
+              exec ${lib.getExe pkgs.forgejo-mcp} "$@"
+            '';
+          };
+
+          forgejo = pkgs.writeShellApplication {
+            name = "forgejo";
+            text = ''
+              exec ${lib.getExe forgejoMcp} --cli "$@"
+            '';
+          };
         in
         {
           age.secrets =
             lib.optionalAttrs hasSshSecret { "git-ssh".file = sshSecret; }
             // lib.optionalAttrs hasTokenSecret { "forgejo-token".file = tokenSecret; };
+
+          home.packages = lib.optionals hasTokenSecret [
+            forgejoMcp
+            forgejo
+          ];
+
+          mcp-servers.settings.servers = lib.optionalAttrs hasTokenSecret {
+            forgejo = {
+              command = lib.getExe forgejoMcp;
+              args = [
+                "--transport"
+                "stdio"
+              ];
+            };
+          };
 
           # A per-host block beats the catch-all because home-manager renders
           # `Host *` last and ssh takes the first value it sees for a keyword.
