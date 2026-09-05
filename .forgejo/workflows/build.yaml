@@ -32,8 +32,12 @@
           "run": "{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n\n# Appended, not assigned: the runner unit already exports NIX_CONFIG\n# with max-jobs and cores, and a plain NIX_CONFIG= here would silently\n# drop those and let CI build at full width. Heredoc form because the\n# value is multi-line.\n{\n  echo \"NIX_CONFIG<<__NIX_CONFIG_EOF__\"\n  printf '%s\\n' \"${NIX_CONFIG:-}\"\n  echo \"access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\"\n  echo \"__NIX_CONFIG_EOF__\"\n} >> \"$GITHUB_ENV\"\n"
         },
         {
+          "name": "Configure attic",
+          "run": "set -euo pipefail\n\nif [ -n \"${RUNNER_TEMP:-}\" ]; then\n  atticConfigDir=\"$(mktemp -d \"$RUNNER_TEMP/attic-config.XXXXXX\")\"\nelse\n  atticConfigDir=\"$(mktemp -d)\"\nfi\n\n{\n  echo \"XDG_CONFIG_HOME=$atticConfigDir\"\n} >> \"$GITHUB_ENV\"\necho \"/nix/store/l0yvxii1d12kla79rq40f2q9cax9gzvf-attic/bin\" >> \"$GITHUB_PATH\"\n"
+        },
+        {
           "name": "Login to attic",
-          "run": "nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+          "run": "/nix/store/qra45q2lnx30sj2g755k29137lzmrvb3-attic-0-unstable-2026-07-06/bin/attic login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
           "name": "Seed pending statuses",

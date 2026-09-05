@@ -91,7 +91,8 @@ rec {
   # There is deliberately no `|| retry-without-attic` fallback: it fired on ANY
   # non-zero exit, so an eval error or a failed NixOS assertion was reported as
   # "Attic upload failed" and then re-run to produce the identical failure.
-  # `--retries 2` already covers the transient cache errors it was meant to.
+  # `--retries 2` retries build commands/batches, not cache transport; the
+  # Forgejo-only attic wrapper handles bounded upload retries instead.
   #
   # `--no-link` is gone: it is a deprecated no-op in nix-fast-build 2.0.2, which
   # does not create out-links by default. `--no-fold` is deliberately NOT

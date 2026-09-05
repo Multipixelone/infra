@@ -109,12 +109,6 @@ let
       '';
     };
 
-    loginToAttic = {
-      name = "Login to attic";
-      run = ''
-        nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ''${{ secrets.ATTIC_KEY }}
-      '';
-    };
   };
 
   # Every job in every workflow here needs the same three things before it can
@@ -155,6 +149,93 @@ in
 {
   perSystem =
     { pkgs, ... }:
+    let
+      # nix-fast-build shells out to `attic push --stdin` after every completed
+      # build. Serialising only that upload bounds the cache's request pressure
+      # without limiting evaluation or Nix's own build parallelism.
+      atticWrapper = pkgs.writeShellApplication {
+        name = "attic";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          realAttic="${pkgs.attic-client}/bin/attic"
+
+          stdinPush=false
+          if [[ $# -gt 0 && "$1" == "push" ]]; then
+            for arg in "$@"; do
+              if [[ "$arg" == "--stdin" ]]; then
+                stdinPush=true
+                break
+              fi
+            done
+          fi
+
+          if [[ "$stdinPush" != true ]]; then
+            exec "$realAttic" "$@"
+          fi
+
+          pathsFile="$(mktemp)"
+          trap 'rm -f "$pathsFile"' EXIT
+          cat > "$pathsFile"
+
+          atticArgs=()
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --jobs | -j)
+                if [[ $# -lt 2 ]]; then
+                  printf '%s\n' 'attic push: missing value for jobs flag' >&2
+                  exit 2
+                fi
+                shift 2
+                ;;
+              --jobs=* | -j?*)
+                shift
+                ;;
+              *)
+                atticArgs+=("$1")
+                shift
+                ;;
+            esac
+          done
+
+          for attempt in 1 2 3 4; do
+            if "$realAttic" "''${atticArgs[@]}" --jobs 1 < "$pathsFile"; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -eq 4 ]]; then
+              exit 1
+            fi
+
+            sleep "$((2 ** attempt))"
+          done
+        '';
+      };
+
+      configureAttic = {
+        name = "Configure attic";
+        run = ''
+          set -euo pipefail
+
+          if [ -n "''${RUNNER_TEMP:-}" ]; then
+            atticConfigDir="$(mktemp -d "$RUNNER_TEMP/attic-config.XXXXXX")"
+          else
+            atticConfigDir="$(mktemp -d)"
+          fi
+
+          {
+            echo "XDG_CONFIG_HOME=$atticConfigDir"
+          } >> "$GITHUB_ENV"
+          echo "${atticWrapper}/bin" >> "$GITHUB_PATH"
+        '';
+      };
+
+      loginToAttic = {
+        name = "Login to attic";
+        run = ''
+          ${pkgs.attic-client}/bin/attic login fly https://attic-cache.fly.dev ''${{ secrets.ATTIC_KEY }}
+        '';
+      };
+    in
     {
       files.file = {
         # Note there is no aarch64 job: link is x86_64 and this repo sets no
@@ -204,7 +285,8 @@ in
               FORGE_TARGET_URL = "\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_number }}";
             };
             steps = sharedPreSteps ++ [
-              steps.loginToAttic
+              configureAttic
+              loginToAttic
               {
                 name = "Seed pending statuses";
                 # One extra whole-flake `nix eval`, and worth it twice over: it
