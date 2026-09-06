@@ -44,9 +44,13 @@
         # mkPreset: merges a model and optional variant onto the matching role.
 
         models = {
-          # OpenAI Codex via ChatGPT OAuth. Spark has a separate Pro quota and
-          # is deliberately the high-volume worker; its 128k, text-only window
-          # makes it a poor orchestrator or observer despite its speed.
+          # OpenAI Codex via ChatGPT OAuth. Spark's separate Pro quota is far
+          # too small for the high-volume subagent lanes — exhausting it makes
+          # every librarian/explorer call fail over, and oh-my-opencode-slim's
+          # foreground fallback races opencode's task tool, so roughly half the
+          # swapped calls surface to the parent as "Task cancelled". Spark is
+          # therefore kept only as a late fallback. Its 128k, text-only window
+          # also makes it a poor orchestrator or observer despite its speed.
           sol = "openai/gpt-5.6-sol";
           terra = "openai/gpt-5.6-terra";
           spark = "openai/gpt-5.3-codex-spark";
@@ -129,7 +133,7 @@
         # ── Preset definitions ──────────────────────────────────────────
 
         # Terra handles the interactive coordinator and implementation lanes,
-        # Sol remains the deep-reasoning oracle, and Spark handles bounded
+        # Sol remains the deep-reasoning oracle, and Luna handles bounded
         # lookup work. Go supplies model diversity and quota-independent
         # fallbacks.
         presetGoCodex = mkPreset {
@@ -142,11 +146,11 @@
             variant = "xhigh";
           };
           librarian = {
-            model = "spark";
+            model = "luna";
             variant = "low";
           };
           explorer = {
-            model = "spark";
+            model = "luna";
             variant = "low";
           };
           designer = {
@@ -224,16 +228,16 @@
           };
           librarian = {
             model = [
-              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
               (modelVariant "low" models.deepseek-flash)
+              (modelVariant "low" models.spark)
             ];
           };
           explorer = {
             model = [
-              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
               (modelVariant "low" models.deepseek-flash)
+              (modelVariant "low" models.spark)
             ];
           };
           designer = {
