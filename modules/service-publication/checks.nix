@@ -9,6 +9,29 @@ let
   inventory = config.flake.servicePublicationInventory;
 
   hasError = needle: result: lib.any (lib.hasInfix needle) result.errors;
+  hasAccessApplicationFor =
+    application: result:
+    lib.any (entry: entry.application == application) (
+      builtins.attrValues result.cloudflare.accessApplications
+    );
+  wholeBypassAccess = {
+    policy = null;
+    serviceTokens = [ ];
+    bypassAccess = true;
+    bypassJustification = "the application owns authentication and must accept API clients without a Cloudflare Access login";
+  };
+  homeAssistantAllowedSourceCidrs = [
+    "10.100.0.0/24"
+    "192.168.3.0/24"
+    "192.168.5.0/24"
+    "192.168.6.0/24"
+    "192.168.7.0/24"
+    "192.168.8.0/24"
+  ];
+  iotFirewallCommands = config.flake.nixosConfigurations.iot.config.networking.firewall.extraCommands;
+  hasIotFirewallAccept =
+    port: cidr:
+    lib.hasInfix "--dport ${toString port} -s ${cidr} -j nixos-fw-accept" iotFirewallCommands;
 
   privateRoutePublic = publicationLib.resolve (
     registry
@@ -140,6 +163,100 @@ let
               };
             };
           };
+        };
+      };
+    }
+  );
+
+  publicBypass = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // wholeBypassAccess;
+        };
+      };
+    }
+  );
+
+  wholeBypassWithPolicy = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // (wholeBypassAccess // { policy = "finn-only"; });
+        };
+      };
+    }
+  );
+
+  wholeBypassWithServiceToken = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access =
+            registry.applications.grafana.access
+            // (wholeBypassAccess // { serviceTokens = [ "00000000-0000-0000-0000-000000000000" ]; });
+        };
+      };
+    }
+  );
+
+  wholeBypassWithRouteOverride = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
+          access = registry.applications.grafana.access // wholeBypassAccess;
+          routes = registry.applications.grafana.routes // {
+            api = registry.applications.grafana.routes.root // {
+              match.pathPrefix = "/api/";
+              access = registry.applications.grafana.routes.root.access // {
+                policy = "family";
+              };
+            };
+          };
+        };
+      };
+    }
+  );
+
+  nonPublicWholeBypass = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = false;
+          access = registry.applications.grafana.access // wholeBypassAccess;
+        };
+      };
+    }
+  );
+
+  declaredWholeBypassApplications =
+    lib.filter
+      (
+        name:
+        builtins.hasAttr name registry.applications
+        && registry.applications.${name}.public
+        && registry.applications.${name}.access.bypassAccess
+      )
+      [
+        "map"
+        "homeassistant"
+      ];
+
+  unprotectedPublicApplication = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        grafana = registry.applications.grafana // {
+          public = true;
         };
       };
     }
@@ -282,6 +399,25 @@ let
     }
   );
 
+  backendAllowedSources = publicationLib.resolve (
+    registry
+    // {
+      applications = registry.applications // {
+        homepage = registry.applications.homepage // {
+          routes.root = registry.applications.homepage.routes.root // {
+            backend = registry.applications.homepage.routes.root.backend // {
+              allowedSourceCidrs = [
+                "192.0.2.0/24"
+                "198.51.100.0/24"
+                "192.0.2.0/24"
+              ];
+            };
+          };
+        };
+      };
+    }
+  );
+
   checkedInventory =
     assert lib.assertMsg (
       inventory.errors == [ ]
@@ -306,6 +442,54 @@ let
       && innerBypass.cloudflare.accessApplications."grafana/share".access.bypassAccess
       && !innerBypass.cloudflare.accessApplications.grafana.access.bypassAccess
     ) "a bypass nested inside a protected route must resolve and keep its own Access application";
+    assert lib.assertMsg
+      (
+        publicBypass.errors == [ ]
+        && !hasAccessApplicationFor "grafana" publicBypass
+        && publicBypass.cloudflare.dnsRecords.grafana.accessDependency == null
+        && (
+          let
+            tunnelApplication = builtins.head (
+              lib.filter (application: application.key == "grafana") publicBypass.cloudflare.tunnel.applications
+            );
+          in
+          tunnelApplication.key == "grafana"
+          && tunnelApplication.accessDependency == null
+          && tunnelApplication.ingress != [ ]
+          && lib.all (ingress: ingress.accessDependency == null) tunnelApplication.ingress
+        )
+      )
+      "a valid whole-application bypass must retain DNS/Tunnel ingress without any Access application or dependency";
+    assert lib.assertMsg
+      (hasError "whole-application bypass cannot declare an Access policy" wholeBypassWithPolicy)
+      "whole-application bypass must reject an application Access policy";
+    assert lib.assertMsg
+      (hasError "whole-application bypass cannot declare Access service tokens" wholeBypassWithServiceToken)
+      "whole-application bypass must reject application Access service tokens";
+    assert lib.assertMsg
+      (hasError "whole-application bypass cannot declare route Access overrides" wholeBypassWithRouteOverride)
+      "whole-application bypass must reject route Access overrides";
+    assert lib.assertMsg
+      (hasError "whole-application bypass requires public = true" nonPublicWholeBypass)
+      "whole-application bypass must reject private applications";
+    assert lib.assertMsg
+      (lib.all (
+        application:
+        let
+          tunnelApplication = builtins.head (
+            lib.filter (candidate: candidate.key == application) inventory.cloudflare.tunnel.applications
+          );
+        in
+        builtins.hasAttr application inventory.cloudflare.dnsRecords
+        && inventory.cloudflare.dnsRecords.${application}.accessDependency == null
+        && !hasAccessApplicationFor application inventory
+        && tunnelApplication.accessDependency == null
+        && lib.all (ingress: ingress.accessDependency == null) tunnelApplication.ingress
+      ) declaredWholeBypassApplications)
+      "declared whole-application bypasses must retain DNS/Tunnel ingress without Access resources or dependencies";
+    assert lib.assertMsg
+      (hasError "public route has no known Access policy" unprotectedPublicApplication)
+      "public applications without an Access bypass must require a policy";
     assert lib.assertMsg (publicFixture.errors == [ ]) "valid public application fixture must resolve";
     assert lib.assertMsg (
       publicFixture.cloudflare.dnsRecords.grafana.accessDependency == "grafana"
@@ -353,6 +537,32 @@ let
     assert lib.assertMsg
       (hasError "latencyObjectiveSeconds must be positive" nonPositiveLatencyObjective)
       "latency objective positivity validation regressed";
+    assert lib.assertMsg (
+      backendAllowedSources.errors == [ ]
+      &&
+        backendAllowedSources.routes."homepage/root".backend.allowedSourceCidrs == [
+          "192.0.2.0/24"
+          "198.51.100.0/24"
+        ]
+    ) "backend allowed-source CIDRs must project as a stable unique list";
+    assert lib.assertMsg
+      (
+        inventory.routes."map/root".backend.allowedSourceCidrs == [ ]
+        && inventory.routes."forgejo/root".backend.allowedSourceCidrs == [ ]
+        &&
+          inventory.routes."homeassistant/root".backend.allowedSourceCidrs == homeAssistantAllowedSourceCidrs
+      )
+      "backend allowed-source CIDRs must default empty and project Home Assistant's reviewed direct clients";
+    assert lib.assertMsg
+      (
+        lib.all (cidr: hasIotFirewallAccept 8123 cidr) (
+          [ "192.168.6.50/32" ] ++ homeAssistantAllowedSourceCidrs
+        )
+        && hasIotFirewallAccept 80 "192.168.6.50/32"
+        && lib.all (cidr: !hasIotFirewallAccept 80 cidr) homeAssistantAllowedSourceCidrs
+        && !hasIotFirewallAccept 3000 "192.168.6.50/32"
+      )
+      "IoT remote-backend firewall rules must allow Home Assistant's proxy and direct clients without leaking them to other ports";
     inventory;
 in
 {
@@ -385,7 +595,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and

@@ -106,6 +106,13 @@ let
               application.access.bypassJustification;
         };
 
+      # A whole-application bypass is deliberately a declaration-level choice.
+      # A route inheriting bypassAccess is not sufficient: the application must
+      # explicitly own the public bypass contract.
+      wholeApplicationBypass = application: application.public && application.access.bypassAccess;
+
+      needsAccessApplication = access: !(access.bypassAccess && access.policy == null);
+
       mkRoute =
         applicationName: application: routeName: route:
         let
@@ -130,7 +137,11 @@ let
           route = routeName;
           inherit (application) site;
           pathPrefix = route.match.pathPrefix;
-          inherit (route) backend;
+          backend = route.backend // {
+            allowedSourceCidrs = lib.sort (left: right: left < right) (
+              lib.unique route.backend.allowedSourceCidrs
+            );
+          };
           proxy = {
             host = proxyHost;
             lanAddress = if proxyHost == null then null else hostLan proxyHost;
@@ -151,7 +162,7 @@ let
       routeList = attrValues routes;
       applicationList = lib.mapAttrsToList (applicationName: application: {
         name = applicationName;
-        inherit (application) site public;
+        inherit (application) site public access;
         canonical = canonicalFor applicationName application;
         alias = aliasFor applicationName application;
         routes = filter (route: route.application == applicationName) routeList;
@@ -220,6 +231,9 @@ let
       ) routesByProxy;
 
       publicApplications = filter (application: application.public) applicationList;
+      protectedPublicApplications = filter (
+        application: !wholeApplicationBypass application
+      ) publicApplications;
       readyPolicies = lib.filterAttrs (
         _: policy: policy.cloudflareImportKey != null && policy.include != [ ]
       ) accessPolicies;
@@ -251,7 +265,12 @@ let
         ) advancedRoutes
         ++ [ (mkAccess "" application.canonical applicationAccess) ];
 
-      accessApplications = concatMap accessApplicationFor publicApplications;
+      accessApplications = filter (accessApplication: needsAccessApplication accessApplication.access) (
+        # Whole-application bypasses have no Cloudflare Access resource at any
+        # precedence. Route-level bypasses remain in protected applications and
+        # therefore keep their base and path Access applications.
+        concatMap accessApplicationFor protectedPublicApplications
+      );
       accessApplicationsByKey = lib.listToAttrs (
         map (application: lib.nameValuePair application.key application) accessApplications
       );
@@ -261,7 +280,7 @@ let
           application:
           lib.nameValuePair application.name {
             hostname = application.canonical;
-            accessDependency = application.name;
+            accessDependency = if wholeApplicationBypass application then null else application.name;
           }
         ) publicApplications
       );
@@ -274,7 +293,7 @@ let
         {
           key = application.name;
           hostname = application.canonical;
-          accessDependency = application.name;
+          accessDependency = if wholeApplicationBypass application then null else application.name;
           ingress = map (
             route:
             if route.public then
@@ -285,7 +304,13 @@ let
                 originServerName = route.canonical;
                 httpHostHeader = route.canonical;
                 noTlsVerify = false;
-                accessDependency = application.name;
+                accessDependency =
+                  if wholeApplicationBypass application then
+                    null
+                  else if needsAccessApplication route.access then
+                    application.name
+                  else
+                    null;
               }
             else
               {
@@ -295,7 +320,7 @@ let
                 originServerName = null;
                 httpHostHeader = null;
                 noTlsVerify = false;
-                accessDependency = application.name;
+                accessDependency = if wholeApplicationBypass application then null else application.name;
               }
           ) orderedRoutes;
         }
@@ -344,8 +369,17 @@ let
         application:
         let
           original = applications.${application.name};
+          applicationBypassRequested = original.access.bypassAccess;
+          wholeBypass = wholeApplicationBypass original;
           appRoutes = application.routes;
           publicRoutes = filter (route: route.public) appRoutes;
+          routeAccessOverrides = filter (
+            route:
+            route.access.policy != null
+            || route.access.serviceTokens != [ ]
+            || route.access.bypassAccess
+            || route.access.bypassJustification != null
+          ) (attrValues original.routes);
           prefixes = map (route: route.pathPrefix) appRoutes;
           routePairs = concatMap (
             outer: map (inner: { inherit outer inner; }) (filter (inner: inner.key != outer.key) appRoutes)
@@ -384,6 +418,24 @@ let
         ++ optional (
           original.public && publicRoutes == [ ]
         ) "application ${application.name}: public application has no effective public route"
+        ++ optional (
+          applicationBypassRequested && !original.public
+        ) "application ${application.name}: whole-application bypass requires public = true"
+        ++
+          optional (applicationBypassRequested && !isNonEmpty original.access.bypassJustification)
+            "application ${application.name}: whole-application bypass requires a non-empty application justification"
+        ++ optional (
+          applicationBypassRequested && original.access.policy != null
+        ) "application ${application.name}: whole-application bypass cannot declare an Access policy"
+        ++ optional (
+          applicationBypassRequested && original.access.serviceTokens != [ ]
+        ) "application ${application.name}: whole-application bypass cannot declare Access service tokens"
+        ++ optional (
+          applicationBypassRequested && routeAccessOverrides != [ ]
+        ) "application ${application.name}: whole-application bypass cannot declare route Access overrides"
+        ++
+          optional (wholeBypass && lib.any (route: !route.access.bypassAccess) publicRoutes)
+            "application ${application.name}: whole-application bypass must bypass every effective public route"
         # Duplicates the option type on purpose. A non-positive objective would
         # be emitted as `vector(0)` and every probe would sit above it forever,
         # and `resolve` is called on hand-built fixtures that never go through
@@ -447,12 +499,17 @@ let
           ) "route ${route.key}: bypassAccess requires a non-empty justification"
           ++ optional (
             route.public
+            && !wholeBypass
             && (
-              route.access.policy == null || !(builtins.hasAttr (toString route.access.policy) accessPolicies)
+              (route.access.policy != null && !(builtins.hasAttr route.access.policy accessPolicies))
+              || (!route.access.bypassAccess && route.access.policy == null)
             )
           ) "route ${route.key}: public route has no known Access policy"
           ++ optional (
-            route.public && route.access.policy != null && !(builtins.hasAttr route.access.policy readyPolicies)
+            route.public
+            && !wholeBypass
+            && route.access.policy != null
+            && !(builtins.hasAttr route.access.policy readyPolicies)
           ) "route ${route.key}: Access policy ${toString route.access.policy} is not import-ready"
         ) appRoutes
         ++ concatMap (
@@ -552,13 +609,13 @@ let
         ++ concatMap (
           name:
           optional (
-            !(builtins.hasAttr name accessApplicationsByKey)
+            publicDns.${name}.accessDependency != null && !(builtins.hasAttr name accessApplicationsByKey)
           ) "public DNS ${name}: missing Access application dependency"
         ) (attrNames publicDns)
-        # Route validation only sees route-effective access, so an application
-        # whose own access block never names a policy still emits a base Access
-        # application. Cloudflare binds that policy as the default at the lowest
-        # precedence, so every emitted application must name a real, adopted one.
+        # Whole-application bypasses have no Access application. Cloudflare
+        # binds every other application's default policy at the lowest
+        # precedence, so every emitted application must name a real, adopted
+        # one.
         # Import-readiness only proves a policy body was read back from
         # Cloudflare, not that it protects anything: the last-precedence default
         # has to actually gate identity, or the application is open to whoever

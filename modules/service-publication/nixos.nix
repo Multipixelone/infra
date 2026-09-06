@@ -141,6 +141,14 @@ let
           remoteBackendRoutes = lib.filterAttrs (
             _: route: route.backend.host == hostName && route.proxy.host != hostName
           ) inventory.routes;
+          remoteBackendSourcesByPort = lib.mapAttrs (
+            _: routes:
+            lib.sort (left: right: left < right) (
+              lib.unique (
+                lib.concatMap (route: [ "${route.proxy.lanAddress}/32" ] ++ route.backend.allowedSourceCidrs) routes
+              )
+            )
+          ) (lib.groupBy (route: toString route.backend.port) (lib.attrValues remoteBackendRoutes));
           probeScript = pkgs.writeShellApplication {
             name = "service-publication-health-${hostName}";
             runtimeInputs = [
@@ -197,9 +205,12 @@ let
             ) allowedProxySources
             + lib.optionalString (remoteBackendRoutes != { }) "\n"
             + lib.concatMapStringsSep "\n" (
-              route:
-              "iptables -w -A nixos-service-publication -p tcp --dport ${toString route.backend.port} -s ${route.proxy.lanAddress}/32 -j nixos-fw-accept"
-            ) (lib.attrValues remoteBackendRoutes);
+              port:
+              lib.concatMapStringsSep "\n" (
+                cidr:
+                "iptables -w -A nixos-service-publication -p tcp --dport ${port} -s ${cidr} -j nixos-fw-accept"
+              ) remoteBackendSourcesByPort.${port}
+            ) (lib.attrNames remoteBackendSourcesByPort);
           connectorPackage = pkgs.cloudflared;
         in
         lib.mkMerge [

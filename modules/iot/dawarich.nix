@@ -37,10 +37,16 @@
       };
     };
 
-  # Published as map.nyc.finnrut.is (internal only). Dawarich's nginx vhost
+  # Published as map.finnrut.is. Dawarich's nginx vhost
   # listens on port 80 and proxies to the Rails process on its private port.
   servicePublication.applications.map = {
     site = "nyc";
+    public = true;
+    publicHostname = "map.finnrut.is";
+    access = {
+      bypassAccess = true;
+      bypassJustification = "Dawarich authenticates the UI and mobile ingestion uses API keys; Cloudflare Access would break background location uploads.";
+    };
     homepage = {
       name = "Dawarich";
       group = "Services";
@@ -100,12 +106,29 @@
         enable = true;
         package = pkgs.dawarich;
         configureNginx = true;
-        localDomain = "map.nyc.finnrut.is";
+        localDomain = "map.finnrut.is";
         webPort = 3000;
         automaticMigrations = true;
         database.createLocally = true;
         redis.createLocally = true;
+        environment = {
+          APPLICATION_PROTOCOL = "https";
+        };
         extraEnvFiles = [ "/var/lib/dawarich/secrets/jwt.env" ];
+      };
+
+      # Preserve the HTTPS scheme from the Impa TLS terminator through this
+      # second proxy hop instead of replacing it with iot's HTTP scheme.
+      services.nginx.virtualHosts."map.finnrut.is".locations."@proxy" = {
+        recommendedProxySettings = lib.mkForce false;
+        extraConfig = ''
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Server $hostname;
+        '';
       };
 
       services.home-assistant = {

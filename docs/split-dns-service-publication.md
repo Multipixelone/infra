@@ -364,23 +364,35 @@ inputs, logs, or committed files.
 
 ## Access policy
 
-Every public application gets a Cloudflare Access application. Its default
-binding is the existing imported Finn-only policy. An application may explicitly
-select the imported family policy instead. A route may select a stricter valid
-policy as an advanced override, but a public route without a resolvable policy
-is rejected.
+Protected public applications get a Cloudflare Access application. Its default
+binding is the existing imported Finn-only policy, unless the application
+explicitly selects the imported family policy. A route may select a stricter
+valid policy as an advanced override, but a protected public route without a
+resolvable policy is rejected.
 
-Non-interactive callers should use Cloudflare Access service tokens. Service
-token identifiers may be declared, but secrets must remain in agenix or the
-appropriate secret system and outside generated plans/state wherever the
-provider permits. `bypassAccess` is exceptional and requires a non-empty,
-reviewable `bypassJustification`. A bypass still belongs to an explicitly
-managed Access application/policy ordering; it must not be represented by
-omitting Access resources. Validation rejects an unjustified bypass.
+There are two deliberately different bypass forms:
 
-Policy precedence must be generated deterministically so an internal-only path,
-a service-token path, or a justified bypass cannot accidentally widen adjacent
-paths. The default catch-all Access policy remains last and protective.
+- A **whole-application bypass** is declared only at application scope with
+  `public = true` and `access.bypassAccess = true`. It requires a non-empty
+  application `bypassJustification`, no application Access policy or service
+  tokens, and no route-level Access overrides. It is for applications that own
+  authentication or need non-interactive clients that cannot complete Access.
+  It emits no Cloudflare Access application or binding; its public DNS record,
+  Tunnel application, and every Tunnel ingress item have `accessDependency =
+null`.
+- A **route-level bypass** is a narrow path exception inside a protected
+  application. The application must retain its default identity policy and base
+  Access application; the bypass path receives its own path-specific Access
+  application. It cannot be used to make the whole application bypassed by
+  inheritance.
+
+Non-interactive callers of protected applications should use Cloudflare Access
+service tokens. Identifiers may be declared, but secrets must remain in agenix
+or the appropriate secret system and outside generated plans/state wherever the
+provider permits. Policy precedence must be generated deterministically so an
+internal-only path, a service-token path, or a route-level bypass cannot
+accidentally widen adjacent paths. The default catch-all Access policy remains
+last and protective.
 
 ## Control-plane ownership
 
@@ -406,9 +418,10 @@ small reviewed OpenTofu module consumes that artifact or generated resources.
 The exact file boundary is an implementation detail, but hand-maintained copies
 of the registry in HCL are not acceptable.
 
-Cloudflare resource dependencies must enforce fail-closed ordering: a public
-DNS/ingress route depends on its Access application and bindings. Destruction
-uses the reverse dependency order, removing reachability before removing Access
+Cloudflare resource dependencies must enforce fail-closed ordering: a protected
+public DNS/ingress route depends on its Access application and bindings. A valid
+whole-application bypass has no Access dependency by design. Destruction uses
+the reverse dependency order, removing reachability before removing Access
 protection. Stable keys and lifecycle review must make replacement behavior
 visible in plans.
 
@@ -457,7 +470,11 @@ module must reject at least:
 - a private application with a route override that attempts public exposure;
 - a public application with no effective public route;
 - `bypassAccess = true` without a non-empty justification;
-- a public application or effective public route without a known Access policy;
+- a protected public application or effective public route without a known
+  Access policy;
+- a whole-application bypass that is private, lacks an application
+  justification, declares an application policy/service token, or has any
+  route-level Access override;
 - a route without a health check, valid expected statuses, or usable path;
 - an unknown/missing site or host, a host without its site LAN address, or a
   cross-site backend/proxy relationship not explicitly supported;
@@ -470,7 +487,8 @@ module must reject at least:
 - a public route whose connector origin lacks an HTTPS vhost and matching SAN;
 - invalid path-exposure combinations, including a public child below an
   internal-only parent or a bypass that shadows broader protected paths; and
-- generation of any Cloudflare DNS/Tunnel route without its Access dependency.
+- generation of a protected Cloudflare DNS/Tunnel route without its Access
+  dependency, or a whole-application bypass with a non-null dependency.
 
 Cross-projection assertions must also prove:
 

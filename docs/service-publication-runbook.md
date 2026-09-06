@@ -219,6 +219,11 @@ nix run .#service-publication-tofu -- import \
   'cloudflare_dns_record.public["<application-key>"]'
 ```
 
+Before the first Home Assistant apply, import
+`cloudflare_dns_record.public["homeassistant"]`. There is intentionally no
+Home Assistant Cloudflare Access application or policy import: Home Assistant
+owns authentication.
+
 The wrapper prompts without echo for each provider import ID. Supplying
 `SERVICE_PUBLICATION_IMPORT_ID` from a protected operator environment is also
 supported; do not put real IDs in shell scripts, committed tfvars, or runbooks.

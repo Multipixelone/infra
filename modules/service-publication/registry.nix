@@ -78,6 +78,11 @@ let
           default = "http";
         };
         port = mkOption { type = types.port; };
+        allowedSourceCidrs = mkOption {
+          type = types.listOf (types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+");
+          default = [ ];
+          description = "Additional source CIDRs allowed directly to this backend port; proxy reachability remains governed by reachableFromProxyHosts.";
+        };
       };
       proxy.host = mkOption {
         type = types.nullOr types.str;
@@ -498,6 +503,36 @@ in
       };
 
       applications = {
+        homeassistant = {
+          site = "nyc";
+          public = true;
+          publicHostname = "ha.finnrut.is";
+          access = {
+            bypassAccess = true;
+            bypassJustification = "Home Assistant owns authentication; Cloudflare Access would disrupt Companion, API, and webhook clients.";
+          };
+          routes.root = {
+            backend = {
+              host = "iot";
+              scheme = "http";
+              port = 8123;
+              allowedSourceCidrs = [
+                "192.168.3.0/24"
+                "192.168.5.0/24"
+                "192.168.6.0/24"
+                "192.168.7.0/24"
+                "192.168.8.0/24"
+                "10.100.0.0/24"
+              ];
+            };
+            proxy.host = "impa";
+            health = {
+              path = "/api/";
+              expectedStatuses = [ 401 ];
+              timeoutSeconds = 8;
+            };
+          };
+        };
         grafana = {
           site = "nyc";
           homepage = {
