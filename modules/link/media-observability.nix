@@ -1371,8 +1371,9 @@ in
         sonarr = 4;
         bazarr = 5;
         calibre = 6;
-        notifiarr = 7;
-        snapweb = 8;
+        romm = 7;
+        notifiarr = 8;
+        snapweb = 9;
       };
       homepageServices =
         let

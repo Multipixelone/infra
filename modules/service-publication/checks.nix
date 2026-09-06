@@ -505,6 +505,21 @@ let
           "copyparty/share"
           "forgejo"
           "grafana"
+          "romm"
+          "romm/collections"
+          "romm/config"
+          "romm/deviceAuthInit"
+          "romm/deviceAuthToken"
+          "romm/devices"
+          "romm/firmware"
+          "romm/heartbeat"
+          "romm/platforms"
+          "romm/resources"
+          "romm/roms"
+          "romm/saves"
+          "romm/sync"
+          "romm/tokenExchange"
+          "romm/usersMe"
           "seerr"
         ]
       && applicationServiceToken.cloudflare.accessApplications.grafana.domain == "grafana.apps.finnrut.is"
@@ -519,6 +534,21 @@ let
           "forgejo"
           "grafana"
           "grafana/api"
+          "romm"
+          "romm/collections"
+          "romm/config"
+          "romm/deviceAuthInit"
+          "romm/deviceAuthToken"
+          "romm/devices"
+          "romm/firmware"
+          "romm/heartbeat"
+          "romm/platforms"
+          "romm/resources"
+          "romm/roms"
+          "romm/saves"
+          "romm/sync"
+          "romm/tokenExchange"
+          "romm/usersMe"
           "seerr"
         ]
       &&
@@ -595,7 +625,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "romm", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and
