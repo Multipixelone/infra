@@ -97,7 +97,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (40)</summary>
+<summary>Packages exposed by this flake (41)</summary>
 
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
@@ -106,6 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`claude-status-line`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/status-line.nix) · `nix run github:Multipixelone/infra#claude-status-line`
 - [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
 - `convert-mpc` · `nix run github:Multipixelone/infra#convert-mpc`
+- [`dawarich-home-assistant`](https://github.com/Multipixelone/infra/blob/main/modules/iot/dawarich.nix) — Dawarich integration for Home Assistant · `nix run github:Multipixelone/infra#dawarich-home-assistant`
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
 - [`forgejo-check-status`](https://github.com/Multipixelone/infra/blob/main/modules/ci/status.nix) — Report each flake check as its own Forgejo commit status from one nix-fast-build run · `nix run github:Multipixelone/infra#forgejo-check-status`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`

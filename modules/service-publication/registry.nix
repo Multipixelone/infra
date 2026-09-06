@@ -453,6 +453,7 @@ in
           site = "nyc";
           addresses.lan = config.hosts.iot.homeAddress;
           managedByNixOS = true;
+          reachableFromProxyHosts = [ "impa" ];
         };
         marin = {
           site = "nyc";
