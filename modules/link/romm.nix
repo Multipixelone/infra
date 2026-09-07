@@ -20,7 +20,7 @@ let
   # write. See the pgDump comment below for why this is not under dataDir.
   dumpDir = "/var/backup/romm";
 
-  publicHostname = "rom.finnrut.is";
+  publicHostname = "roms.finnrut.is";
 
   backend = {
     host = "link";
@@ -286,6 +286,9 @@ in
       #   IGDB_CLIENT_ID=          IGDB_CLIENT_SECRET=      (via Twitch)
       #   MOBYGAMES_API_KEY=
       #   SCREENSCRAPER_USER=      SCREENSCRAPER_PASSWORD=
+      #   SCREENSCRAPER_DEV_ID=    SCREENSCRAPER_DEV_PASSWORD=
+      #     The nixpkgs package does not embed the official image's RomM
+      #     developer credentials; supply them through this encrypted file.
       #   STEAMGRIDDB_API_KEY=
       #   RETROACHIEVEMENTS_API_KEY=
       #   ROMM_AUTH_SECRET_KEY=    (openssl rand -hex 32)
@@ -316,7 +319,7 @@ in
 
         nginx = {
           enable = true;
-          # An internal-only server name. Naming the vhost rom.finnrut.is
+          # An internal-only server name. Naming the vhost roms.finnrut.is
           # would collide with the vhost service-publication generates for the
           # same name on this host: nginx resolves duplicate server_names by
           # silently keeping the first, which is not a failure mode worth

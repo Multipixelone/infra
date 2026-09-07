@@ -330,7 +330,7 @@
           findutils
         ];
         text = ''
-          URL="https://rom.finnrut.is"
+          URL="https://roms.finnrut.is"
           SAVES="${staging}/saves-flat"
           TOKEN_FILE="${tokenPath}"
           APPLY=0
