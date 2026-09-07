@@ -527,8 +527,8 @@ in
             };
             proxy.host = "impa";
             health = {
-              path = "/api/";
-              expectedStatuses = [ 401 ];
+              path = "/manifest.json";
+              expectedStatuses = [ 200 ];
               timeoutSeconds = 8;
             };
           };
