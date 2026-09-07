@@ -407,6 +407,17 @@
           enabled = true;
           pruneNotification = "detailed";
           pruneNotificationType = "chat";
+          # Manual mode splits DCP in two: the deterministic cleanup below
+          # (deduplication, purgeErrors) keeps running automatically, while
+          # compression only happens when asked for via /dcp-compress. DCP
+          # never compresses on its own — it nudges the model until the model
+          # decides to, and that judgement was costing more warm context than
+          # it saved. The compress block below is inert while this is on; it
+          # stays tuned so flipping back is one line.
+          manualMode = {
+            enabled = true;
+            automaticStrategies = true;
+          };
           experimental = {
             allowSubAgents = false;
             customPrompts = false;
@@ -419,10 +430,13 @@
             # Conservative fallback for models without an explicit override.
             maxContextLimit = 96000;
             minContextLimit = 64000;
-            # Sol and Terra have 1.05M context windows (922k input + 128k
-            # output), while Spark has 128k total. Prune around 75% and
-            # compress to roughly 45% for Sol/Terra; Spark needs more
-            # headroom, so compresses to 31%. Go models remain 256k-class.
+            # These are nudge thresholds, not compression targets. Below
+            # modelMinLimits DCP stays silent; at or above it turn/iteration
+            # reminders switch on; above modelMaxLimits it nudges hard every
+            # nudgeFrequency fetches. So the min is where compression pressure
+            # *starts* — keep it high or the session compresses all session.
+            # Sol and Terra have 1.05M windows (922k input + 128k output),
+            # Spark has 128k total, Go models are 256k-class.
             modelMaxLimits = {
               ${models.sol} = 780000;
               ${models.terra} = 780000;
@@ -436,22 +450,24 @@
               ${models.mimo-pro} = 192000;
             };
             modelMinLimits = {
-              ${models.sol} = 470000;
-              ${models.terra} = 470000;
-              ${models.spark} = 40000;
-              ${models.luna} = 128000;
-              ${models.kimi} = 128000;
-              ${models.deepseek-flash} = 128000;
-              ${models.glm} = 128000;
-              ${models.qwen} = 128000;
-              ${models.mimo} = 128000;
-              ${models.mimo-pro} = 128000;
+              ${models.sol} = 700000;
+              ${models.terra} = 700000;
+              ${models.spark} = 68000;
+              ${models.luna} = 160000;
+              ${models.kimi} = 160000;
+              ${models.deepseek-flash} = 160000;
+              ${models.glm} = 160000;
+              ${models.qwen} = 160000;
+              ${models.mimo} = 160000;
+              ${models.mimo-pro} = 160000;
             };
             # nudgeFrequency counts fetches between nudges above the ceiling,
-            # so higher = quieter. nudgeForce "soft" (the upstream default)
-            # makes post-user-message compression less likely than "strong".
-            nudgeFrequency = 6;
-            iterationNudgeThreshold = 16;
+            # so higher = quieter. iterationNudgeThreshold is how many messages
+            # after a user message before reminders resume, so higher is also
+            # quieter. nudgeForce "soft" (the upstream default) makes
+            # post-user-message compression less likely than "strong".
+            nudgeFrequency = 10;
+            iterationNudgeThreshold = 40;
             nudgeForce = "soft";
             protectedTools = [
               "task"
@@ -567,6 +583,11 @@
           tui = {
             scroll_speed = 1;
             scroll_acceleration.enabled = true;
+            # Cache hit rate + token breakdown in the sidebar. A TUI plugin,
+            # so it loads from tui.json and not settings.plugin — the two
+            # lists are separate loaders and a TUI plugin listed in the main
+            # one is silently ignored.
+            plugin = [ "opencode-visual-cache" ];
           };
         };
 
