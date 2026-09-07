@@ -10,12 +10,21 @@
 # to it does not follow -- which is the single most likely way to silently lose
 # access to a save in this migration. Nothing here ever deletes or moves an
 # original: every step reads one tree and writes a new one.
+{ inputs, ... }:
 {
   configurations.nixos.link.module =
-    { pkgs, ... }:
+    { config, pkgs, ... }:
     let
       staging = "/media/Data/romm-staging";
       library = "/media/Data/romm/library";
+
+      # The seed uploader authenticates with a RomM Client API Token. It lives
+      # in agenix like every other credential here rather than a dotfile in
+      # $HOME: the token carries assets.write against an instance whose /api/
+      # is reachable from the internet, so it is worth the same handling as the
+      # provider keys next to it. Owned by tunnel because the migration tools
+      # are run by hand, as the login user, not by a service.
+      tokenPath = config.age.secrets."romm-api-token".path;
 
       # igir's CSV report is a human artifact, not a machine input. Its column
       # headers are not part of any documented contract, so the rename step
@@ -123,10 +132,21 @@
           if [ "$PROMOTE" -eq 1 ]; then
             echo
             echo "==> Promoting $OUT -> ${library}/roms/"
-            # --chmod so the service (group romm, via the setgid library dirs)
-            # can rewrite what we drop in; -a alone would carry the staging
-            # tree's modes and lock RomM out of its own library.
-            rsync -a --chmod=D2770,F0660 --info=stats1 "$OUT/" "${library}/roms/"
+            # --chmod so the service can rewrite what we drop in; -a alone
+            # would carry the staging tree's modes and lock RomM out of its own
+            # library.
+            #
+            # --no-owner --no-group matter as much as the mode: -a implies -g,
+            # which preserves the staging tree's group and so OVERRIDES the
+            # setgid bit on the destination directories. Files then land
+            # tunnel:users, and with 0660 the romm uid -- which is only ever in
+            # group romm -- cannot read its own library at all. Dropping -o/-g
+            # lets setgid do what it is there for.
+            # --omit-dir-times because the platform directories are owned by
+            # romm, and only their owner may set their mtime; without it rsync
+            # exits 23 on every one of them after transferring the files fine.
+            rsync -a --no-owner --no-group --omit-dir-times \
+              --chmod=D2770,F0660 --info=stats1 "$OUT/" "${library}/roms/"
             echo "Done. Run a scan from the RomM UI."
           else
             cat <<EOF
@@ -134,7 +154,8 @@
           Nothing was written to the live library. Check $OUT, then either rerun
           with --promote or copy it yourself:
 
-            rsync -a --chmod=D2770,F0660 "$OUT/" "${library}/roms/"
+            rsync -a --no-owner --no-group --omit-dir-times \
+              --chmod=D2770,F0660 "$OUT/" "${library}/roms/"
 
           Sort $UNMATCHED into RomM platform slugs by hand before promoting it.
           EOF
@@ -311,7 +332,7 @@
         text = ''
           URL="https://rom.finnrut.is"
           SAVES="${staging}/saves-flat"
-          TOKEN_FILE="$HOME/.config/romm/api-token"
+          TOKEN_FILE="${tokenPath}"
           APPLY=0
 
           while [ $# -gt 0 ]; do
@@ -329,9 +350,9 @@
             romm-save-rename first and scan the library in RomM before this.
 
             Auth is a RomM Client API Token with the assets.write and roms.read
-            scopes (Settings -> API tokens). Put it in --token-file or the
-            ROMM_API_TOKEN environment variable. The token goes to /api/, which
-            is bypassed at the Cloudflare edge, so this works off-LAN.
+            scopes (Settings -> API tokens), read from agenix by default. The
+            token goes to /api/, which is bypassed at the Cloudflare edge, so
+            this works off-LAN.
 
             Dry run by default.
           USAGE
@@ -340,14 +361,20 @@
             esac
           done
 
-          TOKEN="''${ROMM_API_TOKEN:-}"
-          if [ -z "$TOKEN" ]; then
-            [ -r "$TOKEN_FILE" ] || {
-              echo "no token: set ROMM_API_TOKEN or write one to $TOKEN_FILE" >&2
-              exit 1
-            }
-            TOKEN="$(tr -d '\n' < "$TOKEN_FILE")"
-          fi
+          [ -r "$TOKEN_FILE" ] || {
+            cat >&2 <<EOF
+          Cannot read the RomM API token at $TOKEN_FILE
+
+          It comes from agenix. In the nix-secrets repo:
+
+            "media/romm-api-token.age".publicKeys = users ++ systems;
+            agenix -e media/romm-api-token.age    # the rmm_... token, one line
+
+          then push, and here: nix flake update secrets && colmena apply.
+          EOF
+            exit 1
+          }
+          TOKEN="$(tr -d '\n' < "$TOKEN_FILE")"
 
           [ -d "$SAVES" ] || { echo "not a directory: $SAVES" >&2; exit 1; }
 
@@ -430,6 +457,15 @@
       };
     in
     {
+      # Owner is the login user, not romm: these are hand-run migration tools,
+      # and nothing decrypts this on the service's behalf.
+      age.secrets."romm-api-token" = {
+        file = "${inputs.secrets}/media/romm-api-token.age";
+        mode = "400";
+        owner = "tunnel";
+        group = "users";
+      };
+
       environment.systemPackages = [
         romm-igir-import
         romm-save-rename
