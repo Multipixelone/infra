@@ -125,7 +125,17 @@ let
           "linux"
           "ios"
           "android"
+          "darwin"
         ];
+        description = ''
+          Which path vocabulary and delivery mechanism this client speaks.
+          "darwin" is macOS RetroArch from the Homebrew cask: it is never
+          `managed`, because nixpkgs marks retroarch-bare broken on
+          aarch64-darwin and the cask owns the app bundle, but unlike "ios" it
+          does have a command line
+          (/Applications/RetroArch.app/Contents/MacOS/RetroArch), so its
+          settings delta is deliverable as --appendconfig rather than typed in.
+        '';
       };
       managed = mkOption {
         type = types.bool;

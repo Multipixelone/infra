@@ -41,7 +41,7 @@
 # `saveSync.clients`. Each entry is:
 #
 #   managed     :: bool          nix already owns this client's retroarch.cfg
-#   platform    :: str           "linux" | "ios" | "android"
+#   platform    :: str           "linux" | "ios" | "android" | "darwin"
 #   delivery    :: str           how `settings` reaches the device:
 #                                  "nix"           -- already applied, ship nothing
 #                                  "append-config" -- writable as a file passed to
@@ -208,7 +208,7 @@ let
       delivery =
         if client.managed then
           "nix"
-        else if client.platform == "android" then
+        else if client.platform == "android" || client.platform == "darwin" then
           "append-config"
         else
           "manual";
@@ -223,6 +223,12 @@ let
             "If the RG Slide launcher passes command-line arguments through to RetroArch, ship `rendered` as a file and add `--appendconfig <path>`. Launch once and confirm the values under Settings before trusting it."
             "If it does not, merge these keys into the device's retroarch.cfg by hand, ONCE. Do not build a launcher and do not fork RetroArch for this."
             "Never put the credentials in an --appendconfig file: the launcher may back up or sync its own data directory."
+          ]
+          ++ deltaNotes
+        else if client.platform == "darwin" then
+          [
+            "Launch as `/Applications/RetroArch.app/Contents/MacOS/RetroArch --appendconfig <path> --menu`. The .app bundle is owned by the `retroarch-metal` Homebrew cask, so nix ships the delta as a file and never edits the bundle."
+            "macOS splits RetroArch's directories across TWO roots: saves and states default under ~/Documents/RetroArch, while config, playlists and downloads live under ~/Library/Application Support/RetroArch. Confirm both against Settings -> Directory before trusting the paths in this client's profile -- a wrong savefile_directory forks the save history silently, which is the failure this whole policy exists to prevent."
           ]
           ++ deltaNotes
         else

@@ -61,6 +61,11 @@ let
     linux = "_libretro.so";
     android = "_libretro_android.so";
     ios = "_libretro_ios.dylib";
+    # macOS is NOT the iOS suffix. The Apple buildbot ships desktop cores as a
+    # bare `_libretro.dylib` and only the iOS tree carries the `_ios` infix, so
+    # copying the ios value here would name a file that never exists and the
+    # Core Downloader check in the bundle README would fail against every core.
+    darwin = "_libretro.dylib";
   };
 
   # The core's RetroArch display name, taken from the policy rather than
@@ -453,6 +458,77 @@ in
               2. Every core in cores.txt appears in Core Downloader as installed.
               3. Loading the playlist entry shows the core named in manifest.tsv,
                  not DETECT.
+              4. Load the game, unload the core, and confirm the save appears on
+                 the authority under saves/<system>/.
+          '';
+
+          darwin = ''
+
+            hylia: macOS RetroArch
+            ----------------------
+            The app is the `retroarch-metal` Homebrew cask, declared in
+            modules/gaming/retroarch-darwin.nix. Nix does NOT own the bundle,
+            the cores or retroarch.cfg here: nixpkgs marks retroarch-bare
+            broken on aarch64-darwin, so there is no closure to install and
+            this client is `managed = false` for that reason and no other.
+
+            Paths span TWO roots
+            --------------------
+            macOS does not put RetroArch under one directory. Saves and states
+            default beneath ~/Documents/RetroArch, while config, playlists and
+            downloads live beneath ~/Library/Application Support/RetroArch.
+            paths.tsv reflects that split.
+
+            Confirm every row against Settings -> Directory before trusting it.
+            The rows were taken from RetroArch's documented macOS defaults, not
+            measured on this machine, and a wrong savefile_directory does not
+            raise an error -- it forks the save history silently, which is the
+            failure this whole policy exists to prevent.
+
+            Getting the data across
+            -----------------------
+            ROMs and BIOS arrive over Syncthing, receive-only, at
+            ~/Games/RomM/roms and ~/Games/RomM/bios. Both folders are declared
+            in modules/hylia/syncthing.nix and both are mirrors of link's
+            sendonly originals: deleting a ROM here to reclaim disk is local
+            only and never travels back to the Library. The two .stignore files
+            in this bundle belong to those two folders.
+
+            They live outside ~/Library/Application Support/RetroArch on
+            purpose. A receive-only folder treats any local write as a conflict
+            to revert, so its root must not be a directory RetroArch also
+            writes. system_directory points AT the synced BIOS tree instead --
+            one tree, delivered by Syncthing, read by RetroArch.
+
+            Applying the delta
+            ------------------
+            Unlike iOS, macOS RetroArch has a command line:
+
+              /Applications/RetroArch.app/Contents/MacOS/RetroArch \
+                --appendconfig <path to retroarch-delta.cfg> --menu
+
+            Launch it that way once and confirm the values under Settings.
+            Launching the app from Finder or Spotlight passes no arguments, so
+            the delta does NOT apply on an ordinary launch -- if the keys have
+            to survive every launch, merge them into retroarch.cfg by hand
+            instead, ONCE, and do not build a launcher for this.
+
+            Never put the credentials in the appendconfig file. It sits in the
+            home directory, which is exactly what a backup tool sweeps up.
+
+            Cores
+            -----
+            Install them through RetroArch's own Online Updater -> Core
+            Downloader. cores.txt names the file each one lands as; on macOS
+            that is `<core>_libretro.dylib` under
+            ~/Library/Application Support/RetroArch/cores.
+
+            Validation
+            ----------
+              1. Every path in paths.tsv exists, and matches Settings -> Directory.
+              2. Every core in cores.txt appears in Core Downloader as installed.
+              3. The two Syncthing folders show "Up to Date" and the ROM count
+                 matches the roms.stignore view.
               4. Load the game, unload the core, and confirm the save appears on
                  the authority under saves/<system>/.
           '';

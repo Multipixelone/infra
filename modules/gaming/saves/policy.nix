@@ -224,6 +224,52 @@
         };
       };
 
+      # macOS RetroArch, from the `retroarch-metal` Homebrew cask declared in
+      # modules/gaming/retroarch-darwin.nix. Unmanaged on purpose and not by
+      # omission: nixpkgs marks retroarch-bare BROKEN on aarch64-darwin, so
+      # there is no `withCores` projection to install here and the cask owns the
+      # app bundle. The cores are downloaded once through RetroArch's own Online
+      # Updater, and the validation report is what holds them to the policy.
+      #
+      # PATHS ARE THE DOCUMENTED DEFAULTS, NOT MEASURED ONES. macOS splits
+      # RetroArch across two roots -- saves/states under ~/Documents/RetroArch,
+      # everything else under ~/Library/Application Support/RetroArch -- and the
+      # split is what the Cloud Sync documentation and RetroArch's own macOS
+      # save discovery both describe. Confirm each one against Settings ->
+      # Directory after the first launch and correct it here if the build on
+      # that Mac disagrees. A wrong `saves` path does not error; it forks the
+      # save history, which is the exact failure this policy exists to prevent.
+      hylia = {
+        platform = "darwin";
+        managed = false;
+        systems = [
+          "gb"
+          "gbc"
+          "gba"
+          "nes"
+          "genesis"
+          "snes"
+          "nds"
+          "n64"
+        ];
+        paths = {
+          # The two Syncthing replicas, kept out of the app bundle's own state
+          # so the receive-only folders never fight RetroArch for a directory.
+          # modules/hylia/syncthing.nix declares both at exactly these paths.
+          roms = "~/Games/RomM/roms";
+          bios = "~/Games/RomM/bios";
+          saves = "~/Documents/RetroArch/saves";
+          states = "~/Documents/RetroArch/states";
+          playlists = "~/Library/Application Support/RetroArch/playlists";
+          config = "~/Library/Application Support/RetroArch/config";
+          # system_directory points AT the synced BIOS replica rather than the
+          # app's own system/ dir: one tree, delivered by Syncthing, read by
+          # RetroArch.
+          system = "~/Games/RomM/bios";
+          coreAssets = "~/Library/Application Support/RetroArch/downloads";
+        };
+      };
+
       # The two pilot clients carry ONE game and no whole system, which is
       # deliberately the hardest .stignore shape: a per-game inclusion from an
       # otherwise-disabled system, needing its parent directory re-included

@@ -76,10 +76,21 @@ let
     {
       options = {
         id = mkOption {
-          type = types.str;
+          type = types.nullOr types.str;
+          default = null;
           description = ''
             The device's Syncthing device ID, copied from that device's own
             "Show ID" screen. Never generated, never guessed.
+
+            `null` means DECLARED BUT NOT YET PAIRED. That is a real state, not
+            a placeholder to be tidied away: a device that has never run
+            Syncthing has no ID to copy, so the folder lists here can name it
+            before it exists. An unpaired device is filtered out of the
+            generated config entirely -- no device object, and its name is
+            dropped from every folder's device list -- so declaring one changes
+            nothing on the daemon until the ID lands. Naming an unpaired device
+            in `receivers` is the one case that fails the build, because that is
+            someone believing a dataset is being delivered when it is not.
           '';
         };
         name = mkOption {
@@ -107,6 +118,16 @@ let
   );
 
   deviceNames = builtins.attrNames cfg.devices;
+
+  # Only devices with an ID reach the daemon. Everything downstream -- the
+  # device objects, every folder's device list, the receiver set -- is built
+  # from this, so an unpaired declaration is inert by construction rather than
+  # by remembering to leave it out in three places.
+  pairedDevices = lib.filterAttrs (_: device: device.id != null) cfg.devices;
+  pairedNames = builtins.attrNames pairedDevices;
+  unpairedNames = lib.subtractLists pairedNames deviceNames;
+  onlyPaired = builtins.filter (name: pairedDevices ? ${name});
+
   libraryReceivers = lib.optionals cfg.shareDatasets cfg.receivers;
 
   # Folder id -> the devices it is shared with, by name. link itself is never
@@ -188,6 +209,9 @@ let
   };
 
   referencedDevices = lib.unique (lib.concatLists (builtins.attrValues folderShares));
+
+  # What actually gets written, per folder.
+  sharesOf = id: onlyPaired folderShares.${id};
 in
 {
   options.saveSync.syncthing = {
@@ -252,6 +276,18 @@ in
       finn-router.id = "I5BYRFS-6ROFYD3-NRFJBMC-NE6653P-47I64WI-3XAX2ER-OIBYALN-3T6USAN";
       link-win.id = "AW3NGYJ-KMR7OKW-JYXYRXG-I4UTF3L-HBDO7BC-KRZCMPU-W7GXXIU-KRPJSAK";
       steamdeck.id = "F2M3MJV-FYNRHJM-YRQWG6G-XN6DLFI-AJZGE7F-VTJRMK6-DAHLJ2F-FL7RBAW";
+
+      # hylia is the nix-darwin MacBook, and it is NOT the device already
+      # paired as "Macbook Pro" (7UEQILL...), which is a different machine.
+      # Its Syncthing has never run, so it has no ID to copy yet: hylia's own
+      # side is declared in modules/hylia/syncthing.nix and names link (whose
+      # ID has always been known), so the first `darwin-rebuild switch` there
+      # generates the identity and offers the connection to link.
+      #
+      # To finish the pairing: read the ID off hylia
+      #   syncthing --device-id            # or the GUI, Actions -> Show ID
+      # set it here, and add "hylia" to `receivers` below in the same edit.
+      hylia.id = null;
     };
 
     shareDatasets = true;
@@ -287,8 +323,8 @@ in
         }
         {
           assertion = lib.all (
-            name: builtins.match deviceIdPattern cfg.devices.${name}.id != null
-          ) deviceNames;
+            name: builtins.match deviceIdPattern pairedDevices.${name}.id != null
+          ) pairedNames;
           message = ''
             saveSync.syncthing.devices has an entry whose id is not a Syncthing device ID.
 
@@ -297,6 +333,24 @@ in
 
             Read it off the device itself (Syncthing -> Actions -> Show ID). Do
             not shorten it and do not paste the device name.
+          '';
+        }
+        {
+          assertion = lib.all (name: pairedDevices ? ${name}) cfg.receivers;
+          message = ''
+            saveSync.syncthing.receivers names a device that has no Syncthing
+            device ID yet: ${
+              lib.concatStringsSep ", " (builtins.filter (n: !(pairedDevices ? ${n})) cfg.receivers)
+            }
+
+            An unpaired device receives nothing, so listing it here would claim
+            a dataset is being delivered when no such device exists on the
+            daemon. Either pair it and set its id in
+            saveSync.syncthing.devices, or take it out of receivers.
+
+            Currently declared but unpaired: ${
+              if unpairedNames == [ ] then "(none)" else lib.concatStringsSep ", " unpairedNames
+            }
           '';
         }
         {
@@ -377,8 +431,10 @@ in
 
         settings = {
           devices = lib.mapAttrs (_: device: {
-            inherit (device) id name introducer;
-          }) cfg.devices;
+            inherit (device) name introducer;
+            # Non-null by construction: pairedDevices is filtered on exactly this.
+            inherit (device) id;
+          }) pairedDevices;
 
           # IDs are the permanent identity every receiver must match; labels are
           # cosmetic and may be renamed freely. Paths are reproduced exactly as
@@ -397,14 +453,14 @@ in
               label = "RomM Library ROMs (one-way)";
               path = romsPath;
               type = "sendonly";
-              devices = folderShares."romm-library-roms";
+              devices = sharesOf "romm-library-roms";
             };
             "romm-library-bios" = {
               id = "romm-library-bios";
               label = "RomM Library BIOS (one-way)";
               path = biosPath;
               type = "sendonly";
-              devices = folderShares."romm-library-bios";
+              devices = sharesOf "romm-library-bios";
             };
 
             # -- Retired RetroArch trees --------------------------------------
@@ -412,14 +468,14 @@ in
               id = "3m6rp-ypawu";
               label = "roms";
               path = "/home/${username}/.config/retroarch/roms";
-              devices = folderShares."3m6rp-ypawu";
+              devices = sharesOf "3m6rp-ypawu";
             };
             "mujrf-sx6dp" = {
               id = "mujrf-sx6dp";
               label = "saves";
               path = "~/.config/retroarch/saves";
               type = "sendonly";
-              devices = folderShares."mujrf-sx6dp";
+              devices = sharesOf "mujrf-sx6dp";
               # Six months of staggered history. This is the only pre-WebDAV
               # copy of some saves, so it is reproduced exactly rather than
               # allowed to fall back to the no-versioning default.
@@ -435,25 +491,25 @@ in
               label = "Music";
               path = "/media/Data/Music";
               type = "sendonly";
-              devices = folderShares."4bvms-ufujg";
+              devices = sharesOf "4bvms-ufujg";
             };
             "transcoded-music" = {
               id = "transcoded-music";
               label = "Transcoded-Music";
               path = "/media/Data/TranscodedMusic";
-              devices = folderShares."transcoded-music";
+              devices = sharesOf "transcoded-music";
             };
             "playlists" = {
               id = "playlists";
               label = "Playlists";
               path = "/media/Data/Playlists";
-              devices = folderShares."playlists";
+              devices = sharesOf "playlists";
             };
             "singing" = {
               id = "singing";
               label = "Singing";
               path = "~/Music/Singing";
-              devices = folderShares."singing";
+              devices = sharesOf "singing";
             };
 
             # -- Games --------------------------------------------------------
@@ -461,31 +517,31 @@ in
               id = "multimc";
               label = "Prism Launcher";
               path = "/home/${username}/.local/share/PrismLauncher/instances/";
-              devices = folderShares."multimc";
+              devices = sharesOf "multimc";
             };
             "multimc-icons" = {
               id = "multimc-icons";
               label = "Prism Launcher Icons";
               path = "/home/${username}/.local/share/PrismLauncher/icons/";
-              devices = folderShares."multimc-icons";
+              devices = sharesOf "multimc-icons";
             };
             "sakft-erofr" = {
               id = "sakft-erofr";
               label = "ShipOfHarkinian";
               path = "/media/BigData/Games/ShipOfHarkinian/";
-              devices = folderShares."sakft-erofr";
+              devices = sharesOf "sakft-erofr";
             };
             "vintage-story" = {
               id = "vintage-story";
               label = "Vintage Story Saves";
               path = "/home/${username}/.config/VintagestoryData/Saves";
-              devices = folderShares."vintage-story";
+              devices = sharesOf "vintage-story";
             };
             "tvhrc-cfaky" = {
               id = "tvhrc-cfaky";
               label = "Steam Assets";
               path = "/home/${username}/.local/share/Steam/userdata/122579086/config/grid";
-              devices = folderShares."tvhrc-cfaky";
+              devices = sharesOf "tvhrc-cfaky";
             };
 
             # -- Everything else ----------------------------------------------
@@ -493,13 +549,13 @@ in
               id = "qgis";
               label = "qgis";
               path = "~/qgis";
-              devices = folderShares."qgis";
+              devices = sharesOf "qgis";
             };
             "screenshots" = {
               id = "screenshots";
               label = "screenshots";
               path = "~/Pictures/Screenshots";
-              devices = folderShares."screenshots";
+              devices = sharesOf "screenshots";
             };
           };
         };
