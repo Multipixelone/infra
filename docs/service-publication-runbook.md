@@ -270,7 +270,10 @@ its approval prompt, and both plan paths print the same list as a warning.
 routes it withdraws in `SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS`
 (comma- or space-separated), so a registry-modelled unpublish still applies.
 Set that variable by hand only for a reviewed removal of ingress the registry
-never modelled.
+never modelled -- a hostname left live in Cloudflare by a canonical rename is
+gone from both sides of the registry diff, so the deploy cannot derive it. A
+value set in the environment is added to the derived set, not substituted for
+it, so every unnamed removal is still refused.
 
 Only after the adoption plan is accepted, change
 `servicePublication.cloudflare.adoptionComplete` to `true`. Then run

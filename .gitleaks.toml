@@ -15,5 +15,10 @@ description = "Cloudflare Access policy identifiers in the publication registry"
 regexTarget = "match"
 regexes = ['cloudflareImportKey"?[ =:]+"[0-9a-f-]{36}"']
 
+[[allowlists]]
+description = "RetroArch's public Discord Rich Presence application id"
+regexTarget = "line"
+regexes = ['discord_app_id"?[ =:]+"[0-9]{17,20}"']
+
 [extend]
 useDefault = true

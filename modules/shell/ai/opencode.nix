@@ -414,6 +414,13 @@
           # decides to, and that judgement was costing more warm context than
           # it saved. The compress block below is inert while this is on; it
           # stays tuned so flipping back is one line.
+          #
+          # This is only a *default*: DCP persists a per-session manualMode
+          # boolean in ~/.local/share/opencode/storage/plugin/dcp/<session>.json
+          # and `persisted ?? default` means an existing session keeps whatever
+          # it was created with. Flipping this option leaves every already-open
+          # session compressing on its own; patch the key in those state files
+          # (it is re-read every request) or start a new session.
           manualMode = {
             enabled = true;
             automaticStrategies = true;

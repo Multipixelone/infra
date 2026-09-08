@@ -460,7 +460,7 @@
       # Owner is the login user, not romm: these are hand-run migration tools,
       # and nothing decrypts this on the service's behalf.
       age.secrets."romm-api-token" = {
-        file = "${inputs.secrets}/media/romm-api-token.age";
+        file = "${inputs.secrets}/games/romm-api-token.age";
         mode = "400";
         owner = "tunnel";
         group = "users";

@@ -1,3 +1,7 @@
+---
+Status: superseded by ADR-0002
+---
+
 # RomM is the save hub; Syncthing is retired for saves and ROMs
 
 Save files used to live in a Syncthing folder fanned out to eight devices, sent

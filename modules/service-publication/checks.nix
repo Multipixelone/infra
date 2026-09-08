@@ -249,6 +249,7 @@ let
       [
         "map"
         "homeassistant"
+        "saves"
       ];
 
   unprotectedPublicApplication = publicationLib.resolve (
@@ -625,7 +626,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "romm", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "romm", "saves", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and

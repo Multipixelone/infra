@@ -67,6 +67,12 @@ Task execution is managed via `just`.
 | `just deploy-services [mode] [routes]` | Fail-closed split-DNS and service publication deployment. |
 | `just services-smoke [context] [routes]` | Smoke-test published service routes from a given network context. |
 | `just services-tofu [action]` | Run the service publication OpenTofu workspace. |
+| `just saves-bundle <client> <core_dir> [extra]` | See Justfile recipe. |
+| `just saves-credential <client>` | See Justfile recipe. |
+| `just saves-plan [extra]` | See Justfile recipe. |
+| `just saves-archive [extra]` | See Justfile recipe. |
+| `just saves-select [extra]` | See Justfile recipe. |
+| `just saves-seed <credential> [extra]` | See Justfile recipe. |
 | `just fastb` | Fast build with `nix-fast-build` and Attic cache upload. |
 | `just hm-build <host>` | Build a standalone Home Manager activation package locally. |
 | `just hm-deploy <host> [remote_nix_bindir]` | Build, copy and activate a Home Manager closure over SSH. |
@@ -97,7 +103,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (41)</summary>
+<summary>Packages exposed by this flake (59)</summary>
 
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
@@ -127,6 +133,24 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`
 - [`ralph-wiggum-plugin`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/claude.nix) — Ralph Wiggum loop plugin for Claude Code — self-referential agentic loops · `nix run github:Multipixelone/infra#ralph-wiggum-plugin`
 - [`rb-albumart`](https://github.com/Multipixelone/infra/blob/main/modules/media/rockbox.nix) · `nix run github:Multipixelone/infra#rb-albumart`
+- [`retroarch-bundle-generate`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Generate one client's RetroArch save-sync bundle from the Core policy · `nix run github:Multipixelone/infra#retroarch-bundle-generate`
+- [`retroarch-config-diff`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/retroarch-config.nix) — Diff the generated RetroArch configuration against the live one, key by key, without printing credential values · `nix run github:Multipixelone/infra#retroarch-config-diff`
+- [`retroarch-config-import`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/retroarch-config.nix) — Emit the live RetroArch settings as a secret-free Nix attrset for saveSync.retroarch.baseSettings · `nix run github:Multipixelone/infra#retroarch-config-import`
+- [`retroarch-config-scan`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/retroarch-config.nix) — Report which RetroArch settings hold credentials, by key name only, never printing a value · `nix run github:Multipixelone/infra#retroarch-config-scan`
+- [`retroarch-config-snapshot`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/retroarch-config.nix) — Copy the live RetroArch configuration to a timestamped mode-0600 work directory outside git and outside the nix store · `nix run github:Multipixelone/infra#retroarch-config-snapshot`
+- [`retroarch-credential-stage`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Decrypt exactly one client's WebDAV credential into a marked file under XDG_RUNTIME_DIR · `nix run github:Multipixelone/infra#retroarch-credential-stage`
+- [`retroarch-save-archive`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Archive and hash every file in the live RetroArch save tree before it is touched · `nix run github:Multipixelone/infra#retroarch-save-archive`
+- [`retroarch-save-plan`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Ordered save-migration plan with every precondition checked against the live host · `nix run github:Multipixelone/infra#retroarch-save-plan`
+- [`retroarch-save-seed`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Seed an empty WebDAV save authority from the selected tree and read every file back · `nix run github:Multipixelone/infra#retroarch-save-seed`
+- [`retroarch-save-select`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Classify the live save tree and map core-name sorting onto content-directory sorting · `nix run github:Multipixelone/infra#retroarch-save-select`
+- [`retroarch-saves-export`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Export raw RetroArch saves for migration to a future replacement · `nix run github:Multipixelone/infra#retroarch-saves-export`
+- [`retroarch-saves-inspect`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Compare RetroArch save candidates by size and hash only · `nix run github:Multipixelone/infra#retroarch-saves-inspect`
+- [`retroarch-saves-preflight`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Assert the save subvolume and snapshot directory exist as declared · `nix run github:Multipixelone/infra#retroarch-saves-preflight`
+- [`retroarch-saves-promote`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Deliberately reseed the live RetroArch save namespace from a candidate · `nix run github:Multipixelone/infra#retroarch-saves-promote`
+- [`retroarch-saves-quarantine`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Restore a RetroArch save snapshot into the quarantine namespace · `nix run github:Multipixelone/infra#retroarch-saves-quarantine`
+- [`retroarch-saves-secret-scan`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/checks.nix) — Refuses a generated save-sync artifact that names a credential-bearing RetroArch key, carries a non-empty webdav_password, or contains a high-entropy token. · `nix run github:Multipixelone/infra#retroarch-saves-secret-scan`
+- [`retroarch-saves-snapshot-select`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Resolve the newest completed read-only RetroArch save snapshot · `nix run github:Multipixelone/infra#retroarch-saves-snapshot-select`
+- [`retroarch-saves-versions`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — List retained RetroArch save versions, local snapshots and offsite · `nix run github:Multipixelone/infra#retroarch-saves-versions`
 - [`rtk-rewrite`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/rtk-rewrite.nix) · `nix run github:Multipixelone/infra#rtk-rewrite`
 - [`screenshot-area`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area`
 - [`screenshot-area-ocr`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area-ocr`

@@ -133,6 +133,8 @@ result-*
 /.pre-commit-config.yaml
 /result
 /result.*
+/retroarch-save-bundles/
+/retroarch-save-migration/
 backend.hcl
 crash.*.log
 crash.log

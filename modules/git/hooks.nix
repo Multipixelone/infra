@@ -45,6 +45,24 @@
             regexTarget = "match";
             regexes = [ "cloudflareImportKey\"?[ =:]+\"[0-9a-f-]{36}\"" ];
           }
+          {
+            # RetroArch's OWN Discord Rich Presence application id, compiled in
+            # as DEFAULT_DISCORD_APP_ID and written back into every
+            # retroarch.cfg whether or not Discord is enabled -- the live file
+            # on link carries it beside `discord_allow = "false"`, which is what
+            # proves it was never operator-entered. It arrives here because
+            # saveSync.retroarch.baseSettings is an import of that file.
+            #
+            # A Discord client id is public by construction: it is the first
+            # thing in every OAuth authorize URL. gitleaks' stock
+            # discord-client-id rule cannot tell a client id from a client
+            # SECRET, so it is matched narrowly on the RetroArch key name rather
+            # than by allowlisting the digits, which would also silence a real
+            # Discord credential if one ever landed in this tree.
+            description = "RetroArch's public Discord Rich Presence application id";
+            regexTarget = "line";
+            regexes = [ "discord_app_id\"?[ =:]+\"[0-9]{17,20}\"" ];
+          }
         ];
         extend.useDefault = true;
       };

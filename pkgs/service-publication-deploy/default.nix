@@ -176,13 +176,25 @@ writeShellApplication {
     fi
     # The tofu wrapper refuses any Tunnel ingress removal it was not told to expect;
     # the withdrawn public routes of this deploy are exactly the reviewed exception.
+    # An operator can name further hostnames in the environment, per the runbook,
+    # for a removal the registry cannot model: a hostname left live in Cloudflare
+    # by a canonical rename is absent from both sides of the registry diff, so
+    # nothing derivable here would ever produce it. Those names are added to the
+    # derived set rather than replacing it, so every other removal stays refused.
+    operator_ingress_removals=''${SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS:-}
     SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS=$(jq -rn \
       --argjson old "$previous_public" \
       --argjson new "$current_public" \
-      --argjson canonical "$previous_canonical" '
-      [($old - $new)[] | $canonical[split("/")[0]] // empty] | unique | join(",")
+      --argjson canonical "$previous_canonical" \
+      --arg operator "$operator_ingress_removals" '
+      [($old - $new)[] | $canonical[split("/")[0]] // empty]
+      + ($operator | split("[,[:space:]]+"; null) | map(select(. != "")))
+      | unique | join(",")
     ')
     export SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS
+    if [[ -n $operator_ingress_removals ]]; then
+      echo "SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS names ingress the registry does not model; this deploy allows removing: $SERVICE_PUBLICATION_EXPECTED_INGRESS_REMOVALS" >&2
+    fi
     origin_moves=$(jq -n --argjson old "$previous_origins" --argjson new "$current_origins" '
       [$old | keys[] as $key | select($new[$key] != null and $new[$key] != $old[$key])] | length
     ')

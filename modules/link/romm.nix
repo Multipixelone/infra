@@ -293,7 +293,7 @@ in
       #   RETROACHIEVEMENTS_API_KEY=
       #   ROMM_AUTH_SECRET_KEY=    (openssl rand -hex 32)
       age.secrets."romm" = {
-        file = "${inputs.secrets}/media/romm.age";
+        file = "${inputs.secrets}/games/romm.age";
         mode = "400";
         owner = "romm";
         group = "romm";

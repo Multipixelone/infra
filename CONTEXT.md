@@ -19,30 +19,56 @@ _Avoid_: saves folder, user data
 
 **Save file**:
 The in-game save the emulated game itself writes (`.srm`, `.sav`, `.mcr`, …).
-Interchangeable across cores of the same platform, and the only thing that
-syncs between devices.
+It is the only recovery-critical game progress shared between sync clients;
+compatibility across different cores is not assumed.
 _Avoid_: save, savegame, SRAM
 
 **Save state**:
-A snapshot of the whole emulator at one moment. Core- and build-specific, never
-synced, and local to the machine that wrote it.
+A snapshot of the whole emulator at one moment. It is core- and build-specific
+and may be carried by Cloud Sync because save files and save states cannot be
+selected separately. It is optional rather than recovery-critical or portable;
+durable progress must use save files.
 _Avoid_: save, snapshot
 
-**Hub**:
-RomM, as the single source of truth every client reads from and writes back to.
-Clients hold copies; the hub holds the history.
-_Avoid_: server, master
+**ROM authority**:
+The canonical ROM collection owned by RomM. Distributed copies may be
+one-way replicas, but changes to them never flow back into the Library.
+_Avoid_: hub, master, ROM folder
 
-**Device**:
-An endpoint registered with RomM and bound to a Client API Token, so the sync
-orchestrator can attribute a save to whatever wrote it. The RG35XXSP is one;
-`link` and `zelda` are not, because desktop RetroArch does not sync.
-_Avoid_: client, machine, host
+**Content identity**:
+The stable Library-relative path and filename stem assigned after RomM imports,
+tags and renames a ROM. Save files, playlists and per-game Core-policy exceptions
+refer to that identity; changing it requires an explicit migration.
+_Avoid_: ROM ID, game name, current filename
+
+**Save authority**:
+The sole canonical save-file history from which every sync client reads and to
+which it writes. It is deliberately separate from the ROM authority.
+_Avoid_: hub, master, saves folder
+
+**Sync client**:
+A RetroArch installation, or another implementation proven compatible with
+its cloud-sync protocol, that participates in the save authority. Generic
+WebDAV access alone does not qualify.
+_Avoid_: device, machine, host
+
+**Client profile**:
+The centrally declared projection of the Library assigned to one sync client:
+complete emulated systems plus explicit per-game inclusions and exclusions,
+together with that client's local paths and Core-policy associations.
+Contradictory selections are invalid.
+_Avoid_: device config, ROM subset, ignore list
+
+**Core policy**:
+The canonical mapping from each emulated system to its default RetroArch core,
+plus explicit per-game exceptions. Sync clients derive local core associations
+from it; a client that lacks the prescribed core must offer to install it or
+fail rather than silently substitute another core.
+_Avoid_: emulator choice, core preference, default emulator
 
 **Seed**:
-The one-time import of pre-existing save files into an empty RomM, over the
-API, after the ROM library has been imported and renamed. Distinct from sync,
-which is continuous and bidirectional.
+The one-time introduction of one verified save file per game into an empty save
+authority. Distinct from sync, which is continuous and bidirectional.
 _Avoid_: migration, initial sync
 
 **Origin**:

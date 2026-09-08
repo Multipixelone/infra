@@ -55,6 +55,42 @@ services-smoke context="lan" routes="":
 services-tofu action="plan":
   nix run .#service-publication-tofu -- "{{action}}"
 
+# RetroArch save authority. Bundles and migration working trees are written
+# under $XDG_STATE_HOME, never into the checkout, and nothing they produce is
+# committed. `extra` is unquoted on purpose: these tools take flags, and a
+# quoted empty default would arrive as an empty argument and be rejected.
+
+# core_dir is the device's own RetroArch core directory (Settings -> Directory
+# -> Cores). It has no default because a playlist entry stores an absolute
+# core path, and that path differs on every client.
+[doc("Generate a RetroArch save-sync bundle for one client.")]
+saves-bundle client core_dir extra="":
+  nix run .#retroarch-bundle-generate -- --client "{{client}}" --core-dir "{{core_dir}}" {{extra}}
+
+# Decrypts exactly one client's WebDAV credential into $XDG_RUNTIME_DIR at
+# mode 0600 and prints only the path. Delete the staging copy afterwards.
+[doc("Stage one client's save-authority credential.")]
+saves-credential client:
+  nix run .#retroarch-credential-stage -- --client "{{client}}"
+
+[doc("Show the save migration plan and what is blocking each step.")]
+saves-plan extra="":
+  nix run .#retroarch-save-plan -- {{extra}}
+
+# Every step below is a dry run until --apply, and none of them ever moves or
+# deletes an original: they read one tree and write another.
+[doc("Archive and hash the live save tree. Pass --apply to write it.")]
+saves-archive extra="":
+  nix run .#retroarch-save-archive -- {{extra}}
+
+[doc("Map core-name-sorted saves onto the content-directory layout. Pass --apply.")]
+saves-select extra="":
+  nix run .#retroarch-save-select -- {{extra}}
+
+[doc("Seed the empty save authority from the selected tree. Pass --apply.")]
+saves-seed credential extra="":
+  nix run .#retroarch-save-seed -- --credential-file "{{credential}}" {{extra}}
+
 fastb:
   nix-fast-build --attic-cache system --no-link
 
