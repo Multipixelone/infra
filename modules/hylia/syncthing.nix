@@ -40,9 +40,7 @@ let
   # Declared beats introduced whenever nix owns the file.
   syncthing = config.saveSync.syncthing;
   meshNames = lib.subtractLists [ "hylia" ] ([ "link" ] ++ syncthing.receivers);
-  meshDevices = lib.filterAttrs (
-    name: device: builtins.elem name meshNames && device.id != null
-  ) syncthing.devices;
+  meshDevices = lib.filterAttrs (name: _: builtins.elem name meshNames) syncthing.devices;
   peerNames = builtins.attrNames meshDevices;
 in
 {

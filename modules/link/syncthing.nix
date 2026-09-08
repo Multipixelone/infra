@@ -76,23 +76,14 @@ let
     {
       options = {
         id = mkOption {
-          type = types.nullOr types.str;
-          default = null;
+          type = types.str;
           description = ''
             The device's Syncthing device ID, copied from that device's own
-            "Show ID" screen. Never generated, never guessed.
-
-            `null` means DECLARED BUT NOT YET PAIRED. That is a real state, not
-            a placeholder to be tidied away: a device that has never run
-            Syncthing has no ID to copy, so the folder lists here can name it
-            before it exists. An unpaired device is filtered out of the
-            generated config entirely -- no device object, and its name is
-            dropped from every folder's device list -- so declaring one changes
-            nothing on the daemon until the ID lands. Naming an unpaired device
-            in `receivers` is the one case that fails the build, because that is
-            someone believing a dataset is being delivered when it is not.
+            "Show ID" screen. Never generated, never guessed -- so a device
+            gets declared here only once it has actually run Syncthing.
           '';
         };
+
         name = mkOption {
           type = types.str;
           default = name;
@@ -118,15 +109,6 @@ let
   );
 
   deviceNames = builtins.attrNames cfg.devices;
-
-  # Only devices with an ID reach the daemon. Everything downstream -- the
-  # device objects, every folder's device list, the receiver set -- is built
-  # from this, so an unpaired declaration is inert by construction rather than
-  # by remembering to leave it out in three places.
-  pairedDevices = lib.filterAttrs (_: device: device.id != null) cfg.devices;
-  pairedNames = builtins.attrNames pairedDevices;
-  unpairedNames = lib.subtractLists pairedNames deviceNames;
-  onlyPaired = builtins.filter (name: pairedDevices ? ${name});
 
   libraryReceivers = lib.optionals cfg.shareDatasets cfg.receivers;
 
@@ -209,9 +191,6 @@ let
   };
 
   referencedDevices = lib.unique (lib.concatLists (builtins.attrValues folderShares));
-
-  # What actually gets written, per folder.
-  sharesOf = id: onlyPaired folderShares.${id};
 in
 {
   options.saveSync.syncthing = {
@@ -344,8 +323,8 @@ in
         }
         {
           assertion = lib.all (
-            name: builtins.match deviceIdPattern pairedDevices.${name}.id != null
-          ) pairedNames;
+            name: builtins.match deviceIdPattern cfg.devices.${name}.id != null
+          ) deviceNames;
           message = ''
             saveSync.syncthing.devices has an entry whose id is not a Syncthing device ID.
 
@@ -354,24 +333,6 @@ in
 
             Read it off the device itself (Syncthing -> Actions -> Show ID). Do
             not shorten it and do not paste the device name.
-          '';
-        }
-        {
-          assertion = lib.all (name: pairedDevices ? ${name}) cfg.receivers;
-          message = ''
-            saveSync.syncthing.receivers names a device that has no Syncthing
-            device ID yet: ${
-              lib.concatStringsSep ", " (builtins.filter (n: !(pairedDevices ? ${n})) cfg.receivers)
-            }
-
-            An unpaired device receives nothing, so listing it here would claim
-            a dataset is being delivered when no such device exists on the
-            daemon. Either pair it and set its id in
-            saveSync.syncthing.devices, or take it out of receivers.
-
-            Currently declared but unpaired: ${
-              if unpairedNames == [ ] then "(none)" else lib.concatStringsSep ", " unpairedNames
-            }
           '';
         }
         {
@@ -462,9 +423,8 @@ in
           # Syncthing adds the local device to every folder on its own.
           devices = lib.mapAttrs (_: device: {
             inherit (device) name introducer;
-            # Non-null by construction: pairedDevices is filtered on exactly this.
             inherit (device) id;
-          }) (removeAttrs pairedDevices [ "link" ]);
+          }) (removeAttrs cfg.devices [ "link" ]);
 
           # IDs are the permanent identity every receiver must match; labels are
           # cosmetic and may be renamed freely. Paths are reproduced exactly as
@@ -483,14 +443,14 @@ in
               label = "RomM Library ROMs (one-way)";
               path = romsPath;
               type = "sendonly";
-              devices = sharesOf "romm-library-roms";
+              devices = folderShares."romm-library-roms";
             };
             "romm-library-bios" = {
               id = "romm-library-bios";
               label = "RomM Library BIOS (one-way)";
               path = biosPath;
               type = "sendonly";
-              devices = sharesOf "romm-library-bios";
+              devices = folderShares."romm-library-bios";
             };
 
             # -- Retired RetroArch trees --------------------------------------
@@ -498,14 +458,14 @@ in
               id = "3m6rp-ypawu";
               label = "roms";
               path = "/home/${username}/.config/retroarch/roms";
-              devices = sharesOf "3m6rp-ypawu";
+              devices = folderShares."3m6rp-ypawu";
             };
             "mujrf-sx6dp" = {
               id = "mujrf-sx6dp";
               label = "saves";
               path = "~/.config/retroarch/saves";
               type = "sendonly";
-              devices = sharesOf "mujrf-sx6dp";
+              devices = folderShares."mujrf-sx6dp";
               # Six months of staggered history. This is the only pre-WebDAV
               # copy of some saves, so it is reproduced exactly rather than
               # allowed to fall back to the no-versioning default.
@@ -521,25 +481,25 @@ in
               label = "Music";
               path = "/media/Data/Music";
               type = "sendonly";
-              devices = sharesOf "4bvms-ufujg";
+              devices = folderShares."4bvms-ufujg";
             };
             "transcoded-music" = {
               id = "transcoded-music";
               label = "Transcoded-Music";
               path = "/media/Data/TranscodedMusic";
-              devices = sharesOf "transcoded-music";
+              devices = folderShares."transcoded-music";
             };
             "playlists" = {
               id = "playlists";
               label = "Playlists";
               path = "/media/Data/Playlists";
-              devices = sharesOf "playlists";
+              devices = folderShares."playlists";
             };
             "singing" = {
               id = "singing";
               label = "Singing";
               path = "~/Music/Singing";
-              devices = sharesOf "singing";
+              devices = folderShares."singing";
             };
 
             # -- Games --------------------------------------------------------
@@ -547,31 +507,31 @@ in
               id = "multimc";
               label = "Prism Launcher";
               path = "/home/${username}/.local/share/PrismLauncher/instances/";
-              devices = sharesOf "multimc";
+              devices = folderShares."multimc";
             };
             "multimc-icons" = {
               id = "multimc-icons";
               label = "Prism Launcher Icons";
               path = "/home/${username}/.local/share/PrismLauncher/icons/";
-              devices = sharesOf "multimc-icons";
+              devices = folderShares."multimc-icons";
             };
             "sakft-erofr" = {
               id = "sakft-erofr";
               label = "ShipOfHarkinian";
               path = "/media/BigData/Games/ShipOfHarkinian/";
-              devices = sharesOf "sakft-erofr";
+              devices = folderShares."sakft-erofr";
             };
             "vintage-story" = {
               id = "vintage-story";
               label = "Vintage Story Saves";
               path = "/home/${username}/.config/VintagestoryData/Saves";
-              devices = sharesOf "vintage-story";
+              devices = folderShares."vintage-story";
             };
             "tvhrc-cfaky" = {
               id = "tvhrc-cfaky";
               label = "Steam Assets";
               path = "/home/${username}/.local/share/Steam/userdata/122579086/config/grid";
-              devices = sharesOf "tvhrc-cfaky";
+              devices = folderShares."tvhrc-cfaky";
             };
 
             # -- Everything else ----------------------------------------------
@@ -579,13 +539,13 @@ in
               id = "qgis";
               label = "qgis";
               path = "~/qgis";
-              devices = sharesOf "qgis";
+              devices = folderShares."qgis";
             };
             "screenshots" = {
               id = "screenshots";
               label = "screenshots";
               path = "~/Pictures/Screenshots";
-              devices = sharesOf "screenshots";
+              devices = folderShares."screenshots";
             };
           };
         };
