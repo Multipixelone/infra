@@ -28,14 +28,37 @@ let
   inventory = config.flake.saveSyncInventory;
   hyliaPaths = inventory.clients.hylia.paths;
 
-  # link is the sole sender of both datasets. Its ID is the one constant in
-  # this file; everything else is derived from the client profile so the
-  # Syncthing folder roots and RetroArch's directories cannot drift apart.
-  linkDeviceId = "XOMPLRL-64GMF4T-P4SQ4XN-GCG26C2-3BKWACO-4DSWVCW-BU755ZU-KOJUDQ2";
+  # The Library mesh, read out of the one registry in
+  # modules/link/syncthing.nix rather than restated here: link (the sole
+  # SENDER of both datasets) plus every receiver, minus hylia itself.
+  #
+  # Every peer is named explicitly instead of being learned through
+  # Syncthing's introducer feature, and that is forced by overrideDevices
+  # below. An introduced device exists only in the daemon's config; nix never
+  # sees it, so the delete loop in merge-syncthing-config would remove it on
+  # the very next activation and re-learn it on the next connection, forever.
+  # Declared beats introduced whenever nix owns the file.
+  syncthing = config.saveSync.syncthing;
+  meshNames = lib.subtractLists [ "hylia" ] ([ "link" ] ++ syncthing.receivers);
+  meshDevices = lib.filterAttrs (
+    name: device: builtins.elem name meshNames && device.id != null
+  ) syncthing.devices;
+  peerNames = builtins.attrNames meshDevices;
 in
 {
   configurations.darwin.hylia.module = {
     assertions = [
+      {
+        assertion = builtins.elem "hylia" syncthing.receivers;
+        message = ''
+          hylia declares the two RomM Library folders but is not in
+          saveSync.syncthing.receivers (modules/link/syncthing.nix).
+
+          link would then offer them to nobody on this device, and these
+          receive-only folders would sit empty forever while looking correctly
+          configured. Add "hylia" there, or drop this module.
+        '';
+      }
       {
         # The whole point of reading the paths out of the inventory is that
         # this stays true. If the profile moves the ROM replica under the app
@@ -70,26 +93,31 @@ in
           overrideFolders = true;
 
           settings = {
-            devices.link.id = linkDeviceId;
+            devices = lib.mapAttrs (_: device: { inherit (device) id name; }) meshDevices;
 
-            # receiveonly, mirroring link's sendonly. The Library is authoritative
-            # and lives on link; deleting a ROM here to reclaim disk must never
-            # travel back. The folder IDs are the permanent identity and MUST
-            # match link's byte-for-byte -- the labels are cosmetic.
+            # receiveonly, mirroring link's sendonly. The Library is
+            # authoritative and lives on link; deleting a ROM here to reclaim
+            # disk must never travel back. Every other mesh member is
+            # receive-only too, and that is fine: a receive-only device still
+            # SERVES what it holds, so hylia can pull from whichever peer is
+            # awake while no peer can push a change back into the Library.
+            #
+            # The folder IDs are the permanent identity and MUST match link's
+            # byte-for-byte -- the labels are cosmetic.
             folders = {
               "romm-library-roms" = {
                 id = "romm-library-roms";
                 label = "RomM Library ROMs";
                 path = hyliaPaths.roms;
                 type = "receiveonly";
-                devices = [ "link" ];
+                devices = peerNames;
               };
               "romm-library-bios" = {
                 id = "romm-library-bios";
                 label = "RomM Library BIOS";
                 path = hyliaPaths.bios;
                 type = "receiveonly";
-                devices = [ "link" ];
+                devices = peerNames;
               };
             };
           };
