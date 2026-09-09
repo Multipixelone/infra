@@ -189,6 +189,7 @@ let
     "Apply this as a DELTA, key by key. Do NOT replace the device's retroarch.cfg: its input, video, audio, menu and path settings are device facts and are not represented here."
     "config_save_on_exit stays \"true\" on this client. Nix owns nothing here, and turning it off would discard the WebDAV credentials on the next app close."
     "webdav_username and webdav_password are entered BY HAND, once, under Settings -> Services -> Cloud Sync. Neither platform has a reliable credential-file importer: dropping a file next to retroarch.cfg does not apply it."
+    "savefiles_in_content_dir and savestates_in_content_dir must both read \"false\" (Settings -> Saving -> Write Saves to Content Directory / Write Save States to Content Directory, both OFF). Left on, the save is written beside the ROM and Cloud Sync never uploads it, while anything fetched from the authority is never read back."
     "Verify with Settings -> Services -> Cloud Sync -> Sync Now, then confirm manifest.server appeared in this client's core_assets directory."
   ];
 

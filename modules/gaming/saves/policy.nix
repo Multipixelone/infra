@@ -270,10 +270,13 @@
         };
       };
 
-      # The two pilot clients carry ONE game and no whole system, which is
+      # ios is the remaining pilot client: ONE game and no whole system, which is
       # deliberately the hardest .stignore shape: a per-game inclusion from an
       # otherwise-disabled system, needing its parent directory re-included
       # above the catch-all before Syncthing will ever descend into it.
+      # rg-slide used to be the second such client and no longer is -- it now
+      # takes every declared system, so the per-game inclusion is gone: keeping
+      # it beside systems = [ "gba" ... ] is a redundant-inclusion error.
       ios = {
         platform = "ios";
         managed = false;
@@ -297,20 +300,52 @@
       rg-slide = {
         platform = "android";
         managed = false;
-        systems = [ ];
-        includeGames = [ "gba/Pokemon - Emerald-R 260525" ];
-        # Android 13 scoped storage: config and sync state live in the app's own
-        # external files dir, which needs no permission grant; ROMs and BIOS
-        # live on the microSD under a stable root the launcher can also read.
+        # The RG Slide is a full handheld with room for the whole library, so it
+        # takes every declared system rather than a single pilot game. Every core
+        # in cores.txt must be installed through RetroArch's Online Updater
+        # BEFORE a save from the authority is opened under it -- that is the
+        # entire point of the core policy, and it is now eleven cores, not one.
+        systems = [
+          "gb"
+          "gbc"
+          "gba"
+          "nes"
+          "genesis"
+          "snes"
+          "nds"
+          "n64"
+          "psx"
+          "ps2"
+          "psp"
+        ];
+        includeGames = [ ];
+        # PATHS ARE MEASURED, NOT ASSUMED: read out of the live retroarch.cfg
+        # pulled off the device. Official RetroArch (com.retroarch.aarch64) does
+        # NOT use the app's scoped-storage files dir here -- it keeps its whole
+        # tree in shared storage under /storage/emulated/0/RetroArch, and there
+        # is no second volume: /storage/sdcard1 does not exist on this device,
+        # so the BIOS tree is RetroArch's own system/ dir.
+        #
+        # Shared storage is exactly why this needs RetroArch's "All files
+        # access" (MANAGE_EXTERNAL_STORAGE) granted in Android settings. Without
+        # it the app still starts and still reads, so the breakage looks
+        # unrelated: writes into that tree fail, and the first symptom is
+        # "failed saving config" on exit -- observed on the real device. Saves
+        # and states fail the same way, silently, which is the exact history
+        # fork this policy exists to prevent.
+        #
+        # ROMs stay outside that tree at /storage/emulated/0/ROMs -- the
+        # capitalisation is load-bearing, and the system subdirectory under it
+        # ("gba", lowercase) is the same string that keys the remote save prefix.
         paths = {
-          roms = "/storage/sdcard1/roms";
-          bios = "/storage/sdcard1/bios";
-          saves = "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/saves";
-          states = "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/states";
-          playlists = "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/playlists";
-          config = "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/config";
-          system = "/storage/sdcard1/bios";
-          coreAssets = "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/downloads";
+          roms = "/storage/emulated/0/ROMs";
+          bios = "/storage/emulated/0/RetroArch/system";
+          saves = "/storage/emulated/0/RetroArch/saves";
+          states = "/storage/emulated/0/RetroArch/states";
+          playlists = "/storage/emulated/0/RetroArch/playlists";
+          config = "/storage/emulated/0/RetroArch/config";
+          system = "/storage/emulated/0/RetroArch/system";
+          coreAssets = "/storage/emulated/0/RetroArch/downloads";
         };
       };
     };

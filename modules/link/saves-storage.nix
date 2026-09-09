@@ -652,6 +652,7 @@ let
       name = "retroarch-saves-promote";
       meta.description = "Deliberately reseed the live RetroArch save namespace from a candidate";
       runtimeInputs = with pkgs; [
+        blankScan
         coreutils
         findutils
         preflight
@@ -663,21 +664,28 @@ let
         FROM=""
         APPLY=0
         FROZEN=0
+        ALLOW_BLANK=0
 
         while [ $# -gt 0 ]; do
           case "$1" in
             --from)   FROM="$2"; shift 2 ;;
             --apply)  APPLY=1; shift ;;
             --i-have-frozen-every-client) FROZEN=1; shift ;;
+            --allow-blank) ALLOW_BLANK=1; shift ;;
             -h|--help)
               cat <<'USAGE'
-        retroarch-saves-promote --from DIR [--apply --i-have-frozen-every-client]
+        retroarch-saves-promote --from DIR [--apply --i-have-frozen-every-client] [--allow-blank]
 
           Replaces the contents of the live save namespace with a candidate from
           quarantine. This is the only tool here that writes to the live tree, it
           is a dry run by default, and --apply alone is NOT enough: the interlock
           flag has to be passed too, because the failure it guards against is not
           a bad candidate, it is a second client still running.
+
+          A candidate holding a save that reads as never written (all 0x00, all
+          0xFF, or empty -- see retroarch-saves-blank-scan) is refused, because
+          promoting it would put the absence of a save where a real one may be.
+          --allow-blank overrides that for games that genuinely were never saved.
 
           Before it overwrites anything it copies the current live tree into
           quarantine, so the state being replaced remains readable afterwards.
@@ -740,6 +748,19 @@ let
         if [ "$src_files" -eq 0 ]; then
           echo "refusing: $FROM holds no files. Promoting it would empty the live namespace." >&2
           exit 1
+        fi
+
+        # Runs on the dry run too, so the refusal is seen before anyone freezes
+        # a client for it. The scanner lists every blank file itself.
+        if ! retroarch-saves-blank-scan "$FROM"; then
+          if [ "$ALLOW_BLANK" -eq 1 ]; then
+            echo "continuing past the blank saves above because --allow-blank was given"
+          else
+            echo "refusing: $FROM holds save files that read as never written (listed above)." >&2
+            echo "Restore the real saves into the candidate first, or pass --allow-blank if" >&2
+            echo "every one of them is a game that genuinely has never been saved." >&2
+            exit 1
+          fi
         fi
         live_files=$(find "$DATA" -type f 2>/dev/null | wc -l)
 
@@ -905,10 +926,208 @@ let
       '';
     };
 
+    # The one content check the manifest's "no hashes" rule leaves room for. A
+    # hash asks "is this the same save", which changes every session and would
+    # turn normal play into a failed check. This asks "has this save EVER been
+    # written", which a cartridge answers the same way for its whole life: an
+    # erased GBA flash chip reads 0xFF end to end, SRAM or EEPROM that was never
+    # touched reads 0x00, and mGBA faithfully writes exactly that image to disk
+    # for a game that has never saved. Such a file is not a version of a save,
+    # it is the absence of one -- and Cloud Sync carries it over a real save as
+    # readily as any other byte change, because a byte change is all it sees.
+    # That is the loss in this repository's own history: a client booted the
+    # pilot game fresh, wrote 131072 bytes of 0xFF, and pushed them.
+    blankScan = pkgs.writeShellApplication {
+      name = "retroarch-saves-blank-scan";
+      meta.description = "Find save files that read as a never-written cartridge: all 0x00, all 0xFF, or empty";
+      runtimeInputs = with pkgs; [
+        coreutils
+        findutils
+      ];
+      text = ''
+        default_exts=(${lib.concatStringsSep " " (map q inventory.saveExtensions)})
+        exts=()
+        paths=()
+        quiet=0
+        count_only=0
+        gba_only=0
+
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --ext) exts+=("$2"); shift 2 ;;
+            --quiet) quiet=1; shift ;;
+            --count) count_only=1; shift ;;
+            --gba-sizes-only) gba_only=1; shift ;;
+            -h|--help)
+              cat <<'USAGE'
+        retroarch-saves-blank-scan [--ext EXT ...] [--gba-sizes-only] [--quiet | --count] PATH ...
+
+          Walks each PATH (a file or a tree) and reports every save file whose
+          bytes are all 0x00, all 0xFF, or absent -- what an emulator writes for
+          a cartridge that has never saved. Such a file is not a version of a
+          save, it is the absence of one, and a sync that carries it over a real
+          save is the data loss this tool exists to name before it happens.
+
+          Only files with a save extension are considered: the policy's list by
+          default, or --ext (repeatable, case-insensitive). A trailing
+          -YYMMDD-HHMMSS is stripped before that test, because rclone and
+          RetroArch Cloud Sync both move a file aside by appending one to the
+          whole name -- so the deleted/ and <coreAssets>/cloud_backups/ copies a
+          recovery actually searches are walked, while a .png, .state or
+          .state.auto wearing the same suffix is still skipped. Syncthing's
+          .stversions/ archives are walked too: the runbook sends an operator
+          into them to choose a candidate, and a blank one missing from this
+          report reads as a good save. Only the .stfolder marker is skipped. A
+          PATH that names a file directly is scanned whatever it is called.
+
+          Each blank file is reported with its fill, its size, and whether that
+          size is one a GBA cartridge produces (512, 8192, 32768, 65536 or
+          131072 bytes). --gba-sizes-only reports only those. --count prints the
+          number and nothing else and exits 0, for a metrics collector; without
+          it the exit status is 1 whenever anything blank was found.
+
+          It never prints, diffs or decodes save CONTENT beyond the one
+          question it asks of every byte.
+        USAGE
+              exit 0 ;;
+            --) shift; paths+=("$@"); break ;;
+            -*) echo "unknown argument: $1" >&2; exit 2 ;;
+            *) paths+=("$1"); shift ;;
+          esac
+        done
+
+        [ "''${#exts[@]}" -gt 0 ] || exts=("''${default_exts[@]}")
+        if [ "''${#paths[@]}" -eq 0 ]; then
+          echo "usage: retroarch-saves-blank-scan [--ext EXT ...] [--gba-sizes-only] [--quiet | --count] PATH ..." >&2
+          exit 2
+        fi
+
+        # rclone and RetroArch Cloud Sync both move a file aside by APPENDING
+        # -YYMMDD-HHMMSS to the whole name, extension included: the moved copy of
+        # "Pokemon - Emerald-R 260525.srm" is
+        # "Pokemon - Emerald-R 260525.srm-260908-000248", whose final extension
+        # is "srm-260908-000248" and matches no extension rule. deleted/ and
+        # <coreAssets>/cloud_backups/ consist ENTIRELY of such names, and they
+        # are the two trees a recovery searches -- so a walk that read only the
+        # last extension reported exactly those trees as clean, which is worse
+        # than not scanning them: a false "0 blanks" there is what makes an
+        # operator restore an erased image believing it was verified.
+        #
+        # The suffix is stripped by its shape, not by scanning every file: these
+        # same trees hold .png thumbnails, .state and .state.auto files,
+        # manifests and Syncthing markers wearing the identical suffix, and each
+        # of those still fails the extension test once the suffix comes off.
+        # Repeated because a file can be moved aside more than once; each pass
+        # removes at least the fourteen characters it matched, so it terminates.
+        #
+        # Syncthing's archive names are a different shape --
+        # "Golden Sun~20260422-220430.srm" -- and already END in the save
+        # extension, so nothing has to be stripped for those. What kept them out
+        # was the path filter on the walk below, not this test.
+        is_save() { # <path>
+          local name ext e
+          name="''${1##*/}"
+          while :; do
+            case "$name" in
+              *-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9])
+                name="''${name%-*-*}" ;;
+              *) break ;;
+            esac
+          done
+          case "$name" in *.*) ;; *) return 1 ;; esac
+          ext="''${name##*.}"
+          ext="''${ext,,}"
+          for e in "''${exts[@]}"; do
+            [ "$ext" = "''${e,,}" ] && return 0
+          done
+          return 1
+        }
+
+        # The sizes a GBA cartridge's save hardware produces: 4 kbit and 64 kbit
+        # EEPROM, 256 kbit SRAM, 512 kbit and 1 Mbit flash.
+        is_gba_size() {
+          case "$1" in 512|8192|32768|65536|131072) return 0 ;; esac
+          return 1
+        }
+
+        # Prints the byte a file consists of -- "0x00", "0xff" or "empty" -- and
+        # nothing for a file that holds anything else. Deleting the candidate
+        # byte leaves output only if some other byte is present, so a 128 KiB
+        # save costs one pass and no decoding.
+        fill_of() { # <path>
+          local size
+          size=$(stat -c %s -- "$1")
+          if [ "$size" -eq 0 ]; then
+            echo empty
+          elif [ "$(LC_ALL=C tr -d '\000' < "$1" | wc -c)" -eq 0 ]; then
+            echo 0x00
+          elif [ "$(LC_ALL=C tr -d '\377' < "$1" | wc -c)" -eq 0 ]; then
+            echo 0xff
+          fi
+        }
+
+        blank=0
+        scanned=0
+        check() { # <path> [explicit]
+          local fill size shape
+          if [ "''${2:-}" != explicit ]; then
+            is_save "$1" || return 0
+          fi
+          scanned=$(( scanned + 1 ))
+          fill=$(fill_of "$1")
+          [ -n "$fill" ] || return 0
+          size=$(stat -c %s -- "$1")
+          if is_gba_size "$size"; then shape=gba-size; else shape=other-size; fi
+          if [ "$gba_only" -eq 1 ] && [ "$shape" != gba-size ]; then
+            return 0
+          fi
+          blank=$(( blank + 1 ))
+          if [ "$quiet" -eq 0 ] && [ "$count_only" -eq 0 ]; then
+            printf 'BLANK  %-5s  %8s  %-10s  %s\n' "$fill" "$size" "$shape" "$1"
+          fi
+        }
+
+        for p in "''${paths[@]}"; do
+          if [ -f "$p" ]; then
+            check "$p" explicit
+          elif [ -d "$p" ]; then
+            # .stversions/ is NOT excluded, deliberately. It was, and that was
+            # the same defect in a second form: the runbook's own migration step
+            # says "the junk is precisely where the alternative version of a
+            # save you are about to choose wrongly will be found", and names
+            # .stversions as that junk. An archived version an operator is
+            # choosing between, omitted from a report of which candidates are
+            # erased, reads as a candidate that passed. Only .stfolder -- a
+            # zero-byte marker that is not a version of anything -- is skipped,
+            # and it fails the extension test anyway.
+            while IFS= read -r -d "" f; do
+              check "$f"
+            done < <(find "$p" -type f -not -name '.stfolder' -print0 | sort -z)
+          else
+            echo "skipping $p (not a file or directory)" >&2
+          fi
+        done
+
+        if [ "$count_only" -eq 1 ]; then
+          echo "$blank"
+          exit 0
+        fi
+        if [ "$blank" -gt 0 ]; then
+          echo "$blank of $scanned save files read as never written." >&2
+          echo "FIX: a blank save is the absence of a save, not a version of one. Find which" >&2
+          echo "     client booted the game fresh, restore the real save from a snapshot or" >&2
+          echo "     from that client's <coreAssets>/cloud_backups/, and only then let it sync." >&2
+          exit 1
+        fi
+        [ "$quiet" -eq 1 ] || echo "no blank save files among $scanned scanned."
+      '';
+    };
+
     metrics = pkgs.writeShellApplication {
       name = "retroarch-saves-storage-metrics";
       meta.description = "Emit snapshot and offsite-backup age gauges for the textfile collector";
       runtimeInputs = with pkgs; [
+        blankScan
         coreutils
         findutils
         gawk
@@ -952,6 +1171,48 @@ let
           offsite=$(stat -c %Y "$marker")
         fi
 
+        # The two shapes a lost save takes on the authority, counted every run.
+        # A blank file is a game some client booted fresh and synced. A file
+        # under a prefix no declared system owns is a client that loaded a ROM
+        # from somewhere other than <roms>/<system>/: sort_savefiles_by_content
+        # names the save directory after the ROM's parent directory, so that
+        # save landed in a fork of the game's history no other client will ever
+        # look in. Both happened to the pilot game, hours apart, from paths the
+        # policy never names (rom/, downloads/), and neither raised anything.
+        #
+        # Scope is saves/ only, not the whole subvolume: deleted/ is the
+        # operator's own moved-aside copy of the pre-migration tree and is full
+        # of erased images on purpose, so counting it would pin
+        # RetroarchSavesBlankSaveFile forever on history nobody can fix. Within
+        # saves/ the scanner now also sees moved-aside copies (-YYMMDD-HHMMSS)
+        # and .stversions/ entries; there are none there today, so this gauge
+        # does not move, but one appearing under the authority IS the event this
+        # alert is for. The foreign-prefix walk below keeps its own .stversions
+        # exclusion because it asks a different question -- the first path
+        # component of an archived file is ".stversions", which is not a client
+        # having loaded a ROM from an unmanaged directory.
+        systems=${
+          q (
+            lib.concatStringsSep " " (
+              lib.naturalSort (lib.mapAttrsToList (_: s: s.canonicalDir) inventory.systems)
+            )
+          )
+        }
+        blank=0
+        foreign=0
+        if [ "$present" -eq 1 ] && [ -d "$data/saves" ]; then
+          blank=$(retroarch-saves-blank-scan --count "$data/saves" 2>/dev/null || echo 0)
+          foreign=$(find "$data/saves" -type f -not -path '*/.stversions/*' -not -name '.stfolder' -printf '%P\n' 2>/dev/null \
+            | awk -v ok="$systems" '
+                BEGIN { n = split(ok, a, " "); for (i = 1; i <= n; i++) known[a[i]] = 1 }
+                {
+                  if (index($0, "/") == 0) { c++; next }
+                  split($0, p, "/")
+                  if (!(p[1] in known)) c++
+                }
+                END { printf "%d\n", c + 0 }')
+        fi
+
         {
           echo '# HELP retroarch_saves_subvolume_present Whether the save path is a Btrfs subvolume.'
           echo '# TYPE retroarch_saves_subvolume_present gauge'
@@ -968,6 +1229,12 @@ let
           echo '# HELP retroarch_saves_offsite_last_success_timestamp_seconds Completion time of the last successful offsite backup.'
           echo '# TYPE retroarch_saves_offsite_last_success_timestamp_seconds gauge'
           echo "retroarch_saves_offsite_last_success_timestamp_seconds $offsite"
+          echo '# HELP retroarch_saves_blank_files Save files on the authority that read as a never-written cartridge: all 0x00, all 0xFF, or empty.'
+          echo '# TYPE retroarch_saves_blank_files gauge'
+          echo "retroarch_saves_blank_files $blank"
+          echo '# HELP retroarch_saves_foreign_prefix_files Save files under saves/ whose first path component is not a declared system directory.'
+          echo '# TYPE retroarch_saves_foreign_prefix_files gauge'
+          echo "retroarch_saves_foreign_prefix_files $foreign"
           echo '# HELP retroarch_saves_storage_metrics_timestamp_seconds When this collector last ran.'
           echo '# TYPE retroarch_saves_storage_metrics_timestamp_seconds gauge'
           echo "retroarch_saves_storage_metrics_timestamp_seconds $(date +%s)"
@@ -996,6 +1263,7 @@ in
         retroarch-saves-inspect = tools.inspect;
         retroarch-saves-promote = tools.promote;
         retroarch-saves-export = tools.export;
+        retroarch-saves-blank-scan = tools.blankScan;
       };
     };
 
@@ -1050,6 +1318,30 @@ in
                 for = "1h";
                 labels.severity = "critical";
                 annotations.summary = "RetroArch saves have not reached the offsite repository in 48h";
+              }
+              {
+                # Fires the first time the collector sees one. There is no
+                # benign reason for a file on the authority to read as a
+                # never-written cartridge: a game nobody has saved has no save
+                # file at all until a client boots it fresh and syncs the empty
+                # image, and that is exactly the event that overwrote the pilot
+                # game's real save.
+                alert = "RetroarchSavesBlankSaveFile";
+                expr = ''retroarch_saves_blank_files{instance="link"} > 0'';
+                for = "1m";
+                labels.severity = "warning";
+                annotations.summary = "A save on the authority reads as a never-written cartridge (all 0x00/0xFF); run retroarch-saves-blank-scan and check the client's cloud_backups before anything syncs again";
+              }
+              {
+                # A prefix that is not a declared system directory is a client
+                # that loaded a ROM from outside <roms>/<system>/ and has forked
+                # that game's save history; the fork is invisible to every
+                # other client and to the runbook's per-system checks.
+                alert = "RetroarchSavesForeignPrefix";
+                expr = ''retroarch_saves_foreign_prefix_files{instance="link"} > 0'';
+                for = "1m";
+                labels.severity = "warning";
+                annotations.summary = "Saves exist under a prefix that is not a declared system directory; a client loaded a ROM from an unmanaged path and forked its save history";
               }
               {
                 # Without this, a dead collector freezes every gauge above at its
@@ -1292,6 +1584,7 @@ in
         tools.inspect
         tools.promote
         tools.export
+        tools.blankScan
         (pkgs.writeShellApplication {
           name = "retroarch-saves-offsite-restore";
           meta.description = "Restore an offsite RetroArch save snapshot into quarantine";

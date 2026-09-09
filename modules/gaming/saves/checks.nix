@@ -160,7 +160,7 @@ let
     and (.pilot.title == "Pokémon Revelation (v260525)")
     and (.pilot.romFilename == "Pokemon - Emerald-R 260525.gba")
     and (.pilot.ios == [.pilot.identity])
-    and (.pilot.rgSlide == [.pilot.identity])
+    and (.pilot.rgSlide == [])
     and (.clean == [])
     and (.bothWays | any(contains("pilot-both") and contains("gba/Alpha Quest") and contains("both included and excluded")))
     and (.strayExclusion | any(contains("pilot-stray") and contains("gba/Beta Quest") and contains("excluded from a system this client does not enable")))
@@ -731,6 +731,8 @@ let
     ''sort_savestates_enable = "false"''
     ''sort_savefiles_by_content_enable = "true"''
     ''sort_savestates_by_content_enable = "true"''
+    ''savefiles_in_content_dir = "false"''
+    ''savestates_in_content_dir = "false"''
     ''webdav_url = "${inventory.webdav.publicUrl}"''
   ];
 
@@ -741,7 +743,7 @@ let
 in
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, self', ... }:
     let
       jqContract =
         name: evidence: filter:
@@ -834,6 +836,11 @@ in
           exit "$status"
         '';
       };
+
+      # Defined beside the recovery tools in modules/link/saves-storage.nix,
+      # where promote and the metrics collector call it; consumed here so the
+      # positive controls exercise the exact binary those two run.
+      blankScanner = self'.packages.retroarch-saves-blank-scan;
 
       managedConfigFile = pkgs.writeText "retroarch-managed.cfg" managedRendered;
       inventoryFile = pkgs.writeText "save-sync-inventory.json" (builtins.toJSON inventory);
@@ -1546,6 +1553,194 @@ in
               fail "the +0100 instant is not later than +0200; the DST premise is wrong"
             fi
             echo "ok  name order is NOT chronological across the fold -- otime is authoritative"
+
+            touch "$out"
+          '';
+
+      # 12. Blank-save detection, with a positive control at every GBA save
+      #     size and both fills. The manifest carries no content hashes on
+      #     purpose -- a save's bytes change every session -- and this is the
+      #     one content question that does not: whether a save has EVER been
+      #     written. The failure it guards is in this repository's history: an
+      #     erased 128 KiB flash image, all 0xFF, written by a client that had
+      #     booted the pilot game fresh and pushed over the real save by a sync
+      #     that saw only a changed file. A scanner that never fires is
+      #     indistinguishable from one that is broken, so every size is planted.
+      #
+      #     It also plants the two naming shapes the recovery trees are made of,
+      #     because a scanner that reports THOSE trees clean is worse than one
+      #     that never runs: rclone and RetroArch Cloud Sync append
+      #     -YYMMDD-HHMMSS to the whole name (deleted/, cloud_backups/), and
+      #     Syncthing's archive inserts ~YYYYMMDD-HHMMSS before the extension
+      #     (.stversions/). Both are where the runbook sends an operator to pick
+      #     a candidate. The negatives prove the first rule matches a shape and
+      #     not merely "any file": a .png, .state or .state.auto wearing the
+      #     same suffix stays out of the report.
+      checks.retroarch-saves-blank-detection =
+        pkgs.runCommand "retroarch-saves-blank-detection"
+          {
+            nativeBuildInputs = [
+              blankScanner
+              pkgs.coreutils
+              pkgs.gnugrep
+            ];
+          }
+          ''
+            set -euo pipefail
+
+            fail() { echo "FAIL: $*" >&2; exit 1; }
+            expect() { # <label> <expected> <actual>
+              if [ "$2" != "$3" ]; then fail "$1: expected $2, got $3"; fi
+              printf 'ok  %-58s %s\n' "$1" "$3"
+            }
+            ff()   { head -c "$1" /dev/zero | LC_ALL=C tr '\000' '\377' > "$2"; }
+            zero() { head -c "$1" /dev/zero > "$2"; }
+
+            mkdir -p tree/gba tree/snes tree/rom tree/.stversions/gpSP
+
+            # Positive controls: every GBA save size, both fills, the empty file,
+            # an uppercase extension, and the exact shape of the incident -- an
+            # erased 1 Mbit flash image under a prefix no system owns.
+            ff   131072 tree/gba/erased-flash-1m.srm
+            ff   65536  tree/gba/erased-flash-512k.srm
+            zero 32768  tree/gba/blank-sram.srm
+            zero 8192   tree/gba/blank-eeprom-64k.sav
+            ff   512    'tree/gba/blank-eeprom-4k (USA).SRM'
+            : >         tree/gba/empty.srm
+            ff   131072 'tree/rom/Pokemon - Emerald-R 260525.srm'
+            # Uniform but not a GBA size: reported, and dropped by --gba-sizes-only.
+            ff   1000   tree/snes/odd-size.srm
+
+            # The moved-aside shape, on which the tree walk used to be blind.
+            # The first is the incident's own file as it exists today under
+            # deleted/saves/gba/ and under a client's cloud_backups/; the second
+            # is the same file moved aside twice.
+            ff   131072 'tree/gba/Pokemon - Emerald-R 260525.srm-260908-000248'
+            zero 32768  'tree/gba/moved-aside-twice.srm-260907-223638-260908-000248'
+            # Syncthing's archive: its own shape, and its own shape with the
+            # rclone suffix layered on top -- which is literally how every file
+            # under deleted/saves/.stversions/ is named.
+            ff   131072 'tree/.stversions/gpSP/Golden Sun~20260422-220430.srm'
+            ff   131072 'tree/.stversions/gpSP/Golden Sun~20260422-220430.srm-260907-223628'
+
+            # Negative controls. The first is what a real flash save looks like:
+            # almost entirely 0xFF with a few hundred bytes of progress in it.
+            { head -c 131000 /dev/zero | LC_ALL=C tr '\000' '\377'
+              printf 'FIXTURE-PROGRESS'
+              head -c 56 /dev/zero; } > tree/gba/played-flash.srm
+            printf 'a save with entropy in it 0123456789' > tree/snes/chrono.srm
+            zero 65536  tree/snes/all-zero.state
+            zero 32768  tree/gba/not-a-save.png
+            : >         tree/.stfolder
+            # Everything the recovery trees hold BESIDES saves, wearing the same
+            # moved-aside suffix. Each of these is all-zero or empty, so any of
+            # them reaching the report means the suffix rule stopped matching a
+            # shape and started matching a name.
+            zero 32768  'tree/gba/not-a-save.png-260908-000248'
+            zero 65536  'tree/snes/all-zero.state-260908-000248'
+            zero 65536  'tree/snes/all-zero.state.auto-260908-000248'
+            : >         'tree/.stfolder-260908-000248'
+            # A real save wearing the suffix: scanned (it counts toward the
+            # denominator) and correctly not blank.
+            cp tree/gba/played-flash.srm 'tree/gba/played-flash.srm-260908-000248'
+
+            echo "== a tree holding blank saves is refused, and every one is named =="
+            if retroarch-saves-blank-scan --ext srm --ext sav tree > report.txt 2> summary.txt; then
+              fail "the scanner ACCEPTED a tree holding erased and blank saves"
+            fi
+            cat report.txt summary.txt
+            expect "blank files reported" 12 "$(grep -c '^BLANK' report.txt)"
+            expect "erased 1 Mbit flash: fill, size and shape" 1 \
+              "$(grep -c '^BLANK  0xff  *131072  gba-size  *tree/gba/erased-flash-1m.srm$' report.txt)"
+            expect "erased 512 kbit flash" 1 \
+              "$(grep -c '^BLANK  0xff  *65536  gba-size  *tree/gba/erased-flash-512k.srm$' report.txt)"
+            expect "blank 256 kbit SRAM" 1 \
+              "$(grep -c '^BLANK  0x00  *32768  gba-size  *tree/gba/blank-sram.srm$' report.txt)"
+            expect "blank 64 kbit EEPROM as .sav" 1 \
+              "$(grep -c '^BLANK  0x00  *8192  gba-size  *tree/gba/blank-eeprom-64k.sav$' report.txt)"
+            expect "blank 4 kbit EEPROM, uppercase .SRM" 1 \
+              "$(grep -c '^BLANK  0xff  *512  gba-size  *tree/gba/blank-eeprom-4k (USA).SRM$' report.txt)"
+            expect "empty file" 1 \
+              "$(grep -c '^BLANK  empty  *0  other-size  *tree/gba/empty.srm$' report.txt)"
+            expect "the incident's own shape, under a foreign prefix" 1 \
+              "$(grep -c '^BLANK  0xff  *131072  gba-size  *tree/rom/Pokemon - Emerald-R 260525.srm$' report.txt)"
+            expect "uniform file of a non-GBA size" 1 \
+              "$(grep -c '^BLANK  0xff  *1000  other-size  *tree/snes/odd-size.srm$' report.txt)"
+            # The bug this check gained coverage for: a save moved aside by
+            # rclone or by Cloud Sync ends in ".srm-260908-000248", so the walk
+            # skipped it and called deleted/ and cloud_backups/ clean.
+            expect "moved aside once, the incident's own file" 1 \
+              "$(grep -c '^BLANK  0xff  *131072  gba-size  *tree/gba/Pokemon - Emerald-R 260525.srm-260908-000248$' report.txt)"
+            expect "moved aside twice" 1 \
+              "$(grep -c '^BLANK  0x00  *32768  gba-size  *tree/gba/moved-aside-twice.srm-260907-223638-260908-000248$' report.txt)"
+            # .stversions is walked on purpose: the runbook sends an operator in
+            # there to choose between versions of a save, and an erased one this
+            # report omits reads as a version that passed.
+            expect "Syncthing archive entry" 1 \
+              "$(grep -c '^BLANK  0xff  *131072  gba-size  *tree/.stversions/gpSP/Golden Sun~20260422-220430.srm$' report.txt)"
+            expect "Syncthing archive entry, moved aside as well" 1 \
+              "$(grep -c '^BLANK  0xff  *131072  gba-size  *tree/.stversions/gpSP/Golden Sun~20260422-220430.srm-260907-223628$' report.txt)"
+            # grep -F on the stem, so each of these also covers the copy of
+            # itself that wears the -YYMMDD-HHMMSS suffix.
+            for negative in played-flash.srm chrono.srm all-zero.state not-a-save.png .stfolder; do
+              if grep -qF "$negative" report.txt; then
+                fail "negative control $negative was reported as blank"
+              fi
+            done
+            echo "ok  no negative control was reported"
+            echo "ok  a .png, .state, .state.auto or marker wearing the suffix is still skipped"
+            grep -q '^12 of 15 save files read as never written' summary.txt \
+              || fail "the summary did not count 12 blank of 15 scanned"
+            grep -q 'cloud_backups' summary.txt \
+              || fail "the refusal did not say where a real copy of the save may still be"
+
+            echo "== --gba-sizes-only keeps the cartridge sizes and drops the rest =="
+            retroarch-saves-blank-scan --ext srm --ext sav --gba-sizes-only tree > gba.txt 2> /dev/null || true
+            expect "gba-size blanks" 10 "$(grep -c '^BLANK' gba.txt)"
+            if grep -qE 'empty\.srm|odd-size\.srm' gba.txt; then
+              fail "--gba-sizes-only reported a file of a non-cartridge size"
+            fi
+
+            echo "== --count is for the collector: the number, nothing else, exit 0 =="
+            expect "count" 12 "$(retroarch-saves-blank-scan --ext srm --ext sav --count tree)"
+
+            echo "== a single file is a valid argument =="
+            if retroarch-saves-blank-scan --ext srm tree/gba/erased-flash-1m.srm > /dev/null 2>&1; then
+              fail "a single blank file passed"
+            fi
+            retroarch-saves-blank-scan --ext srm tree/gba/played-flash.srm > /dev/null \
+              || fail "a single real save was refused"
+
+            echo "== a tree of real saves passes =="
+            mkdir -p clean/gba
+            cp tree/gba/played-flash.srm tree/snes/chrono.srm clean/gba/
+            retroarch-saves-blank-scan --ext srm --ext sav clean \
+              || fail "a tree of real saves was refused"
+            expect "clean count" 0 "$(retroarch-saves-blank-scan --ext srm --ext sav --count clean)"
+
+            echo "== the extension list is honoured, not guessed =="
+            expect "only .sav considered" 1 "$(retroarch-saves-blank-scan --ext sav --count tree)"
+
+            echo "== a file named explicitly is scanned whatever it is called =="
+            # The explicit-PATH escape hatch predates the walk understanding the
+            # moved-aside shape, and it still has to work for a name that
+            # matches no rule at all -- otherwise there is nothing left to reach
+            # for when a fourth tool invents a fifth naming convention.
+            mkdir -p outside
+            cp tree/gba/erased-flash-1m.srm 'outside/manifest.local-260907-223638'
+            if retroarch-saves-blank-scan --ext srm 'outside/manifest.local-260907-223638' > /dev/null 2>&1; then
+              fail "an explicitly named file was not scanned"
+            fi
+            retroarch-saves-blank-scan --ext srm tree/gba/not-a-save.png > /dev/null 2>&1 \
+              && fail "an explicitly named all-zero file passed" || true
+            # ... and the walk over the same directory does NOT scan it: the
+            # suffix rule strips the timestamp and is then left with ".local",
+            # which is not a save extension. This is the assertion that fails if
+            # anyone "fixes" the walk by scanning every file it finds.
+            retroarch-saves-blank-scan --ext srm outside \
+              || fail "the tree walk scanned a file whose extension is not a save extension"
+            expect "the tree walk is unchanged by the explicit scan" 12 \
+              "$(retroarch-saves-blank-scan --ext srm --ext sav --count tree)"
 
             touch "$out"
           '';

@@ -534,6 +534,24 @@ in
         };
         users.groups.${serviceUser} = { };
 
+        # The operator reads this tree constantly and writes it almost never:
+        # every diagnosis of a forked save prefix or a blanked cartridge is
+        # `blank-scan`, `md5sum` and `ls` over the live data and the btrbk
+        # snapshots, and routing all of that through sudo is how a read turns
+        # into an accidental write. Group membership grants exactly the read.
+        #
+        # It cannot grant more: the tmpfiles rule below holds the subvolume at
+        # 0750 and rclone's umask 0027 makes every file inside 0640, so the
+        # group bit is r-x on directories and r-- on files. Restoring a save
+        # still needs sudo, deliberately -- that asymmetry is the point, not an
+        # oversight to be fixed later by widening the mode to 0770.
+        #
+        # Supplementary groups are resolved when a process STARTS, so an
+        # already-running login session keeps the old set: this takes effect at
+        # the operator's next login, not at switch time. See the same trap
+        # documented against the romm group in modules/link/syncthing.nix.
+        users.users.tunnel.extraGroups = [ serviceUser ];
+
         # `z`, never `d`. See the header: `d` would create a plain directory
         # where an operator-created Btrfs subvolume belongs, rclone would serve
         # it, and the failure would surface as an impossible restore. `z`

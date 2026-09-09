@@ -235,6 +235,17 @@ let
       sort_savestates_enable = "false";
       sort_savefiles_by_content_enable = "true";
       sort_savestates_by_content_enable = "true";
+
+      # Both off, unconditionally, and pinned even though "false" is already
+      # RetroArch's default: the default is what a device drifts away from. On,
+      # runloop_path_set_redirect swaps the save directory for the ROM's own
+      # directory, while Cloud Sync keeps walking the CONFIGURED
+      # savefile_directory -- so the client writes saves the authority never
+      # sees and reads none of the ones it fetched, in both directions, while
+      # looking perfectly healthy. Two clients did exactly this on 2026-09-07
+      # and forked one game's save history four ways.
+      savefiles_in_content_dir = "false";
+      savestates_in_content_dir = "false";
     }
     // savePathsOf;
 
