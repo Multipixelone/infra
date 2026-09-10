@@ -409,20 +409,25 @@
           pruneNotificationType = "chat";
           # Manual mode splits DCP in two: the deterministic cleanup below
           # (deduplication, purgeErrors) keeps running automatically, while
-          # compression only happens when asked for via /dcp-compress. DCP
-          # never compresses on its own — it nudges the model until the model
-          # decides to, and that judgement was costing more warm context than
-          # it saved. The compress block below is inert while this is on; it
-          # stays tuned so flipping back is one line.
+          # compression only happens when asked for via /dcp-compress.
+          #
+          # It stays off. It was on to stop DCP compressing every couple of
+          # minutes, but that was never DCP's judgement — the config was
+          # landing in dcp.json while DCP read a stub dcp.jsonc, so every
+          # model ran on the stock 50k/100k thresholds and got nudged from
+          # 50k of a 1.05M window onward. With the file at the path DCP
+          # actually reads, the per-model floors below apply and nudging only
+          # starts near the real ceiling, which is when compression is worth
+          # its cost.
           #
           # This is only a *default*: DCP persists a per-session manualMode
           # boolean in ~/.local/share/opencode/storage/plugin/dcp/<session>.json
           # and `persisted ?? default` means an existing session keeps whatever
           # it was created with. Flipping this option leaves every already-open
-          # session compressing on its own; patch the key in those state files
+          # session on the old behaviour; patch the key in those state files
           # (it is re-read every request) or start a new session.
           manualMode = {
-            enabled = true;
+            enabled = false;
             automaticStrategies = true;
           };
           experimental = {
@@ -633,7 +638,14 @@
         '';
 
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;
-        xdg.configFile."opencode/dcp.json".text = dcpConfig;
+        # Must be `dcp.jsonc`, not `dcp.json`. DCP's getConfigPaths() picks
+        # the *first* of ~/.config/opencode/dcp.jsonc, then dcp.json — it does
+        # not merge them. DCP's own first-run createDefaultConfig() writes a
+        # schema-only dcp.jsonc, and that stub silently shadowed every value
+        # below (manualMode fell back to off, the context limits to the stock
+        # 50k/100k), which is what made every model compress constantly.
+        # Home-manager moves the stale stub to dcp.jsonc.bkp on activation.
+        xdg.configFile."opencode/dcp.jsonc".text = dcpConfig;
       };
   };
 }
