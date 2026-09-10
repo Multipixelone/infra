@@ -550,6 +550,18 @@
           agents = aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
           settings = {
+            # programs.mcp uses Claude-style ${VAR} placeholders, but OpenCode
+            # only expands {env:VAR}. OpenCode settings replace the whole
+            # server entry imported by enableMcpIntegration rather than
+            # merging into it, so restate type/url here -- a headers-only
+            # entry fails OpenCode's mcp schema ("mcp.websearch.enabled
+            # missing key").
+            mcp.websearch = {
+              type = "remote";
+              url = "https://search.parallel.ai/mcp";
+              enabled = true;
+              headers.Authorization = "Bearer {env:PARALLEL_API_KEY}";
+            };
             plugin = [
               "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
