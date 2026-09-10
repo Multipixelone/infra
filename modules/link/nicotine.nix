@@ -11,6 +11,7 @@ in
   # Explo drives over its API.
   servicePublication.applications.nicotine = {
     site = "nyc";
+    excusedWhen = [ "gamemode" ];
     homepage = {
       group = "Downloads";
       name = "Nicotine+";

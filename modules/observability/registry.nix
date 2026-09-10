@@ -120,6 +120,24 @@ in
     slo = {
       availability = lib.mkOption { type = lib.types.float; };
       window = lib.mkOption { type = lib.types.str; };
+      excusals = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              name = lib.mkOption {
+                type = lib.types.str;
+                description = "Prometheus signal name for this planned-downtime excusal.";
+              };
+              rationale = lib.mkOption {
+                type = lib.types.str;
+                description = "Why downtime is expected while this signal is active.";
+              };
+            };
+          }
+        );
+        default = { };
+        description = "Declared planned-downtime excusal signals.";
+      };
       latencySeconds = {
         internal = lib.mkOption { type = lib.types.float; };
         public = lib.mkOption { type = lib.types.float; };
@@ -154,6 +172,10 @@ in
       slo = {
         availability = 0.99;
         window = "7d";
+        excusals.gamemode = {
+          name = "gamemode";
+          rationale = "Nicotine+ is intentionally stopped during gaming, so its downtime is planned.";
+        };
         # Class defaults, not universal truths: an application that needs its
         # own budget sets `latencyObjectiveSeconds` in the service-publication
         # registry. Seeded at roughly 3x the measured success-only p95 with a

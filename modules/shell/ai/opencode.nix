@@ -51,12 +51,14 @@
           # swapped calls surface to the parent as "Task cancelled". Spark is
           # therefore kept only as a late fallback. Its 128k, text-only window
           # also makes it a poor orchestrator or observer despite its speed.
+          astra = "openai/gpt-6-astra";
           sol = "openai/gpt-5.6-sol";
-          terra = "openai/gpt-5.6-terra";
+          terra = "openai/gpt-5.6-terra-fast";
+          luna = "openai/gpt-5.6-luna-fast";
           spark = "openai/gpt-5.3-codex-spark";
 
           # opencode go
-          luna = "opencode-go/gpt-5.6-luna";
+          # luna = "opencode-go/gpt-5.6-luna";
           kimi = "opencode-go/kimi-k3";
           deepseek-flash = "opencode-go/deepseek-v4-flash";
           glm = "opencode-go/glm-5.2";
@@ -139,18 +141,18 @@
         presetGoCodex = mkPreset {
           orchestrator = {
             model = "sol";
-            variant = "high";
+            variant = "medium";
           };
           oracle = {
-            model = "sol";
+            model = "astra";
             variant = "xhigh";
           };
           librarian = {
-            model = "luna";
+            model = "spark";
             variant = "low";
           };
           explorer = {
-            model = "luna";
+            model = "spark";
             variant = "low";
           };
           designer = {
@@ -213,7 +215,7 @@
         agentFallbacks = {
           orchestrator = {
             model = [
-              (modelVariant "xhigh" models.sol)
+              (modelVariant "medium" models.sol)
               (modelVariant "xhigh" models.terra)
               (modelVariant "xhigh" models.luna)
               (modelVariant "xhigh" models.spark)
@@ -221,23 +223,23 @@
           };
           oracle = {
             model = [
+              (modelVariant "xhigh" models.astra)
               (modelVariant "xhigh" models.sol)
               (modelVariant "xhigh" models.luna)
-              (modelVariant "xhigh" models.spark)
             ];
           };
           librarian = {
             model = [
+              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
               (modelVariant "low" models.deepseek-flash)
-              (modelVariant "low" models.spark)
             ];
           };
           explorer = {
             model = [
+              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
               (modelVariant "low" models.deepseek-flash)
-              (modelVariant "low" models.spark)
             ];
           };
           designer = {

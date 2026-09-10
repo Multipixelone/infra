@@ -103,7 +103,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (59)</summary>
+<summary>Packages exposed by this flake (60)</summary>
 
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
 - [`asl-anki`](https://github.com/Multipixelone/infra/blob/main/modules/media/asl-anki.nix) — Generate Anki flashcards for ASL vocabulary from signasl.org · `nix run github:Multipixelone/infra#asl-anki`
@@ -143,6 +143,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`retroarch-save-plan`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Ordered save-migration plan with every precondition checked against the live host · `nix run github:Multipixelone/infra#retroarch-save-plan`
 - [`retroarch-save-seed`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Seed an empty WebDAV save authority from the selected tree and read every file back · `nix run github:Multipixelone/infra#retroarch-save-seed`
 - [`retroarch-save-select`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Classify the live save tree and map core-name sorting onto content-directory sorting · `nix run github:Multipixelone/infra#retroarch-save-select`
+- [`retroarch-saves-blank-scan`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Find save files that read as a never-written cartridge: all 0x00, all 0xFF, or empty · `nix run github:Multipixelone/infra#retroarch-saves-blank-scan`
 - [`retroarch-saves-export`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Export raw RetroArch saves for migration to a future replacement · `nix run github:Multipixelone/infra#retroarch-saves-export`
 - [`retroarch-saves-inspect`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Compare RetroArch save candidates by size and hash only · `nix run github:Multipixelone/infra#retroarch-saves-inspect`
 - [`retroarch-saves-preflight`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Assert the save subvolume and snapshot directory exist as declared · `nix run github:Multipixelone/infra#retroarch-saves-preflight`

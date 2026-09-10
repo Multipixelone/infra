@@ -12,6 +12,10 @@ let
   viz = import ../../lib/grafana.nix { inherit lib; };
   inherit (config.flake.meta.owner) email username;
   serviceInventory = config.flake.servicePublicationInventory;
+  declaredExcusalNames = builtins.attrNames config.observability.slo.excusals;
+  everyApplicationExcusalIsDeclared = lib.all (
+    application: lib.all (signal: lib.elem signal declaredExcusalNames) application.excusedWhen
+  ) (builtins.attrValues config.servicePublication.applications);
   localCutover = config.servicePublication.rollout.enableLocalCutover;
   grafanaCanonical = serviceInventory.applications.grafana.canonical;
   homepageCanonical = serviceInventory.applications.homepage.canonical;
@@ -267,6 +271,16 @@ let
   effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and on (job, instance) (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
   endpointProbeSuccess = "min by (endpoint, slo_class) (${effectiveProbeSuccess})";
   endpointAvailabilityExpr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and on (endpoint, slo_class) ${endpointProbeSuccess}";
+  endpointProbeSuccessUnexcused = "${endpointProbeSuccess} unless on (endpoint, slo_class) endpoint:excused == 1";
+  endpointGoodMinutesExpr = "sum_over_time(endpoint:probe_success_unexcused[7d])";
+  endpointCountedMinutesExpr = "count_over_time(endpoint:probe_success_unexcused[7d])";
+  endpointAvailabilityUnexcusedExpr = "endpoint:good_minutes_7d / endpoint:counted_minutes_7d and on (endpoint, slo_class) ${endpointProbeSuccess}";
+  endpointExcusedSecondsExpr = "sum_over_time(endpoint:excused[7d]) * 60";
+  endpointExcusedExpr = "max by (endpoint, slo_class) (endpoint:excusal_signal)";
+  endpointErrorBudgetRemainingExpr = "1 - ((1 - endpoint:availability_7d) / ${
+    toString (1.0 - observability.slo.availability)
+  })";
+  endpointDownExpr = "endpoint:probe_success_unexcused == 0";
   # Blackbox records the full timeout as a probe's *duration* when it gives up,
   # so percentiling the raw series turns every outage into a latency
   # regression: actual.nyc.finnrut.is reported a p95 of 1.95s while every
@@ -365,6 +379,48 @@ let
           observability.slo.latencySeconds.${sloClass};
     }
   ) serviceInventory.applications;
+  # A service-publication route can be registered without becoming a generated
+  # SLO probe. Only generate excusal series for applications that really
+  # contribute an endpoint SLI, so unused metadata cannot mint an orphan rule.
+  probedSloApplicationNames = lib.unique (
+    map (probe: serviceInventory.routes.${probe.routeKey}.application) serviceInventory.internalProbes
+  );
+  # Keep each registry reference and emitted signal distinct until the ordered
+  # endpoint-level max below. That prevents two signals for one application
+  # from producing duplicate recording-rule label sets.
+  excusalRule =
+    {
+      endpoint,
+      sloClass,
+      excusalReference,
+      signal,
+    }:
+    {
+      record = "endpoint:excusal_signal";
+      expr = ''max(excusal_active{signal="${signal}"})'';
+      labels = {
+        inherit endpoint;
+        slo_class = sloClass;
+        excusal = excusalReference;
+        inherit signal;
+      };
+    };
+  excusalRules = lib.concatMap (
+    applicationName:
+    let
+      application = config.servicePublication.applications.${applicationName};
+      sloClass = sloClassFor applicationName;
+    in
+    map (
+      excusalReference:
+      excusalRule {
+        endpoint = serviceInventory.applications.${applicationName}.canonical;
+        inherit sloClass;
+        inherit excusalReference;
+        signal = config.observability.slo.excusals.${excusalReference}.name;
+      }
+    ) application.excusedWhen
+  ) probedSloApplicationNames;
   # The join, shared by the alert and by its promtool case so the test cannot
   # drift from the rule it certifies. `on (endpoint, slo_class)` and not a bare
   # comparison: the objective series carries only those two labels, while the
@@ -378,6 +434,8 @@ let
   # are what keep this from parsing as `(breach and count(...)) <= count(...)`.
   sloLatencyAlertExpr =
     sloClass: "${sloLatencyBreachExpr sloClass} and on (endpoint, slo_class) ${sloWindowEligibility}";
+  sloErrorBudgetBreachAndEligibilityExpr = "endpoint:error_budget_remaining_7d < 0 and on (endpoint, slo_class) ${sloWindowEligibility}";
+  sloErrorBudgetExhaustedExpr = "${sloErrorBudgetBreachAndEligibilityExpr} and on (endpoint, slo_class) (endpoint:counted_minutes_7d > 2520)";
   # The instance matcher also excludes pre-normalization history whose label
   # was an IP address. It is better to show a gap across this one-time schema
   # migration than leak transport addresses back into a host legend.
@@ -906,9 +964,31 @@ let
             type = "state-timeline";
             w = 16;
             h = 10;
-            expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
+            description = "Up, down, and excused time for each endpoint.";
+            expr = "min by (endpoint) (endpoint:probe_success_unexcused or on (endpoint, slo_class) (endpoint:excused * 2))";
             legend = "{{endpoint}}";
-            mappings = viz.boolMapping { };
+            mappings = [
+              {
+                type = "value";
+                options = {
+                  "0" = {
+                    text = "Down";
+                    color = "red";
+                    index = 0;
+                  };
+                  "1" = {
+                    text = "Up";
+                    color = "green";
+                    index = 1;
+                  };
+                  "2" = {
+                    text = "Excused";
+                    color = "blue";
+                    index = 2;
+                  };
+                };
+              }
+            ];
             options = {
               perPage = 40;
               legend.showLegend = false;
@@ -2820,10 +2900,31 @@ let
             type = "state-timeline";
             w = 24;
             h = 14;
-            description = "Green bands are healthy runs; the red slivers are the outages.";
-            expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
+            description = "Green bands are healthy runs, red marks outages, and blue marks excused time.";
+            expr = "min by (endpoint) (endpoint:probe_success_unexcused or on (endpoint, slo_class) (endpoint:excused * 2))";
             legend = "{{endpoint}}";
-            mappings = viz.boolMapping { };
+            mappings = [
+              {
+                type = "value";
+                options = {
+                  "0" = {
+                    text = "Down";
+                    color = "red";
+                    index = 0;
+                  };
+                  "1" = {
+                    text = "Up";
+                    color = "green";
+                    index = 1;
+                  };
+                  "2" = {
+                    text = "Excused";
+                    color = "blue";
+                    index = 2;
+                  };
+                };
+              }
+            ];
             options = {
               # 29 probe series would otherwise paginate at Grafana's
               # default of 20 rows.
@@ -3151,6 +3252,26 @@ let
               }
             ];
             options.colorMode = "background";
+          })
+        ]
+        [
+          (viz.panel {
+            title = "Excused downtime";
+            type = "stat";
+            w = 6;
+            h = 6;
+            description = "Total excused downtime across endpoints in the rolling seven-day window.";
+            targets = [
+              {
+                expr = "sum(endpoint:excused_seconds_7d) or vector(0)";
+                instant = true;
+              }
+            ];
+            unit = "dtdurations";
+            options = {
+              colorMode = "none";
+              graphMode = "none";
+            };
           })
         ]
         [
@@ -4959,6 +5080,18 @@ in
           ];
       testExpr = shrinkSloWindow endpointAvailabilityExpr;
       testLatencyExpr = shrinkSloWindow endpointLatencyExpr;
+      # The excusal pipeline ranges over already-recorded one-minute samples,
+      # not a subquery. Keep that production shape in tests while shrinking
+      # the plain seven-day range to three minutes.
+      shrinkRecordedSloRange = builtins.replaceStrings [ "[7d]" ] [ "[3m]" ];
+      testProbeSuccessUnexcusedExpr = endpointProbeSuccessUnexcused;
+      testGoodMinutesExpr = shrinkRecordedSloRange endpointGoodMinutesExpr;
+      testCountedMinutesExpr = shrinkRecordedSloRange endpointCountedMinutesExpr;
+      testAvailabilityUnexcusedExpr = endpointAvailabilityUnexcusedExpr;
+      testRawAvailabilityExpr = testExpr;
+      testExcusedSecondsExpr = shrinkRecordedSloRange endpointExcusedSecondsExpr;
+      testSloErrorBudgetBreachAndEligibilityExpr = shrinkSloWindow sloErrorBudgetBreachAndEligibilityExpr;
+      testSloErrorBudgetExhaustedExpr = shrinkSloWindow sloErrorBudgetExhaustedExpr;
       # The registry's own objectives name real endpoints, so the test builds
       # its own through the same helper the rules use. The shape under test is
       # the join, not the seeded constants: one endpoint over the shared
@@ -5004,23 +5137,81 @@ in
           seconds = 0.25;
         }
       ];
+      # As with latency objectives, make the tests exercise the production
+      # rule generator rather than a hand-written lookalike expression.
+      testExcusalRules = map excusalRule [
+        {
+          endpoint = "excused.example";
+          sloClass = "internal";
+          excusalReference = "test-excused";
+          signal = "test-excused";
+        }
+        {
+          endpoint = "unexcused.example";
+          sloClass = "internal";
+          excusalReference = "test-unexcused";
+          signal = "test-unexcused";
+        }
+        {
+          endpoint = "two-signal.example";
+          sloClass = "internal";
+          excusalReference = "test-two-signal-active";
+          signal = "test-two-signal-active";
+        }
+        {
+          endpoint = "two-signal.example";
+          sloClass = "internal";
+          excusalReference = "test-two-signal-inactive";
+          signal = "test-two-signal-inactive";
+        }
+      ];
       testRules = pkgs.writeText "observability-slo-test-rules.json" (
         builtins.toJSON {
           groups = [
             {
               name = "observability-slo-test";
               interval = "1m";
-              rules = [
-                {
-                  record = "endpoint:availability_7d";
-                  expr = testExpr;
-                }
-                {
-                  record = "endpoint:latency_p95_7d";
-                  expr = testLatencyExpr;
-                }
-              ]
-              ++ testObjectiveRules;
+              rules =
+                testExcusalRules
+                ++ [
+                  {
+                    record = "endpoint:excused";
+                    expr = endpointExcusedExpr;
+                  }
+                  {
+                    record = "endpoint:probe_success_unexcused";
+                    expr = testProbeSuccessUnexcusedExpr;
+                  }
+                  {
+                    record = "endpoint:good_minutes_7d";
+                    expr = testGoodMinutesExpr;
+                  }
+                  {
+                    record = "endpoint:counted_minutes_7d";
+                    expr = testCountedMinutesExpr;
+                  }
+                  {
+                    record = "endpoint:availability_7d";
+                    expr = testAvailabilityUnexcusedExpr;
+                  }
+                  {
+                    record = "endpoint:availability_raw_7d";
+                    expr = testRawAvailabilityExpr;
+                  }
+                  {
+                    record = "endpoint:excused_seconds_7d";
+                    expr = testExcusedSecondsExpr;
+                  }
+                  {
+                    record = "endpoint:error_budget_remaining_7d";
+                    expr = endpointErrorBudgetRemainingExpr;
+                  }
+                  {
+                    record = "endpoint:latency_p95_7d";
+                    expr = testLatencyExpr;
+                  }
+                ]
+                ++ testObjectiveRules;
             }
           ];
         }
@@ -5050,6 +5241,217 @@ in
                     {
                       labels = ''endpoint:availability_7d{endpoint="x.example",slo_class="internal"}'';
                       value = 1;
+                    }
+                  ];
+                }
+              ];
+            }
+            # Per-signal rules retain their signal label until this aggregate:
+            # one active signal must excuse the endpoint even while another is
+            # inactive, without the rules colliding on a label set.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="two-signal.example",endpoint="two-signal.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "0";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="two-signal.example",endpoint="two-signal.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1";
+                }
+                {
+                  series = ''excusal_active{signal="test-two-signal-active"}'';
+                  values = "1";
+                }
+                {
+                  series = ''excusal_active{signal="test-two-signal-inactive"}'';
+                  values = "0";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:excusal_signal";
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:excusal_signal{endpoint="two-signal.example",slo_class="internal",excusal="test-two-signal-active",signal="test-two-signal-active"}'';
+                      value = 1;
+                    }
+                    {
+                      labels = ''endpoint:excusal_signal{endpoint="two-signal.example",slo_class="internal",excusal="test-two-signal-inactive",signal="test-two-signal-inactive"}'';
+                      value = 0;
+                    }
+                  ];
+                }
+                {
+                  expr = "endpoint:excused";
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:excused{endpoint="two-signal.example",slo_class="internal"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+                {
+                  expr = testProbeSuccessUnexcusedExpr;
+                  eval_time = "0m";
+                  exp_samples = [ ];
+                }
+              ];
+            }
+            # Error-budget exhaustion still waits for a meaningful amount of
+            # unexcused history. This endpoint is live and eligible at both
+            # sides of the shortened window, with a negative budget, but only
+            # four counted minutes -- well below production's 2,520-minute
+            # threshold -- so the production alert expression must stay empty.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="sparse.example",endpoint="sparse.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "0 0 0 0 0 0 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="sparse.example",endpoint="sparse.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 1 1 1 1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:counted_minutes_7d";
+                  eval_time = "6m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:counted_minutes_7d{endpoint="sparse.example",slo_class="internal"}'';
+                      # PromQL range selectors are left-open/right-closed, so
+                      # [3m] at t=6m contains the samples at t=4m, 5m, and 6m.
+                      value = 3;
+                    }
+                  ];
+                }
+                {
+                  expr = testSloErrorBudgetBreachAndEligibilityExpr;
+                  eval_time = "6m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:error_budget_remaining_7d{endpoint="sparse.example",slo_class="internal"}'';
+                      value = -65.66666666666667;
+                    }
+                  ];
+                }
+                {
+                  expr = testSloErrorBudgetExhaustedExpr;
+                  eval_time = "6m";
+                  exp_samples = [ ];
+                }
+              ];
+            }
+            # Excused failures disappear from both the numerator and the
+            # denominator. An otherwise identical unexcused failure remains in
+            # both, so this distinguishes a real time exclusion from merely
+            # overwriting failed samples with success.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="excused.example",endpoint="excused.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 0 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="excused.example",endpoint="excused.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''excusal_active{signal="test-excused"}'';
+                  values = "0 1 0";
+                }
+                {
+                  series = ''probe_success{job="blackbox-internal",instance="unexcused.example",endpoint="unexcused.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 0 1";
+                }
+                {
+                  series = ''up{job="blackbox-internal",instance="unexcused.example",endpoint="unexcused.example",slo_class="internal",scope="internal",resolver="link"}'';
+                  values = "1 1 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = "endpoint:good_minutes_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:good_minutes_7d{endpoint="excused.example",slo_class="internal"}'';
+                      value = 2;
+                    }
+                    {
+                      labels = ''endpoint:good_minutes_7d{endpoint="unexcused.example",slo_class="internal"}'';
+                      value = 2;
+                    }
+                  ];
+                }
+                {
+                  expr = "endpoint:counted_minutes_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:counted_minutes_7d{endpoint="excused.example",slo_class="internal"}'';
+                      value = 2;
+                    }
+                    {
+                      labels = ''endpoint:counted_minutes_7d{endpoint="unexcused.example",slo_class="internal"}'';
+                      value = 3;
+                    }
+                  ];
+                }
+                {
+                  expr = "endpoint:availability_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:availability_7d{endpoint="excused.example",slo_class="internal"}'';
+                      value = 1;
+                    }
+                    {
+                      labels = ''endpoint:availability_7d{endpoint="unexcused.example",slo_class="internal"}'';
+                      value = 0.6666666666666666;
+                    }
+                  ];
+                }
+                {
+                  expr = "endpoint:availability_raw_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:availability_raw_7d{endpoint="excused.example",slo_class="internal"}'';
+                      value = 0.6666666666666666;
+                    }
+                    {
+                      labels = ''endpoint:availability_raw_7d{endpoint="unexcused.example",slo_class="internal"}'';
+                      value = 0.6666666666666666;
+                    }
+                  ];
+                }
+                {
+                  expr = "endpoint:excused_seconds_7d";
+                  eval_time = "2m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:excused_seconds_7d{endpoint="excused.example",slo_class="internal"}'';
+                      value = 60;
+                    }
+                  ];
+                }
+                {
+                  # At t=1m the excused endpoint is failing but suppressed;
+                  # the identically failing unexcused endpoint remains down.
+                  expr = endpointDownExpr;
+                  eval_time = "1m";
+                  exp_samples = [
+                    {
+                      labels = ''endpoint:probe_success_unexcused{endpoint="unexcused.example",slo_class="internal"}'';
+                      value = 0;
                     }
                   ];
                 }
@@ -5602,33 +6004,64 @@ in
           {
             name = "observability-slo";
             interval = "1m";
-            rules = [
-              {
-                record = "endpoint:availability_7d";
-                # A removed probe otherwise keeps producing a rolling value
-                # until its last sample ages out of the range vector.
-                # Resolver/path copies are implementation details: one endpoint
-                # gets one conservative SLO series, using its worst view.
-                # The subquery evaluates one effective status per minute. Its
-                # `up` fallback counts a failed Blackbox scrape as downtime
-                # instead of letting absent probe samples improve the average.
-                # That collapse has to happen *inside* the subquery: the two
-                # fallback branches differ only in `__name__`, which
-                # `avg_over_time` drops, so any window holding both aborts the
-                # rule with "vector cannot contain metrics with the same
-                # labelset" and the whole dashboard reads NO DATA.
-                expr = endpointAvailabilityExpr;
-              }
-              {
-                record = "endpoint:error_budget_remaining_7d";
-                expr = "1 - ((1 - endpoint:availability_7d) / ${toString (1.0 - observability.slo.availability)})";
-              }
-              {
-                record = "endpoint:latency_p95_7d";
-                expr = endpointLatencyExpr;
-              }
-            ]
-            ++ latencyObjectiveRules;
+            rules =
+              excusalRules
+              ++ [
+                {
+                  record = "endpoint:excused";
+                  expr = endpointExcusedExpr;
+                }
+                {
+                  record = "endpoint:probe_success_unexcused";
+                  expr = endpointProbeSuccessUnexcused;
+                }
+                {
+                  record = "endpoint:good_minutes_7d";
+                  expr = endpointGoodMinutesExpr;
+                }
+                {
+                  record = "endpoint:counted_minutes_7d";
+                  expr = endpointCountedMinutesExpr;
+                }
+                {
+                  record = "endpoint:availability_7d";
+                  # Since 2026-09-10 this excludes excused minutes rather than
+                  # reporting raw probe availability. The new recorded inputs
+                  # replace their history within one seven-day window, so the
+                  # meaning self-heals without a data migration; masking both
+                  # numerator and denominator keeps excused time out of the SLO.
+                  expr = endpointAvailabilityUnexcusedExpr;
+                }
+                {
+                  record = "endpoint:availability_raw_7d";
+                  # A removed probe otherwise keeps producing a rolling value
+                  # until its last sample ages out of the range vector.
+                  # Resolver/path copies are implementation details: one endpoint
+                  # gets one conservative SLO series, using its worst view.
+                  # The subquery evaluates one effective status per minute. Its
+                  # `up` fallback counts a failed Blackbox scrape as downtime
+                  # instead of letting absent probe samples improve the average.
+                  # That collapse has to happen *inside* the subquery: the two
+                  # fallback branches differ only in `__name__`, which
+                  # `avg_over_time` drops, so any window holding both aborts the
+                  # rule with "vector cannot contain metrics with the same
+                  # labelset" and the whole dashboard reads NO DATA.
+                  expr = endpointAvailabilityExpr;
+                }
+                {
+                  record = "endpoint:excused_seconds_7d";
+                  expr = endpointExcusedSecondsExpr;
+                }
+                {
+                  record = "endpoint:error_budget_remaining_7d";
+                  expr = endpointErrorBudgetRemainingExpr;
+                }
+                {
+                  record = "endpoint:latency_p95_7d";
+                  expr = endpointLatencyExpr;
+                }
+              ]
+              ++ latencyObjectiveRules;
           }
           {
             name = "observability-alerts";
@@ -5681,7 +6114,7 @@ in
               }
               {
                 alert = "EndpointDown";
-                expr = "${endpointProbeSuccess} == 0";
+                expr = endpointDownExpr;
                 for = "5m";
                 labels.severity = "critical";
                 annotations.summary = "Endpoint {{ $labels.endpoint }} is down";
@@ -5754,7 +6187,7 @@ in
                 # same live probe at the far edge of the window also prevents
                 # newly added targets from exhausting their budget during
                 # their first week.
-                expr = "endpoint:error_budget_remaining_7d < 0 and on (endpoint, slo_class) ${sloWindowEligibility}";
+                expr = sloErrorBudgetExhaustedExpr;
                 for = "15m";
                 labels.severity = "critical";
                 annotations.summary = "{{ $labels.endpoint }} exhausted its 99% seven-day error budget";
@@ -5991,6 +6424,10 @@ in
         {
           assertion = everyProbedEndpointHasObjective;
           message = "Every probed endpoint needs an endpoint:latency_objective_seconds series; without one the latency alert's join drops it and that endpoint can never alert.";
+        }
+        {
+          assertion = everyApplicationExcusalIsDeclared;
+          message = "Every application excusedWhen signal must be declared in observability.slo.excusals.";
         }
         {
           assertion = !telegramContactRouted;

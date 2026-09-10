@@ -122,6 +122,11 @@ let
           default = null;
           description = "p95 latency objective for this application's probes, in seconds. Null inherits observability.slo.latencySeconds for the application's class (public or internal).";
         };
+        excusedWhen = mkOption {
+          type = types.listOf types.str;
+          default = [ ];
+          description = "Declared planned-downtime excusal signals that apply to this application.";
+        };
         homepage = mkOption {
           type = types.submodule {
             options = {
