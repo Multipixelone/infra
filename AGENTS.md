@@ -15,9 +15,22 @@ runners; no hosts are aarch64). Declared in `modules/systems.nix`.
 - `just iso` — build installer ISO
 - `just install <host> <ip>` — install a declared host onto bare metal via `nix run .#nixos-anywhere` (see [`docs/new-host.md`](docs/new-host.md))
 - `just gc` — garbage collect + wipe old generations
-- `nix flake check` — run all checks (CI does this too)
+- `nix flake check` — run all checks (normally leave this to CI; it is not default local validation)
 
 **NEVER use bare `nix build` or `nixos-rebuild`.**
+
+## Validation policy
+
+For host-specific Nix changes, use the narrowest validation ladder: first
+`nix eval .#nixosConfigurations.<host>.config.system.build.toplevel.drvPath`, then
+`nh os build -H <host> --dry`, and an actual host build only when needed.
+
+Do not run `nix flake check` or other long/full validation commands in the
+orchestrator foreground unless explicitly requested; full flake-wide checks should
+normally be left to CI. Delegate every independent heavy validation lane to its own
+background `@fixer`. Each fixer must use an explicit extended Bash timeout, redirect
+full stdout and stderr to a unique file under `/tmp/opencode`, and return only the
+command, exit code, duration, pass/fail, smallest actionable excerpt, and log path.
 
 Every node carries its own name as a colmena tag alongside its roles, so `--on @<host>` targets a single machine (`just colmena-apply-tag iot`) and `--on @server` targets a role.
 

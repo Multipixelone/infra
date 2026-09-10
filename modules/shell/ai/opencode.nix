@@ -148,11 +148,11 @@
             variant = "xhigh";
           };
           librarian = {
-            model = "spark";
+            model = "luna";
             variant = "low";
           };
           explorer = {
-            model = "spark";
+            model = "luna";
             variant = "low";
           };
           designer = {
@@ -230,15 +230,15 @@
           };
           librarian = {
             model = [
-              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
+              (modelVariant "low" models.spark)
               (modelVariant "low" models.deepseek-flash)
             ];
           };
           explorer = {
             model = [
-              (modelVariant "low" models.spark)
               (modelVariant "low" models.luna)
+              (modelVariant "low" models.spark)
               (modelVariant "low" models.deepseek-flash)
             ];
           };
@@ -258,6 +258,9 @@
               (modelVariant "high" models.sol)
               (modelVariant "high" models.luna)
             ];
+            orchestratorPrompt = ''
+              @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. Require an explicit extended Bash timeout, full stdout/stderr redirected to a unique `/tmp/opencode` log, and a compact final report with command, exit code, duration, pass/fail, smallest actionable excerpt, and log path.
+            '';
           };
           # Spark is text-only. Keep the complete observer chain multimodal.
           observer = {
