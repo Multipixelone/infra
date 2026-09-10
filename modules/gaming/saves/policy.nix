@@ -231,14 +231,21 @@
       # app bundle. The cores are downloaded once through RetroArch's own Online
       # Updater, and the validation report is what holds them to the policy.
       #
-      # PATHS ARE THE DOCUMENTED DEFAULTS, NOT MEASURED ONES. macOS splits
-      # RetroArch across two roots -- saves/states under ~/Documents/RetroArch,
-      # everything else under ~/Library/Application Support/RetroArch -- and the
-      # split is what the Cloud Sync documentation and RetroArch's own macOS
-      # save discovery both describe. Confirm each one against Settings ->
-      # Directory after the first launch and correct it here if the build on
-      # that Mac disagrees. A wrong `saves` path does not error; it forks the
-      # save history, which is the exact failure this policy exists to prevent.
+      # PATHS ARE MEASURED, NOT ASSUMED: read out of the live retroarch.cfg on
+      # hylia (RetroArch 1.22.2, `cloud_sync_sync_mode` present). macOS splits
+      # RetroArch across two roots, and the split does NOT fall where the
+      # documentation implies: saves, states AND playlists are under
+      # ~/Documents/RetroArch, while config, downloads, cores and thumbnails
+      # are under ~/Library/Application Support/RetroArch. The documented
+      # default put playlists in the second root; this build puts them in the
+      # first, which is why every row here has to be read off the device rather
+      # than inferred. A wrong `saves` path does not error; it forks the save
+      # history, which is the exact failure this policy exists to prevent.
+      #
+      # `system` is the one row that is deliberately NOT what the device says.
+      # RetroArch ships system_directory as ~/Documents/RetroArch/system; the
+      # policy repoints it at the Syncthing BIOS replica, so this is a value
+      # the operator sets in Settings -> Directory, not one to reconcile back.
       hylia = {
         platform = "darwin";
         managed = false;
@@ -260,7 +267,13 @@
           bios = "~/Games/RomM/bios";
           saves = "~/Documents/RetroArch/saves";
           states = "~/Documents/RetroArch/states";
-          playlists = "~/Library/Application Support/RetroArch/playlists";
+          # MEASURED on hylia, and NOT the Application Support root the other
+          # non-save directories use: playlist_directory reads
+          # ~/Documents/RetroArch/playlists, and the builtin history/favorites
+          # .lpl files sit under it at playlists/builtin/. rgui_config_directory
+          # below really is under Application Support, so the split runs
+          # through the middle of this attrset rather than around it.
+          playlists = "~/Documents/RetroArch/playlists";
           config = "~/Library/Application Support/RetroArch/config";
           # system_directory points AT the synced BIOS replica rather than the
           # app's own system/ dir: one tree, delivered by Syncthing, read by
