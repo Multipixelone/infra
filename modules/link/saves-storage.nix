@@ -66,6 +66,12 @@ let
   # an assertion below keeps the derivation honest if the policy moves either.
   volume = dirOf dataDir;
   subvolName = baseNameOf dataDir;
+
+  # btrbk's snapshot naming, bound once and used twice: the instance config far
+  # below sets it, and the selector's snapshot_timestamp parses it back. They
+  # are the same binding so they cannot drift -- see the function's comment for
+  # why the name, and not stat(2), is where a snapshot's creation time lives.
+  timestampFormat = "long-iso";
   snapshotDirRelative = lib.removePrefix "${volume}/" snapshotDir;
 
   # Recovery never writes into the live namespace, so it needs somewhere else to
@@ -89,6 +95,38 @@ let
   manifestPath = "${inventory.clients.link.paths.coreAssets}/manifest.local";
 
   q = lib.escapeShellArg;
+
+  # Creation time of one btrbk snapshot, in seconds, from its name. Expects
+  # $PREFIX to hold "<subvolName>." and returns non-zero for anything that is
+  # not a snapshot of this subvolume.
+  #
+  # NOT `stat -c %W`. A btrfs snapshot's root inode is a copy of the source
+  # subvolume's, otime included, so EVERY snapshot here reports the same %W --
+  # the moment the save subvolume itself was created -- and ranking by it made
+  # every candidate compare equal. The "newest" snapshot was then whichever
+  # readdir returned first, and the freshness guard measured lag against a
+  # timestamp frozen at subvolume creation, so the lag grew without bound and
+  # failed the offsite backup every night while btrbk was snapshotting hourly
+  # and correctly. `btrfs subvolume show` does report the real creation time,
+  # but needs CAP_SYS_ADMIN, which the operator tooling deliberately lacks.
+  #
+  # The name is the only per-snapshot creation time an unprivileged caller can
+  # read. long-iso is YYYYMMDDThhmmss±hhmm: seconds-resolution and
+  # zone-qualified, so it is unique and correctly ordered even across the DST
+  # fallback hour, which is why the instance pins that format.
+  snapshotTimestampFn = ''
+    snapshot_timestamp() {
+      local base stamp iso
+      base=$(basename "$1")
+      stamp=''${base#"$PREFIX"}
+      case "$stamp" in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9][-+][0-9][0-9][0-9][0-9]) ;;
+        *) return 1 ;;
+      esac
+      iso="''${stamp:0:4}-''${stamp:4:2}-''${stamp:6:2}T''${stamp:9:2}:''${stamp:11:2}:''${stamp:13:2}''${stamp:15:3}:''${stamp:18:2}"
+      date -d "$iso" +%s 2>/dev/null || return 1
+    }
+  '';
 
   # Built once and shared by perSystem.packages (operator tooling, shellcheck'd
   # and `nix run .#<name>`-able) and by link's own module (the metrics emitter
@@ -222,6 +260,7 @@ let
         DATA=${q dataDir}
         PREFIX=${q "${subvolName}."}
         MODE=report
+        ${snapshotTimestampFn}
         GUARD=0
         # Relative limit: how far the newest snapshot may trail the newest save
         # write. This, not an absolute age, is the correct staleness test --
@@ -277,14 +316,9 @@ let
           # working copy or a snapshot btrfs never finished. Neither is a version
           # of anything, and backing one up would ship a torn tree.
           [ "$(btrfs property get -ts "$candidate" ro 2>/dev/null || true)" = "ro=true" ] || continue
-          # %W is the btrfs otime, which for a snapshot is its creation time.
-          # Unlike `btrfs subvolume show` it needs no privileges, and unlike
-          # parsing the name out of timestamp_format it cannot be broken by
-          # someone changing that format later.
-          ts=$(stat -c %W "$candidate")
-          case "$ts" in
-            *[!0-9]*|"") ts=0 ;;
-          esac
+          # A candidate that carries the prefix but no parseable stamp is not
+          # a btrbk snapshot of this subvolume, whatever else it is.
+          ts=$(snapshot_timestamp "$candidate") || continue
           [ "$ts" -gt "$best_ts" ] || continue
           best_ts="$ts"
           best="$candidate"
@@ -379,7 +413,7 @@ let
       text = ''
         SNAPS=${q snapshotDir}
         PREFIX=${q "${subvolName}."}
-
+        ${snapshotTimestampFn}
         if [ $# -gt 0 ]; then
           case "$1" in
             -h|--help)
@@ -410,13 +444,14 @@ let
             ro=false) state=WRITABLE ;;
             *)        state=unknown ;;
           esac
-          ts=$(stat -c %W "$candidate")
-          case "$ts" in
-            *[!0-9]*|"") ts=0 ;;
-          esac
+          if ts=$(snapshot_timestamp "$candidate"); then
+            created=$(date -d "@$ts" -Is)
+          else
+            created="(unparseable name)"
+          fi
           files=$(find "$candidate" -type f 2>/dev/null | wc -l)
           printf '%-44s  %-25s  %-9s  %s\n' \
-            "$base" "$(date -d "@$ts" -Is)" "$state" "$files"
+            "$base" "$created" "$state" "$files"
           found=$(( found + 1 ))
         done < <(find "$SNAPS" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 
@@ -1427,7 +1462,7 @@ in
           # happens twice: two snapshots want one name. "long-iso" carries seconds
           # and the UTC offset, so the repeated hour produces two distinct,
           # correctly-ordered names.
-          timestamp_format = "long-iso";
+          timestamp_format = timestampFormat;
           volume.${volume} = {
             snapshot_dir = snapshotDirRelative;
             # No `target`: snapshot-only. Snapshots are always read-only in btrbk
