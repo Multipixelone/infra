@@ -6333,7 +6333,7 @@ in
           # shellcheck disable=SC1091
           source ${runtimeGrafanaSecret}
           set +a
-          export GRAFANA_URL="http://${grafana.backendAddress}:${toString grafana.port}"
+          export GRAFANA_URL="https://${grafanaCanonical}"
           export GRAFANA_USERNAME=admin
           export GRAFANA_PASSWORD="$GRAFANA_ADMIN_PASSWORD"
           unset GRAFANA_ADMIN_PASSWORD GRAFANA_SECRET_KEY
