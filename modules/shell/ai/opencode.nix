@@ -101,7 +101,7 @@
             mcps = [ ];
           };
           fixer = {
-            skills = [ ];
+            skills = [ "agent-run-long" ];
             mcps = [ ];
           };
           observer = {
@@ -259,7 +259,7 @@
               (modelVariant "high" models.luna)
             ];
             orchestratorPrompt = ''
-              @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. Require an explicit extended Bash timeout, full stdout/stderr redirected to a unique `/tmp/opencode` log, and a compact final report with command, exit code, duration, pass/fail, smallest actionable excerpt, and log path.
+              @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. On Linux, use the `agent-run-long` skill and helper rather than constructing logging or timing wrappers. Return its compact report fields.
             '';
           };
           # Spark is text-only. Keep the complete observer chain multimodal.

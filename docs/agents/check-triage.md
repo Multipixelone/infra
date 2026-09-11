@@ -14,11 +14,10 @@ Purpose: classify `nix flake check` failures quickly and route to the correct fi
 
 ## Procedure
 
-1. Run checks and capture key failing section:
-
-```bash
-nix flake check
-```
+1. Start from the reported CI failure and capture its key failing section. Do
+   not run `nix flake check` by default: full checks stay in CI. If a user
+   explicitly requests local full validation, delegate it to a background fixer
+   using the `agent-run-long` skill.
 
 2. Classify failure type:
 
@@ -35,7 +34,7 @@ nix flake check
 4. Provide minimal reproduction command for the failing target when possible:
 
 ```bash
-nix build .#checks.x86_64-linux.<check-name> --show-trace
+agent-run-long --label check-build --timeout 30m -- nix build .#checks.x86_64-linux.<check-name> --show-trace
 ```
 
 5. Suggest next action:

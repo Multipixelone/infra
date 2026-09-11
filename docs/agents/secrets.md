@@ -84,13 +84,10 @@ Tell them to paste the secret value into the editor and save. If relevant, sugge
 
 ## Step 5: Validate
 
-```bash
-# Check that the module evaluates (secret file must exist in inputs.secrets)
-nix flake check --no-build
-
-# Full validation
-nix flake check
-```
+Use the narrowest relevant evaluation only when needed; verify that the secret
+file exists in `inputs.secrets`. Full `nix flake check` validation stays in CI.
+If a user explicitly requests it locally, delegate it to a background fixer
+using the `agent-run-long` skill.
 
 ## Output Contract
 

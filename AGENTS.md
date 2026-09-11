@@ -12,10 +12,10 @@
 - Never run `nix build` without an explicit installable, and never run
   `nixos-rebuild`.
 - Leave full checks to CI by default. If local long-running or full validation
-  is needed, delegate each validation task to a background `@fixer` with an
-  extended timeout and a unique log under `/tmp/opencode`. Run it in the
-  orchestrator foreground only when explicitly requested. If delegation is
-  unavailable, report the limitation rather than silently running it there.
+  is needed, delegate each validation task to a background `@fixer` and follow
+  the inherited `agent-run-long` skill. Run it in the orchestrator foreground
+  only when explicitly requested. If delegation is unavailable, report the
+  limitation rather than silently running it there.
 - `~/.ssh/colmena` is deliberately outside Nix and agenix. A rebuild restores
   SSH configuration, not this private key. Rotate it with overlapping public-key
   authorization until the new key works on every node.

@@ -90,9 +90,11 @@ Decision tree:
 # Track new file (REQUIRED for import-tree)
 git add modules/<path>/<service>.nix
 
-# Validate
-nix flake check
 ```
+
+Use the narrowest relevant evaluation or existing check for the service. Full
+`nix flake check` validation stays in CI; if explicitly requested locally,
+delegate it to a background fixer using the `agent-run-long` skill.
 
 ## Output Contract
 

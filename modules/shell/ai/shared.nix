@@ -33,6 +33,9 @@
 
         ## Env
         Nix-managed NixOS+HM. Shell-scripts: prefer fish (no bash syntax). Terminal: foot+zellij. Bash tool: zsh, not fish — prefix `eval "$(direnv export zsh 2>/dev/null)"` when needed.
+
+        ## Long builds and tests (Linux)
+        On Linux, load and use the `agent-run-long` skill before long builds, tests, or Nix validation. Invoke `agent-run-long --label NAME --timeout 30m -- COMMAND…` through the Bash tool with an outer timeout of at least `(inner seconds + 60) × 1000` milliseconds (30m: `1860000`). The helper owns logging, timing, status, excerpts, and cleanup; do not add wrappers. Keep full validation delegated to background fixers; if unavailable, report the limitation.
       '';
     };
 
