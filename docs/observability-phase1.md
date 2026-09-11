@@ -78,6 +78,90 @@ from only a partial first week of data. Dashboard and SLO queries collapse
 resolver-level copies to the logical endpoint FQDN using the worst
 availability/latency result.
 
+## Duration semantics: evaluator state versus durable incident history
+
+Treat `ALERTS` and `ALERTS_FOR_STATE` as Prometheus evaluator state, not an
+incident ledger. `Longest evaluator age` and `Firing alerts (evaluator age)` calculate
+`time() - ALERTS_FOR_STATE...`; their displayed age is the age of the current
+matching rule evaluation state, including pending time and the rule's `for`
+period, rather than authoritative outage age. A reload can preserve matching
+state in memory and does not inherently reset alerts. Restart recovery depends
+on retained state, matching identity, and bounded restoration; rule, group, or
+label changes and state loss may reset or adjust its timestamp. The repository
+does not explicitly override Prometheus recovery flags: upstream defaults are a
+one-hour outage tolerance and ten-minute grace period. `NixOSHostExporterDown`
+has `for = "5m"`, and short-`for` rules may therefore not restore. These are
+semantics, not a claim that every restart resets state or that recovery proves
+continuous incident history.
+
+| Panels                                                                 | Intended semantics                                  | Do not use as / remediation                                                                                                                                     |
+| ---------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Longest evaluator age`, `Firing alerts (evaluator age)`               | Evaluator-state age, including pending/`for`        | Incident or outage age; label the value as evaluator state/age.                                                                                                 |
+| `Alert evaluator state over time`, `Firing alert count over time`      | Retained evaluator history                          | Confirmed recovery or uninterrupted history; gaps can also reflect missing series or evaluator interruption.                                                    |
+| `Evaluator timestamp changes`                                          | Observed changes to evaluator activation timestamps | Durable incident-episode count. It excludes first observations and pending-to-firing when the timestamp is unchanged, and can include reactivation or rebasing. |
+| `Load and host uptime`, `NixOS hosts`, `Host uptime`, `Blocky process` | Host/process uptime and restart telemetry           | Service-incident duration. Keep them for restart diagnosis.                                                                                                     |
+
+Use this vocabulary in dashboards and runbooks: **evaluator-state age** is the
+age of current rule state; **host/process uptime** is time since boot or process
+start; **event freshness** is age since an application-recorded successful
+event; **retained-window availability** is availability computed from retained
+samples; and **durable incident age** is elapsed time for an incident held in a
+durable event system. Survival across telemetry loss requires state persisted
+outside telemetry history; a persisted last-success timestamp is event
+freshness, not incident lifecycle.
+
+For a bounded “time since last successful observation” over retained samples,
+use a query such as:
+
+```promql
+time() -
+max_over_time(
+  (
+    timestamp(up{job="example"})
+    and (up{job="example"} == 1)
+  )[30d:1m]
+)
+```
+
+The scrape timestamp becomes a value before success filtering. This is time
+since the latest successful scrape selected by the subquery, not incident
+duration; grid resolution, scrape jitter, and short successes matter. No
+success returns no series, label changes split history, and removed identities
+need separate handling. The lookback is not guaranteed retention, and a broad
+30-day subquery must not run on an auto-refresh dashboard. Do **not** use
+`timestamp(last_over_time((up == 1)[30d:]))`: `last_over_time` returns the
+selected value, and the outer `timestamp()` describes its instant-vector result
+rather than reliably preserving the selected sample timestamp. The 30-day range
+is an upper bound, not a guarantee: the 2 GB retention limit may shorten it.
+Pair freshness with an expected-target/missing-target signal (for example, a
+suitably scoped `absent(up{...})`); `absent` cannot distinguish an intentionally
+removed target from a failed one, and a target removed beyond the retained
+window has no history to query.
+
+For user-impact availability, prefer the existing blackbox or
+application-health signals over exporter `up`: `up` establishes that Prometheus
+scraped an exporter, not that users could use the service. For a durable
+successful-event age, follow the backup precedent: record a last-success
+timestamp only after the application operation succeeds, rather than deriving
+it from rule state.
+
+Marin evidence, audited 2026-09-11 over the preceding seven days, illustrates
+the distinction: retained `up == 0` samples begin at approximately
+2026-09-05 06:50 UTC; the Prometheus process start timestamp is
+2026-09-10 13:27:56 UTC; and the evaluator timestamp rebased about two seconds
+later. The window contains 13 observed process-start timestamp changes. These
+are observed changes, not crash determinations, and gaps do not establish an
+uninterrupted real-world outage.
+
+Prometheus defines pending and `for` alert-rule behavior in its
+[alerting-rule documentation](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
+Its [`--rules.alert.for-outage-tolerance` and
+`--rules.alert.for-grace-period` controls](https://prometheus.io/docs/prometheus/latest/command-line/prometheus)
+provide bounded recovery behavior, not durable incident history. See also the
+[PromQL function reference](https://prometheus.io/docs/prometheus/latest/querying/functions/),
+[staleness semantics](https://prometheus.io/docs/prometheus/latest/querying/basics/#staleness),
+and Grafana's [target-down and missing-target guidance](https://grafana.com/docs/grafana/next/datasources/prometheus/alerting.md).
+
 ## Privacy boundary
 
 Alloy drops journal entries carrying `_SYSTEMD_USER_UNIT` before they reach

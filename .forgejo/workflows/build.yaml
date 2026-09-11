@@ -33,11 +33,11 @@
         },
         {
           "name": "Configure attic",
-          "run": "set -euo pipefail\n\nif [ -n \"${RUNNER_TEMP:-}\" ]; then\n  atticConfigDir=\"$(mktemp -d \"$RUNNER_TEMP/attic-config.XXXXXX\")\"\nelse\n  atticConfigDir=\"$(mktemp -d)\"\nfi\n\n{\n  echo \"XDG_CONFIG_HOME=$atticConfigDir\"\n} >> \"$GITHUB_ENV\"\necho \"/nix/store/l0yvxii1d12kla79rq40f2q9cax9gzvf-attic/bin\" >> \"$GITHUB_PATH\"\n"
+          "run": "set -euo pipefail\n\nif [ -n \"${RUNNER_TEMP:-}\" ]; then\n  atticConfigDir=\"$(mktemp -d \"$RUNNER_TEMP/attic-config.XXXXXX\")\"\nelse\n  atticConfigDir=\"$(mktemp -d)\"\nfi\n\n{\n  echo \"XDG_CONFIG_HOME=$atticConfigDir\"\n} >> \"$GITHUB_ENV\"\necho \"/nix/store/qck9k2266imgz0nargns3j7yikqk04np-attic/bin\" >> \"$GITHUB_PATH\"\n"
         },
         {
           "name": "Login to attic",
-          "run": "/nix/store/qra45q2lnx30sj2g755k29137lzmrvb3-attic-0-unstable-2026-07-06/bin/attic login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
+          "run": "/nix/store/jq3815sanklcvgc2wr8qripwq5hvpgjk-attic-0-unstable-2026-07-06/bin/attic login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
         },
         {
           "name": "Seed pending statuses",

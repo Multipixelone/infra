@@ -90,7 +90,7 @@ in
         }
       );
       validator = pkgs.writeText "validate-grafana-dashboards.py" ''
-        import json, re, sys
+        import copy, json, re, sys
 
         dashboards = json.load(open(sys.argv[1]))
         config = json.load(open(sys.argv[2]))
@@ -116,6 +116,65 @@ in
 
         def fail(dashboard, message):
             problems.append(f"{dashboard}: {message}")
+
+
+        # These four panels share one evaluator-state contract. Keep it local to
+        # the alerts dashboard: generic title/description scanning would make
+        # unrelated dashboard wording part of this structural check.
+        def alert_duration_contract_problems(dashboard):
+            required_titles = [
+                "Longest evaluator age",
+                "Firing alerts (evaluator age)",
+                "Alert evaluator state over time",
+                "Evaluator timestamp changes",
+            ]
+            errors = []
+            by_title = {}
+            panels = dashboard.get("panels", [])
+            for title in required_titles:
+                matches = [panel for panel in panels if panel.get("title") == title]
+                if len(matches) != 1:
+                    errors.append(f"expected exactly one {title!r} panel, found {len(matches)}")
+                else:
+                    by_title[title] = matches[0]
+
+            table = by_title.get("Firing alerts (evaluator age)")
+            if table is not None:
+                targets = table.get("targets", [])
+                if len(targets) != 1 or not targets[0].get("instant") or targets[0].get("format") != "table":
+                    errors.append("firing evaluator-age table target must remain instant/table")
+                organize = next(
+                    (item for item in table.get("transformations", []) if item.get("id") == "organize"),
+                    None,
+                )
+                if organize is None or organize.get("options", {}).get("renameByName", {}).get("Value") != "Evaluator age":
+                    errors.append("firing evaluator-age table must rename Value to 'Evaluator age'")
+                sort = next(
+                    (item for item in table.get("transformations", []) if item.get("id") == "sortBy"),
+                    None,
+                )
+                sort_fields = sort.get("options", {}).get("sort", []) if sort else []
+                if len(sort_fields) != 1 or sort_fields[0].get("field") != "Evaluator age" or sort_fields[0].get("desc") is not True:
+                    errors.append("firing evaluator-age table must sort descending by 'Evaluator age'")
+                overrides = [
+                    override
+                    for override in table.get("fieldConfig", {}).get("overrides", [])
+                    if override.get("matcher", {}).get("id") == "byName"
+                    and override.get("matcher", {}).get("options") == "Evaluator age"
+                ]
+                if len(overrides) != 1 or not any(
+                    prop.get("id") == "unit" and prop.get("value") == "dtdurations"
+                    for prop in overrides[0].get("properties", [])
+                ):
+                    errors.append("firing evaluator-age table needs one duration override for 'Evaluator age'")
+
+            timeline = by_title.get("Alert evaluator state over time")
+            if timeline is not None:
+                if timeline.get("fieldConfig", {}).get("defaults", {}).get("noValue") != "No evaluator sample":
+                    errors.append("evaluator timeline noValue must be 'No evaluator sample'")
+                if timeline.get("options", {}).get("connectNulls") is not False:
+                    errors.append("evaluator timeline gaps must not be connected")
+            return errors
 
 
         for name, dashboard in sorted(dashboards.items()):
@@ -295,6 +354,37 @@ in
                 if ptype in ("state-timeline", "status-history"):
                     if not defaults.get("mappings") and not thresholds:
                         fail(name, f"{title}: {ptype} needs mappings or thresholds to colour states")
+
+            if name == "alerts.json":
+                for message in alert_duration_contract_problems(dashboard):
+                    fail(name, message)
+
+        if "alerts.json" not in dashboards:
+            fail("alerts.json", "missing alerts dashboard")
+        else:
+            # Regression fixtures mutate in-memory copies only. They prove this
+            # narrow contract rejects the former sort label and timeline text.
+            alerts = dashboards["alerts.json"]
+            old_sort = copy.deepcopy(alerts)
+            old_sort_table = next(
+                panel for panel in old_sort["panels"]
+                if panel.get("title") == "Firing alerts (evaluator age)"
+            )
+            old_sort_transform = next(
+                item for item in old_sort_table["transformations"] if item.get("id") == "sortBy"
+            )
+            old_sort_transform["options"]["sort"][0]["field"] = "Active for"
+            if not alert_duration_contract_problems(old_sort):
+                fail("alerts.json", "fixture with old 'Active for' sort unexpectedly passed")
+
+            old_timeline = copy.deepcopy(alerts)
+            old_timeline_panel = next(
+                panel for panel in old_timeline["panels"]
+                if panel.get("title") == "Alert evaluator state over time"
+            )
+            old_timeline_panel["fieldConfig"]["defaults"]["noValue"] = "OK"
+            if not alert_duration_contract_problems(old_timeline):
+                fail("alerts.json", "fixture with old timeline 'OK' unexpectedly passed")
 
         if problems:
             print("Grafana dashboard validation failed:", file=sys.stderr)

@@ -691,7 +691,7 @@ let
             options = viz.gaugePresets.segmented;
           })
           (viz.panel {
-            title = "Load and uptime";
+            title = "Load and host uptime";
             # A table, not a stat: three metrics across every host is a grid,
             # and a `stat` renders a grid as one big labelled number per
             # series. At four hosts that was twelve numbers in a third of a
@@ -700,6 +700,7 @@ let
             type = "table";
             w = 8;
             h = 7;
+            description = "Host uptime is time since the host booted, not service availability or incident duration.";
             targets = [
               {
                 expr = "max by (instance) (node_load1{${hostJobSelector}})";
@@ -723,7 +724,7 @@ let
               columns = [
                 "Load 1m"
                 "Cores"
-                "Uptime"
+                "Host uptime"
               ];
             };
             unit = viz.units.short;
@@ -746,7 +747,7 @@ let
                   value = 0;
                 }
               ])
-              (viz.overrideByName "Uptime" [
+              (viz.overrideByName "Host uptime" [
                 {
                   id = "unit";
                   value = viz.units.duration;
@@ -1005,7 +1006,7 @@ let
         "provisioned"
         "alerts"
       ];
-      description = "Prometheus-side alerting rules. There is no Alertmanager: rules evaluate in Prometheus and surface here and as the ALERTS series.";
+      description = "Prometheus-side alerting rules. There is no Alertmanager: rules evaluate in Prometheus and surface here and as the ALERTS series. Ages and history describe Prometheus evaluator state, not durable incidents; missing samples and zero fallbacks do not confirm recovery.";
       from = "now-24h";
       rows = [
         [ (viz.row "Right now") ]
@@ -1090,10 +1091,11 @@ let
             options.graphMode = "none";
           })
           (viz.panel {
-            title = "Longest active";
+            title = "Longest evaluator age";
             type = "stat";
             w = 8;
             h = 6;
+            description = "Maximum age since the stored activation timestamp among firing alerts. Includes pending/for time and may reset or be adjusted during state restoration or identity changes. Not incident or outage duration. Zero is the fallback when no matching firing state is returned.";
             # ALERTS_FOR_STATE carries no `alertstate` label, so an unqualified
             # `and` matches nothing at all; the label must be ignored.
             expr = ''max(time() - (ALERTS_FOR_STATE and ignoring(alertstate) ALERTS{alertstate="firing"})) or vector(0)'';
@@ -1117,11 +1119,11 @@ let
         ]
         [
           (viz.panel {
-            title = "Active alerts";
+            title = "Firing alerts (evaluator age)";
             type = "table";
             w = 24;
             h = 11;
-            description = "Duration counts from when the alert became pending, so it includes each rule's `for` window.";
+            description = "Firing alerts with matching evaluator activation timestamps. Evaluator age includes pending/for time and may reset or be adjusted when state changes. It is not incident or outage duration; an empty result does not confirm service health.";
             targets = [
               {
                 expr = ''time() - (ALERTS_FOR_STATE and ignoring(alertstate) ALERTS{alertstate="firing"})'';
@@ -1129,7 +1131,7 @@ let
                 format = "table";
               }
             ];
-            noValue = "Nothing is firing.";
+            noValue = "—";
             transformations = [
               {
                 id = "organize";
@@ -1158,7 +1160,7 @@ let
                     resolver = "Resolver";
                     scope = "Scope";
                     slo_class = "SLO class";
-                    Value = "Active for";
+                    Value = "Evaluator age";
                   };
                 };
               }
@@ -1168,7 +1170,7 @@ let
                   fields = { };
                   sort = [
                     {
-                      field = "Active for";
+                      field = "Evaluator age";
                       desc = true;
                     }
                   ];
@@ -1213,7 +1215,7 @@ let
               {
                 matcher = {
                   id = "byName";
-                  options = "Active for";
+                  options = "Evaluator age";
                 };
                 properties = [
                   {
@@ -1275,14 +1277,14 @@ let
             ];
           })
         ]
-        [ (viz.row "History") ]
+        [ (viz.row "Evaluator history") ]
         [
           (viz.panel {
-            title = "Alert state over time";
+            title = "Alert evaluator state over time";
             type = "state-timeline";
             w = 24;
             h = 14;
-            description = "A gap means the alert was not firing: Prometheus stops emitting the series entirely rather than reporting zero.";
+            description = "Retained pending/firing evaluator samples. A gap means no sample was returned, not confirmed recovery; staleness, rule or label changes, and evaluation or ingestion interruption can cause gaps.";
             # Encode the two states as distinct numbers so one series can carry
             # both pending and firing.
             targets = [
@@ -1316,8 +1318,9 @@ let
                 };
               }
             ];
-            noValue = "OK";
+            noValue = "No evaluator sample";
             options = {
+              connectNulls = false;
               perPage = 40;
               legend.showLegend = false;
             };
@@ -1325,9 +1328,10 @@ let
         ]
         [
           (viz.panel {
-            title = "Firing over time";
+            title = "Firing alert count over time";
             w = 12;
             h = 8;
+            description = "Counts retained firing evaluator samples by severity. Missing samples or gaps do not confirm recovery.";
             expr = ''sum by (severity) (ALERTS{alertstate="firing"})'';
             legend = "{{severity}}";
             unit = viz.units.none;
@@ -1361,11 +1365,11 @@ let
             ];
           })
           (viz.panel {
-            title = "Noisiest rules";
+            title = "Evaluator timestamp changes";
             type = "bargauge";
             w = 12;
             h = 8;
-            description = "How many times each rule entered the pending state over the window -- the flapping detector.";
+            description = "Changes to ALERTS_FOR_STATE activation timestamps. Can include reactivation or rebasing, excludes first observations and pending-to-firing when the timestamp is unchanged, and is not an incident count.";
             targets = [
               {
                 expr = "topk(10, sum by (alertname) (changes(ALERTS_FOR_STATE[$__range])))";
@@ -1414,7 +1418,7 @@ let
             type = "table";
             w = 24;
             h = 10;
-            description = "One row per configured node exporter. DOWN is a failed scrape; NO DATA means the target is missing from Prometheus.";
+            description = "One row per configured node exporter. DOWN is a failed scrape; NO DATA means the target is missing from Prometheus. Host uptime is time since boot, not service availability or incident duration.";
             links = [
               (viz.dataLink {
                 title = "Open host details";
@@ -1489,7 +1493,7 @@ let
                   renameByName = {
                     instance = "Host";
                     "Value #A" = "Exporter";
-                    "Value #B" = "Uptime";
+                    "Value #B" = "Host uptime";
                     "Value #C" = "CPU";
                     "Value #D" = "Memory";
                     "Value #E" = "Root filesystem";
@@ -1522,7 +1526,7 @@ let
                   value = 110;
                 }
               ])
-              (viz.overrideByName "Uptime" [
+              (viz.overrideByName "Host uptime" [
                 {
                   id = "unit";
                   value = viz.units.duration;
@@ -1911,10 +1915,11 @@ let
             options = viz.gaugePresets.segmented;
           })
           (viz.panel {
-            title = "Uptime";
+            title = "Host uptime";
             type = "stat";
             w = 4;
             h = 7;
+            description = "Time since the selected host booted, not service availability or incident duration.";
             expr = ''node_time_seconds{instance="$node"} - node_boot_time_seconds{instance="$node"}'';
             legend = "$node";
             unit = viz.units.duration;
@@ -4562,12 +4567,12 @@ let
             title = "Blocky process";
             # Three metrics per resolver is a grid, and a `stat` renders a
             # grid as one big labelled number per series -- six of them here,
-            # in a quarter of a row. Same reason "Load and uptime" on the home
+            # in a quarter of a row. Same reason "Load and host uptime" on the home
             # dashboard is a table.
             type = "table";
             w = 6;
             h = 5;
-            description = "Restart detection. A blocky that restarted minutes ago explains an otherwise alarming cache hit rate, and nothing else on this dashboard would tell you. A climbing goroutine count is the classic leak signal; RSS tracks denylist size.";
+            description = "Restart detection. Process uptime is time since Blocky started, not DNS availability or incident duration. A Blocky restart can explain an otherwise alarming cache hit rate; a climbing goroutine count is the classic leak signal, and RSS tracks denylist size.";
             targets = [
               {
                 expr = ''sum by (resolver) (process_resident_memory_bytes{job="blocky"})'';
@@ -4591,7 +4596,7 @@ let
               columns = [
                 "RSS"
                 "Goroutines"
-                "Uptime"
+                "Process uptime"
               ];
             };
             unit = viz.units.short;
@@ -4601,7 +4606,7 @@ let
               frozenColumns.left = 1;
               sortBy = [
                 {
-                  displayName = "Uptime";
+                  displayName = "Process uptime";
                   desc = false;
                 }
               ];
@@ -4614,7 +4619,7 @@ let
                   value = viz.units.bytes;
                 }
               ])
-              (viz.overrideByName "Uptime" [
+              (viz.overrideByName "Process uptime" [
                 {
                   id = "unit";
                   value = viz.units.duration;
