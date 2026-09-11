@@ -206,13 +206,13 @@ writeShellApplication {
     removed='[]'
     while IFS=$'\t' read -r slug tid; do
       [ -z "$slug" ] && continue
-      hit="$(jq -r --argjson ids "$completed_ids" --arg t "$tid" '$ids|index($t)|if .==null then 0 else 1 end')"
+      hit="$(jq -nr --argjson ids "$completed_ids" --arg t "$tid" '$ids|index($t)|if .==null then 0 else 1 end')"
       if [ "$hit" != "1" ]; then
         log "tracked task gone but not in completed feed (deleted?): $slug"
         continue
       fi
-      can="$(jq -r --argjson m "$allmap" --arg s "$slug" '$m[$s].can_claim // false')"
-      name="$(jq -r --argjson m "$allmap" --arg s "$slug" '$m[$s].name // ""')"
+      can="$(jq -nr --argjson m "$allmap" --arg s "$slug" '$m[$s].can_claim // false')"
+      name="$(jq -nr --argjson m "$allmap" --arg s "$slug" '$m[$s].name // ""')"
       if [ "$can" != "true" ] || [ -z "$name" ]; then
         log "completed in Todoist but not claimable in HA, skipping sync-back: $slug"
         continue
@@ -287,7 +287,7 @@ writeShellApplication {
     actionable_slugs="$(jq -c '[.[].slug]' <<<"$actionable")"
     while IFS=$'\t' read -r slug tid; do
       [ -z "$slug" ] && continue
-      keep="$(jq -r --argjson a "$actionable_slugs" --arg s "$slug" '$a|index($s)|if .==null then 0 else 1 end')"
+      keep="$(jq -nr --argjson a "$actionable_slugs" --arg s "$slug" '$a|index($s)|if .==null then 0 else 1 end')"
       if [ "$keep" = "1" ]; then continue; fi
       if [ "$DRY" = "1" ]; then
         log "[dry] would close stale task: $slug"
