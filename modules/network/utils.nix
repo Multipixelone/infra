@@ -9,6 +9,7 @@
           curl
           gping
           inetutils
+          mosh
           socat
         ])
         # Linux-only network tooling.
