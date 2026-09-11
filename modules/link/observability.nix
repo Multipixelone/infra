@@ -3408,9 +3408,32 @@ let
         "provisioned"
         "logs"
       ];
-      description = "Journal from Link. User journals are dropped and secrets redacted before they reach Loki.";
+      description = "Journal from the selected host. User journals are dropped and secrets redacted before they reach Loki.";
       from = "now-1h";
       templating.list = [
+        {
+          name = "host";
+          label = "Host";
+          type = "query";
+          datasource.uid = "loki";
+          query = {
+            refId = "LokiVariableQueryEditor-VariableQuery";
+            type = 1;
+            label = "host";
+            stream = "{}";
+          };
+          # Keep the current single-host workflow intact until remote journals
+          # arrive; the selector discovers those hosts from Loki automatically.
+          includeAll = false;
+          multi = false;
+          refresh = 2;
+          sort = 1;
+          current = {
+            selected = true;
+            text = "link";
+            value = "link";
+          };
+        }
         {
           name = "unit";
           label = "Unit";
@@ -3420,7 +3443,7 @@ let
             refId = "LokiVariableQueryEditor-VariableQuery";
             type = 1;
             label = "unit";
-            stream = ''{host="link"}'';
+            stream = ''{host="$host"}'';
           };
           includeAll = true;
           multi = true;
@@ -3443,7 +3466,7 @@ let
             refId = "LokiVariableQueryEditor-VariableQuery";
             type = 1;
             label = "level";
-            stream = ''{host="link"}'';
+            stream = ''{host="$host"}'';
           };
           includeAll = true;
           multi = true;
@@ -3471,7 +3494,7 @@ let
             datasource = "loki";
             # `count_over_time` with $__auto makes one bar per plotted
             # bucket, which is what Explore's own volume histogram does.
-            expr = ''sum by (level) (count_over_time({host="link", unit=~"$unit", level=~"$level"} |= `$search` [$__auto]))'';
+            expr = ''sum by (level) (count_over_time({host="$host", unit=~"$unit", level=~"$level"} |= `$search` [$__auto]))'';
             legend = "{{level}}";
             unit = viz.units.short;
             decimals = 0;
@@ -3492,7 +3515,7 @@ let
             w = 24;
             h = 22;
             datasource = "loki";
-            expr = ''{host="link", unit=~"$unit", level=~"$level"} |= `$search`'';
+            expr = ''{host="$host", unit=~"$unit", level=~"$level"} |= `$search`'';
           })
         ]
         [ (viz.row "Noisiest units") ]
@@ -3505,7 +3528,7 @@ let
             datasource = "loki";
             targets = [
               {
-                expr = ''topk(15, sum by (unit) (count_over_time({host="link", unit=~"$unit"} [$__range])))'';
+                expr = ''topk(15, sum by (unit) (count_over_time({host="$host", unit=~"$unit"} [$__range])))'';
                 legend = "{{unit}}";
                 instant = true;
               }
@@ -3522,7 +3545,7 @@ let
             datasource = "loki";
             targets = [
               {
-                expr = ''topk(15, sum by (unit) (count_over_time({host="link", level=~"emerg|alert|crit|critical|err|error|warn|warning"} [$__range])))'';
+                expr = ''topk(15, sum by (unit) (count_over_time({host="$host", level=~"emerg|alert|crit|critical|err|error|warn|warning"} [$__range])))'';
                 legend = "{{unit}}";
                 instant = true;
               }
@@ -6238,18 +6261,18 @@ in
 
         loki.process "redact" {
           stage.replace {
-            expression = "(?i)(authorization|token|password|secret|api[_-]?key)([\\\"'=:\\x20]+)[^\\x20,;]+"
-            replace    = "$1$2[REDACTED]"
+            expression = ${builtins.toJSON "(?i)(?:bearer\\x20+)([A-Za-z0-9._~+/-]+=*)"}
+            replace    = "[REDACTED]"
           }
 
           stage.replace {
-            expression = "(?i)(bearer\\x20+)[A-Za-z0-9._~+/-]+=*"
-            replace    = "$1[REDACTED]"
+            expression = ${builtins.toJSON "(?i)(?:authorization|token|password|secret|api[_-]?key)(?:[\\\"'=:\\x20]+)([^,;]+)"}
+            replace    = "[REDACTED]"
           }
 
           stage.replace {
-            expression = "bot[0-9]+:[A-Za-z0-9_-]+"
-            replace    = "bot[REDACTED]"
+            expression = ${builtins.toJSON "(bot[0-9]+:[A-Za-z0-9_-]+)"}
+            replace    = "[REDACTED]"
           }
 
           forward_to = [loki.write.local.receiver]
@@ -6450,7 +6473,8 @@ in
           assertion =
             !lib.hasInfix "/home/${username}/.openclaw" alloyConfig
             && lib.hasInfix "__journal__systemd_user_unit" alloyConfig
-            && lib.hasInfix ''action        = "drop"'' alloyConfig;
+            && lib.hasInfix ''action        = "drop"'' alloyConfig
+            && lib.hasInfix ''replace    = "[REDACTED]"'' alloyConfig;
           message = "Alloy must exclude user journals and raw OpenClaw payloads; only service metrics are allowed.";
         }
         {

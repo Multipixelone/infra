@@ -84,6 +84,42 @@ let
       };
     }
   );
+  journalSourceType = lib.types.submodule {
+    options.units = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9@_.:-]+\\.service");
+      description = "Nonempty NixOS-defined system service units allowed from this logical journal service. Multiple Nix list definitions merge, then source-host assertions reject duplicates. Package- or runtime-generated units are out of scope until they are declared here and exist in systemd.services.";
+    };
+  };
+  journalClientType = lib.types.submodule {
+    options = {
+      address = lib.mkOption {
+        type = lib.types.nullOr (lib.types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+");
+        default = null;
+        description = "Source IPv4 address allowed at journal ingress; null uses hosts.<host>.homeAddress.";
+      };
+      username = lib.mkOption {
+        type = lib.types.strMatching "[A-Za-z0-9_-]+";
+        default = "journal";
+        description = "HTTP Basic username for this journal client.";
+      };
+      passwordSecret = lib.mkOption {
+        type = lib.types.strMatching "[A-Za-z0-9_-]+";
+        default = "journal-ingress-password";
+        description = "Agenix secret basename for this client's plaintext push password; defaults to the first shared credential.";
+      };
+    };
+  };
+  privateIpv4Octet = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+  privateIpv4 = "(10\\.${privateIpv4Octet}\\.${privateIpv4Octet}\\.${privateIpv4Octet}|172\\.(1[6-9]|2[0-9]|3[01])\\.${privateIpv4Octet}\\.${privateIpv4Octet}|192\\.168\\.${privateIpv4Octet}\\.${privateIpv4Octet})";
+  isPrivateIpv4 = address: builtins.match privateIpv4 address != null;
+  sourceHasUnits =
+    sourceServices:
+    sourceServices != { } && lib.any (source: source.units != [ ]) (builtins.attrValues sourceServices);
+  effectiveClientAddress =
+    hostName: client:
+    if client.address == null then config.hosts.${hostName}.homeAddress else client.address;
+  validIngressFqdn =
+    name: builtins.match "([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)+[A-Za-z]{2,}" name != null;
 in
 {
   # Every provisioned Grafana dashboard, as pure data. Exposing them here is
@@ -150,6 +186,35 @@ in
     nodes = lib.mkOption {
       type = lib.types.attrsOf nodeTargetType;
       description = "Node-exporter scrape inventory; dashboard identities come from the matching host registry entries.";
+    };
+    journal = {
+      sources = lib.mkOption {
+        type = lib.types.attrsOf (lib.types.attrsOf journalSourceType);
+        default = { };
+        description = "Allowlisted system-journal sources, keyed by host and bounded logical service name.";
+      };
+      clients = lib.mkOption {
+        type = lib.types.attrsOf journalClientType;
+        default = { };
+        description = "Hosts enrolled to push their allowlisted system journals to the central ingress.";
+      };
+      ingress = {
+        fqdn = lib.mkOption {
+          type = lib.types.str;
+          default = "loki-journal.home.finnrut.is";
+          description = "Dedicated TLS name for journal ingestion.";
+        };
+        port = lib.mkOption {
+          type = lib.types.port;
+          default = 8443;
+          description = "Dedicated HTTPS port for journal ingestion, never the shared HTTPS port.";
+        };
+      };
+      hub.systemJournal.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Phase B policy switch for a hub whole-system-journal reader; Phase A leaves Link's existing reader untouched.";
+      };
     };
   };
 
@@ -280,6 +345,82 @@ in
       {
         assertion = config.hosts.link.roles == [ "desktop" ];
         message = "Link remains a desktop; observabilityHub must not reclassify it as a server.";
+      }
+      {
+        assertion = !config.observability.journal.hub.systemJournal.enable;
+        message = "Whole-hub journal policy is Phase B; Phase A must not add a second Link journal reader.";
+      }
+      {
+        assertion = lib.all (hostName: hostName != config.observability.hubHost) (
+          builtins.attrNames config.observability.journal.sources
+        );
+        message = "Phase A journal sources must not include the hub, which already has its existing Link journal reader.";
+      }
+      {
+        assertion = lib.all (
+          hostName:
+          builtins.hasAttr hostName config.hosts
+          && config.hosts.${hostName}.isNixOS
+          && builtins.hasAttr hostName config.configurations.nixos
+        ) (builtins.attrNames config.observability.journal.sources);
+        message = "Every journal source must be a configured NixOS/systemd host in the host registry.";
+      }
+      {
+        assertion = lib.all (
+          hostName: builtins.hasAttr hostName config.hosts && config.hosts.${hostName}.isNixOS
+        ) (builtins.attrNames config.observability.journal.clients);
+        message = "Every journal client must be a registered NixOS host.";
+      }
+      {
+        assertion = lib.all (
+          hostName:
+          builtins.hasAttr hostName config.hosts
+          && (
+            let
+              client = config.observability.journal.clients.${hostName};
+              host = config.hosts.${hostName};
+              registeredAddresses = builtins.filter (address: address != null) [
+                host.homeAddress
+                host.iotAddress
+                host.wireguard.ipv4Address
+              ];
+              effectiveAddress = effectiveClientAddress hostName client;
+            in
+            effectiveAddress != null
+            && isPrivateIpv4 effectiveAddress
+            && (client.address == null || lib.elem client.address registeredAddresses)
+          )
+        ) (builtins.attrNames config.observability.journal.clients);
+        message = "Every journal client address must be a valid private IPv4; overrides must equal that host's registered home, IoT, or WireGuard address.";
+      }
+      {
+        assertion =
+          let
+            activeClientNames = builtins.filter (
+              hostName:
+              hostName != config.observability.hubHost
+              && builtins.hasAttr hostName config.hosts
+              && builtins.hasAttr hostName config.observability.journal.sources
+              && sourceHasUnits config.observability.journal.sources.${hostName}
+            ) (builtins.attrNames config.observability.journal.clients);
+            addresses = map (
+              hostName: effectiveClientAddress hostName config.observability.journal.clients.${hostName}
+            ) activeClientNames;
+          in
+          lib.length addresses == lib.length (lib.unique addresses);
+        message = "No two active journal clients may claim the same effective source address.";
+      }
+      {
+        assertion = validIngressFqdn config.observability.journal.ingress.fqdn;
+        message = "Journal ingress must use a valid DNS FQDN for its dedicated TLS certificate.";
+      }
+      {
+        assertion =
+          config.observability.journal.ingress.port != 443
+          && !lib.elem config.observability.journal.ingress.port (
+            map (endpoint: endpoint.port) (lib.attrValues config.observability.endpoints)
+          );
+        message = "Journal ingress must use a dedicated port, not 443 or an observability backend port.";
       }
       {
         assertion = lib.all (
