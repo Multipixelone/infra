@@ -103,10 +103,15 @@
             onFailure = [ "notify-telegram@%n.service" ];
           }))
           {
-            restic-check-repo.serviceConfig = {
-              Type = "oneshot";
-              ExecStart = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} check --read-data-subset=25%";
-              Environment = "RCLONE_CONFIG=${rclone.configFile}";
+            restic-check-repo = {
+              environment.RESTIC_CACHE_DIR = "/var/cache/restic-check-repo";
+              serviceConfig = {
+                Type = "oneshot";
+                ExecStart = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} check --read-data-subset=25%";
+                Environment = "RCLONE_CONFIG=${rclone.configFile}";
+                CacheDirectory = "restic-check-repo";
+                CacheDirectoryMode = "0700";
+              };
             };
 
             # Repo-wide retention, split out of the backup units (see
@@ -115,10 +120,15 @@
             # two prunes only contended for the same lock. restic's default
             # `--group-by host,paths` still applies the policy to each snapshot
             # set independently, so behaviour is unchanged.
-            restic-prune.serviceConfig = {
-              Type = "oneshot";
-              ExecStart = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} forget --prune --retry-lock 2h ${lib.concatStringsSep " " retentionOpts}";
-              Environment = "RCLONE_CONFIG=${rclone.configFile}";
+            restic-prune = {
+              environment.RESTIC_CACHE_DIR = "/var/cache/restic-prune";
+              serviceConfig = {
+                Type = "oneshot";
+                ExecStart = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} forget --prune --retry-lock 2h ${lib.concatStringsSep " " retentionOpts}";
+                Environment = "RCLONE_CONFIG=${rclone.configFile}";
+                CacheDirectory = "restic-prune";
+                CacheDirectoryMode = "0700";
+              };
             };
           }
         ];
