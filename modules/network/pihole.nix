@@ -10,11 +10,6 @@ let
     |> lib.mapAttrs' (_: endpoint: lib.nameValuePair endpoint.dnsName hub.homeAddress);
 in
 {
-  flake-file.inputs.blocklist = {
-    url = "github:StevenBlack/hosts";
-    flake = false;
-  };
-
   flake.modules.nixos.edge =
     { lib, config, ... }:
     let
@@ -77,7 +72,17 @@ in
         settings = {
           listen_addresses = [ "127.0.0.1:${toString dnscryptPort}" ];
           ipv6_servers = true;
+          # Pinned catalog entries are independently operated and leave filtering to Blocky.
+          server_names = [
+            "quad9-doh-ip4-port443-nofilter-pri"
+            "nextdns"
+            "adguard-dns-unfiltered-doh"
+            "cloudflare"
+          ];
           require_dnssec = true;
+          require_nolog = true;
+          require_nofilter = true;
+          lb_strategy = "wp2";
           sources.public-resolvers = {
             urls = [
               "https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md"
@@ -108,8 +113,12 @@ in
             rrset-cache-slabs = 4;
             infra-cache-slabs = 4;
             key-cache-slabs = 4;
-            cache-min-ttl = 3600;
             cache-max-ttl = 86400;
+            # Preserve authoritative TTLs; serve stale data only when refresh is slow or unavailable.
+            serve-expired = true;
+            serve-expired-client-timeout = 1800;
+            serve-expired-ttl = 86400;
+            serve-expired-reply-ttl = 30;
             hide-identity = true;
             hide-version = true;
             do-not-query-localhost = false; # required to forward to dnscrypt-proxy on localhost

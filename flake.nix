@@ -69,10 +69,6 @@
       url = "github:Brainicism/bgutil-ytdlp-pot-provider";
       flake = false;
     };
-    blocklist = {
-      url = "github:StevenBlack/hosts";
-      flake = false;
-    };
     calibre-plugins.url = "github:nydragon/calibre-plugins";
     catppuccin.url = "github:catppuccin/nix";
     catppuccin-foot = {

@@ -389,22 +389,6 @@
         "type": "github"
       }
     },
-    "blocklist": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1788448912,
-        "narHash": "sha256-0g6w7Msk2JKamnyJfRQNp0I+Yzj2f3PyUkI9l9z0gos=",
-        "owner": "StevenBlack",
-        "repo": "hosts",
-        "rev": "055144d2871f5a010ec263405eda66a306fd448e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "StevenBlack",
-        "repo": "hosts",
-        "type": "github"
-      }
-    },
     "blueprint": {
       "inputs": {
         "nixpkgs": [
@@ -4208,7 +4192,6 @@
         "beets-plugins": "beets-plugins",
         "better-fox": "better-fox",
         "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
-        "blocklist": "blocklist",
         "calibre-plugins": "calibre-plugins",
         "catppuccin": "catppuccin",
         "catppuccin-foot": "catppuccin-foot",
