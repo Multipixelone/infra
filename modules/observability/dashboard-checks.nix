@@ -64,6 +64,14 @@ let
   # asserted here instead.
   histogramPanelTypes = [ "heatmap" ];
 
+  # Grafana's numeric rows-frame conversion treats classic histogram upper
+  # bounds as lower bounds, shifting every `le` bucket upward.
+  numericHeatmapScales = [
+    "linear"
+    "log"
+    "symlog"
+  ];
+
   # A rate/increase window narrower than 4x the scrape interval has fewer than
   # four samples, and at exactly 1x returns *zero series*: the panel reads "No
   # data" and nothing errors. Everything here is scraped at 60s, so any
@@ -85,6 +93,7 @@ in
           inherit numericPanelTypes;
           inherit statMultiSeriesAllowance;
           inherit histogramPanelTypes;
+          inherit numericHeatmapScales;
           inherit minimumRateWindowSeconds;
           targetlessPanelTypes = viz.targetlessTypes;
         }
@@ -99,6 +108,7 @@ in
         stat_allowance = config["statMultiSeriesAllowance"]
         targetless_types = set(config["targetlessPanelTypes"])
         histogram_types = set(config["histogramPanelTypes"])
+        numeric_heatmap_scales = set(config["numericHeatmapScales"])
         min_rate_window = config["minimumRateWindowSeconds"]
 
         # PromQL duration suffixes, in seconds.
@@ -308,8 +318,8 @@ in
                             "textMode value_and_name so the tiles are labelled",
                         )
 
-                # A heatmap fed a classic histogram fails silently in four
-                # distinct ways. Assert the three that are visible in the JSON.
+                # A heatmap fed a classic histogram can fail silently in several
+                # ways. Assert the configuration contracts visible in the JSON.
                 if ptype in histogram_types:
                     options = panel.get("options", {})
                     if options.get("calculate") is not False:
@@ -323,6 +333,15 @@ in
                             name,
                             f"{title}: heatmap needs options.yAxis.unit; the y "
                             "field's own unit is forced to 'short'",
+                        )
+                    rows_frame = options.get("rowsFrame", {})
+                    scale_type = rows_frame.get("yBucketScale", {}).get("type")
+                    if rows_frame.get("layout") == "le" and scale_type in numeric_heatmap_scales:
+                        fail(
+                            name,
+                            f"{title}: classic `le` heatmap must not set numeric "
+                            f"rowsFrame.yBucketScale {scale_type!r}; Grafana shifts "
+                            "bucket bounds upward",
                         )
                     for target in targets:
                         if target.get("format") != "heatmap":

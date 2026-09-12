@@ -747,15 +747,9 @@ rec {
     {
       expr,
       unit ? units.seconds,
-      # Latency buckets are exponentially spaced, so an ordinal axis (evenly
-      # spaced rows) misrepresents them. `fields.ts` reads `yBucketScale`
-      # unconditionally on the data path; only its *editor* is gated behind
-      # the `heatmapRowsAxisOptions` feature toggle.
-      logAxis ? true,
       # Must be an exact d3 scheme name (Turbo, Spectral, Viridis, ...); an
       # unrecognised string silently falls back to Spectral.
       scheme ? "Turbo",
-      value ? "Requests",
     }:
     {
       targets = [
@@ -773,17 +767,12 @@ rec {
           decimals = 0;
           reverse = false;
         };
-        # "le" names the y field `yMax`, so a cell is drawn BELOW its tick,
-        # which is what `le` means.
+        # `le` names the y field `yMax`, so cells belong below their ticks.
+        # Grafana's numeric rows-frame conversion treats these upper bounds as
+        # lower bounds and shifts every classic-histogram bucket upward. Keep the
+        # ordinal layout until Grafana fixes that conversion.
         rowsFrame = {
           layout = "le";
-          inherit value;
-        }
-        // optionalAttrs logAxis {
-          yBucketScale = {
-            type = "log";
-            log = 2;
-          };
         };
         cellValues = {
           unit = units.short;

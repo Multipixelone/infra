@@ -3933,10 +3933,10 @@ let
             type = "barchart";
             w = 8;
             h = 8;
-            description = "A dozen record types is well past the point a pie chart stays readable. `ceil(increase(...))` keeps the labels whole query counts rather than extrapolated fractions.";
+            description = "A dozen record types is well past the point a pie chart stays readable. The aggregate query estimates display as whole counts.";
             targets = [
               {
-                expr = ''sum by (type) (ceil(increase(blocky_query_total{resolver=~"$resolver"}[$__range])))'';
+                expr = ''sum by (type) (increase(blocky_query_total{resolver=~"$resolver"}[$__range]))'';
                 instant = true;
                 format = "table";
               }
@@ -4279,7 +4279,6 @@ let
               expr = ''sum by (le) (increase(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval]))'';
               unit = viz.units.seconds;
               scheme = "Turbo";
-              value = "Resolutions";
             }
           ))
           (viz.panel {
@@ -4381,11 +4380,11 @@ let
             description = "An off-box view of blocky answering. phase=request is the real wire time; probe_dns_lookup_time_seconds is NOT DNS latency -- it is the resolve phase for a literal IP and reads microseconds of noise. probe_dns_query_succeeded rather than probe_success, because probe_success also folds in an answer-RR regex assertion that can read 0 while every query is being answered correctly.";
             targets = [
               {
-                expr = ''probe_dns_duration_seconds{job="blackbox-dns",phase="request"}'';
+                expr = ''probe_dns_duration_seconds{job="blackbox-dns",phase="request",resolver=~"$resolver"}'';
                 legend = "{{resolver}} request";
               }
               {
-                expr = ''min by (resolver) (probe_dns_query_succeeded{job="blackbox-dns"})'';
+                expr = ''min by (resolver) (probe_dns_query_succeeded{job="blackbox-dns",resolver=~"$resolver"})'';
                 legend = "{{resolver}} answered";
               }
             ];
@@ -4575,17 +4574,17 @@ let
             description = "Restart detection. Process uptime is time since Blocky started, not DNS availability or incident duration. A Blocky restart can explain an otherwise alarming cache hit rate; a climbing goroutine count is the classic leak signal, and RSS tracks denylist size.";
             targets = [
               {
-                expr = ''sum by (resolver) (process_resident_memory_bytes{job="blocky"})'';
+                expr = ''sum by (resolver) (process_resident_memory_bytes{job="blocky",resolver=~"$resolver"})'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''sum by (resolver) (go_goroutines{job="blocky"})'';
+                expr = ''sum by (resolver) (go_goroutines{job="blocky",resolver=~"$resolver"})'';
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''time() - max by (resolver) (process_start_time_seconds{job="blocky"})'';
+                expr = ''time() - max by (resolver) (process_start_time_seconds{job="blocky",resolver=~"$resolver"})'';
                 instant = true;
                 format = "table";
               }
