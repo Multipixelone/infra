@@ -35,6 +35,11 @@ let
         enabledCollectors = [ "systemd" ];
       };
 
+      systemd.services.prometheus-node-exporter = {
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+      };
+
       # Insert this before nixpkgs' broad interface/conntrack accepts: only
       # Link's central Prometheus may initiate a node-exporter connection.
       networking.firewall = {
