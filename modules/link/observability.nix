@@ -151,6 +151,37 @@ let
       }
     ) (lib.unique (map internalProbeContract serviceInventory.internalProbes))
   );
+  # These are deliberately diagnostic-only public-positive modules.  The
+  # canonical `dns` module below checks a generated private publication record
+  # and remains the availability signal for private-record correctness.
+  dnsCheckModuleName = transport: "dns_public_positive_${transport}";
+  dnsCheckModules = lib.listToAttrs (
+    map
+      (
+        transport:
+        lib.nameValuePair (dnsCheckModuleName transport) {
+          prober = "dns";
+          timeout = "5s";
+          dns = {
+            preferred_ip_protocol = "ip4";
+            transport_protocol = transport;
+            query_name = "example.com";
+            query_type = "A";
+            recursion_desired = true;
+            valid_rcodes = [ "NOERROR" ];
+            # Require a positive A answer without pinning a public address owned by
+            # somebody else. `example.com` is an operator-neutral stable fixture.
+            validate_answer_rrs.fail_if_not_matches_regexp = [
+              "^example\\.com\\..*\\sIN\\sA\\s.+$"
+            ];
+          };
+        }
+      )
+      [
+        "udp"
+        "tcp"
+      ]
+  );
   blackboxModules = {
     http_internal = {
       prober = "http";
@@ -184,6 +215,7 @@ let
       };
     };
   }
+  // dnsCheckModules
   // internalProbeModules;
   # After the service-publication cutover, its generated internal HTTPS probe
   # is the user-visible health check. Keeping the old direct-backend probe as
@@ -268,7 +300,22 @@ let
   # the rolling SLO makes an observability component consume a service's
   # availability budget.
   sloProbeSelector = ''job=~"blackbox-internal|blackbox-private",endpoint!=""'';
-  effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and on (job, instance) (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
+  effectiveProbeSuccess = "((probe_success{${sloProbeSelector}} and (up{${sloProbeSelector}} == 1)) or up{${sloProbeSelector}})";
+  # Diagnostic checks never enter the endpoint SLO. Default exact-label
+  # matching keeps resolver/layer/vantage/transport/ip_family/check distinct.
+  dnsDiagnosticSelector = ''job="blackbox-dns-checks"'';
+  # A reachable Blackbox exporter without a probe result is a failed
+  # diagnostic assertion, not a healthy one. The zero-valued fallback retains
+  # every target label from `up` without inventing a target when both metrics
+  # are absent. Default matching deliberately retains the complete diagnostic
+  # identity rather than collapsing contracts which share a resolver.
+  dnsDiagnosticEffectiveSuccess = "((probe_success{${dnsDiagnosticSelector}} and (up{${dnsDiagnosticSelector}} == 1)) or (0 * up{${dnsDiagnosticSelector}}))";
+  dnsDiagnosticAlertExpr = "${dnsDiagnosticEffectiveSuccess} == 0";
+  canonicalDnsProbeAlertExpr = ''min by (resolver) ((probe_success{job="blackbox-dns"} and (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"}) == 0'';
+  # Collection is healthy only when a reachable exporter reports `unbound_up`
+  # as one. `unless` therefore catches false, absent, and stale status while
+  # leaving an unreachable exporter to the generic scrape-down alert.
+  unboundStatsCollectionAlertExpr = ''(up{job="unbound"} == 1) unless on (job, instance, resolver) (unbound_up{job="unbound"} == 1)'';
   endpointProbeSuccess = "min by (endpoint, slo_class) (${effectiveProbeSuccess})";
   endpointAvailabilityExpr = "avg_over_time(${endpointProbeSuccess}[${observability.slo.window}:1m]) and on (endpoint, slo_class) ${endpointProbeSuccess}";
   endpointProbeSuccessUnexcused = "${endpointProbeSuccess} unless on (endpoint, slo_class) endpoint:excused == 1";
@@ -3649,11 +3696,11 @@ let
             options.graphMode = "area";
           })
           (viz.panel {
-            title = "Upstream p95";
+            title = "Blocky upstream response p95";
             type = "stat";
             w = 4;
             h = 5;
-            description = "95th percentile for queries that actually leave the box. The all-traffic p95 is ~5ms no matter how bad upstream gets, because ~97% of requests are answered from cache or a blocklist and land in the first histogram bucket.";
+            description = "95th percentile for queries that leave Blocky. Its configured upstream can be local Unbound or a cache response, so this is not general Internet DNS latency. The all-traffic p95 is ~5ms no matter how bad this gets, because ~97% of requests are answered from cache or a blocklist.";
             expr = ''histogram_quantile(0.95, sum by (le) (rate(blocky_request_duration_seconds_bucket{response_type="RESOLVED",resolver=~"$resolver"}[$__rate_interval])))'';
             unit = viz.units.seconds;
             decimals = 2;
@@ -3864,6 +3911,225 @@ let
                 }
               ])
             ];
+          })
+        ]
+        [ (viz.row "Chain health") ]
+        [
+          (viz.panel {
+            title = "Diagnostic DNS assertions";
+            type = "state-timeline";
+            w = 16;
+            h = 7;
+            description = "UDP and TCP checks for a public positive record. They diagnose this resolver chain only; they are not general Internet DNS health. Compare with probe reachability to distinguish a failed assertion from missing telemetry.";
+            expr = ''probe_success{job="blackbox-dns-checks",resolver=~"$resolver"}'';
+            legend = "{{resolver}} · {{layer}} · {{vantage}} · {{transport}}";
+            mappings = viz.boolMapping {
+              falseText = "ASSERTION FAILED";
+              trueText = "PASSED";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+            };
+          })
+          (viz.panel {
+            title = "Diagnostic probe reachability";
+            type = "state-timeline";
+            w = 8;
+            h = 7;
+            description = "Blackbox scrape reachability for each diagnostic check. It is separate from assertion success; gaps are missing telemetry, never healthy results.";
+            expr = ''up{job="blackbox-dns-checks",resolver=~"$resolver"}'';
+            legend = "{{resolver}} · {{layer}} · {{vantage}} · {{transport}}";
+            mappings = viz.boolMapping {
+              falseText = "PROBE UNREACHABLE";
+              trueText = "REACHABLE";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+            };
+          })
+        ]
+        [ (viz.row "Resolver telemetry") ]
+        [
+          (viz.panel {
+            title = "Resolver exporter reachability";
+            type = "state-timeline";
+            w = 8;
+            h = 6;
+            description = "Prometheus scrape reachability for the three resolver layers. A gap is missing telemetry, not a healthy zero.";
+            expr = ''up{job=~"blocky|dnscrypt-proxy|unbound",resolver=~"$resolver"}'';
+            legend = "{{resolver}} {{job}}";
+            mappings = viz.boolMapping {
+              falseText = "UNREACHABLE";
+              trueText = "UP";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+            };
+          })
+          (viz.panel {
+            title = "Unbound statistics collection";
+            type = "state-timeline";
+            w = 8;
+            h = 6;
+            description = "The exporter was scraped, then separately reports whether it could collect Unbound control-socket statistics. A gap is missing telemetry.";
+            expr = ''unbound_up{job="unbound",resolver=~"$resolver"}'';
+            legend = "{{resolver}}";
+            mappings = viz.boolMapping {
+              falseText = "COLLECTION FAILED";
+              trueText = "COLLECTING";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+            };
+          })
+          (viz.panel {
+            title = "Resolver systemd units";
+            type = "state-timeline";
+            w = 8;
+            h = 6;
+            description = "Node Exporter's systemd collector reports unit active state. This is process state, not a DNS assertion; a dnscrypt-proxy restart is not incident duration. A gap is missing telemetry.";
+            expr = ''node_systemd_unit_state{job=~"(${resolverHostRegex})-node",instance=~"${resolverHostRegex}",name=~"blocky.service|dnscrypt-proxy.service|unbound.service",state="active"}'';
+            legend = "{{instance}} {{name}}";
+            mappings = viz.boolMapping {
+              falseText = "INACTIVE";
+              trueText = "ACTIVE";
+            };
+            options = {
+              mergeValues = true;
+              showValue = "never";
+            };
+          })
+        ]
+        [ (viz.row "Inner-layer workload") ]
+        [
+          (viz.panel {
+            title = "DNSCrypt workload";
+            w = 12;
+            h = 7;
+            description = "Queries handled by dnscrypt-proxy itself, not Blocky's client/filtering traffic. The pinned generator's counter is shown as a 60s-scrape-safe rate.";
+            expr = ''sum by (resolver) (rate(dnscrypt_proxy_queries_total{job="dnscrypt-proxy",resolver=~"$resolver"}[$__rate_interval]))'';
+            legend = "{{resolver}} queries";
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
+            custom.fillOpacity = 15;
+          })
+          (viz.panel {
+            title = "Unbound workload";
+            w = 12;
+            h = 7;
+            description = "Queries handled by Unbound. Thread labels are aggregated so the resolver comparison stays readable.";
+            expr = ''sum by (resolver) (rate(unbound_queries_total{job="unbound",resolver=~"$resolver"}[$__rate_interval]))'';
+            legend = "{{resolver}} queries";
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
+            custom.fillOpacity = 15;
+          })
+        ]
+        [ (viz.row "Inner-layer cache behavior") ]
+        [
+          (viz.panel {
+            title = "DNSCrypt cache activity";
+            w = 12;
+            h = 7;
+            description = "dnscrypt-proxy cache hits and misses. This cache is separate from Blocky's cache and from Unbound's cache.";
+            targets = [
+              {
+                expr = ''sum by (resolver) (rate(dnscrypt_proxy_cache_hits_total{job="dnscrypt-proxy",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "{{resolver}} hits";
+              }
+              {
+                expr = ''sum by (resolver) (rate(dnscrypt_proxy_cache_misses_total{job="dnscrypt-proxy",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "{{resolver}} misses";
+              }
+            ];
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
+            custom.fillOpacity = 15;
+          })
+          (viz.panel {
+            title = "Unbound cache and prefetch";
+            w = 12;
+            h = 7;
+            description = "Unbound cache hits, misses, and prefetches. Thread labels are aggregated so the resolver comparison stays readable.";
+            targets = [
+              {
+                expr = ''sum by (resolver) (rate(unbound_cache_hits_total{job="unbound",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "{{resolver}} hits";
+              }
+              {
+                expr = ''sum by (resolver) (rate(unbound_cache_misses_total{job="unbound",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "{{resolver}} misses";
+              }
+              {
+                expr = ''sum by (resolver) (rate(unbound_prefetches_total{job="unbound",resolver=~"$resolver"}[$__rate_interval]))'';
+                legend = "{{resolver}} prefetches";
+              }
+            ];
+            unit = viz.units.reqps;
+            min = 0;
+            decimals = 2;
+            custom.fillOpacity = 15;
+          })
+        ]
+        [ (viz.row "Resolver pressure") ]
+        [
+          (viz.panel {
+            title = "Unbound request-list pressure";
+            w = 24;
+            h = 7;
+            description = "Current Unbound request-list occupancy. Thread labels are aggregated to the worst thread per resolver; this is a gauge, not an alert threshold.";
+            targets = [
+              {
+                expr = ''max by (resolver) (unbound_request_list_current_all{job="unbound",resolver=~"$resolver"})'';
+                legend = "{{resolver}} all";
+              }
+              {
+                expr = ''max by (resolver) (unbound_request_list_current_user{job="unbound",resolver=~"$resolver"})'';
+                legend = "{{resolver}} user";
+              }
+              {
+                expr = ''max by (resolver) (unbound_request_list_current_replies{job="unbound",resolver=~"$resolver"})'';
+                legend = "{{resolver}} replies";
+              }
+            ];
+            unit = viz.units.short;
+            min = 0;
+            decimals = 0;
+            custom.fillOpacity = 10;
+          })
+        ]
+        [ (viz.row "Inner-layer latency") ]
+        [
+          (viz.panel {
+            title = "DNSCrypt server response time";
+            w = 12;
+            h = 7;
+            description = "Average per-server response time reported by the pinned dnscrypt-proxy generator. It is service-reported server timing, not a whole-path WAN latency SLI.";
+            expr = ''dnscrypt_proxy_server_response_time_average_ms{job="dnscrypt-proxy",resolver=~"$resolver"}'';
+            legend = "{{resolver}} {{server}}";
+            unit = viz.units.milliseconds;
+            min = 0;
+            decimals = 2;
+            custom.fillOpacity = 10;
+          })
+          (viz.panel {
+            title = "Unbound recursive timing";
+            w = 12;
+            h = 7;
+            description = "Average time for Unbound queries needing recursive processing; cached requests are excluded by the exporter metric definition.";
+            expr = ''unbound_recursion_time_seconds_avg{job="unbound",resolver=~"$resolver"}'';
+            legend = "{{resolver}} average";
+            unit = viz.units.seconds;
+            min = 0;
+            decimals = 3;
+            custom.fillOpacity = 10;
           })
         ]
         [ (viz.row "Traffic") ]
@@ -4377,7 +4643,7 @@ let
             title = "External view (blackbox probe)";
             w = 10;
             h = 7;
-            description = "An off-box view of blocky answering. phase=request is the real wire time; probe_dns_lookup_time_seconds is NOT DNS latency -- it is the resolve phase for a literal IP and reads microseconds of noise. probe_dns_query_succeeded rather than probe_success, because probe_success also folds in an answer-RR regex assertion that can read 0 while every query is being answered correctly.";
+            description = "An off-box check of the generated private record through Blocky, not general Internet DNS health. phase=request is the real wire time; probe_dns_lookup_time_seconds is NOT DNS latency -- it is the resolve phase for a literal IP and reads microseconds of noise. probe_dns_query_succeeded rather than probe_success, because probe_success also folds in an answer-RR regex assertion that can read 0 while every query is being answered correctly.";
             targets = [
               {
                 expr = ''probe_dns_duration_seconds{job="blackbox-dns",phase="request",resolver=~"$resolver"}'';
@@ -5215,7 +5481,23 @@ in
                     expr = testLatencyExpr;
                   }
                 ]
-                ++ testObjectiveRules;
+                ++ testObjectiveRules
+                ++ [
+                  {
+                    # Keep the focused cases below tied to the exact shipped
+                    # selectors. The production rules add their normal `for`.
+                    alert = "DnsProbeFailed";
+                    expr = canonicalDnsProbeAlertExpr;
+                  }
+                  {
+                    alert = "DnsDiagnosticAssertionFailed";
+                    expr = dnsDiagnosticAlertExpr;
+                  }
+                  {
+                    alert = "UnboundStatsCollectionFailed";
+                    expr = unboundStatsCollectionAlertExpr;
+                  }
+                ];
             }
           ];
         }
@@ -5225,6 +5507,197 @@ in
           rule_files = [ testRules ];
           evaluation_interval = "1m";
           tests = [
+            # Two diagnostic contracts share a resolver. A full-label result
+            # must retain the failed UDP assertion only; the canonical job is
+            # healthy and cannot be pulled into this diagnostic alert.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''probe_success{job="blackbox-dns",instance="link",resolver="link"}'';
+                  values = "1";
+                }
+                {
+                  series = ''up{job="blackbox-dns",instance="link",resolver="link"}'';
+                  values = "1";
+                }
+                {
+                  series = ''probe_success{job="blackbox-dns-checks",instance="link",resolver="link",layer="blocky",vantage="link",transport="udp",ip_family="ip4",check="public-positive"}'';
+                  values = "0";
+                }
+                {
+                  series = ''up{job="blackbox-dns-checks",instance="link",resolver="link",layer="blocky",vantage="link",transport="udp",ip_family="ip4",check="public-positive"}'';
+                  values = "1";
+                }
+                {
+                  series = ''probe_success{job="blackbox-dns-checks",instance="link",resolver="link",layer="blocky",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                  values = "1";
+                }
+                {
+                  series = ''up{job="blackbox-dns-checks",instance="link",resolver="link",layer="blocky",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                  values = "1";
+                }
+                {
+                  series = ''up{job="unbound",instance="link",resolver="link"}'';
+                  values = "1";
+                }
+                {
+                  series = ''unbound_up{job="unbound",instance="link",resolver="link"}'';
+                  values = "0";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = canonicalDnsProbeAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [ ];
+                }
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''probe_success{job="blackbox-dns-checks",instance="link",resolver="link",layer="blocky",vantage="link",transport="udp",ip_family="ip4",check="public-positive"}'';
+                      value = 0;
+                    }
+                  ];
+                }
+                {
+                  expr = unboundStatsCollectionAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''up{job="unbound",instance="link",resolver="link"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+              ];
+            }
+            # No scrape and no probe result must remain absent: the fallback is
+            # derived from `up`, never a synthetic fleet-wide zero.
+            {
+              interval = "1m";
+              input_series = [ ];
+              promql_expr_test = [
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [ ];
+                }
+              ];
+            }
+            # A down exporter has no diagnostic result, but its zero-valued
+            # `up` fallback must still fire the assertion alert. The Unbound
+            # collection alert must not duplicate the generic scrape-down
+            # signal when its exporter is unreachable.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''up{job="blackbox-dns-checks",instance="link",resolver="link",layer="unbound",vantage="link",transport="udp",ip_family="ip4",check="public-positive"}'';
+                  values = "0";
+                }
+                {
+                  series = ''up{job="unbound",instance="link",resolver="link"}'';
+                  values = "0";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''{job="blackbox-dns-checks",instance="link",resolver="link",layer="unbound",vantage="link",transport="udp",ip_family="ip4",check="public-positive"}'';
+                      value = 0;
+                    }
+                  ];
+                }
+                {
+                  expr = unboundStatsCollectionAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [ ];
+                }
+              ];
+            }
+            # `up=1` without the required status metric is not healthy. The
+            # stale sample exercises the same contract after a formerly valid
+            # metric disappears, and the final sample proves recovery clears
+            # both alerts without changing their `for` duration.
+            {
+              interval = "1m";
+              input_series = [
+                {
+                  series = ''up{job="blackbox-dns-checks",instance="link",resolver="link",layer="dnscrypt",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''probe_success{job="blackbox-dns-checks",instance="link",resolver="link",layer="dnscrypt",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                  values = "_ stale 1";
+                }
+                {
+                  series = ''up{job="unbound",instance="link",resolver="link"}'';
+                  values = "1 1 1";
+                }
+                {
+                  series = ''unbound_up{job="unbound",instance="link",resolver="link"}'';
+                  values = "_ stale 1";
+                }
+              ];
+              promql_expr_test = [
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''{job="blackbox-dns-checks",instance="link",resolver="link",layer="dnscrypt",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                      value = 0;
+                    }
+                  ];
+                }
+                {
+                  expr = unboundStatsCollectionAlertExpr;
+                  eval_time = "0m";
+                  exp_samples = [
+                    {
+                      labels = ''up{job="unbound",instance="link",resolver="link"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "1m";
+                  exp_samples = [
+                    {
+                      labels = ''{job="blackbox-dns-checks",instance="link",resolver="link",layer="dnscrypt",vantage="link",transport="tcp",ip_family="ip4",check="public-positive"}'';
+                      value = 0;
+                    }
+                  ];
+                }
+                {
+                  expr = unboundStatsCollectionAlertExpr;
+                  eval_time = "1m";
+                  exp_samples = [
+                    {
+                      labels = ''up{job="unbound",instance="link",resolver="link"}'';
+                      value = 1;
+                    }
+                  ];
+                }
+                {
+                  expr = dnsDiagnosticAlertExpr;
+                  eval_time = "2m";
+                  exp_samples = [ ];
+                }
+                {
+                  expr = unboundStatsCollectionAlertExpr;
+                  eval_time = "2m";
+                  exp_samples = [ ];
+                }
+              ];
+            }
             {
               interval = "1m";
               input_series = [
@@ -5833,11 +6306,13 @@ in
         alloy
         blackbox
         blocky
+        dnscrypt
         grafana
         homepage
         loki
         node
         prometheus
+        unbound
         ;
 
       yaml = pkgs.formats.yaml { };
@@ -5864,7 +6339,133 @@ in
           };
         }
       ) resolverEntries;
+      dnscryptScrapeTargets = map (
+        resolver:
+        let
+          scrapeAddress =
+            if resolver.registryName == observability.hubHost then dnscrypt.backendAddress else resolver.lan;
+        in
+        {
+          targets = [ "${scrapeAddress}:${toString dnscrypt.port}" ];
+          labels = {
+            instance = resolver.hostName;
+            resolver = resolver.hostName;
+          };
+        }
+      ) resolverEntries;
+      unboundScrapeTargets = map (
+        resolver:
+        let
+          scrapeAddress =
+            if resolver.registryName == observability.hubHost then unbound.backendAddress else resolver.lan;
+        in
+        {
+          targets = [ "${scrapeAddress}:${toString unbound.port}" ];
+          labels = {
+            instance = resolver.hostName;
+            resolver = resolver.hostName;
+          };
+        }
+      ) resolverEntries;
       blackboxConfig = yaml.generate "blackbox-observability.yaml" { modules = blackboxModules; };
+
+      # `blackbox-dns` is intentionally kept separate: it tests the generated
+      # `grafana.nyc.finnrut.is` private publication record and feeds the
+      # canonical resolver-availability alert. These bounded checks use a
+      # public positive fixture to diagnose the Blocky -> Unbound -> dnscrypt
+      # layers without affecting that availability logic.
+      dnsCheckTransports = [
+        "udp"
+        "tcp"
+      ];
+      mkDnsCheckTarget =
+        {
+          resolver,
+          layer,
+          vantage,
+          transport,
+          target,
+          exporter ? "${blackbox.backendAddress}:${toString blackbox.port}",
+        }:
+        {
+          targets = [ target ];
+          labels = {
+            inherit
+              resolver
+              layer
+              vantage
+              transport
+              ;
+            instance = resolver;
+            ip_family = "ip4";
+            check = "public-positive";
+            __probe_module = dnsCheckModuleName transport;
+          }
+          // lib.optionalAttrs (exporter != null) {
+            __blackbox_exporter = exporter;
+          };
+        };
+      blockyDnsCheckTargets = lib.concatMap (
+        resolverName:
+        let
+          resolver = hostRegistry.${resolverName}.hostName;
+        in
+        map (
+          transport:
+          mkDnsCheckTarget {
+            inherit resolver transport;
+            layer = "blocky";
+            vantage = "link";
+            target = "${hostRegistry.${resolverName}.homeAddress}:53";
+          }
+        ) dnsCheckTransports
+      ) publicationSite.internalDnsHosts;
+      localLayerDnsCheckTargets =
+        lib.concatMap
+          (
+            layer:
+            let
+              port = if layer == "unbound" then 5335 else 6000;
+            in
+            map (
+              transport:
+              mkDnsCheckTarget {
+                resolver = observability.hubHost;
+                inherit layer transport;
+                vantage = "link";
+                target = "127.0.0.1:${toString port}";
+              }
+            ) dnsCheckTransports
+          )
+          [
+            "unbound"
+            "dnscrypt"
+          ]
+        ++
+          lib.concatMap
+            (
+              layer:
+              let
+                port = if layer == "unbound" then 5335 else 6000;
+              in
+              map (
+                transport:
+                mkDnsCheckTarget {
+                  resolver = hostRegistry.impa.hostName;
+                  inherit layer transport;
+                  vantage = "impa";
+                  target = "127.0.0.1:${toString port}";
+                  # This internal scrape label selects Impa's LAN-bound exporter;
+                  # it never survives relabelling into a metric label.
+                  exporter = "${hostRegistry.impa.homeAddress}:${toString blackbox.port}";
+                }
+              ) dnsCheckTransports
+            )
+            [
+              "unbound"
+              "dnscrypt"
+            ];
+      dnsCheckTargets = blockyDnsCheckTargets ++ localLayerDnsCheckTargets;
 
       # A job either names one module for every target (`module`) or lets each
       # target select its own through a label (`moduleLabel`), never both: two
@@ -5876,6 +6477,9 @@ in
           moduleLabel ? null,
           targets,
           instanceLabel ? "endpoint",
+          exporterLabel ? null,
+          scrapeInterval ? null,
+          scrapeTimeout ? null,
         }:
         assert (module == null) != (moduleLabel == null);
         {
@@ -5905,13 +6509,22 @@ in
                 source_labels = [ instanceLabel ];
                 target_label = "instance";
               }
-              {
-                target_label = "__address__";
-                replacement = "${blackbox.backendAddress}:${toString blackbox.port}";
-              }
-            ];
+            ]
+            ++ lib.optional (exporterLabel == null) {
+              target_label = "__address__";
+              replacement = "${blackbox.backendAddress}:${toString blackbox.port}";
+            }
+            ++ lib.optional (exporterLabel != null) {
+              # A target may use a tightly scoped remote exporter (for an
+              # Impa-local layer probe) while ordinary targets continue to use
+              # Link's loopback exporter.
+              source_labels = [ exporterLabel ];
+              target_label = "__address__";
+            };
         }
-        // lib.optionalAttrs (module != null) { params.module = [ module ]; };
+        // lib.optionalAttrs (module != null) { params.module = [ module ]; }
+        // lib.optionalAttrs (scrapeInterval != null) { scrape_interval = scrapeInterval; }
+        // lib.optionalAttrs (scrapeTimeout != null) { scrape_timeout = scrapeTimeout; };
 
       safeInstanceName =
         value:
@@ -6087,7 +6700,7 @@ in
               }
               {
                 alert = "DnsProbeFailed";
-                expr = ''min by (resolver) ((probe_success{job="blackbox-dns"} and on (job, instance) (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"}) == 0'';
+                expr = canonicalDnsProbeAlertExpr;
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "DNS validation probe failed through {{ $labels.resolver }}";
@@ -6097,10 +6710,29 @@ in
                 # Inventory cardinality must not be part of the failure
                 # condition: this remains correct when resolvers are added or
                 # removed.
-                expr = ''max(min by (resolver) ((probe_success{job="blackbox-dns"} and on (job, instance) (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"})) == 0'';
+                expr = ''max(min by (resolver) ((probe_success{job="blackbox-dns"} and (up{job="blackbox-dns"} == 1)) or up{job="blackbox-dns"})) == 0'';
                 for = "1m";
                 labels.severity = "critical";
                 annotations.summary = "Every NYC internal DNS probe is failing";
+              }
+              {
+                alert = "DnsDiagnosticAssertionFailed";
+                # Never aggregate diagnostic contracts: default exact-label
+                # matching retains resolver/layer/vantage/transport/ip_family/check.
+                expr = dnsDiagnosticAlertExpr;
+                for = "5m";
+                labels.severity = "warning";
+                annotations.summary = "Diagnostic DNS assertion failed for {{ $labels.resolver }} {{ $labels.layer }} via {{ $labels.vantage }}";
+                annotations.description = "{{ $labels.transport }}/{{ $labels.ip_family }} {{ $labels.check }} assertion is failing or its Blackbox scrape is unreachable.";
+              }
+              {
+                alert = "UnboundStatsCollectionFailed";
+                # A reachable exporter reporting unbound_up=0 is distinct from
+                # a missing exporter scrape, which remains missing telemetry.
+                expr = unboundStatsCollectionAlertExpr;
+                for = "5m";
+                labels.severity = "warning";
+                annotations.summary = "Unbound statistics collection failed on {{ $labels.resolver }}";
               }
               {
                 alert = "DnsBlockingStopped";
@@ -6110,11 +6742,22 @@ in
                 annotations.summary = "Blocky filtering stopped on {{ $labels.resolver }}";
               }
               {
-                alert = "DnsUpstreamFailures";
-                expr = "sum by (resolver) (rate(blocky_error_total[5m])) > 0";
-                for = "5m";
+                alert = "DnsResolutionErrorRatioHigh";
+                expr = ''
+                  (
+                    sum by (resolver) (increase(blocky_error_total{job="blocky"}[15m]))
+                    /
+                    sum by (resolver) (increase(blocky_query_total{job="blocky"}[15m]))
+                  ) > 0.01
+                  and on (resolver)
+                  sum by (resolver) (increase(blocky_error_total{job="blocky"}[15m])) >= 5
+                  and on (resolver)
+                  sum by (resolver) (increase(blocky_query_total{job="blocky"}[15m])) > 0
+                '';
+                for = "10m";
                 labels.severity = "warning";
-                annotations.summary = "Blocky upstream errors persist on {{ $labels.resolver }}";
+                annotations.summary = "Elevated Blocky resolver-chain error ratio on {{ $labels.resolver }}";
+                annotations.description = "The rolling 15m Blocky resolver-chain error ratio has stayed over 1% with at least 5 estimated errors per window for 10m. This is not upstream-specific; inspect DNS probes, SERVFAIL responses, and Blocky, Unbound, and dnscrypt logs.";
               }
               {
                 alert = "EndpointDown";
@@ -6748,6 +7391,18 @@ in
               job_name = "blocky";
               static_configs = blockyScrapeTargets;
             }
+            {
+              job_name = "dnscrypt-proxy";
+              scrape_interval = "60s";
+              metrics_path = "/metrics";
+              static_configs = dnscryptScrapeTargets;
+            }
+            {
+              job_name = "unbound";
+              scrape_interval = "60s";
+              metrics_path = "/metrics";
+              static_configs = unboundScrapeTargets;
+            }
             (mkBlackboxScrape {
               name = "dns";
               module = "dns";
@@ -6756,6 +7411,17 @@ in
                 targets = [ "${hostRegistry.${resolver}.homeAddress}:53" ];
                 labels = { inherit resolver; };
               }) publicationSite.internalDnsHosts;
+            })
+            (mkBlackboxScrape {
+              name = "dns-checks";
+              moduleLabel = "__probe_module";
+              exporterLabel = "__blackbox_exporter";
+              instanceLabel = "instance";
+              scrapeInterval = "60s";
+              # Leave enough room for Blackbox's 5s probe timeout while still
+              # bounding an unavailable remote exporter promptly.
+              scrapeTimeout = "10s";
+              targets = dnsCheckTargets;
             })
             (mkBlackboxScrape {
               name = "internal";

@@ -235,6 +235,14 @@ in
           port = 4000;
           description = "Private DNS metrics";
         };
+        dnscrypt = {
+          port = 9101;
+          description = "DNSCrypt-proxy native Prometheus metrics";
+        };
+        unbound = {
+          port = 9167;
+          description = "Unbound recursive resolver metrics";
+        };
       };
       # Only always-on hosts are scrape targets. Zelda and Hylia are laptops
       # that hold a WireGuard address but are off it most of the time, so a

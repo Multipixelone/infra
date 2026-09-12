@@ -11,12 +11,18 @@ let
 in
 {
   flake.modules.nixos.edge =
-    { lib, config, ... }:
+    {
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
     let
       dnscryptPort = 6000;
       unboundPort = 5335;
       isObservabilityHub = config.networking.hostName == observability.hubHost;
       isImpa = config.networking.hostName == "impa";
+      isObservedResolver = isObservabilityHub || isImpa;
       lanAddress = (hostRegistry.${config.networking.hostName} or { homeAddress = null; }).homeAddress;
       blockGroups = [
         "ads"
@@ -47,6 +53,38 @@ in
           ++ (registryClientNames.${config.networking.hostName} or [ ]);
         }
       );
+      # Impa needs a Blackbox exporter only to run probes against its own
+      # loopback-only Unbound and dnscrypt listeners. Keep this small module
+      # set in lockstep with Link's diagnostic public-positive checks; it does
+      # not assert DO/AD/DNSSEC state, which this Blackbox configuration does
+      # not expose as a first-class assertion.
+      impaBlackboxDnsConfig = (pkgs.formats.yaml { }).generate "impa-blackbox-dns-checks.yaml" {
+        modules = lib.listToAttrs (
+          map
+            (
+              transport:
+              lib.nameValuePair "dns_public_positive_${transport}" {
+                prober = "dns";
+                timeout = "5s";
+                dns = {
+                  preferred_ip_protocol = "ip4";
+                  transport_protocol = transport;
+                  query_name = "example.com";
+                  query_type = "A";
+                  recursion_desired = true;
+                  valid_rcodes = [ "NOERROR" ];
+                  validate_answer_rrs.fail_if_not_matches_regexp = [
+                    "^example\\.com\\..*\\sIN\\sA\\s.+$"
+                  ];
+                };
+              }
+            )
+            [
+              "udp"
+              "tcp"
+            ]
+        );
+      };
     in
     {
       # Disable systemd-resolved to allow blocky to bind to port 53
@@ -71,6 +109,8 @@ in
         enable = true;
         settings = {
           listen_addresses = [ "127.0.0.1:${toString dnscryptPort}" ];
+          # Do not configure query_log.file: its absence keeps dnscrypt-proxy's
+          # on-disk query log disabled.
           ipv6_servers = true;
           # Pinned catalog entries are independently operated and leave filtering to Blocky.
           server_names = [
@@ -90,6 +130,28 @@ in
             ];
             cache_file = "/var/lib/dnscrypt-proxy2/public-resolvers.md";
             minisign_key = "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3";
+          };
+        }
+        // lib.optionalAttrs isObservedResolver {
+          # The monitoring UI also serves its API and WebSocket; dnscrypt-proxy
+          # has no metrics-only listener. Keep it local on Link, and expose it
+          # on Impa's LAN address solely for Link's central Prometheus (the
+          # firewall below permits no other remote client).
+          monitoring_ui = {
+            enabled = true;
+            listen_address = "${
+              if isImpa then lanAddress else "127.0.0.1"
+            }:${toString observability.endpoints.dnscrypt.port}";
+            # Authentication credentials would be stored in the generated TOML
+            # in the Nix store. Network confinement is the authentication
+            # boundary here, so explicitly disable the upstream example's
+            # admin/changeme credentials instead.
+            username = "";
+            password = "";
+            enable_query_log = false;
+            privacy_level = 2;
+            prometheus_enabled = true;
+            prometheus_path = "/metrics";
           };
         };
       };
@@ -122,6 +184,11 @@ in
             hide-identity = true;
             hide-version = true;
             do-not-query-localhost = false; # required to forward to dnscrypt-proxy on localhost
+          }
+          // lib.optionalAttrs isObservedResolver {
+            # The exporter uses `stats_noreset`; basic statistics do not need
+            # Unbound's higher-cardinality extended statistics.
+            extended-statistics = false;
           };
 
           forward-zone = [
@@ -130,6 +197,60 @@ in
               forward-addr = [ "127.0.0.1@${toString dnscryptPort}" ];
             }
           ];
+        };
+      }
+      // lib.optionalAttrs isObservedResolver {
+        # Use the local remote-control socket only. It has administrative
+        # authority, so the exporter is the sole additional principal granted
+        # access below; no TCP control listener is configured.
+        localControlSocketPath = "/run/unbound/unbound.ctl";
+      };
+
+      # This is deliberately neither service-published nor part of DNS startup:
+      # it is an outbound probe primitive for Link's Prometheus only. It binds
+      # Impa's telemetry/LAN address, and the firewall below admits Link alone.
+      services.prometheus.exporters.blackbox = lib.mkIf isImpa {
+        enable = true;
+        listenAddress = lanAddress;
+        port = observability.endpoints.blackbox.port;
+        configFile = impaBlackboxDnsConfig;
+      };
+
+      # The control socket remains owned by Unbound. This identity receives
+      # only the Unbound group at exporter service start, which is enough to
+      # connect to that socket and does not grant it the control key files.
+      users = lib.mkIf isObservedResolver {
+        groups.unbound-exporter = { };
+        users.unbound-exporter = {
+          isSystemUser = true;
+          group = "unbound-exporter";
+        };
+      };
+
+      services.prometheus.exporters.unbound = lib.mkIf isObservedResolver {
+        enable = true;
+        listenAddress = if isImpa then lanAddress else observability.endpoints.unbound.backendAddress;
+        port = observability.endpoints.unbound.port;
+        telemetryPath = "/metrics";
+        unbound = {
+          host = "unix:///run/unbound/unbound.ctl";
+          # Unix socket authentication is filesystem-based. Do not give the
+          # exporter client-key material it does not need for this transport.
+          ca = null;
+          certificate = null;
+          key = null;
+        };
+      };
+
+      # The packaged exporter otherwise runs as `unbound` to read its control
+      # key. Keep it independent from the resolver's identity and give it only
+      # the control-socket group. Its unit orders after/requires Unbound, while
+      # Unbound has no dependency on telemetry.
+      systemd.services.prometheus-unbound-exporter = lib.mkIf isObservedResolver {
+        serviceConfig = {
+          User = lib.mkForce "unbound-exporter";
+          Group = "unbound-exporter";
+          SupplementaryGroups = [ config.services.unbound.group ];
         };
       };
 
@@ -269,6 +390,12 @@ in
           ${lib.optionalString isImpa ''
             iptables -w -I nixos-fw 1 -p tcp --dport ${toString observability.endpoints.blocky.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept
             iptables -w -I nixos-fw 2 -p tcp --dport ${toString observability.endpoints.blocky.port} -j nixos-fw-refuse
+            iptables -w -I nixos-fw 1 -p tcp --dport ${toString observability.endpoints.blackbox.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept
+            iptables -w -I nixos-fw 2 -p tcp --dport ${toString observability.endpoints.blackbox.port} -j nixos-fw-refuse
+            iptables -w -I nixos-fw 1 -p tcp --dport ${toString observability.endpoints.dnscrypt.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept
+            iptables -w -I nixos-fw 2 -p tcp --dport ${toString observability.endpoints.dnscrypt.port} -j nixos-fw-refuse
+            iptables -w -I nixos-fw 1 -p tcp --dport ${toString observability.endpoints.unbound.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept
+            iptables -w -I nixos-fw 2 -p tcp --dport ${toString observability.endpoints.unbound.port} -j nixos-fw-refuse
           ''}
         '';
         extraStopCommands = ''
@@ -277,6 +404,12 @@ in
           ${lib.optionalString isImpa ''
             iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blocky.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept 2>/dev/null || true
             iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blocky.port} -j nixos-fw-refuse 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blackbox.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.blackbox.port} -j nixos-fw-refuse 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.dnscrypt.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.dnscrypt.port} -j nixos-fw-refuse 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.unbound.port} -s ${hostRegistry.link.homeAddress}/32 -j nixos-fw-accept 2>/dev/null || true
+            iptables -w -D nixos-fw -p tcp --dport ${toString observability.endpoints.unbound.port} -j nixos-fw-refuse 2>/dev/null || true
           ''}
           iptables -w -F nixos-edge-dns 2>/dev/null || true
           iptables -w -X nixos-edge-dns 2>/dev/null || true

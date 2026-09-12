@@ -187,6 +187,91 @@ in
             return errors
 
 
+        # DNS has one canonical private-record probe and a separate diagnostic
+        # job. These assertions keep their selectors and the pinned metric
+        # names visible without attempting to interpret dashboard layout.
+        def dns_contract_problems(dashboard):
+            required = {
+                "Resolver exporter reachability": [
+                    'up{job=~"blocky|dnscrypt-proxy|unbound",resolver=~"$resolver"}',
+                ],
+                "Unbound statistics collection": [
+                    'unbound_up{job="unbound",resolver=~"$resolver"}',
+                ],
+                "Resolver systemd units": [
+                    "node_systemd_unit_state{",
+                    'name=~"blocky.service|dnscrypt-proxy.service|unbound.service"',
+                    'state="active"',
+                ],
+                "Diagnostic DNS assertions": [
+                    'probe_success{job="blackbox-dns-checks",resolver=~"$resolver"}',
+                    "{{resolver}} · {{layer}} · {{vantage}} · {{transport}}",
+                ],
+                "Diagnostic probe reachability": [
+                    'up{job="blackbox-dns-checks",resolver=~"$resolver"}',
+                    "{{resolver}} · {{layer}} · {{vantage}} · {{transport}}",
+                ],
+                "DNSCrypt workload": [
+                    'dnscrypt_proxy_queries_total{job="dnscrypt-proxy",resolver=~"$resolver"}',
+                ],
+                "DNSCrypt cache activity": [
+                    'dnscrypt_proxy_cache_hits_total{job="dnscrypt-proxy",resolver=~"$resolver"}',
+                    'dnscrypt_proxy_cache_misses_total{job="dnscrypt-proxy",resolver=~"$resolver"}',
+                ],
+                "DNSCrypt server response time": [
+                    'dnscrypt_proxy_server_response_time_average_ms{job="dnscrypt-proxy",resolver=~"$resolver"}',
+                ],
+                "Unbound workload": [
+                    'unbound_queries_total{job="unbound",resolver=~"$resolver"}',
+                ],
+                "Unbound cache and prefetch": [
+                    'unbound_cache_hits_total{job="unbound",resolver=~"$resolver"}',
+                    'unbound_cache_misses_total{job="unbound",resolver=~"$resolver"}',
+                    'unbound_prefetches_total{job="unbound",resolver=~"$resolver"}',
+                ],
+                "Unbound request-list pressure": [
+                    'unbound_request_list_current_all{job="unbound",resolver=~"$resolver"}',
+                    'unbound_request_list_current_user{job="unbound",resolver=~"$resolver"}',
+                    'unbound_request_list_current_replies{job="unbound",resolver=~"$resolver"}',
+                ],
+                "Unbound recursive timing": [
+                    'unbound_recursion_time_seconds_avg{job="unbound",resolver=~"$resolver"}',
+                ],
+            }
+            errors = []
+            panels = dashboard.get("panels", [])
+            for title, fragments in required.items():
+                matches = [panel for panel in panels if panel.get("title") == title]
+                if len(matches) != 1:
+                    errors.append(f"expected exactly one {title!r} panel, found {len(matches)}")
+                    continue
+                text = "\n".join(
+                    target.get("expr", "") + "\n" + target.get("legendFormat", "")
+                    for target in matches[0].get("targets", [])
+                )
+                for fragment in fragments:
+                    if fragment not in text:
+                        errors.append(f"{title}: missing required selector/identity {fragment!r}")
+
+            canonical = [panel for panel in panels if panel.get("title") == "External view (blackbox probe)"]
+            if len(canonical) != 1:
+                errors.append(f"expected exactly one canonical DNS probe panel, found {len(canonical)}")
+            else:
+                canonical_text = "\n".join(target.get("expr", "") for target in canonical[0].get("targets", []))
+                if 'job="blackbox-dns"' not in canonical_text or "blackbox-dns-checks" in canonical_text:
+                    errors.append("canonical DNS probe panel must select only job=blackbox-dns")
+
+            text = json.dumps(dashboard)
+            for forbidden in (
+                "dnscrypt_proxy_blocked_queries_total",
+                "dnscrypt_proxy_query_log_entries",
+                "dnscrypt_proxy_memory_usage_bytes",
+            ):
+                if forbidden in text:
+                    errors.append(f"forbidden DNSCrypt blocked/log metric claim {forbidden!r}")
+            return errors
+
+
         for name, dashboard in sorted(dashboards.items()):
             # 42 is the final v1 dashboard schema. Emitting anything lower
             # makes Grafana rewrite datasource refs and panel fields on load.
@@ -377,6 +462,9 @@ in
             if name == "alerts.json":
                 for message in alert_duration_contract_problems(dashboard):
                     fail(name, message)
+            if name == "dns.json":
+                for message in dns_contract_problems(dashboard):
+                    fail(name, message)
 
         if "alerts.json" not in dashboards:
             fail("alerts.json", "missing alerts dashboard")
@@ -404,6 +492,20 @@ in
             old_timeline_panel["fieldConfig"]["defaults"]["noValue"] = "OK"
             if not alert_duration_contract_problems(old_timeline):
                 fail("alerts.json", "fixture with old timeline 'OK' unexpectedly passed")
+
+        if "dns.json" not in dashboards:
+            fail("dns.json", "missing DNS dashboard")
+        else:
+            old_dns = copy.deepcopy(dashboards["dns.json"])
+            old_diagnostic = next(
+                panel for panel in old_dns["panels"]
+                if panel.get("title") == "Diagnostic DNS assertions"
+            )
+            old_diagnostic["targets"][0]["expr"] = old_diagnostic["targets"][0]["expr"].replace(
+                "blackbox-dns-checks", "blackbox-dns"
+            )
+            if not dns_contract_problems(old_dns):
+                fail("dns.json", "fixture with canonical diagnostic job unexpectedly passed")
 
         if problems:
             print("Grafana dashboard validation failed:", file=sys.stderr)

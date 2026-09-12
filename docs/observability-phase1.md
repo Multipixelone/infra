@@ -254,3 +254,23 @@ requires at least 24 hours of clean aggregate telemetry plus deliberate firing
 and recovery tests for each media alert. Do not route or test Telegram during
 this cutover. Routine maintenance consists of digest review, checking exporter
 release notes for metric/schema changes, and repeating the privacy fixtures.
+
+## DNS diagnostic telemetry
+
+`blackbox-dns` remains the canonical private-record availability signal.
+`blackbox-dns-checks` is a separate, bounded public-positive diagnostic contract
+labelled by `resolver`, `layer`, `vantage`, `transport`, `ip_family`, and
+`check`; dashboard and alert expressions keep that complete identity instead of
+collapsing different checks on one resolver. Its assertion result and exporter
+scrape reachability are shown separately, so missing telemetry is never shown as
+healthy. The Unbound exporter is additionally checked with `unbound_up` only
+when its own scrape is reachable.
+
+The pinned unbound_exporter exposes `unbound_request_list_current_*` gauges and
+`unbound_request_list_exceeded_total`, but the configured Unbound request-list
+capacity is not exported as a matching bounded signal. A sustained request-list
+pressure alert is deferred: a raw occupancy threshold or a single counter
+increment would not be a defensible no-traffic/reset-safe incident condition.
+No dnscrypt-proxy blocked-query metric or resolver operational-log claim is
+used; secure Impa journal delivery remains blocked pending dedicated
+TLS/client-auth secrets.
