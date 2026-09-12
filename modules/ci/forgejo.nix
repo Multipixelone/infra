@@ -354,18 +354,23 @@ in
           };
         };
 
-        # The scheduled lock bump, moved off GitHub Actions so the forge is the
+        # The automated lock bump, moved off GitHub Actions so the forge is the
         # only thing that writes to this repo. While both forges ran it, each
         # opened its own pull request from the same branch name and the GitHub
         # copy had to be merged back by hand.
         ${updateLockFilePath}.source = pkgs.writers.writeJSON "forgejo-actions-workflow-update-lock.yaml" {
           name = "Update flake inputs";
           on = {
+            push.branches = [ repo.defaultBranch ];
             workflow_dispatch = { };
             # Forgejo only honours `schedule` on the default branch, which
             # is where this is generated, so the cadence matches the GitHub
             # workflow it replaces: every third day.
             schedule = [ { cron = "0 0 1-31/3 * *"; } ];
+          };
+          concurrency = {
+            group = "update-flake-lock";
+            cancel-in-progress = true;
           };
           jobs.update-flake-lock = {
             runs-on = runner.name;
@@ -374,16 +379,75 @@ in
             # derivation — so this stays well inside the runner's slice
             # even while a build matrix is running beside it.
             timeout-minutes = 60;
-            steps = sharedPreSteps ++ [
+            steps = [
+              {
+                # Main-push runs only refresh an existing bot PR. Scheduled and
+                # manually dispatched runs also discover new input updates.
+                id = "update-gate";
+                name = "Discover update pull request";
+                env.FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+                run = ''
+                  set -euo pipefail
+
+                  tmpdir="$(mktemp -d)"
+                  trap 'rm -rf "$tmpdir"' EXIT
+                  pulls="$tmpdir/pulls.json"
+                  curl_config="$tmpdir/curl.config"
+                  printf 'header = "Authorization: token %s"\n' "$FORGE_TOKEN" > "$curl_config"
+                  chmod 600 "$curl_config"
+                  pr_index=""
+                  gate_failed=false
+                  code=transport-error
+
+                  # Filter locally: Forgejo's list endpoint does not reliably
+                  # support a head= query across versions.
+                  if code="$(curl --config "$curl_config" -sS -o "$pulls" -w '%{http_code}' \
+                    "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls?state=open&limit=50")" && [ "$code" = 200 ]; then
+                    if ! jq -e 'type == "array"' "$pulls" > /dev/null; then
+                      echo "Open pull-request response was not a JSON array; failing open." >&2
+                      gate_failed=true
+                    elif ! pr_index="$(jq -r --arg branch "${updateBranch}" \
+                      '[.[] | select(.head.ref == $branch)] | first | .index // empty' "$pulls")"; then
+                      echo "Could not parse the open pull-request list; failing open." >&2
+                      pr_index=""
+                      gate_failed=true
+                    fi
+                  else
+                    echo "Pull-request discovery returned HTTP $code; failing open." >&2
+                    gate_failed=true
+                  fi
+
+                  should_run=true
+                  if [ "''${{ github.event_name }}" = push ] && [ "$gate_failed" = false ] && [ -z "$pr_index" ]; then
+                    should_run=false
+                  fi
+
+                  {
+                    echo "should-run=$should_run"
+                    echo "pr-index=$pr_index"
+                  } >> "$GITHUB_OUTPUT"
+                '';
+              }
+              (steps.checkout // { "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}"; })
+              (steps.installSshKey // { "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}"; })
+              (steps.githubTokenRewrite // { "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}"; })
               {
                 name = "Update flake.lock";
-                run = "nix ${nixArgs} flake update";
+                "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}";
+                run = ''
+                  git fetch origin "+refs/heads/${repo.defaultBranch}:refs/remotes/origin/${repo.defaultBranch}"
+                  git switch -C "${updateBranch}" "origin/${repo.defaultBranch}"
+                  base_sha="$(git rev-parse "origin/${repo.defaultBranch}")"
+                  echo "UPDATE_BASE_SHA=$base_sha" >> "$GITHUB_ENV"
+                  nix ${nixArgs} flake update
+                '';
               }
               {
                 # Mirror `just update`: keep the pinned Firefox addons in
                 # lockstep with the flake bump so the automated PR doesn't
                 # drift from a manual update.
                 name = "Update Firefox addons";
+                "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}";
                 run = ''
                   nix run 'git+https://git.sr.ht/~rycee/mozilla-addons-to-nix' \
                     --option allow-import-from-derivation true \
@@ -401,9 +465,11 @@ in
                 # triggers for pushes made with the automatic token, so
                 # the bumped branch would never get built.
                 name = "Open pull request";
+                "if" = "\${{ steps.update-gate.outputs.should-run == 'true' }}";
                 env = {
                   FORGE_USER = forge.owner;
                   FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+                  PR_INDEX = "\${{ steps.update-gate.outputs.pr-index }}";
                 };
                 run = ''
                   set -euo pipefail
@@ -411,16 +477,19 @@ in
                   paths="flake.lock pkgs/firefox-addons/generated.nix"
 
                   if git diff --quiet -- $paths; then
-                    echo "Inputs and addon pins are already current; nothing to open."
-                    exit 0
+                    changed=false
+                  else
+                    changed=true
+                    git config user.name  "${owner.name}"
+                    git config user.email "${owner.email}"
+                    git add -- $paths
+                    git commit -m "⚙️ bump flake.lock"
                   fi
 
-                  git config user.name  "${owner.name}"
-                  git config user.email "${owner.email}"
-
-                  git switch -C "${updateBranch}"
-                  git add -- $paths
-                  git commit -m "⚙️ bump flake.lock"
+                  if [ "$changed" = false ] && [ -z "$PR_INDEX" ]; then
+                    echo "Inputs and addon pins are already current; no open pull request or bot branch needs refreshing."
+                    exit 0
+                  fi
 
                   # checkout@v4 leaves an Authorization header pinned to the
                   # run's automatic token in the local config, and it wins
@@ -429,20 +498,103 @@ in
                   git config --local --unset-all \
                     'http.https://${forge.domain}/.extraheader' || true
 
-                  # Via a credential file rather than a URL so the token
-                  # never lands in git's argv on a machine the owner also
-                  # uses interactively.
-                  creds="$(mktemp)"
-                  trap 'rm -f "$creds"' EXIT
+                  # Via a credential file rather than a URL so the token never
+                  # lands in git's argv on a machine the owner also uses.
+                  tmpdir="$(mktemp -d)"
+                  trap 'rm -rf "$tmpdir"' EXIT
+                  creds="$tmpdir/credentials"
+                  curl_config="$tmpdir/curl.config"
                   printf 'https://%s:%s@${forge.domain}\n' "$FORGE_USER" "$FORGE_TOKEN" > "$creds"
+                  chmod 600 "$creds"
+                  printf 'header = "Authorization: token %s"\n' "$FORGE_TOKEN" > "$curl_config"
+                  chmod 600 "$curl_config"
                   git config --local credential.helper "store --file=$creds"
 
-                  git push --force origin "HEAD:refs/heads/${updateBranch}"
+                  # checkout's fetch refspec may omit the bot branch. Discover
+                  # it first so a missing ref is distinct from a failed remote
+                  # query, and only discard stale tracking state on confirmation.
+                  fetch_update_branch() {
+                    remote_ref="refs/heads/${updateBranch}"
+                    remote_branch="refs/remotes/origin/${updateBranch}"
 
-                  body="$(mktemp)"
-                  code="$(curl -sS -o "$body" -w '%{http_code}' \
+                    if remote_advertisement="$(git ls-remote --exit-code --heads origin "$remote_ref")"; then
+                      git fetch origin "+$remote_ref:$remote_branch"
+                      UPDATE_BRANCH_LEASE="$(git rev-parse "$remote_branch")"
+                      return
+                    else
+                      remote_status=$?
+                      case "$remote_status" in
+                        2)
+                          git update-ref -d "$remote_branch"
+                          UPDATE_BRANCH_LEASE=""
+                          ;;
+                        *)
+                          echo "Could not discover remote ${updateBranch} (git ls-remote exited $remote_status)." >&2
+                          return 1
+                          ;;
+                      esac
+                    fi
+                  }
+
+                  pr_index_from_array() {
+                    response="$1"
+                    if ! jq -e 'type == "array"' "$response" > /dev/null; then
+                      echo "Expected a JSON array from the pull-request API." >&2
+                      return 1
+                    fi
+                    jq -r --arg branch "${updateBranch}" \
+                      '[.[] | select(.head.ref == $branch)] | first | .index // empty' "$response"
+                  }
+
+                  if [ "$changed" = false ]; then
+                    close_body="$tmpdir/close-pr.json"
+                    close_code="$(curl --config "$curl_config" -sS -o "$close_body" -w '%{http_code}' \
+                      -X PATCH "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls/$PR_INDEX" \
+                      -H 'Content-Type: application/json' \
+                      -d '{"state":"closed"}')"
+                    case "$close_code" in
+                      200)
+                        echo "Closed superseded pull request #$PR_INDEX."
+                        ;;
+                      *)
+                        echo "Could not close superseded pull request #$PR_INDEX (HTTP $close_code):" >&2
+                        cat "$close_body" >&2
+                        exit 1
+                        ;;
+                    esac
+
+                    fetch_update_branch
+                    if [ -n "$UPDATE_BRANCH_LEASE" ]; then
+                      git push --force-with-lease="refs/heads/${updateBranch}:$UPDATE_BRANCH_LEASE" \
+                        origin ":refs/heads/${updateBranch}"
+                      echo "Deleted the superseded remote ${updateBranch} branch."
+                    else
+                      echo "The superseded remote ${updateBranch} branch is already absent."
+                    fi
+                    exit 0
+                  fi
+
+                  # Refetch immediately before pushing so stale generated output
+                  # cannot overwrite a branch based on an older main revision.
+                  git fetch origin "+refs/heads/${repo.defaultBranch}:refs/remotes/origin/${repo.defaultBranch}"
+                  current_base="$(git rev-parse "origin/${repo.defaultBranch}")"
+                  if [ "$current_base" != "$UPDATE_BASE_SHA" ]; then
+                    echo "${repo.defaultBranch} advanced during generation; refusing to push stale output." >&2
+                    exit 1
+                  fi
+
+                  fetch_update_branch
+                  git push --force-with-lease="refs/heads/${updateBranch}:$UPDATE_BRANCH_LEASE" \
+                    origin "${updateBranch}:refs/heads/${updateBranch}"
+
+                  if [ -n "$PR_INDEX" ]; then
+                    echo "Updated the head of existing pull request #$PR_INDEX."
+                    exit 0
+                  fi
+
+                  body="$tmpdir/create-pr.json"
+                  code="$(curl --config "$curl_config" -sS -o "$body" -w '%{http_code}' \
                     -X POST "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls" \
-                    -H "Authorization: token $FORGE_TOKEN" \
                     -H 'Content-Type: application/json' \
                     -d '${
                       builtins.toJSON {
@@ -459,10 +611,59 @@ in
                       echo "Opened $(jq -r '.html_url' "$body")"
                       ;;
                     409)
-                      # The previous run's pull request is still open and
-                      # now points at the branch we just force-pushed,
-                      # which is the intended end state.
-                      echo "Pull request already open; updated its head instead."
+                      # A concurrent run may have opened the same head after
+                      # the gate. Re-query once before treating this as a race.
+                      race_body="$tmpdir/race-open.json"
+                      race_code="$(curl --config "$curl_config" -sS -o "$race_body" -w '%{http_code}' \
+                        "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls?state=open&limit=50")"
+                      if [ "$race_code" = 200 ]; then
+                        if ! race_index="$(pr_index_from_array "$race_body")"; then
+                          echo "Pull-request creation conflicted and the open-PR race response was invalid." >&2
+                          exit 1
+                        fi
+                      else
+                        echo "Pull-request creation conflicted and the open-PR race query returned HTTP $race_code; inspect Forgejo before retrying." >&2
+                        exit 1
+                      fi
+
+                      if [ -n "$race_index" ]; then
+                        echo "Pull request #$race_index appeared concurrently; its head was updated."
+                        exit 0
+                      fi
+
+                      closed_body="$tmpdir/race-closed.json"
+                      closed_code="$(curl --config "$curl_config" -sS -o "$closed_body" -w '%{http_code}' \
+                        "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls?state=closed&limit=50")"
+                      if [ "$closed_code" = 200 ]; then
+                        if ! closed_index="$(pr_index_from_array "$closed_body")"; then
+                          echo "Pull-request creation conflicted and the closed-PR response was invalid." >&2
+                          exit 1
+                        fi
+                      else
+                        echo "Pull-request creation conflicted; no open fixed-head PR was found, and the closed-PR query returned HTTP $closed_code. Inspect Forgejo before retrying." >&2
+                        exit 1
+                      fi
+
+                      if [ -n "$closed_index" ]; then
+                        reopen_body="$tmpdir/reopen-pr.json"
+                        reopen_code="$(curl --config "$curl_config" -sS -o "$reopen_body" -w '%{http_code}' \
+                          -X PATCH "https://${forge.domain}/api/v1/repos/${forge.owner}/${forge.name}/pulls/$closed_index" \
+                          -H 'Content-Type: application/json' \
+                          -d '{"state":"open"}')"
+                        case "$reopen_code" in
+                          200)
+                            echo "Reopened fixed-head pull request #$closed_index after creation conflict."
+                            ;;
+                          *)
+                            echo "Pull-request creation conflicted, and reopening fixed-head pull request #$closed_index failed (HTTP $reopen_code):" >&2
+                            cat "$reopen_body" >&2
+                            exit 1
+                            ;;
+                        esac
+                      else
+                        echo "Pull-request creation conflicted, but no open or closed PR with head ${updateBranch} was found; inspect the Forgejo pull requests and resolve the conflict." >&2
+                        exit 1
+                      fi
                       ;;
                     *)
                       echo "Unexpected HTTP $code from the pulls API:" >&2

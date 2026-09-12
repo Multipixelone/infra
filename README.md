@@ -103,7 +103,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (61)</summary>
+<summary>Packages exposed by this flake (62)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -119,6 +119,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
 - [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`
+- [`grafana-alloy`](https://github.com/Multipixelone/infra/blob/main/modules/link/alloy-package.nix) — OpenTelemetry Collector distribution with programmable pipelines · `nix run github:Multipixelone/infra#grafana-alloy`
 - [`hacs`](https://github.com/Multipixelone/infra/blob/main/modules/iot/homeassistant.nix) — Home Assistant Community Store (HACS) · `nix run github:Multipixelone/infra#hacs`
 - [`helix`](https://github.com/Multipixelone/infra/blob/main/modules/shell/helix.nix) · `nix run github:Multipixelone/infra#helix`
 - [`hyprctl-instance`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/instance.nix) · `nix run github:Multipixelone/infra#hyprctl-instance`
