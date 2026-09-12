@@ -1,5 +1,9 @@
 { inputs, ... }:
 {
+  # The producer owns its service-to-unit mapping. Central journal ingress owns
+  # the separate client enrollment and network authorization.
+  observability.journal.sources.iot.mosquitto.units = [ "mosquitto.service" ];
+
   configurations.nixos.iot.module =
     { config, ... }:
     {
