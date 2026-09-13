@@ -42,6 +42,7 @@
       beets-dir = "/home/tunnel/.config/beets";
       beets-library = "${beets-dir}/library.db";
       beets-config = "${beets-dir}/config.yaml";
+      beets-lock = "${beets-dir}/.import.lock";
       detect-file = "${download-dir}/download-finished";
       ffmpeg = lib.getExe pkgs.ffmpeg-full;
       convert-mpc = withSystem pkgs.stdenv.hostPlatform.system (
@@ -54,9 +55,21 @@
         runtimeInputs = [
           beets-plugins
           pkgs.coreutils
+          pkgs.findutils
+          pkgs.util-linux
         ];
         text = ''
-          beet -c ${beets-config} import -q ${download-dir}
+          exec {lock_fd}>${beets-lock}
+          flock --exclusive "$lock_fd"
+          imports_file=$(mktemp)
+          trap 'rm -f "$imports_file"' EXIT
+          if ! find ${download-dir} -mindepth 1 -maxdepth 1 ! -name openclaw ! -name download-finished -print0 > "$imports_file"; then
+            exit 1
+          fi
+          mapfile -d "" -t imports < "$imports_file"
+          if (( ''${#imports[@]} )); then
+            beet -c ${beets-config} import -q "''${imports[@]}"
+          fi
           rm -f ${detect-file}
         '';
       };
@@ -69,8 +82,11 @@
         runtimeInputs = [
           beets-plugins
           pkgs.findutils
+          pkgs.util-linux
         ];
         text = ''
+          exec {lock_fd}>${beets-lock}
+          flock --exclusive "$lock_fd"
           if [ -n "$(find ${explo-import-dir} -type f -print -quit 2>/dev/null)" ]; then
             beet -c ${beets-config} import -q -s --set import_source=Explo ${explo-import-dir}
           fi

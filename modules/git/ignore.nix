@@ -11,6 +11,10 @@
 
   config.gitignore = [
     "/.claude/settings.local.json"
+    "/.slim/clonedeps/repos/"
+    "/.slim/deepwork/"
+    "/.slim/worktrees.json"
+    "/.slim/worktrees/"
   ];
 
   config.flake-file.inputs = {

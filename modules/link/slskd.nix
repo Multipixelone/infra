@@ -7,7 +7,12 @@
       # to it over its API; the existing Nicotine+ container has no API, so a
       # dedicated slskd instance is needed. Keep the Nicotine+ container stopped
       # while slskd is up to avoid two simultaneous Soulseek logins.
-      age.secrets."slskd".file = "${inputs.secrets}/media/slskd.age";
+      age.secrets."slskd" = {
+        file = "${inputs.secrets}/media/slskd.age";
+        owner = "tunnel";
+        group = "users";
+        mode = "0400";
+      };
 
       systemd.tmpfiles.rules = [
         "d /volume1/Media/ImportMusic/slskd 0775 tunnel users -"
