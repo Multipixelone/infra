@@ -18,6 +18,7 @@ from .models import digest, new_job, now, touch, transition
 from .slskd import (
     rank_offers,
     source_offers,
+    state_flags,
     timestamp_after,
     transfer_failed,
     transfer_succeeded,
@@ -87,6 +88,14 @@ def public(job: dict, operation: str) -> dict:
 
 def _due(stamp: str | None) -> bool:
     return not stamp or stamp <= now()
+
+
+def _zero_byte_rejected_transfer(record: dict) -> bool:
+    return (
+        "rejected" in state_flags(record["state"])
+        and type(record["bytes"]) is int
+        and record["bytes"] == 0
+    )
 
 
 class JobService:
@@ -481,11 +490,15 @@ class JobService:
             (item["peer"], item["remote"], item["size"]): item
             for item in intent["files"]
         }
-        matches = [
-            record
-            for record in records
-            if (record["peer"], record["remote"], record["size"]) in expected
-        ]
+        matches = []
+        for record in records:
+            if (record["peer"], record["remote"], record["size"]) not in expected:
+                continue
+            if record.get("batch_id") != intent[
+                "batch_id"
+            ] and _zero_byte_rejected_transfer(record):
+                continue
+            matches.append(record)
         for record in matches:
             if record.get("batch_id") != intent["batch_id"]:
                 return "needs_review", matches
@@ -517,6 +530,12 @@ class JobService:
             )
             for record in matches
         ):
+            if all(
+                transfer_failed(record["state"])
+                and _zero_byte_rejected_transfer(record)
+                for record in matches
+            ):
+                return "failed_zero_bytes", matches
             return "failed", matches
         if all(
             transfer_succeeded(record["state"]) and record["bytes"] == record["size"]
@@ -524,6 +543,34 @@ class JobService:
         ):
             return "complete", matches
         return "pending", matches
+
+    def _fail_zero_byte_transfer_rejection(
+        self, job: dict, revision: int, records: list[dict]
+    ) -> dict:
+        reasons = sorted(
+            {
+                record["exception"]
+                for record in records
+                if isinstance(record.get("exception"), str)
+            }
+        )
+        message = "all transfers were rejected before any data was downloaded"
+        if reasons:
+            message += f" ({_bounded_text(reasons[0], 80)})"
+        action = "wait or change source, then submit a new request with a new idempotency key"
+        transition(
+            job,
+            "failed",
+            error={
+                "code": "transfer_rejected",
+                "message": f"{message}; {action}",
+                "retryable": False,
+                "resume_phase": None,
+                "manual_action": action,
+            },
+        )
+        self._commit(job, revision)
+        return public(job, "worker")
 
     def _receipt_valid(self, receipt: object, identity: dict, count: int) -> bool:
         if not isinstance(receipt, dict) or any(
@@ -807,6 +854,10 @@ class JobService:
                     raise BackendUncertain(
                         "queue POST was started but has no exact transfer evidence"
                     )
+                if outcome == "failed_zero_bytes":
+                    return self._fail_zero_byte_transfer_rejection(
+                        job, revision, records
+                    )
                 if outcome not in {"pending", "complete"}:
                     raise InvalidInput("queue reconciliation is not exact")
                 intent["status"] = "submitted"
@@ -828,6 +879,10 @@ class JobService:
                     touch(job)
                     self._commit(job, revision)
                     return public(job, "worker")
+                if outcome == "failed_zero_bytes":
+                    return self._fail_zero_byte_transfer_rejection(
+                        job, revision, records
+                    )
                 if outcome != "complete":
                     raise InvalidInput("transfer reconciliation failed: " + outcome)
                 intent["evidence"] = records

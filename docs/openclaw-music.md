@@ -123,18 +123,21 @@ The user timer runs on boot and approximately every 12 seconds after the previou
 
 ## Recovery guide
 
-| Condition                                    | Agent action                                                                                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `needs_choice`                               | Show the current candidates and ask the user. Call `choose` only with their exact returned IDs/revision.                                                |
-| `failed` with `retryable:true`               | Call `retry` once with the job UUID, then resume polling.                                                                                               |
-| `failed` without retryability                | Report `error.code`/`error.message`; ask the user how to proceed.                                                                                       |
-| `needs_review`                               | Never blindly retry. Report the bounded error and `manual_action`; ask the user/human operator. `retry` is not a recovery path for this state.          |
-| `beets_no_import`                            | Inspect the existing beets import log, validated staging directory, and library with a human operator. Do not run raw beet yourself.                    |
-| uncertain queue/import (`backend_uncertain`) | Do not replay the mutation. Report it as review-required. In particular, a `calling` beets import without normal acknowledgement is not auto-completed. |
-| unknown job                                  | The UUID is not in this ledger; ask for the correct UUID or submit a new user intent.                                                                   |
-| idempotency conflict                         | Do not alter the existing key/request. Use the original exact request/key for delivery retry, or obtain a new user intent and a new random key.         |
+| Condition                                      | Agent action                                                                                                                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `needs_choice`                                 | Show the current candidates and ask the user. Call `choose` only with their exact returned IDs/revision.                                                                                             |
+| `failed` with `retryable:true`                 | Call `retry` once with the job UUID, then resume polling.                                                                                                                                            |
+| `failed` with `error.code:"transfer_rejected"` | All exact batch transfers were terminally rejected before any bytes downloaded. Wait or change source, then submit a new request with a new idempotency key. Do not call `retry` or reuse the batch. |
+| `failed` without retryability                  | Report `error.code`/`error.message`; ask the user how to proceed.                                                                                                                                    |
+| `needs_review`                                 | Never blindly retry. Report the bounded error and `manual_action`; ask the user/human operator. `retry` is not a recovery path for this state.                                                       |
+| `beets_no_import`                              | Inspect the existing beets import log, validated staging directory, and library with a human operator. Do not run raw beet yourself.                                                                 |
+| uncertain queue/import (`backend_uncertain`)   | Do not replay the mutation. Report it as review-required. In particular, a `calling` beets import without normal acknowledgement is not auto-completed.                                              |
+| unknown job                                    | The UUID is not in this ledger; ask for the correct UUID or submit a new user intent.                                                                                                                |
+| idempotency conflict                           | Do not alter the existing key/request. Use the original exact request/key for delivery retry, or obtain a new user intent and a new random key.                                                      |
 
 After confirmed manual cleanup, submit a new request with a **new** idempotency key. Do not claim that cleanup, retry, or beets recovery happened automatically.
+
+An exact, current batch where every transfer was explicitly rejected with zero bytes is recorded as non-retryable `failed` with `error.code:"transfer_rejected"`, not `needs_review`. Its bounded error includes any normalized slskd rejection reason. This does not apply to partial bytes, other failure states, missing/stale/ambiguous records, wrong batch identity, or uncertain queue mutations; those remain review-required.
 
 ## Security rules
 

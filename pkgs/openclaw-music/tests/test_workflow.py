@@ -481,6 +481,7 @@ class WorkflowTests(unittest.TestCase):
                                     "size": 1,
                                     "state": "Completed",
                                     "requestedAt": "2999-01-01T00:00:00Z",
+                                    "exception": "  backend\nreason  ",
                                 }
                             ]
                         }
@@ -489,6 +490,149 @@ class WorkflowTests(unittest.TestCase):
             ]
         )
         self.assertEqual(records[0]["remote"], "A/1.wav")
+        self.assertEqual(records[0]["exception"], "backend reason")
+
+    def _submitted_transfer_job(self, key):
+        job = self.service.submit(
+            {
+                "idempotency_key": key,
+                "artist": "Artist",
+                "release": "Album",
+                "quality_profile": "lossless",
+            }
+        )
+        files = [
+            {"peer": "peer", "remote": "Album/01.wav", "size": 10},
+            {"peer": "peer", "remote": "Album/02.wav", "size": 20},
+        ]
+        with self.service.ledger.locked():
+            stored = self.service.ledger.get(job["job_id"])
+            stored["state"] = "downloading"
+            stored["transfer_intent"] = {
+                "status": "submitted",
+                "cleanup": "done",
+                "batch_id": job["job_id"],
+                "requested_at": "2000-01-01T00:00:00+00:00",
+                "files": files,
+            }
+            self.service.ledger.save(stored)
+        records = []
+        self.service.slskd = SimpleNamespace(transfers=lambda: records)
+        return job, records
+
+    def test_exact_zero_byte_transfer_rejections_are_terminal_and_actionable(self):
+        job, records = self._submitted_transfer_job("zero-byte-rejected")
+        job_id = job["job_id"]
+        records.extend(
+            [
+                {
+                    "peer": "peer",
+                    "remote": "Album/01.wav",
+                    "size": 10,
+                    "id": "one",
+                    "state": "Completed, Rejected",
+                    "bytes": 0,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "Overwhelmed with requests; try again later.",
+                },
+                {
+                    "peer": "peer",
+                    "remote": "Album/02.wav",
+                    "size": 20,
+                    "id": "two",
+                    "state": "Completed, Rejected",
+                    "bytes": 0,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "Overwhelmed with requests; try again later.",
+                },
+            ]
+        )
+
+        result = self.service.worker_once()
+
+        self.assertEqual(result["state"], "failed")
+        self.assertFalse(result["retryable"])
+        self.assertIsNone(result["resume_phase"])
+        self.assertEqual(result["error"]["code"], "transfer_rejected")
+        self.assertIn("Overwhelmed with requests", result["error"]["message"])
+        self.assertIn("wait or change source", result["error"]["message"])
+        self.assertIn("new idempotency key", result["error"]["message"])
+        with self.assertRaises(Conflict):
+            self.service.retry(job_id)
+
+    def test_partial_byte_transfer_failure_remains_needs_review(self):
+        job, records = self._submitted_transfer_job("partial-byte-rejected")
+        job_id = job["job_id"]
+        records.extend(
+            [
+                {
+                    "peer": "peer",
+                    "remote": "Album/01.wav",
+                    "size": 10,
+                    "id": "one",
+                    "state": "Completed, Rejected",
+                    "bytes": 1,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "Overwhelmed with requests; try again later.",
+                },
+                {
+                    "peer": "peer",
+                    "remote": "Album/02.wav",
+                    "size": 20,
+                    "id": "two",
+                    "state": "Completed, Rejected",
+                    "bytes": 0,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "Overwhelmed with requests; try again later.",
+                },
+            ]
+        )
+
+        result = self.service.worker_once()
+
+        self.assertEqual(result["state"], "needs_review")
+        self.assertFalse(result["retryable"])
+        self.assertEqual(result["error"]["code"], "invalid_input")
+
+    def test_zero_byte_non_rejected_transfer_failure_remains_needs_review(self):
+        job, records = self._submitted_transfer_job("zero-byte-aborted")
+        job_id = job["job_id"]
+        records.extend(
+            [
+                {
+                    "peer": "peer",
+                    "remote": "Album/01.wav",
+                    "size": 10,
+                    "id": "one",
+                    "state": "Completed, Aborted",
+                    "bytes": 0,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "connection interrupted",
+                },
+                {
+                    "peer": "peer",
+                    "remote": "Album/02.wav",
+                    "size": 20,
+                    "id": "two",
+                    "state": "Completed, Aborted",
+                    "bytes": 0,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "batch_id": job_id,
+                    "exception": "connection interrupted",
+                },
+            ]
+        )
+
+        result = self.service.worker_once()
+
+        self.assertEqual(result["state"], "needs_review")
+        self.assertFalse(result["retryable"])
+        self.assertEqual(result["error"]["code"], "invalid_input")
 
     def test_source_mapping_rejects_duplicate_and_wrong_tracks(self):
         tracks = [
@@ -1327,3 +1471,91 @@ class HttpTransportTests(unittest.TestCase):
         self.assertEqual(
             JobService._reconcile_transfer(service, intent)[0], "needs_review"
         )
+
+    def test_reconcile_ignores_only_foreign_zero_byte_rejections(self):
+        intent = {
+            "batch_id": "current",
+            "requested_at": "2000-01-01T00:00:00+00:00",
+            "files": [
+                {"peer": "peer", "remote": "Album/01.flac", "size": 1},
+                {"peer": "peer", "remote": "Album/02.flac", "size": 2},
+            ],
+        }
+        future = "2999-01-01T00:00:00+00:00"
+
+        def record(remote, size, transfer_id, state, bytes_transferred, batch_id):
+            return {
+                "peer": "peer",
+                "remote": remote,
+                "size": size,
+                "id": transfer_id,
+                "state": state,
+                "bytes": bytes_transferred,
+                "timestamps": {"requestedAt": future},
+                "batch_id": batch_id,
+            }
+
+        current = [
+            record(
+                "Album/01.flac", 1, "current-one", "Completed, Succeeded", 1, "current"
+            ),
+            record(
+                "Album/02.flac", 2, "current-two", "Completed, Succeeded", 2, "current"
+            ),
+        ]
+
+        def reconcile(records):
+            service = SimpleNamespace(slskd=SimpleNamespace(transfers=lambda: records))
+            return JobService._reconcile_transfer(service, intent)[0]
+
+        with self.subTest("foreign zero-byte rejected"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        record(
+                            "Album/01.flac",
+                            1,
+                            "old-rejected",
+                            "Completed, Rejected",
+                            0,
+                            "old",
+                        )
+                    ]
+                ),
+                "complete",
+            )
+        with self.subTest("foreign partial-byte rejected"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        record(
+                            "Album/01.flac",
+                            1,
+                            "old-partial",
+                            "Completed, Rejected",
+                            1,
+                            "old",
+                        )
+                    ]
+                ),
+                "needs_review",
+            )
+        with self.subTest("foreign successful"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        record(
+                            "Album/01.flac",
+                            1,
+                            "old-success",
+                            "Completed, Succeeded",
+                            1,
+                            "old",
+                        )
+                    ]
+                ),
+                "needs_review",
+            )

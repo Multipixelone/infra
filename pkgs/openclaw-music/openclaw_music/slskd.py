@@ -58,6 +58,13 @@ def transfer_succeeded(state: object) -> bool:
     return "completed" in flags and "succeeded" in flags and not transfer_failed(state)
 
 
+def normalize_transfer_exception(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    message = " ".join(value.split())
+    return message[:160] or None
+
+
 def _integer(value: object, field: str) -> int:
     if type(value) is not int or value < 0:
         raise InvalidInput(f"invalid backend {field}")
@@ -163,6 +170,9 @@ def normalize_transfers(value: object) -> list[dict]:
                         "timestamps": timestamps,
                         "batch_id": item.get(
                             "batchId", directory.get("batchId", user.get("batchId"))
+                        ),
+                        "exception": normalize_transfer_exception(
+                            item.get("exception")
                         ),
                     }
                 )
