@@ -218,7 +218,7 @@ If instead it reaches `needs_review` with `error.code:"beets_no_import"`, report
 
 ## Operational limitations and troubleshooting paths
 
-This depends on Soulseek availability and complete matching source files; MusicBrainz can require user disambiguation, and a MusicBrainz HTTP 503 is transient rather than a peer-fallback condition. MPD notification is recorded as `beets-mpdupdate` with `verified:false` until externally observed. There is no custom beets plugin and no second beets database.
+This depends on Soulseek availability and complete matching source files; MusicBrainz can require user disambiguation. A MusicBrainz HTTP 503 means temporary throttling or unavailability, not that MusicBrainz is broken; the durable worker backoff retries it without replaying an individual HTTP request. It is not a peer-fallback condition. MPD notification is recorded as `beets-mpdupdate` with `verified:false` until externally observed. There is no custom beets plugin and no second beets database.
 
 Trusted paths for a human operator are:
 

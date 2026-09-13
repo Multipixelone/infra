@@ -33,7 +33,12 @@ from openclaw_music.errors import (
 )
 from openclaw_music.importer import DirectBeetsImportAdapter
 from openclaw_music.jobs import JobService
-from openclaw_music.resolver import MusicBrainzClient, latest_groups
+from openclaw_music.resolver import (
+    MinimumRequestInterval,
+    MusicBrainzClient,
+    Resolver,
+    latest_groups,
+)
 from openclaw_music.slskd import (
     HttpTransport,
     SlskdClient,
@@ -420,6 +425,56 @@ class WorkflowTests(unittest.TestCase):
             [artist["id"] for artist in client.artists("Artist")], ["one", "two"]
         )
         self.assertEqual(len(offsets), 2)
+
+    def test_musicbrainz_uses_conservative_request_start_interval(self):
+        clock = [0.0]
+        sleeps = []
+
+        def sleep(seconds):
+            sleeps.append(seconds)
+            clock[0] += seconds
+
+        limiter = MinimumRequestInterval(clock=lambda: clock[0], sleep=sleep)
+        limiter.wait()
+        clock[0] += 0.5
+        limiter.wait()
+        clock[0] += 1.5
+        limiter.wait()
+
+        self.assertEqual(sleeps, [1.0])
+
+    def test_persisted_artist_selection_skips_artist_lookup(self):
+        class Client:
+            def artists(self, artist):
+                raise AssertionError("artist lookup should be skipped")
+
+            def release_groups(self, artist_id):
+                self.artist_id = artist_id
+                return []
+
+        client = Client()
+        result = Resolver(client).resolve(
+            {"artist": "Artist", "release": "Album"},
+            {"artist": {"id": "artist-id", "name": "Artist"}},
+            "2026-01-01T00:00:00+00:00",
+        )
+
+        self.assertEqual(client.artist_id, "artist-id")
+        self.assertEqual(result["state"], "needs_choice")
+
+    def test_musicbrainz_listing_is_lightweight_but_detail_is_full(self):
+        paths = []
+        client = MusicBrainzClient(
+            "tests/1",
+            transport=lambda path: paths.append(path) or {"releases": []},
+            limiter=type("Limiter", (), {"wait": lambda self: None})(),
+        )
+        client.releases("group")
+        client.release("release")
+
+        self.assertIn("inc=media", paths[0])
+        self.assertNotIn("recordings", paths[0])
+        self.assertIn("inc=media%2Brecordings%2Bartists", paths[1])
 
     def test_candidate_projection_and_cap_are_safe(self):
         job = self.service.submit(
@@ -1555,6 +1610,43 @@ class HttpTransportTests(unittest.TestCase):
         )
         with self.assertRaises(BackendPermanent):
             client.search_status("s")
+
+    def test_musicbrainz_503_has_bounded_diagnostic_and_retry_after(self):
+        class Response:
+            status = 503
+
+            def getheader(self, name):
+                return "12" if name == "Retry-After" else None
+
+            def close(self):
+                pass
+
+        class Connection:
+            def __init__(self, *args, **kwargs):
+                self.response = Response()
+
+            def request(self, *args, **kwargs):
+                pass
+
+            def getresponse(self):
+                return self.response
+
+            def close(self):
+                pass
+
+        with patch.object(resolver_module.http.client, "HTTPSConnection", Connection):
+            client = MusicBrainzClient("tests/1")
+            with self.assertRaises(BackendTransient) as raised:
+                client._transport("/artist/?query=test")
+
+        self.assertEqual(
+            raised.exception.message,
+            "MusicBrainz temporarily unavailable or throttled (503)",
+        )
+        self.assertEqual(
+            raised.exception.detail,
+            {"endpoint": "artist", "retry_after_seconds": 12},
+        )
 
     def test_absolute_deadline_interrupts_dripping_headers_and_body(self):
         class DripHandler(BaseHTTPRequestHandler):

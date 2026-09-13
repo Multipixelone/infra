@@ -12,18 +12,29 @@ from .errors import BackendPermanent, BackendTransient, Configuration, Temporary
 MAX_PAGES = 10
 PAGE_SIZE = 100
 HTTP_DEADLINE = 15.0
+MIN_REQUEST_INTERVAL = 1.5
 
 
-class OnePerSecond:
-    _lock = threading.Lock()
-    _last = 0.0
+class MinimumRequestInterval:
+    def __init__(
+        self, interval: float = MIN_REQUEST_INTERVAL, *, clock=None, sleep=None
+    ):
+        self.interval = interval
+        self.clock = clock or time.monotonic
+        self.sleep = sleep or time.sleep
+        self._lock = threading.Lock()
+        self._last: float | None = None
 
     def wait(self) -> None:
         with self._lock:
-            remaining = 1.0 - (time.monotonic() - self._last)
+            current = self.clock()
+            if self._last is None:
+                self._last = current
+                return
+            remaining = self.interval - (current - self._last)
             if remaining > 0:
-                time.sleep(remaining)
-            self._last = time.monotonic()
+                self.sleep(remaining)
+            self._last = self.clock()
 
 
 class MusicBrainzClient:
@@ -52,7 +63,7 @@ class MusicBrainzClient:
         self.base_path = parsed.path.rstrip("/")
         self.user_agent = user_agent
         self.transport = transport or self._transport
-        self.limiter = limiter or OnePerSecond()
+        self.limiter = limiter or MinimumRequestInterval()
         self.deadline = deadline
 
     def _transport(self, path: str) -> dict:
@@ -92,8 +103,21 @@ class MusicBrainzClient:
                         f"MusicBrainz rejected request ({response.status})"
                     )
                 if response.status >= 500:
+                    category = self._endpoint_category(parsed.path)
+                    if response.status == 503:
+                        detail = {"endpoint": category}
+                        retry_after = self._retry_after(
+                            response.getheader("Retry-After")
+                        )
+                        if retry_after is not None:
+                            detail["retry_after_seconds"] = retry_after
+                        raise BackendTransient(
+                            "MusicBrainz temporarily unavailable or throttled (503)",
+                            detail=detail,
+                        )
                     raise BackendTransient(
-                        f"MusicBrainz HTTP failure ({response.status})"
+                        f"MusicBrainz temporary HTTP failure ({response.status})",
+                        detail={"endpoint": category},
                     )
                 chunks = []
                 size = 0
@@ -133,6 +157,20 @@ class MusicBrainzClient:
         if remaining <= 0:
             raise TimeoutError("MusicBrainz deadline exceeded")
         return remaining
+
+    @staticmethod
+    def _endpoint_category(path: str) -> str:
+        for endpoint in ("artist", "release-group", "release"):
+            if path.rstrip("/").endswith("/" + endpoint):
+                return endpoint
+        return "release"
+
+    @staticmethod
+    def _retry_after(value: object) -> int | None:
+        if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
+            return None
+        seconds = int(value)
+        return seconds if seconds <= 86_400 else None
 
     def get(self, path: str) -> dict:
         self.limiter.wait()
@@ -199,7 +237,7 @@ class MusicBrainzClient:
             "/release/",
             "releases",
             ("release-count", "count"),
-            {"release-group": group_id, "inc": "media+recordings"},
+            {"release-group": group_id, "inc": "media"},
         )
 
     def release(self, release_id: str) -> dict:
@@ -355,10 +393,6 @@ class Resolver:
 
     def resolve(self, request: dict, selections: dict | None, as_of: str) -> dict:
         selections = selections or {}
-        artist_results = self.client.artists(request["artist"])
-        artists = [
-            item for item in artist_results if _artist_matches(item, request["artist"])
-        ]
         chosen = selections.get("artist")
         if chosen:
             if (
@@ -367,7 +401,15 @@ class Resolver:
                 or not chosen["id"]
             ):
                 raise BackendPermanent("persisted artist selection is invalid")
+            artist_results = []
             artists = [chosen]
+        else:
+            artist_results = self.client.artists(request["artist"])
+            artists = [
+                item
+                for item in artist_results
+                if _artist_matches(item, request["artist"])
+            ]
         if len(artists) != 1:
             alternatives = (
                 artists

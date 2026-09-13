@@ -49,7 +49,7 @@
             OPENCLAW_MUSIC_LEDGER=${ledger-root} \
             OPENCLAW_MUSIC_STAGING=${staging-root} \
             OPENCLAW_MUSIC_DOWNLOAD_ROOT=${download-root} \
-            OPENCLAW_MUSIC_MB_USER_AGENT='openclaw-music (https://github.com/Multipixelone/infra)' \
+            OPENCLAW_MUSIC_MB_USER_AGENT='openclaw-music/1.0 (https://github.com/Multipixelone/infra)' \
             OPENCLAW_MUSIC_SLSKD_URL=${slskd-url} \
             OPENCLAW_MUSIC_SLSKD_SECRET=${config.age.secrets.slskd.path} \
             OPENCLAW_MUSIC_FFPROBE=${lib.getExe' pkgs.ffmpeg-full "ffprobe"} \
