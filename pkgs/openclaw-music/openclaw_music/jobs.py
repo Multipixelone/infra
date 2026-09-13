@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -27,6 +28,10 @@ from .validation import capture, expected_batch_relative
 
 MAX_PUBLIC_CANDIDATES = 20
 MAX_PEER_ATTEMPTS = 5
+SIZE_MISMATCH = re.compile(
+    r"^Transfer aborted: the remote size of ([1-9][0-9]*) does not match expected size ([1-9][0-9]*)$",
+    re.ASCII,
+)
 
 
 def _bounded_text(value: object, limit: int = 160) -> str:
@@ -96,7 +101,34 @@ def _zero_byte_rejected_transfer(record: dict) -> bool:
         state_flags(record["state"]) == {"completed", "rejected"}
         and type(record["bytes"]) is int
         and record["bytes"] == 0
+        and record.get("attempts") == 1
     )
+
+
+def _remote_size_mismatch_transfer(record: dict, expected_size: object) -> bool:
+    if (
+        state_flags(record["state"]) != {"completed", "aborted"}
+        or type(record.get("bytes")) is not int
+        or record["bytes"] != 0
+        or record.get("attempts") != 1
+        or type(expected_size) is not int
+        or expected_size <= 0
+        or not isinstance(record.get("exception"), str)
+    ):
+        return False
+    match = SIZE_MISMATCH.fullmatch(record["exception"])
+    if match is None:
+        return False
+    remote_size, reported_expected = (int(value) for value in match.groups())
+    return remote_size != reported_expected and reported_expected == expected_size
+
+
+def _safe_peer_failure_kind(record: dict, expected_size: object) -> str | None:
+    if _zero_byte_rejected_transfer(record):
+        return "rejected"
+    if _remote_size_mismatch_transfer(record, expected_size):
+        return "remote_size_mismatch"
+    return None
 
 
 class JobService:
@@ -573,16 +605,23 @@ class JobService:
             raise InvalidInput("transfer destination contains unexpected entries")
 
     @staticmethod
-    def _clean_rejection_evidence(intent: dict, records: list[dict]) -> bool:
+    def _clean_peer_failure_evidence(
+        intent: dict, records: list[dict]
+    ) -> list[str] | None:
         if intent.get("payload_observed") is not False:
-            return False
+            return None
+        expected = {
+            (item["peer"], item["remote"], item["size"]): item
+            for item in intent["files"]
+        }
+        outcomes = []
         for record in records:
-            flags = state_flags(record["state"])
+            item = expected.get((record["peer"], record["remote"], record["size"]))
+            outcome = _safe_peer_failure_kind(
+                record, item["size"] if item is not None else None
+            )
             if (
-                flags != {"completed", "rejected"}
-                or type(record.get("bytes")) is not int
-                or record["bytes"] != 0
-                or record.get("attempts") != 1
+                outcome is None
                 or not timestamp_after(
                     record["timestamps"].get("requestedAt"), intent["requested_at"]
                 )
@@ -590,8 +629,9 @@ class JobService:
                     record["timestamps"].get("endedAt"), intent["requested_at"]
                 )
             ):
-                return False
-        return bool(records)
+                return None
+            outcomes.append(outcome)
+        return outcomes or None
 
     def _reconcile_transfer(self, intent: dict) -> tuple[str, list[dict]]:
         records = self.slskd.transfers()
@@ -603,9 +643,10 @@ class JobService:
         for record in records:
             if (record["peer"], record["remote"], record["size"]) not in expected:
                 continue
-            if record.get("batch_id") != intent[
-                "batch_id"
-            ] and _zero_byte_rejected_transfer(record):
+            expected_item = expected[(record["peer"], record["remote"], record["size"])]
+            if record.get("batch_id") != intent["batch_id"] and _safe_peer_failure_kind(
+                record, expected_item["size"]
+            ):
                 continue
             matches.append(record)
         for record in matches:
@@ -636,6 +677,8 @@ class JobService:
             for record in matches
         ):
             intent["payload_observed"] = True
+        if JobService._clean_peer_failure_evidence(intent, matches) is not None:
+            return "clean_peer_failure", matches
         if any(
             transfer_failed(record["state"])
             or (
@@ -644,12 +687,6 @@ class JobService:
             )
             for record in matches
         ):
-            if all(
-                transfer_failed(record["state"])
-                and _zero_byte_rejected_transfer(record)
-                for record in matches
-            ):
-                return "failed_zero_bytes", matches
             return "failed", matches
         if all(
             transfer_succeeded(record["state"]) and record["bytes"] == record["size"]
@@ -664,7 +701,8 @@ class JobService:
         plan = self._offer_plan(job)
         intent = job["transfer_intent"]
         if plan is not None:
-            if not self._clean_rejection_evidence(intent, records):
+            outcomes = self._clean_peer_failure_evidence(intent, records)
+            if outcomes is None:
                 raise InvalidInput("transfer rejection evidence is not exact")
             if plan["cursor"] + 1 < len(plan["offers"]):
                 self._check_empty_transfer_destination(job)
@@ -677,7 +715,9 @@ class JobService:
                         "ended_at": max(
                             record["timestamps"]["endedAt"] for record in records
                         ),
-                        "outcome": "rejected",
+                        "outcome": outcomes[0]
+                        if len(set(outcomes)) == 1
+                        else "clean_peer_failure",
                         "transfer_ids": sorted(record["id"] for record in records)[:20],
                     }
                 )
@@ -690,16 +730,7 @@ class JobService:
                 touch(job)
                 self._commit(job, revision)
                 return public(job, "worker")
-        reasons = sorted(
-            {
-                record["exception"]
-                for record in records
-                if isinstance(record.get("exception"), str)
-            }
-        )
-        message = "all transfers were rejected before any data was downloaded"
-        if reasons:
-            message += f" ({_bounded_text(reasons[0], 80)})"
+        message = "all safe peer attempts failed before any payload was downloaded"
         attempted = []
         if plan is not None:
             attempted = [
@@ -1022,7 +1053,7 @@ class JobService:
                     raise BackendUncertain(
                         "queue POST was started but has no exact transfer evidence"
                     )
-                if outcome == "failed_zero_bytes":
+                if outcome == "clean_peer_failure":
                     return self._fail_zero_byte_transfer_rejection(
                         job, revision, records
                     )
@@ -1047,7 +1078,7 @@ class JobService:
                     touch(job)
                     self._commit(job, revision)
                     return public(job, "worker")
-                if outcome == "failed_zero_bytes":
+                if outcome == "clean_peer_failure":
                     return self._fail_zero_byte_transfer_rejection(
                         job, revision, records
                     )

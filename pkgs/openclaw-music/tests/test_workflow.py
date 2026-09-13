@@ -554,6 +554,7 @@ class WorkflowTests(unittest.TestCase):
                 "status": "submitted",
                 "cleanup": "done",
                 "batch_id": job["job_id"],
+                "payload_observed": False,
                 "requested_at": "2000-01-01T00:00:00+00:00",
                 "files": files,
             }
@@ -574,7 +575,11 @@ class WorkflowTests(unittest.TestCase):
                     "id": "one",
                     "state": "Completed, Rejected",
                     "bytes": 0,
-                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "attempts": 1,
+                    "timestamps": {
+                        "requestedAt": "2999-01-01T00:00:00+00:00",
+                        "endedAt": "2999-01-01T00:00:01+00:00",
+                    },
                     "batch_id": job_id,
                     "exception": "Overwhelmed with requests; try again later.",
                 },
@@ -585,7 +590,11 @@ class WorkflowTests(unittest.TestCase):
                     "id": "two",
                     "state": "Completed, Rejected",
                     "bytes": 0,
-                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                    "attempts": 1,
+                    "timestamps": {
+                        "requestedAt": "2999-01-01T00:00:00+00:00",
+                        "endedAt": "2999-01-01T00:00:01+00:00",
+                    },
                     "batch_id": job_id,
                     "exception": "Overwhelmed with requests; try again later.",
                 },
@@ -598,7 +607,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(result["retryable"])
         self.assertIsNone(result["resume_phase"])
         self.assertEqual(result["error"]["code"], "transfer_rejected")
-        self.assertIn("Overwhelmed with requests", result["error"]["message"])
+        self.assertIn("all safe peer attempts failed", result["error"]["message"])
         self.assertIn("wait or change source", result["error"]["message"])
         self.assertIn("new idempotency key", result["error"]["message"])
         self.assertEqual(
@@ -1106,6 +1115,94 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result["state"], "failed")
         self.assertFalse(result["retryable"])
         self.assertEqual(result["error"]["code"], "transfer_rejected")
+        self.assertIn("all safe peer attempts failed", result["error"]["message"])
+
+    def test_clean_remote_size_mismatch_advances_and_invalid_evidence_reviews(self):
+        def mismatch(remote_size=11, expected_size=10, **updates):
+            return {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Aborted",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+                "exception": (
+                    "Transfer aborted: the remote size of "
+                    f"{remote_size} does not match expected size {expected_size}"
+                ),
+                **updates,
+            }
+
+        job, _ = self._fallback_job("size-mismatch", [mismatch()])
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        self.assertEqual(
+            self.service.ledger.get(job["job_id"])["offer_plan"]["cursor"], 1
+        )
+        with self.service.ledger.locked():
+            advanced = self.service.ledger.get(job["job_id"])
+            advanced["state"] = "needs_review"
+            self.service.ledger.save(advanced)
+
+        for name, record in (
+            ("expected-disagrees", mismatch(expected_size=9)),
+            ("malformed", mismatch(exception="Transfer aborted")),
+            ("nonzero", mismatch(bytes=1)),
+            ("missing-attempts", mismatch(attempts=None)),
+            (
+                "missing-ended",
+                mismatch(timestamps={"requestedAt": "2999-01-01T00:00:00+00:00"}),
+            ),
+        ):
+            with self.subTest(name=name):
+                job, _ = self._fallback_job("size-mismatch-" + name, [record])
+                self.assertEqual(self.service.worker_once()["state"], "needs_review")
+
+    def test_mixed_clean_rejection_and_size_mismatch_evidence_is_safe(self):
+        intent = {
+            "payload_observed": False,
+            "requested_at": "2000-01-01T00:00:00+00:00",
+            "files": [
+                {"peer": "first", "remote": "Album/01.wav", "size": 10},
+                {"peer": "first", "remote": "Album/02.wav", "size": 20},
+            ],
+        }
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            },
+            {
+                "peer": "first",
+                "remote": "Album/02.wav",
+                "size": 20,
+                "state": "Completed, Aborted",
+                "bytes": 0,
+                "attempts": 1,
+                "exception": "Transfer aborted: the remote size of 21 does not match expected size 20",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            },
+        ]
+        self.assertEqual(
+            JobService._clean_peer_failure_evidence(intent, records),
+            ["rejected", "remote_size_mismatch"],
+        )
 
     def test_malformed_plan_and_destination_contents_block_fallback(self):
         records = [
@@ -1974,6 +2071,7 @@ class HttpTransportTests(unittest.TestCase):
                 "id": transfer_id,
                 "state": state,
                 "bytes": bytes_transferred,
+                "attempts": 1,
                 "timestamps": {"requestedAt": future},
                 "batch_id": batch_id,
             }
@@ -2004,6 +2102,27 @@ class HttpTransportTests(unittest.TestCase):
                             0,
                             "old",
                         )
+                    ]
+                ),
+                "complete",
+            )
+        with self.subTest("foreign clean size mismatch"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        {
+                            **record(
+                                "Album/01.flac",
+                                1,
+                                "old-size-mismatch",
+                                "Completed, Aborted",
+                                0,
+                                "old",
+                            ),
+                            "attempts": 1,
+                            "exception": "Transfer aborted: the remote size of 2 does not match expected size 1",
+                        }
                     ]
                 ),
                 "complete",
@@ -2053,6 +2172,23 @@ class HttpTransportTests(unittest.TestCase):
                             "old-success",
                             "Completed, Succeeded",
                             1,
+                            "old",
+                        )
+                    ]
+                ),
+                "needs_review",
+            )
+        with self.subTest("foreign generic aborted"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        record(
+                            "Album/01.flac",
+                            1,
+                            "old-aborted",
+                            "Completed, Aborted",
+                            0,
                             "old",
                         )
                     ]
