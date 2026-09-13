@@ -441,7 +441,64 @@ class WorkflowTests(unittest.TestCase):
         clock[0] += 1.5
         limiter.wait()
 
-        self.assertEqual(sleeps, [1.0])
+        self.assertEqual(sleeps, [1.5, 0.5])
+
+    def test_musicbrainz_retries_one_503_for_the_same_path(self):
+        calls, waits, delays = [], [], []
+
+        def transport(path):
+            calls.append(path)
+            if len(calls) == 1:
+                raise BackendTransient(
+                    "MusicBrainz temporarily unavailable or throttled (503, release-group)",
+                    detail={"status": 503, "endpoint": "release-group"},
+                )
+            return {"ok": True}
+
+        client = MusicBrainzClient(
+            "tests/1",
+            transport=transport,
+            limiter=type("Limiter", (), {"wait": lambda self: waits.append(True)})(),
+            retry_sleep=delays.append,
+        )
+        self.assertEqual(client.get("/release-group/?artist=redacted"), {"ok": True})
+        self.assertEqual(calls, ["/release-group/?artist=redacted"] * 2)
+        self.assertEqual(waits, [True, True])
+        self.assertEqual(delays, [3.0])
+
+    def test_musicbrainz_second_503_and_other_transients_are_not_replayed(self):
+        calls, delays = [], []
+
+        def throttled(path):
+            calls.append(path)
+            raise BackendTransient(
+                "MusicBrainz temporarily unavailable or throttled (503, release)",
+                detail={
+                    "status": 503,
+                    "endpoint": "release",
+                    "retry_after_seconds": 120,
+                },
+            )
+
+        client = MusicBrainzClient(
+            "tests/1",
+            transport=throttled,
+            limiter=type("Limiter", (), {"wait": lambda self: None})(),
+            retry_sleep=delays.append,
+        )
+        with self.assertRaises(BackendTransient):
+            client.get("/release/release")
+        self.assertEqual(calls, ["/release/release"] * 2)
+        self.assertEqual(delays, [60])
+
+        calls.clear()
+        client.transport = lambda path: (
+            calls.append(path)
+            or (_ for _ in ()).throw(BackendTransient("MusicBrainz unavailable"))
+        )
+        with self.assertRaises(BackendTransient):
+            client.get("/release/release")
+        self.assertEqual(calls, ["/release/release"])
 
     def test_persisted_artist_selection_skips_artist_lookup(self):
         class Client:
@@ -1641,11 +1698,11 @@ class HttpTransportTests(unittest.TestCase):
 
         self.assertEqual(
             raised.exception.message,
-            "MusicBrainz temporarily unavailable or throttled (503)",
+            "MusicBrainz temporarily unavailable or throttled (503, artist)",
         )
         self.assertEqual(
             raised.exception.detail,
-            {"endpoint": "artist", "retry_after_seconds": 12},
+            {"endpoint": "artist", "retry_after_seconds": 12, "status": 503},
         )
 
     def test_absolute_deadline_interrupts_dripping_headers_and_body(self):

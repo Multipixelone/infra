@@ -12,7 +12,9 @@ from .errors import BackendPermanent, BackendTransient, Configuration, Temporary
 MAX_PAGES = 10
 PAGE_SIZE = 100
 HTTP_DEADLINE = 15.0
-MIN_REQUEST_INTERVAL = 1.5
+MIN_REQUEST_INTERVAL = 2.0
+READ_RETRY_DELAY = 3.0
+MAX_RETRY_AFTER = 60
 
 
 class MinimumRequestInterval:
@@ -46,6 +48,7 @@ class MusicBrainzClient:
         limiter=None,
         *,
         deadline: float = HTTP_DEADLINE,
+        retry_sleep=None,
     ):
         parsed = urlparse(base_url)
         if (
@@ -65,6 +68,7 @@ class MusicBrainzClient:
         self.transport = transport or self._transport
         self.limiter = limiter or MinimumRequestInterval()
         self.deadline = deadline
+        self.retry_sleep = retry_sleep or time.sleep
 
     def _transport(self, path: str) -> dict:
         url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -111,8 +115,9 @@ class MusicBrainzClient:
                         )
                         if retry_after is not None:
                             detail["retry_after_seconds"] = retry_after
+                        detail["status"] = 503
                         raise BackendTransient(
-                            "MusicBrainz temporarily unavailable or throttled (503)",
+                            f"MusicBrainz temporarily unavailable or throttled (503, {category})",
                             detail=detail,
                         )
                     raise BackendTransient(
@@ -174,7 +179,21 @@ class MusicBrainzClient:
 
     def get(self, path: str) -> dict:
         self.limiter.wait()
-        result = self.transport(path)
+        try:
+            result = self.transport(path)
+        except BackendTransient as error:
+            detail = error.detail if isinstance(error.detail, dict) else {}
+            if detail.get("status") != 503:
+                raise
+            retry_after = detail.get("retry_after_seconds")
+            delay = (
+                min(retry_after, MAX_RETRY_AFTER)
+                if type(retry_after) is int and retry_after >= 0
+                else READ_RETRY_DELAY
+            )
+            self.retry_sleep(delay)
+            self.limiter.wait()
+            result = self.transport(path)
         if not isinstance(result, dict):
             raise Temporary("MusicBrainz returned invalid JSON")
         return result
