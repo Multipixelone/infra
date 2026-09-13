@@ -71,6 +71,10 @@ def _integer(value: object, field: str) -> int:
     return value
 
 
+def _nonnegative_int_or_none(value: object) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
 def normalize_responses(value: object) -> list[dict]:
     if not isinstance(value, list):
         raise InvalidInput("invalid search responses")
@@ -156,6 +160,7 @@ def normalize_transfers(value: object) -> list[dict]:
                         "requestedAt",
                         "enqueuedAt",
                         "startedAt",
+                        "endedAt",
                         "completedAt",
                     )
                 }
@@ -166,7 +171,10 @@ def normalize_transfers(value: object) -> list[dict]:
                         "size": size,
                         "id": transfer_id,
                         "state": item.get("state", ""),
-                        "bytes": item.get("bytesTransferred", item.get("bytes", 0)),
+                        "bytes": _nonnegative_int_or_none(
+                            item.get("bytesTransferred", item.get("bytes"))
+                        ),
+                        "attempts": _nonnegative_int_or_none(item.get("attempts")),
                         "timestamps": timestamps,
                         "batch_id": item.get(
                             "batchId", directory.get("batchId", user.get("batchId"))
@@ -264,6 +272,36 @@ def source_offers(rows: list[dict], manifest: list[dict]) -> list[dict]:
             }
         )
     return offers
+
+
+def offer_pool(offers: list[dict], policy: dict, *, limit: int = 5) -> list[dict]:
+    acceptable = [offer for offer in offers if offer["complete"]]
+    if not acceptable:
+        return []
+    lossless = [offer for offer in acceptable if offer["all_lossless"]]
+    if policy["profile"] == "lossless" or lossless:
+        acceptable = lossless
+    elif not policy.get("accepted_lossy"):
+        return []
+    acceptable.sort(
+        key=lambda offer: (
+            -offer["speed"],
+            not offer["free_slot"],
+            offer["queue"],
+            offer["peer"],
+            offer["directory"],
+        )
+    )
+    pool = []
+    peers = set()
+    for offer in acceptable:
+        if offer["peer"] in peers:
+            continue
+        peers.add(offer["peer"])
+        pool.append(offer)
+        if len(pool) == limit:
+            break
+    return pool
 
 
 def rank_offers(offers: list[dict], policy: dict) -> tuple[dict | None, list[dict]]:
@@ -448,13 +486,19 @@ class SlskdClient:
         self.call("DELETE", "/api/v0/searches/" + quote(search_id, safe=""))
 
     def queue(
-        self, peer: str, files: list[dict], *, batch_id: str, search_id: str
+        self,
+        peer: str,
+        files: list[dict],
+        *,
+        batch_id: str,
+        job_id: str,
+        search_id: str,
     ) -> None:
         body = {
             "username": peer,
             "id": batch_id,
             "searchId": search_id,
-            "options": {"destination": f"openclaw/{batch_id}", "externalId": batch_id},
+            "options": {"destination": f"openclaw/{job_id}", "externalId": job_id},
             "files": [
                 {"filename": item["original_remote"], "size": item["size"]}
                 for item in files

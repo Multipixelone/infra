@@ -16,7 +16,7 @@ from .errors import (
 )
 from .models import digest, new_job, now, touch, transition
 from .slskd import (
-    rank_offers,
+    offer_pool,
     source_offers,
     state_flags,
     timestamp_after,
@@ -26,6 +26,7 @@ from .slskd import (
 from .validation import capture, expected_batch_relative
 
 MAX_PUBLIC_CANDIDATES = 20
+MAX_PEER_ATTEMPTS = 5
 
 
 def _bounded_text(value: object, limit: int = 160) -> str:
@@ -92,7 +93,7 @@ def _due(stamp: str | None) -> bool:
 
 def _zero_byte_rejected_transfer(record: dict) -> bool:
     return (
-        "rejected" in state_flags(record["state"])
+        state_flags(record["state"]) == {"completed", "rejected"}
         and type(record["bytes"]) is int
         and record["bytes"] == 0
     )
@@ -414,7 +415,7 @@ class JobService:
             if not expect_absent and not exists:
                 raise InvalidInput("expected completed target is missing")
 
-    def _prepare_transfer(self, job: dict, offer: dict) -> None:
+    def _transfer_files(self, job: dict, offer: dict) -> list[dict]:
         track_map = {
             (track["disc"], track["track"]): track
             for track in job["resolved_release"]["tracks"]
@@ -437,22 +438,13 @@ class JobService:
                     raise InvalidInput("source duration does not match resolved track")
             total += row["size"]
             relative = expected_batch_relative(job["job_id"], row["remote"])
-            path = Path(self.config.download_root) / relative
-            try:
-                path.lstat()
-            except FileNotFoundError:
-                pass
-            else:
-                raise InvalidInput("expected completed target already exists")
             files.append(
                 {
                     **row,
                     "recording_mbid": track_map[key]["recording_mbid"],
                     "duration_ms": track_map[key]["duration_ms"],
                     "expected_relative": str(relative),
-                    "requested_at": job["transfer_intent"]["requested_at"]
-                    if job.get("transfer_intent")
-                    else None,
+                    "requested_at": None,
                 }
             )
         if (
@@ -466,10 +458,23 @@ class JobService:
             raise InvalidInput(
                 "duplicate remote basenames collide in batch destination"
             )
+        return files
+
+    def _build_transfer_intent(self, job: dict, offer: dict, *, cleanup: str) -> None:
+        files = self._transfer_files(job, offer)
+        for item in files:
+            path = Path(self.config.download_root) / item["expected_relative"]
+            try:
+                path.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                raise InvalidInput("expected completed target already exists")
         job["selected_source"] = {
             "peer": offer["peer"],
             "directory": offer["directory"],
         }
+        job["selected_offer"] = offer
         job["selected_quality"] = offer["quality"]
         job["transfer_intent"] = {
             "status": "intent",
@@ -477,12 +482,116 @@ class JobService:
             "files": files,
             "requested_at": now(),
             "source_digest": digest(files),
-            "cleanup": "pending",
-            "batch_id": job["job_id"],
+            "cleanup": cleanup,
+            "batch_id": str(uuid.uuid4()),
+            "payload_observed": False,
         }
         for item in job["transfer_intent"]["files"]:
             item["requested_at"] = job["transfer_intent"]["requested_at"]
+
+    def _validated_offers(self, job: dict, offers: list[dict]) -> list[dict]:
+        valid = []
+        for offer in offers:
+            try:
+                self._transfer_files(job, offer)
+            except (KeyError, InvalidInput):
+                continue
+            valid.append(offer)
+        return valid
+
+    def _validated_offer_pool(self, job: dict, offers: list[dict]) -> list[dict]:
+        return offer_pool(self._validated_offers(job, offers), job["policy"])
+
+    def _prepare_transfer(
+        self, job: dict, offer: dict, *, cleanup: str = "pending"
+    ) -> None:
+        self._build_transfer_intent(job, offer, cleanup=cleanup)
         transition(job, "downloading")
+
+    @staticmethod
+    def _offer_plan(job: dict) -> dict | None:
+        if "offer_plan" not in job:
+            return None
+        plan = job["offer_plan"]
+        if (
+            not isinstance(plan, dict)
+            or not isinstance(plan.get("offers"), list)
+            or not 1 <= len(plan["offers"]) <= MAX_PEER_ATTEMPTS
+            or type(plan.get("cursor")) is not int
+            or not 0 <= plan["cursor"] < len(plan["offers"])
+            or not isinstance(plan.get("history"), list)
+            or len(plan["history"]) > MAX_PEER_ATTEMPTS
+            or len(plan["history"]) != plan["cursor"]
+        ):
+            raise InvalidInput("invalid durable offer plan")
+        peers = set()
+        for offer in plan["offers"]:
+            if (
+                not isinstance(offer, dict)
+                or not isinstance(offer.get("peer"), str)
+                or not offer["peer"].strip()
+                or offer["peer"] in peers
+            ):
+                raise InvalidInput("invalid durable offer plan")
+            peers.add(offer["peer"])
+        active_peer = plan["offers"][plan["cursor"]]["peer"]
+        for value in (job.get("selected_offer"), job.get("transfer_intent")):
+            if value is not None and (
+                not isinstance(value, dict) or value.get("peer") != active_peer
+            ):
+                raise InvalidInput("invalid durable offer plan")
+        intent = job.get("transfer_intent")
+        if intent is not None and type(intent.get("payload_observed")) is not bool:
+            raise InvalidInput("invalid durable offer plan")
+        source = job.get("selected_source")
+        if source is not None and (
+            not isinstance(source, dict) or source.get("peer") != active_peer
+        ):
+            raise InvalidInput("invalid durable offer plan")
+        if any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("peer"), str)
+            or not item["peer"].strip()
+            or not isinstance(item.get("batch_id"), str)
+            or not item["batch_id"].strip()
+            for item in plan["history"]
+        ):
+            raise InvalidInput("invalid durable offer plan")
+        return plan
+
+    def _check_empty_transfer_destination(self, job: dict) -> None:
+        destination = Path(self.config.download_root) / "openclaw" / job["job_id"]
+        try:
+            destination.lstat()
+        except FileNotFoundError:
+            return
+        if (
+            destination.is_symlink()
+            or not destination.is_dir()
+            or any(destination.iterdir())
+        ):
+            raise InvalidInput("transfer destination contains unexpected entries")
+
+    @staticmethod
+    def _clean_rejection_evidence(intent: dict, records: list[dict]) -> bool:
+        if intent.get("payload_observed") is not False:
+            return False
+        for record in records:
+            flags = state_flags(record["state"])
+            if (
+                flags != {"completed", "rejected"}
+                or type(record.get("bytes")) is not int
+                or record["bytes"] != 0
+                or record.get("attempts") != 1
+                or not timestamp_after(
+                    record["timestamps"].get("requestedAt"), intent["requested_at"]
+                )
+                or not timestamp_after(
+                    record["timestamps"].get("endedAt"), intent["requested_at"]
+                )
+            ):
+                return False
+        return bool(records)
 
     def _reconcile_transfer(self, intent: dict) -> tuple[str, list[dict]]:
         records = self.slskd.transfers()
@@ -523,6 +632,11 @@ class JobService:
         ):
             return "stale", matches
         if any(
+            type(record.get("bytes")) is int and record["bytes"] > 0
+            for record in matches
+        ):
+            intent["payload_observed"] = True
+        if any(
             transfer_failed(record["state"])
             or (
                 "completed" in str(record["state"]).casefold()
@@ -547,6 +661,35 @@ class JobService:
     def _fail_zero_byte_transfer_rejection(
         self, job: dict, revision: int, records: list[dict]
     ) -> dict:
+        plan = self._offer_plan(job)
+        intent = job["transfer_intent"]
+        if plan is not None:
+            if not self._clean_rejection_evidence(intent, records):
+                raise InvalidInput("transfer rejection evidence is not exact")
+            if plan["cursor"] + 1 < len(plan["offers"]):
+                self._check_empty_transfer_destination(job)
+                plan["history"].append(
+                    {
+                        "cursor": plan["cursor"],
+                        "peer": intent["peer"],
+                        "batch_id": intent["batch_id"],
+                        "started_at": intent["requested_at"],
+                        "ended_at": max(
+                            record["timestamps"]["endedAt"] for record in records
+                        ),
+                        "outcome": "rejected",
+                        "transfer_ids": sorted(record["id"] for record in records)[:20],
+                    }
+                )
+                plan["history"] = plan["history"][-MAX_PEER_ATTEMPTS:]
+                plan["cursor"] += 1
+                self._build_transfer_intent(
+                    job, plan["offers"][plan["cursor"]], cleanup="done"
+                )
+                job["next_attempt_at"] = now()
+                touch(job)
+                self._commit(job, revision)
+                return public(job, "worker")
         reasons = sorted(
             {
                 record["exception"]
@@ -557,13 +700,19 @@ class JobService:
         message = "all transfers were rejected before any data was downloaded"
         if reasons:
             message += f" ({_bounded_text(reasons[0], 80)})"
+        attempted = []
+        if plan is not None:
+            attempted = [
+                f"{item['peer']} ({item['batch_id']})" for item in plan["history"]
+            ] + [f"{intent['peer']} ({intent['batch_id']})"]
         action = "wait or change source, then submit a new request with a new idempotency key"
+        attempt_text = f"; attempted {', '.join(attempted)[:120]}" if attempted else ""
         transition(
             job,
             "failed",
             error={
                 "code": "transfer_rejected",
-                "message": f"{message}; {action}",
+                "message": f"{message}{attempt_text}; {action}",
                 "retryable": False,
                 "resume_phase": None,
                 "manual_action": action,
@@ -726,26 +875,38 @@ class JobService:
                 return public(job, "worker")
             rows = self.slskd.responses(search["id"])
             offer = job.get("selected_offer")
-            choices = []
             if offer is None:
-                offer, choices = rank_offers(
-                    source_offers(rows, job["resolved_release"]["tracks"]),
-                    job["policy"],
-                )
+                offers = source_offers(rows, job["resolved_release"]["tracks"])
+                pool = self._validated_offer_pool(job, offers)
+                offer = pool[0] if pool else None
+            else:
+                pool = [offer]
             if offer is None:
-                candidates = [
-                    {
-                        "label": f"{item['peer']} ({item['quality']})",
-                        "reason": "source or quality choice",
-                        "offer": item,
-                    }
-                    for item in choices
-                ]
-                if not candidates:
+                if job["policy"]["profile"] != "lossless-preferred":
                     raise InvalidInput(
                         "no complete source matches the release manifest"
                     )
-                self._candidate_set(job, "source_quality", candidates)
+                choices = [
+                    item
+                    for item in self._validated_offers(job, offers)
+                    if item["complete"]
+                ]
+                if not choices:
+                    raise InvalidInput(
+                        "no complete source matches the release manifest"
+                    )
+                self._candidate_set(
+                    job,
+                    "source_quality",
+                    [
+                        {
+                            "label": f"{item['peer']} ({item['quality']})",
+                            "reason": "source or quality choice",
+                            "offer": item,
+                        }
+                        for item in choices
+                    ],
+                )
                 self._commit(job, revision)
                 return public(job, "worker")
             if not self.config.transport_isolated:
@@ -762,10 +923,16 @@ class JobService:
                 touch(job)
                 self._commit(job, revision)
                 return public(job, "worker")
+            job["offer_plan"] = {
+                "offers": pool[:MAX_PEER_ATTEMPTS],
+                "cursor": 0,
+                "history": [],
+            }
             self._prepare_transfer(job, offer)
             self._commit(job, revision)
             return public(job, "worker")
         if state == "downloading":
+            self._offer_plan(job)
             if job.get("integration_required"):
                 if not self.config.transport_isolated:
                     return public(job, "worker")
@@ -808,6 +975,7 @@ class JobService:
                         intent["peer"],
                         intent["files"],
                         batch_id=intent["batch_id"],
+                        job_id=job["job_id"],
                         search_id=job["search"]["id"],
                     )
                 except BackendUncertain:

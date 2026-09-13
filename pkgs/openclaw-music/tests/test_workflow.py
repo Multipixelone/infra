@@ -38,6 +38,7 @@ from openclaw_music.slskd import (
     HttpTransport,
     SlskdClient,
     normalize_transfers,
+    offer_pool,
     rank_offers,
     source_offers,
     transfer_succeeded,
@@ -137,6 +138,7 @@ class SlskdFixture:
         self.queued = 0
         self.deleted = 0
         self.batch_id = None
+        self.destination = None
 
     def __call__(self, method, path, body=None):
         if method == "POST" and path == "/api/v0/searches":
@@ -191,17 +193,19 @@ class SlskdFixture:
             payload = json.loads(body)
             assert payload["username"] == "peer"
             assert payload["searchId"] == self.search_id
-            assert payload["options"] == {
-                "destination": f"openclaw/{payload['id']}",
-                "externalId": payload["id"],
-            }
+            assert payload["options"]["destination"].startswith("openclaw/")
+            assert (
+                payload["options"]["externalId"]
+                == payload["options"]["destination"].split("/")[-1]
+            )
             assert payload["files"] == [
                 {"filename": "Album\\01 - One.wav", "size": len(wav())},
                 {"filename": "Album\\02 - Two.wav", "size": len(wav())},
             ]
             self.queued += 1
             self.batch_id = payload["id"]
-            folder = self.root / "openclaw" / payload["id"]
+            self.destination = payload["options"]["destination"]
+            folder = self.root / payload["options"]["destination"]
             folder.mkdir(parents=True)
             (folder / "01 - One.wav").write_bytes(wav())
             (folder / "02 - Two.wav").write_bytes(wav())
@@ -313,6 +317,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("details", result["resolved_release"])
         self.assertEqual(self.slskd.queued, 1)
         self.assertEqual(self.slskd.deleted, 1)
+        self.assertEqual(self.slskd.destination, f"openclaw/{self.job['job_id']}")
+        self.assertNotEqual(self.slskd.batch_id, self.job["job_id"])
 
     def test_search_lost_post_response_recovers_by_persisted_uuid_without_replay(self):
         self.job = self.service.submit(
@@ -492,6 +498,42 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(records[0]["remote"], "A/1.wav")
         self.assertEqual(records[0]["exception"], "backend reason")
 
+    def test_transfer_counters_are_unknown_unless_strict_nonnegative_integers(self):
+        def item(transfer_id, bytes_transferred, attempts):
+            return {
+                "id": transfer_id,
+                "filename": f"Album\\{transfer_id}.wav",
+                "size": 1,
+                **(
+                    {"bytesTransferred": bytes_transferred}
+                    if bytes_transferred is not None
+                    else {}
+                ),
+                **({"attempts": attempts} if attempts is not None else {}),
+            }
+
+        records = normalize_transfers(
+            [
+                {
+                    "username": "peer",
+                    "directories": [
+                        {
+                            "files": [
+                                item("missing", None, None),
+                                item("string", "0", "1"),
+                                item("bool", False, True),
+                            ]
+                        }
+                    ],
+                }
+            ]
+        )
+
+        self.assertEqual(
+            [(record["bytes"], record["attempts"]) for record in records],
+            [(None, None)] * 3,
+        )
+
     def _submitted_transfer_job(self, key):
         job = self.service.submit(
             {
@@ -559,6 +601,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("Overwhelmed with requests", result["error"]["message"])
         self.assertIn("wait or change source", result["error"]["message"])
         self.assertIn("new idempotency key", result["error"]["message"])
+        self.assertEqual(
+            self.service.ledger.get(job_id)["transfer_intent"]["batch_id"], job_id
+        )  # legacy submitted jobs retain their persisted single batch ID
         with self.assertRaises(Conflict):
             self.service.retry(job_id)
 
@@ -666,6 +711,443 @@ class WorkflowTests(unittest.TestCase):
         offers = source_offers(rows, tracks)
         self.assertFalse(offers[0]["complete"])
         self.assertIsNone(rank_offers(offers, {"profile": "lossless"})[0])
+
+    def test_offer_pool_is_fastest_distinct_peer_and_preserves_quality_policy(self):
+        def offer(peer, speed, *, lossless=True, queue=0, free_slot=True):
+            return {
+                "peer": peer,
+                "directory": peer + str(speed),
+                "complete": True,
+                "all_lossless": lossless,
+                "quality": "lossless" if lossless else "lossy",
+                "speed": speed,
+                "queue": queue,
+                "free_slot": free_slot,
+                "files": [],
+            }
+
+        offers = [
+            offer("slow", 1),
+            offer("fast", 100),
+            offer("fast", 90),
+            offer("middle", 50),
+            offer("lossy", 999, lossless=False),
+            *[offer(f"peer-{index}", 40 - index) for index in range(8)],
+        ]
+        pool = offer_pool(offers, {"profile": "lossless-preferred"})
+        self.assertEqual(
+            [item["peer"] for item in pool],
+            ["fast", "middle", "peer-0", "peer-1", "peer-2"],
+        )
+        self.assertEqual(len(pool), 5)
+        self.assertEqual(
+            offer_pool(
+                [offer("lossy", 1, lossless=False)], {"profile": "lossless-preferred"}
+            ),
+            [],
+        )
+
+    def test_invalid_faster_offer_is_excluded_before_pool_persistence(self):
+        submitted = self.service.submit(
+            {
+                "idempotency_key": "invalid-fast",
+                "artist": "Artist",
+                "release": "Album",
+                "quality_profile": "lossless",
+            }
+        )
+        job = self.service.ledger.get(submitted["job_id"])
+        job["resolved_release"] = {
+            "tracks": [
+                {
+                    "disc": 1,
+                    "track": 1,
+                    "recording_mbid": "recording",
+                    "duration_ms": 200,
+                }
+            ]
+        }
+
+        def offer(peer, speed, length):
+            return {
+                "peer": peer,
+                "directory": "Album",
+                "complete": True,
+                "all_lossless": True,
+                "quality": "lossless",
+                "speed": speed,
+                "queue": 0,
+                "free_slot": True,
+                "files": [
+                    {
+                        "peer": peer,
+                        "remote": "Album/01.wav",
+                        "original_remote": "Album\\01.wav",
+                        "size": 10,
+                        "disc": 1,
+                        "track": 1,
+                        "length": length,
+                    }
+                ],
+            }
+
+        pool = self.service._validated_offer_pool(
+            job, [offer("fast-invalid", 100, 100), offer("slow-valid", 1, 0.2)]
+        )
+
+        self.assertEqual([item["peer"] for item in pool], ["slow-valid"])
+        self.assertIsNone(job["transfer_intent"])
+        self.assertNotIn("offer_plan", job)
+
+    def _fallback_job(self, key, records):
+        job = self.service.submit(
+            {
+                "idempotency_key": key,
+                "artist": "Artist",
+                "release": "Album",
+                "quality_profile": "lossless",
+            }
+        )
+        offers = [
+            {
+                "peer": peer,
+                "directory": "Album",
+                "quality": "lossless",
+                "all_lossless": True,
+                "files": [
+                    {
+                        "peer": peer,
+                        "remote": "Album/01.wav",
+                        "original_remote": "Album\\01.wav",
+                        "size": 10,
+                        "disc": 1,
+                        "track": 1,
+                    }
+                ],
+            }
+            for peer in ("first", "second")
+        ]
+        with self.service.ledger.locked():
+            stored = self.service.ledger.get(job["job_id"])
+            stored["state"] = "downloading"
+            stored["search"] = {"id": "search"}
+            stored["resolved_release"] = {
+                "tracks": [
+                    {
+                        "disc": 1,
+                        "track": 1,
+                        "recording_mbid": "recording",
+                        "duration_ms": 200,
+                    }
+                ]
+            }
+            stored["offer_plan"] = {"offers": offers, "cursor": 0, "history": []}
+            stored["selected_offer"] = offers[0]
+            stored["selected_source"] = {"peer": "first", "directory": "Album"}
+            stored["selected_quality"] = "lossless"
+            stored["transfer_intent"] = {
+                "status": "submitted",
+                "cleanup": "done",
+                "peer": "first",
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "payload_observed": False,
+                "requested_at": "2000-01-01T00:00:00+00:00",
+                "files": [
+                    {
+                        **offers[0]["files"][0],
+                        "expected_relative": f"openclaw/{job['job_id']}/01.wav",
+                        "recording_mbid": "recording",
+                        "duration_ms": 200,
+                    }
+                ],
+            }
+            self.service.ledger.save(stored)
+        queues = []
+        self.service.slskd = SimpleNamespace(
+            transfers=lambda: records,
+            queue=lambda peer, files, **kwargs: queues.append((peer, kwargs)),
+        )
+        return job, queues
+
+    @staticmethod
+    def _clean_rejection_records():
+        return [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+        ]
+
+    def test_crash_before_fallback_commit_keeps_the_old_attempt(self):
+        job, queues = self._fallback_job(
+            "crash-before-advance", self._clean_rejection_records()
+        )
+        old = self.service.ledger.get(job["job_id"])["transfer_intent"]
+
+        with (
+            patch.object(self.service.ledger, "save", side_effect=OSError("crash")),
+            self.assertRaises(OSError),
+        ):
+            self.service.worker_once()
+
+        stored = self.service.ledger.get(job["job_id"])
+        self.assertEqual(stored["offer_plan"]["cursor"], 0)
+        self.assertEqual(stored["transfer_intent"]["batch_id"], old["batch_id"])
+        self.assertEqual(stored["transfer_intent"]["peer"], "first")
+        self.assertEqual(queues, [])
+
+    def test_crash_after_fallback_commit_reuses_persisted_batch_for_one_post(self):
+        job, queues = self._fallback_job(
+            "crash-after-advance", self._clean_rejection_records()
+        )
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        persisted = self.service.ledger.get(job["job_id"])["transfer_intent"]
+        self.assertEqual(persisted["peer"], "second")
+
+        resumed = JobService(
+            self.service.ledger,
+            self.service.resolver,
+            self.service.slskd,
+            self.service.validator,
+            self.config,
+        )
+        self.assertEqual(resumed.worker_once()["state"], "downloading")
+        self.assertEqual(queues[0][1]["batch_id"], persisted["batch_id"])
+        self.assertEqual(resumed.worker_once()["state"], "needs_review")
+        self.assertEqual(len(queues), 1)
+
+    def test_clean_rejection_advances_once_with_new_batch_and_same_destination(self):
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+                "exception": "rejected",
+            }
+        ]
+        job, queues = self._fallback_job("fallback", records)
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        stored = self.service.ledger.get(job["job_id"])
+        self.assertEqual(stored["offer_plan"]["cursor"], 1)
+        self.assertEqual(stored["transfer_intent"]["peer"], "second")
+        self.assertNotEqual(stored["transfer_intent"]["batch_id"], job["job_id"])
+        next_batch = stored["transfer_intent"]["batch_id"]
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        self.assertEqual(
+            queues,
+            [
+                (
+                    "second",
+                    {
+                        "batch_id": next_batch,
+                        "job_id": job["job_id"],
+                        "search_id": "search",
+                    },
+                )
+            ],
+        )
+        self.assertEqual(
+            self.service.ledger.get(job["job_id"])["transfer_intent"]["batch_id"],
+            next_batch,
+        )
+
+    def test_fallback_rejects_partial_nonrejected_and_retried_evidence(self):
+        for name, state, bytes_transferred, attempts in (
+            ("partial", "Completed, Rejected", 1, 1),
+            ("aborted", "Completed, Aborted", 0, 1),
+            ("missing-attempts", "Completed, Rejected", 0, None),
+            ("retried", "Completed, Rejected", 0, 2),
+        ):
+            with self.subTest(name=name):
+                records = [
+                    {
+                        "peer": "first",
+                        "remote": "Album/01.wav",
+                        "size": 10,
+                        "id": "transfer",
+                        "state": state,
+                        "bytes": bytes_transferred,
+                        **({"attempts": attempts} if attempts is not None else {}),
+                        "batch_id": "11111111-1111-1111-1111-111111111111",
+                        "timestamps": {
+                            "requestedAt": "2999-01-01T00:00:00+00:00",
+                            "endedAt": "2999-01-01T00:00:01+00:00",
+                        },
+                    }
+                ]
+                job, _ = self._fallback_job("fallback-" + name, records)
+                self.assertEqual(self.service.worker_once()["state"], "needs_review")
+                self.assertEqual(
+                    self.service.status(job["job_id"])["state"], "needs_review"
+                )
+
+    def test_payload_observed_survives_reconstructed_service_and_blocks_fallback(self):
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "InProgress",
+                "bytes": 1,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+            }
+        ]
+        job, _ = self._fallback_job("payload-latch", records)
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        self.assertTrue(
+            self.service.ledger.get(job["job_id"])["transfer_intent"][
+                "payload_observed"
+            ]
+        )
+        records[:] = [
+            {
+                **records[0],
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+        ]
+        resumed = JobService(
+            self.service.ledger,
+            self.service.resolver,
+            self.service.slskd,
+            self.service.validator,
+            self.config,
+        )
+
+        self.assertEqual(resumed.worker_once()["state"], "needs_review")
+
+    def test_lost_fallback_post_response_retains_batch_without_second_post(self):
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+        ]
+        job, queues = self._fallback_job("lost-fallback-post", records)
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        batch_id = self.service.ledger.get(job["job_id"])["transfer_intent"]["batch_id"]
+
+        def lost_response(peer, files, **kwargs):
+            queues.append((peer, kwargs))
+            raise BackendUncertain("lost response")
+
+        self.service.slskd.queue = lost_response
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        self.assertEqual(self.service.worker_once()["state"], "needs_review")
+        self.assertEqual(len(queues), 1)
+        self.assertEqual(queues[0][1]["batch_id"], batch_id)
+        self.assertEqual(
+            self.service.ledger.get(job["job_id"])["transfer_intent"]["batch_id"],
+            batch_id,
+        )
+
+    def test_final_clean_rejection_exhausts_the_offer_plan(self):
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+        ]
+        job, _ = self._fallback_job("final-rejection", records)
+        with self.service.ledger.locked():
+            stored = self.service.ledger.get(job["job_id"])
+            stored["offer_plan"]["offers"] = stored["offer_plan"]["offers"][:1]
+            self.service.ledger.save(stored)
+
+        result = self.service.worker_once()
+
+        self.assertEqual(result["state"], "failed")
+        self.assertFalse(result["retryable"])
+        self.assertEqual(result["error"]["code"], "transfer_rejected")
+
+    def test_malformed_plan_and_destination_contents_block_fallback(self):
+        records = [
+            {
+                "peer": "first",
+                "remote": "Album/01.wav",
+                "size": 10,
+                "id": "transfer",
+                "state": "Completed, Rejected",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": "11111111-1111-1111-1111-111111111111",
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+        ]
+        for key, mutate in (
+            (
+                "duplicate-plan",
+                lambda stored: stored["offer_plan"].update(
+                    {"offers": [stored["offer_plan"]["offers"][0]] * 2}
+                ),
+            ),
+            (
+                "destination-entry",
+                lambda stored: (
+                    (self.download / "openclaw" / stored["job_id"]).mkdir(parents=True),
+                    (
+                        self.download / "openclaw" / stored["job_id"] / "unexpected"
+                    ).write_text("x"),
+                ),
+            ),
+        ):
+            with self.subTest(key=key):
+                job, _ = self._fallback_job(key, records)
+                with self.service.ledger.locked():
+                    stored = self.service.ledger.get(job["job_id"])
+                    mutate(stored)
+                    self.service.ledger.save(stored)
+                self.assertEqual(self.service.worker_once()["state"], "needs_review")
 
     def test_source_prefix_does_not_strip_canonical_title_numbers(self):
         track = [{"disc": 1, "track": 1, "title": "99 Problems"}]
@@ -1420,12 +1902,13 @@ class HttpTransportTests(unittest.TestCase):
             "peer",
             [{"original_remote": "Album\\01.flac", "size": 1}],
             batch_id="batch",
+            job_id="job",
             search_id="search",
         )
         self.assertEqual(calls[0][1], "/api/v0/transfers/downloads/batches")
         self.assertEqual(
             calls[0][2]["options"],
-            {"destination": "openclaw/batch", "externalId": "batch"},
+            {"destination": "openclaw/job", "externalId": "job"},
         )
         with self.assertRaises(BackendPermanent):
             SlskdClient(
@@ -1435,7 +1918,7 @@ class HttpTransportTests(unittest.TestCase):
                     "batch": {"id": "batch"},
                     "failures": [{"filename": "one", "message": "no slot"}],
                 },
-            ).queue("peer", [], batch_id="batch", search_id="search")
+            ).queue("peer", [], batch_id="batch", job_id="job", search_id="search")
         intent = {
             "batch_id": "batch",
             "requested_at": "2000-01-01T00:00:00+00:00",
@@ -1536,6 +2019,23 @@ class HttpTransportTests(unittest.TestCase):
                             "old-partial",
                             "Completed, Rejected",
                             1,
+                            "old",
+                        )
+                    ]
+                ),
+                "needs_review",
+            )
+        with self.subTest("foreign queued rejected"):
+            self.assertEqual(
+                reconcile(
+                    current
+                    + [
+                        record(
+                            "Album/01.flac",
+                            1,
+                            "old-queued",
+                            "Queued, Rejected",
+                            0,
                             "old",
                         )
                     ]

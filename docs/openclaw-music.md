@@ -4,7 +4,7 @@
 
 This is an asynchronous, narrow music-acquisition workflow. Its path is:
 
-`OpenClaw wrapper -> JSON ledger and serialized worker -> MusicBrainz -> slskd 0.26 batch -> validation -> stock beets -> existing mpdupdate`
+`OpenClaw wrapper -> JSON ledger and serialized worker -> MusicBrainz -> slskd 0.26 batches -> validation -> stock beets -> existing mpdupdate`
 
 Each job gets its own slskd destination, `openclaw/<job UUID>`. Downloaded files are validated and staged, then the existing stock beets configuration, database, and library import the resolved release while holding the shared beets lock. Existing beets mpdupdate is the MPD notification mechanism.
 
@@ -137,7 +137,7 @@ The user timer runs on boot and approximately every 12 seconds after the previou
 
 After confirmed manual cleanup, submit a new request with a **new** idempotency key. Do not claim that cleanup, retry, or beets recovery happened automatically.
 
-An exact, current batch where every transfer was explicitly rejected with zero bytes is recorded as non-retryable `failed` with `error.code:"transfer_rejected"`, not `needs_review`. Its bounded error includes any normalized slskd rejection reason. This does not apply to partial bytes, other failure states, missing/stale/ambiguous records, wrong batch identity, or uncertain queue mutations; those remain review-required.
+For automatically selected sources, up to five distinct peers are tried in frozen fastest-first order. A new slskd batch UUID is used for each peer while the job UUID remains the download destination. Manual source choices remain single-peer plans. Fully successful batches proceed normally. Only an exact current-batch `Completed, Rejected` result with zero transferred bytes and one backend attempt advances to the next peer; mixed, partial, stale, ambiguous, unresolved, or uncertain results require review. After the final clean rejection, the job is non-retryable `failed` with `error.code:"transfer_rejected"`; wait or change source and submit a new request with a new idempotency key.
 
 ## Security rules
 
