@@ -28,6 +28,7 @@ from .validation import capture, expected_batch_relative
 
 MAX_PUBLIC_CANDIDATES = 20
 MAX_PEER_ATTEMPTS = 5
+ACTIVE_TRANSFER_FLAGS = {"queued", "requested", "inprogress", "remotely", "locally"}
 SIZE_MISMATCH = re.compile(
     r"^Transfer aborted: the remote size of ([1-9][0-9]*) does not match expected size ([1-9][0-9]*)$",
     re.ASCII,
@@ -677,6 +678,14 @@ class JobService:
             for record in matches
         ):
             intent["payload_observed"] = True
+        flags = [state_flags(record["state"]) for record in matches]
+        if any("completed" in item and item & ACTIVE_TRANSFER_FLAGS for item in flags):
+            return "needs_review", matches
+        nonterminal = [item for item in flags if "completed" not in item]
+        if nonterminal:
+            if all(item and item <= ACTIVE_TRANSFER_FLAGS for item in nonterminal):
+                return "pending", matches
+            return "needs_review", matches
         if JobService._clean_peer_failure_evidence(intent, matches) is not None:
             return "clean_peer_failure", matches
         if any(
@@ -693,7 +702,7 @@ class JobService:
             for record in matches
         ):
             return "complete", matches
-        return "pending", matches
+        return "needs_review", matches
 
     def _fail_zero_byte_transfer_rejection(
         self, job: dict, revision: int, records: list[dict]

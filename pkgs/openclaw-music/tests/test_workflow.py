@@ -1121,6 +1121,89 @@ class WorkflowTests(unittest.TestCase):
                     self.service.status(job["job_id"])["state"], "needs_review"
                 )
 
+    def test_multifile_safe_failures_wait_for_active_records_before_fallback(self):
+        records = []
+        job, _ = self._fallback_job("multifile-reconciliation", records)
+        batch_id = "11111111-1111-1111-1111-111111111111"
+        second = {
+            "remote": "Album/02.wav",
+            "original_remote": "Album\\02.wav",
+            "size": 20,
+            "disc": 1,
+            "track": 2,
+        }
+        with self.service.ledger.locked():
+            stored = self.service.ledger.get(job["job_id"])
+            stored["resolved_release"]["tracks"].append(
+                {
+                    "disc": 1,
+                    "track": 2,
+                    "recording_mbid": "recording-two",
+                    "duration_ms": 200,
+                }
+            )
+            for offer in stored["offer_plan"]["offers"]:
+                offer["files"].append({"peer": offer["peer"], **second})
+            stored["selected_offer"] = stored["offer_plan"]["offers"][0]
+            stored["transfer_intent"]["files"].append(
+                {
+                    "peer": "first",
+                    **second,
+                    "expected_relative": f"openclaw/{job['job_id']}/02.wav",
+                    "recording_mbid": "recording-two",
+                    "duration_ms": 200,
+                }
+            )
+            self.service.ledger.save(stored)
+
+        def mismatch(remote, size, transfer_id):
+            return {
+                "peer": "first",
+                "remote": remote,
+                "size": size,
+                "id": transfer_id,
+                "state": "Completed, Aborted",
+                "bytes": 0,
+                "attempts": 1,
+                "batch_id": batch_id,
+                "exception": (
+                    "Transfer aborted: the remote size of "
+                    f"{size + 1} does not match expected size {size}"
+                ),
+                "timestamps": {
+                    "requestedAt": "2999-01-01T00:00:00+00:00",
+                    "endedAt": "2999-01-01T00:00:01+00:00",
+                },
+            }
+
+        records.extend(
+            [
+                mismatch("Album/01.wav", 10, "one"),
+                {
+                    "peer": "first",
+                    "remote": "Album/02.wav",
+                    "size": 20,
+                    "id": "two",
+                    "state": "Queued, Remotely",
+                    "bytes": 0,
+                    "attempts": 1,
+                    "batch_id": batch_id,
+                    "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                },
+            ]
+        )
+
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        pending = self.service.ledger.get(job["job_id"])
+        self.assertEqual(pending["offer_plan"]["cursor"], 0)
+        self.assertEqual(pending["transfer_intent"]["batch_id"], batch_id)
+
+        records[1] = mismatch("Album/02.wav", 20, "two")
+        self.assertEqual(self.service.worker_once()["state"], "downloading")
+        advanced = self.service.ledger.get(job["job_id"])
+        self.assertEqual(advanced["offer_plan"]["cursor"], 1)
+        self.assertEqual(len(advanced["offer_plan"]["history"]), 1)
+
     def test_payload_observed_survives_reconstructed_service_and_blocks_fallback(self):
         records = [
             {
@@ -2344,3 +2427,122 @@ class HttpTransportTests(unittest.TestCase):
                 ),
                 "needs_review",
             )
+
+    def test_reconcile_defers_only_recognized_active_states(self):
+        def intent():
+            return {
+                "batch_id": "current",
+                "payload_observed": False,
+                "requested_at": "2000-01-01T00:00:00+00:00",
+                "files": [
+                    {"peer": "peer", "remote": "Album/01.flac", "size": 1},
+                    {"peer": "peer", "remote": "Album/02.flac", "size": 2},
+                ],
+            }
+
+        def record(remote, size, transfer_id, state, bytes_transferred=0, **extra):
+            return {
+                "peer": "peer",
+                "remote": remote,
+                "size": size,
+                "id": transfer_id,
+                "state": state,
+                "bytes": bytes_transferred,
+                "attempts": 1,
+                "batch_id": "current",
+                "timestamps": {"requestedAt": "2999-01-01T00:00:00+00:00"},
+                **extra,
+            }
+
+        def reconcile(records, transfer_intent):
+            service = SimpleNamespace(slskd=SimpleNamespace(transfers=lambda: records))
+            return JobService._reconcile_transfer(service, transfer_intent)[0]
+
+        active = [
+            record("Album/01.flac", 1, "one", "Queued, Remotely"),
+            record("Album/02.flac", 2, "two", "Requested, Locally"),
+        ]
+        self.assertEqual(reconcile(active, intent()), "pending")
+
+        successful = [
+            record("Album/01.flac", 1, "one", "Completed, Succeeded", 1),
+            record("Album/02.flac", 2, "two", "Completed, Succeeded", 2),
+        ]
+        self.assertEqual(reconcile(successful, intent()), "complete")
+        self.assertEqual(
+            reconcile(
+                [
+                    record("Album/01.flac", 1, "one", "Queued, Unknown"),
+                    active[1],
+                ],
+                intent(),
+            ),
+            "needs_review",
+        )
+        self.assertEqual(
+            reconcile(
+                [
+                    record("Album/01.flac", 1, "one", "Completed, Queued"),
+                    active[1],
+                ],
+                intent(),
+            ),
+            "needs_review",
+        )
+        self.assertEqual(
+            reconcile(
+                [
+                    successful[0],
+                    record(
+                        "Album/02.flac",
+                        2,
+                        "two",
+                        "Completed, Rejected",
+                        timestamps={
+                            "requestedAt": "2999-01-01T00:00:00+00:00",
+                            "endedAt": "2999-01-01T00:00:01+00:00",
+                        },
+                    ),
+                ],
+                intent(),
+            ),
+            "failed",
+        )
+
+        latched_intent = intent()
+        self.assertEqual(
+            reconcile(
+                [record("Album/01.flac", 1, "one", "InProgress", 1), active[1]],
+                latched_intent,
+            ),
+            "pending",
+        )
+        self.assertTrue(latched_intent["payload_observed"])
+        self.assertEqual(
+            reconcile(
+                [
+                    record(
+                        "Album/01.flac",
+                        1,
+                        "one",
+                        "Completed, Rejected",
+                        timestamps={
+                            "requestedAt": "2999-01-01T00:00:00+00:00",
+                            "endedAt": "2999-01-01T00:00:01+00:00",
+                        },
+                    ),
+                    record(
+                        "Album/02.flac",
+                        2,
+                        "two",
+                        "Completed, Rejected",
+                        timestamps={
+                            "requestedAt": "2999-01-01T00:00:00+00:00",
+                            "endedAt": "2999-01-01T00:00:01+00:00",
+                        },
+                    ),
+                ],
+                latched_intent,
+            ),
+            "failed",
+        )
