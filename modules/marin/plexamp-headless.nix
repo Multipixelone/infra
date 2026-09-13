@@ -84,7 +84,6 @@
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
-        unitConfig.Conflicts = [ "caldera-headless.service" ];
         # Skip start (and restart loops) until claim has been completed
         unitConfig.ConditionPathExists = tokenPathUnit;
         serviceConfig = {

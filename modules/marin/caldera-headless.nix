@@ -31,6 +31,20 @@
       );
       stateDir = "/var/lib/caldera-headless";
       configDir = "${stateDir}/.config/caldera-music";
+      audioReady = pkgs.writeShellScript "caldera-headless-wait-for-audio" ''
+        set -eu
+
+        deadline=$(${pkgs.coreutils}/bin/date +%s)
+        deadline=$((deadline + 30))
+        while ! ${pkgs.systemd}/bin/systemctl --system is-active --quiet marin-speaker-unmute.service \
+          || ! ${pkgs.wireplumber}/bin/wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1; do
+          if [ "$(${pkgs.coreutils}/bin/date +%s)" -ge "$deadline" ]; then
+            echo "Caldera audio readiness timed out: marin-speaker-unmute.service must be active and PipeWire must have a default audio sink." >&2
+            exit 1
+          fi
+          ${pkgs.coreutils}/bin/sleep 1
+        done
+      '';
 
       control = pkgs.writeShellApplication {
         name = "caldera-headless-control";
@@ -59,28 +73,23 @@
               ;;
             device)
               if [[ $# -ne 2 ]]; then
-                echo "usage: caldera-headless-control device <ALSA-device-uid>" >&2
+                echo "usage: caldera-headless-control device <device-uid>" >&2
                 exit 64
               fi
               args=(--device "$2")
               ;;
             *)
-              echo "usage: caldera-headless-control {login|list-devices|device <ALSA-device-uid>}" >&2
+              echo "usage: caldera-headless-control {login|list-devices|device <device-uid>}" >&2
               exit 64
               ;;
           esac
 
           # The daemon and control command take the same exclusive lock. Stop
           # first, then refuse rather than race if another operation acquired it.
-          systemctl stop caldera-headless.service
-          exec systemd-run --wait --collect --pty \
+          systemctl --user --machine=tunnel@.host stop caldera-headless.service
+          exec systemd-run --user --machine=tunnel@.host --wait --collect --pty \
             --unit=caldera-headless-control \
             --property=Conflicts=caldera-headless.service \
-            --property=User=caldera-headless \
-            --property=Group=caldera-headless \
-            --property=SupplementaryGroups=audio \
-            --property=StateDirectory=caldera-headless \
-            --property=StateDirectoryMode=0700 \
             --property=UMask=0077 \
             --property=Environment=HOME=${stateDir} \
             --property=Environment=XDG_CONFIG_HOME=${configDir} \
@@ -107,14 +116,40 @@
         }
       ];
 
-      users.users.caldera-headless = {
-        isSystemUser = true;
-        group = "caldera-headless";
-        extraGroups = [ "audio" ];
-        home = stateDir;
-        createHome = false;
+      # Caldera shares tunnel's user PipeWire manager and its default endpoint;
+      # no dedicated Caldera account or group is needed.
+      systemd.tmpfiles.rules = [
+        "d ${stateDir} 0700 tunnel users - -"
+      ];
+
+      # Keep existing credentials private while migrating the old service's
+      # tree. Only the state root's required mode is normalized; descendants
+      # retain their existing modes. Stop the former system unit before removing
+      # its account, so this completes before the user unit can use the tree.
+      system.activationScripts.caldera-headless-state = {
+        deps = [ "users" ];
+        text = ''
+          stateDir=${stateDir}
+          ${pkgs.systemd}/bin/systemctl stop caldera-headless.service || true
+          if [ -e "$stateDir" ] && [ ! -d "$stateDir" ]; then
+            echo "caldera-headless state path is not a directory: $stateDir" >&2
+            exit 1
+          fi
+          if [ ! -e "$stateDir" ]; then
+            ${pkgs.coreutils}/bin/install -d -m 0700 -o tunnel -g users "$stateDir"
+          fi
+          ${pkgs.coreutils}/bin/chown tunnel:users "$stateDir"
+          ${pkgs.coreutils}/bin/chmod 0700 "$stateDir"
+          ${pkgs.findutils}/bin/find "$stateDir" -xdev -mindepth 1 -exec ${pkgs.coreutils}/bin/chown -h tunnel:users {} +
+          if ${pkgs.coreutils}/bin/id -u caldera-headless >/dev/null 2>&1; then
+            ${pkgs.shadow}/bin/userdel caldera-headless
+          fi
+          ${pkgs.shadow}/bin/groupdel caldera-headless || groupdelStatus=$?
+          if [ "''${groupdelStatus:-0}" -ne 0 ] && [ "$groupdelStatus" -ne 6 ]; then
+            exit "$groupdelStatus"
+          fi
+        '';
       };
-      users.groups.caldera-headless = { };
 
       environment.systemPackages = [
         control
@@ -131,50 +166,37 @@
         allowedUDPPorts = [ 32412 ];
       };
 
-      systemd.services.caldera-headless = {
+      systemd.user.services.caldera-headless = {
         description = "Caldera Music Headless";
         after = [
-          "network-online.target"
-          "marin-speaker-unmute.service"
+          "pipewire.service"
+          "wireplumber.service"
         ];
         wants = [
-          "network-online.target"
-          "marin-speaker-unmute.service"
+          "pipewire.service"
+          "wireplumber.service"
         ];
-        wantedBy = [ "multi-user.target" ];
+        wantedBy = [ "default.target" ];
         unitConfig = {
-          Conflicts = [ "plexamp-headless.service" ];
-          StartLimitIntervalSec = "1min";
-          StartLimitBurst = 3;
+          ConditionUser = "tunnel";
+          StartLimitIntervalSec = "0";
         };
         serviceConfig = {
           Type = "simple";
-          User = "caldera-headless";
-          Group = "caldera-headless";
-          SupplementaryGroups = [ "audio" ];
-          StateDirectory = "caldera-headless";
-          StateDirectoryMode = "0700";
           UMask = "0077";
           Environment = [
             "HOME=${stateDir}"
             "XDG_CONFIG_HOME=${configDir}"
             "XDG_CACHE_HOME=${stateDir}/.cache"
           ];
+          ExecStartPre = audioReady;
           ExecStart = "${pkgs.util-linux}/bin/flock --exclusive ${stateDir}/.operation.lock ${lib.getExe caldera-headless} --config ${configDir}";
           Restart = "on-failure";
           RestartSec = "5s";
 
-          # Do not use PrivateDevices: Caldera needs ALSA devices. Network
-          # access is required for Plex, so do not use PrivateNetwork either.
+          # User services cannot safely use the mount-namespace hardening used
+          # by the former system service. The state directory remains private.
           NoNewPrivileges = true;
-          PrivateTmp = true;
-          ProtectHome = true;
-          ProtectSystem = "strict";
-          ReadWritePaths = [ stateDir ];
-          ProtectControlGroups = true;
-          ProtectKernelModules = true;
-          ProtectKernelTunables = true;
-          RestrictSUIDSGID = true;
         };
       };
     };
