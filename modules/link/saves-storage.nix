@@ -1552,6 +1552,7 @@ in
         "restic-forget-${instance}" = {
           description = "Expire offsite RetroArch save snapshots (tag ${resticTag})";
           path = [ rcloneCfg.package ];
+          environment.RESTIC_CACHE_DIR = "/var/cache/restic-forget-${instance}";
           wants = [
             "rclone-seed.service"
             "network-online.target"
@@ -1564,6 +1565,8 @@ in
           serviceConfig = {
             Type = "oneshot";
             Environment = "RCLONE_CONFIG=${rcloneCfg.configFile}";
+            CacheDirectory = "restic-forget-${instance}";
+            CacheDirectoryMode = "0700";
             ExecStart = "${resticCmd} forget --tag ${resticTag} --group-by host,tags --retry-lock 2h --keep-last 7 --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --keep-yearly 5";
           };
         };

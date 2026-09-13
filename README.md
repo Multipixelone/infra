@@ -103,7 +103,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (64)</summary>
+<summary>Packages exposed by this flake (63)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -131,7 +131,6 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
 - `musepack` — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
 - [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A sleek, customizable desktop shell crafted for Wayland. · `nix run github:Multipixelone/infra#noctalia-shell`
-- [`openclaw-music`](https://github.com/Multipixelone/infra/blob/main/modules/link/openclaw-music.nix) · `nix run github:Multipixelone/infra#openclaw-music`
 - [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
 - [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
 - [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`

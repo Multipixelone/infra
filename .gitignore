@@ -131,10 +131,6 @@ result-*
 /.claude/settings.local.json
 /.gcroots/
 /.pre-commit-config.yaml
-/.slim/clonedeps/repos/
-/.slim/deepwork/
-/.slim/worktrees.json
-/.slim/worktrees/
 /result
 /result.*
 /retroarch-save-bundles/
