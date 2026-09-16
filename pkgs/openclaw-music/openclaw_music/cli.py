@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 
-from .config import TrustedConfig, production_factory
+from .config import TrustedConfig, _absolute, production_factory
 from .errors import Configuration, MusicError
 from .input import MAX_INPUT, load_json, parse
+from .jobs import public
+from .ledger import Ledger
 from .models import now
 from .resolver import MusicBrainzClient, Resolver
 
@@ -34,6 +37,14 @@ def main(argv=None) -> int:
                 )
             ).resolve(request, None, now())
             output = {"schema": 1, "operation": "resolve", **result}
+        elif operation == "status":
+            # Read-only status must remain available when retrieval credentials are
+            # absent, and it must not rewrite legacy records.
+            ledger_root = _absolute(os.environ.get("OPENCLAW_MUSIC_LEDGER"), "ledger")
+            if not Path(ledger_root).is_dir():
+                raise Configuration("ledger is unavailable")
+            ledger = Ledger(ledger_root)
+            output = public(ledger.get(request["job_id"]), "status")
         else:
             config = TrustedConfig.from_env()
             service = production_factory(config)
@@ -41,8 +52,6 @@ def main(argv=None) -> int:
                 output = service.submit(request)
             elif operation == "choose":
                 output = service.choose(**request)
-            elif operation == "status":
-                output = service.status(**request)
             elif operation == "retry":
                 output = service.retry(**request)
             else:

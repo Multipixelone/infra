@@ -298,6 +298,8 @@ class WorkflowTests(unittest.TestCase):
         )
 
     def test_production_factory_strict_journey_reaches_ready(self):
+        # The legacy omitted-backend request must route exclusively to slskd.
+        self.assertIsNone(self.service.streamrip)
         self.job = self.service.submit(
             {
                 "idempotency_key": "one",

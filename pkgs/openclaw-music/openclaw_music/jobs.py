@@ -70,6 +70,7 @@ def public(job: dict, operation: str) -> dict:
         "retryable": job.get("retryable", False),
         "resume_phase": job.get("resume_phase"),
         "integration_required": job.get("integration_required", False),
+        "backend": job.get("backend", "slskd"),
     }
     for key in (
         "selected_source",
@@ -134,7 +135,16 @@ def _safe_peer_failure_kind(record: dict, expected_size: object) -> str | None:
 
 class JobService:
     def __init__(
-        self, ledger, resolver, slskd, validator, config, *, importer=None, indexer=None
+        self,
+        ledger,
+        resolver,
+        slskd,
+        validator,
+        config,
+        *,
+        importer=None,
+        indexer=None,
+        streamrip=None,
     ):
         self.ledger = ledger
         self.resolver = resolver
@@ -143,6 +153,7 @@ class JobService:
         self.config = config
         self.importer = importer
         self.indexer = indexer
+        self.streamrip = streamrip
 
     def submit(self, request: dict) -> dict:
         raw = {key: value for key, value in request.items() if value is not None}
@@ -253,6 +264,15 @@ class JobService:
                     "track_count": len(offer.get("files", [])),
                 }
             )
+        elif stage == "streamrip_album":
+            # Discovery metadata is intentionally non-authoritative and never
+            # includes a provider identifier in the public ledger projection.
+            candidate.update(
+                {
+                    "description": _bounded_text(item.get("description")),
+                    "indistinguishable": item.get("indistinguishable") is True,
+                }
+            )
         return {
             key: value
             for key, value in candidate.items()
@@ -335,6 +355,26 @@ class JobService:
                     }
                     job["policy_digest"] = digest(job["policy"])
                 target = "searching"
+            elif stage == "streamrip_album":
+                runtime = selected.get("runtime")
+                provider_id = selected.get("provider_id")
+                if not isinstance(runtime, dict) or not isinstance(provider_id, str):
+                    raise InvalidInput("invalid Streamrip candidate plan")
+                job["streamrip"] = {
+                    "runtime": runtime,
+                    "search": job.get("streamrip", {}).get("search"),
+                    "download": {
+                        "operation_id": str(uuid.uuid4()),
+                        "status": "intent",
+                        "provider_id": provider_id,
+                        "created_at": now(),
+                        "description_compatible": selected.get("description_compatible")
+                        is True,
+                    },
+                }
+                job["selected_source"] = {"backend": "streamrip"}
+                job["selected_quality"] = 3
+                target = "downloading"
             else:
                 raise Conflict("unknown candidate stage")
             transition(job, target)
@@ -375,12 +415,17 @@ class JobService:
             ).isoformat()
             touch(job)
         else:
+            streamrip = self._backend(job) == "streamrip"
             transition(
                 job,
                 "needs_review",
                 error={
-                    "code": getattr(error, "symbol", "internal"),
-                    "message": str(error)[:240],
+                    "code": "streamrip_validation_failed"
+                    if streamrip
+                    else getattr(error, "symbol", "internal"),
+                    "message": "Streamrip validation failed; inspect the isolated job"
+                    if streamrip
+                    else str(error)[:240],
                     "retryable": False,
                     "resume_phase": None,
                     "manual_action": "review the job ledger and adapter state",
@@ -437,6 +482,21 @@ class JobService:
                 )
             )
             return active[0], active[0]["revision"]
+
+    @staticmethod
+    def _backend(job: dict) -> str:
+        backend = job.get("backend", "slskd")
+        if backend not in {"slskd", "streamrip"}:
+            raise InvalidInput("invalid frozen backend")
+        return backend
+
+    def _checked_streamrip_runtime(self, job: dict, runtime: object) -> dict:
+        if self.streamrip is None or not isinstance(runtime, dict):
+            raise InvalidInput("missing Streamrip runtime plan")
+        expected = self.streamrip.runtime(job["job_id"])
+        if runtime != expected:
+            raise InvalidInput("Streamrip runtime plan is not contained")
+        return expected
 
     def _check_transfer_targets(self, intent: dict, *, expect_absent: bool) -> None:
         for item in intent["files"]:
@@ -854,6 +914,59 @@ class JobService:
             self._commit(job, revision)
             return public(job, "worker")
         if state == "searching":
+            if self._backend(job) == "streamrip":
+                if self.streamrip is None:
+                    raise InvalidInput("Streamrip adapter is not configured")
+                private = job.setdefault("streamrip", {})
+                runtime = private.get("runtime")
+                if runtime is None:
+                    runtime = self.streamrip.runtime(job["job_id"])
+                    private["runtime"] = runtime
+                else:
+                    runtime = self._checked_streamrip_runtime(job, runtime)
+                search = private.get("search")
+                if search is None:
+                    private["search"] = {
+                        "operation_id": str(uuid.uuid4()),
+                        "status": "calling",
+                        "query": job["resolved_release"]["search_text"],
+                        "created_at": now(),
+                    }
+                    self.streamrip.write_config(runtime)
+                    self.streamrip.establish_baseline(runtime)
+                    touch(job)
+                    self._commit(job, revision)
+                    return public(job, "worker")
+                if search.get("status") not in {"calling", "retrying"}:
+                    raise InvalidInput("invalid durable Streamrip search state")
+                # Search is read-only.  A missing acknowledgement can be retried,
+                # unlike a download invocation.
+                rows = self.streamrip.search(runtime, search["query"])
+                job = self.ledger.get(job["job_id"])
+                revision = job["revision"]
+                private = job["streamrip"]
+                private["search"]["status"] = "acknowledged"
+                private["search"]["result_count"] = len(rows)
+                self._candidate_set(
+                    job,
+                    "streamrip_album",
+                    [
+                        {
+                            "label": row["description"],
+                            "reason": "discovery is not edition or quality proof; choice only authorizes retrieval for validation",
+                            "description": row["description"],
+                            "indistinguishable": row["indistinguishable"],
+                            "description_compatible": self.streamrip.description_matches(
+                                row["description"], job["resolved_release"]
+                            ),
+                            "provider_id": row["provider_id"],
+                            "runtime": runtime,
+                        }
+                        for row in rows
+                    ],
+                )
+                self._commit(job, revision)
+                return public(job, "worker")
             search = job.get("search")
             if search is None:
                 job["search"] = {
@@ -972,6 +1085,83 @@ class JobService:
             self._commit(job, revision)
             return public(job, "worker")
         if state == "downloading":
+            if self._backend(job) == "streamrip":
+                if self.streamrip is None:
+                    raise InvalidInput("Streamrip adapter is not configured")
+                private = job.get("streamrip")
+                if not isinstance(private, dict):
+                    raise InvalidInput("missing Streamrip runtime plan")
+                runtime = self._checked_streamrip_runtime(job, private.get("runtime"))
+                download = private.get("download")
+                if not isinstance(download, dict):
+                    raise InvalidInput("missing Streamrip download plan")
+                if download.get("status") == "calling":
+                    raise BackendUncertain(
+                        "Streamrip download acknowledgement is missing; inspect isolated output before submitting a new job"
+                    )
+                if download.get("status") == "intent":
+                    self.streamrip.adopt_baseline(runtime)
+                    download["status"] = "calling"
+                    download["started_at"] = now()
+                    touch(job)
+                    self._commit(job, revision)
+                    try:
+                        code, stderr = self.streamrip.download(
+                            runtime, download["provider_id"]
+                        )
+                    except BackendUncertain:
+                        return public(job, "worker")
+                    job = self.ledger.get(job["job_id"])
+                    revision = job["revision"]
+                    download = job["streamrip"]["download"]
+                    download.update(
+                        {"status": "acknowledged", "exit_code": code, "stderr": stderr}
+                    )
+                    # An observed, quiescent exit is durable before any read-only
+                    # DB, inventory, or audio validation can fail.
+                    touch(job)
+                    self._commit(job, revision)
+                    return public(job, "worker")
+                if download.get("status") == "acknowledged":
+                    if download.get("exit_code") != 0:
+                        transition(
+                            job,
+                            "needs_review",
+                            error={
+                                "code": "streamrip_download_failed",
+                                "message": "Streamrip download returned a nonzero exit status",
+                                "retryable": False,
+                                "resume_phase": None,
+                                "manual_action": "inspect the isolated Streamrip job output before submitting a new job",
+                            },
+                        )
+                        self._commit(job, revision)
+                        return public(job, "worker")
+                    if not self.streamrip.edition_compatible(job["resolved_release"]):
+                        raise InvalidInput(
+                            "Streamrip edition evidence is incompatible or ambiguous"
+                        )
+                    if download.get("description_compatible") is not True:
+                        raise InvalidInput(
+                            "Streamrip discovery evidence is incompatible or ambiguous"
+                        )
+                    completed = self.streamrip.completed_input(
+                        runtime,
+                        job["resolved_release"],
+                        self.validator,
+                        download["provider_id"],
+                    )
+                    job["transfer_intent"] = {
+                        "status": "complete",
+                        "backend": "streamrip",
+                        "files": completed["files"],
+                        "completed": completed,
+                        "operation_id": download["operation_id"],
+                    }
+                    transition(job, "validating")
+                    self._commit(job, revision)
+                    return public(job, "worker")
+                raise InvalidInput("invalid durable Streamrip download state")
             self._offer_plan(job)
             if job.get("integration_required"):
                 if not self.config.transport_isolated:
@@ -1099,6 +1289,49 @@ class JobService:
                 return public(job, "worker")
             raise InvalidInput("invalid durable queue state")
         if state == "validating":
+            if self._backend(job) == "streamrip":
+                intent = job.get("transfer_intent")
+                runtime = job.get("streamrip", {}).get("runtime")
+                if not isinstance(intent, dict):
+                    raise InvalidInput("missing Streamrip validation plan")
+                runtime = self._checked_streamrip_runtime(job, runtime)
+                completed = intent.get("completed")
+                if not isinstance(completed, dict):
+                    raise InvalidInput("missing Streamrip completed evidence")
+                if not job.get("capture_intent"):
+                    job["capture_intent"] = {"created_at": now(), "status": "copying"}
+                    touch(job)
+                    self._commit(job, revision)
+                    return public(job, "worker")
+                self.streamrip.revalidate_completed_input(
+                    runtime, completed, self.validator
+                )
+                directory, manifest, measurements = capture(
+                    runtime["output"],
+                    self.config.staging_root,
+                    job["job_id"],
+                    intent["files"],
+                    max_bytes=self.config.max_bytes,
+                    validator=self.validator,
+                    policy=job["policy"],
+                )
+                self.streamrip.revalidate_capture(directory, completed, self.validator)
+                self.streamrip.revalidate_completed_input(
+                    runtime, completed, self.validator
+                )
+                for item, measurement in zip(manifest, measurements, strict=True):
+                    expected_duration = item["duration_ms"]
+                    if abs(measurement["duration"] * 1000 - expected_duration) > max(
+                        10_000, expected_duration * 0.1
+                    ):
+                        raise InvalidInput(
+                            "captured duration does not match resolved track"
+                        )
+                job["manifest"] = manifest
+                job["stage_path"] = str(directory)
+                transition(job, "ready")
+                self._commit(job, revision)
+                return public(job, "worker")
             if not self.config.transport_isolated:
                 raise InvalidInput(
                     "Phase 2 transport isolation assertion is required before capture"

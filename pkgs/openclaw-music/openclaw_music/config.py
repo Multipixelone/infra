@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -62,6 +63,9 @@ class TrustedConfig:
     beets_home: str | None = None
     beets_path: str | None = None
     beets_cache: str | None = None
+    streamrip_launcher: str | None = None
+    streamrip_master_config: str | None = None
+    streamrip_runtime_root: str | None = None
 
     def __post_init__(self) -> None:
         _loopback(self.slskd_url)
@@ -93,6 +97,17 @@ class TrustedConfig:
                 not Path(entry).is_absolute() for entry in self.beets_path.split(":")
             ):
                 raise Configuration("beets PATH entries must be absolute")
+        streamrip_paths = (
+            self.streamrip_launcher,
+            self.streamrip_master_config,
+            self.streamrip_runtime_root,
+        )
+        if any(streamrip_paths) and not all(streamrip_paths):
+            raise Configuration("all Streamrip adapter paths are required together")
+        if all(streamrip_paths):
+            _absolute(self.streamrip_launcher, "Streamrip launcher", executable=True)
+            _absolute(self.streamrip_master_config, "Streamrip master config")
+            _absolute(self.streamrip_runtime_root, "Streamrip runtime root")
 
     @classmethod
     def from_env(cls, env=None):
@@ -120,6 +135,9 @@ class TrustedConfig:
             beets_home=env.get("OPENCLAW_MUSIC_BEETS_HOME"),
             beets_path=env.get("OPENCLAW_MUSIC_BEETS_PATH"),
             beets_cache=env.get("OPENCLAW_MUSIC_BEETS_CACHE"),
+            streamrip_launcher=env.get("OPENCLAW_MUSIC_STREAMRIP_LAUNCHER"),
+            streamrip_master_config=env.get("OPENCLAW_MUSIC_STREAMRIP_MASTER_CONFIG"),
+            streamrip_runtime_root=env.get("OPENCLAW_MUSIC_STREAMRIP_RUNTIME_ROOT"),
         )
 
 
@@ -131,6 +149,7 @@ def production_factory(
     run=None,
     importer=None,
     indexer=None,
+    streamrip_run=None,
 ):
     """Production composition; network boundaries remain injectable for offline tests."""
     from .jobs import JobService
@@ -154,6 +173,16 @@ def production_factory(
             config.beets_cache,
             validator=validator,
         )
+    streamrip = None
+    if config.streamrip_launcher:
+        from .streamrip import StreamripAdapter
+
+        streamrip = StreamripAdapter(
+            config.streamrip_launcher,
+            config.streamrip_master_config,
+            config.streamrip_runtime_root,
+            run=streamrip_run if streamrip_run is not None else subprocess.run,
+        )
     return JobService(
         Ledger(config.ledger_root),
         Resolver(MusicBrainzClient(config.mb_user_agent, transport=mb_transport)),
@@ -166,4 +195,5 @@ def production_factory(
         config,
         importer=importer,
         indexer=indexer,
+        streamrip=streamrip,
     )

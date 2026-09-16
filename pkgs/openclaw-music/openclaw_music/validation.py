@@ -129,7 +129,7 @@ def _hash_file(path: Path) -> str:
 
 
 def _manifest_item(item: dict, name: str, size: int, sha256: str) -> dict:
-    return {
+    manifest = {
         "name": name,
         "size": size,
         "sha256": sha256,
@@ -138,6 +138,9 @@ def _manifest_item(item: dict, name: str, size: int, sha256: str) -> dict:
         "recording_mbid": item["recording_mbid"],
         "duration_ms": item["duration_ms"],
     }
+    if "expected_tags" in item:
+        manifest["expected_tags"] = item["expected_tags"]
+    return manifest
 
 
 def _adopt_publication(
@@ -434,7 +437,22 @@ class AudioValidator:
             "sample_rate": sample_rate,
             "channels": channels,
             "bit_depth": audio.get("bits_per_raw_sample"),
+            "tags": self._tags(metadata, audio),
         }
+
+    @staticmethod
+    def _tags(metadata: dict, audio: dict) -> dict[str, list[str]]:
+        tags = {}
+        for source in (
+            metadata.get("format", {}).get("tags", {}),
+            audio.get("tags", {}),
+        ):
+            if not isinstance(source, dict):
+                continue
+            for key, value in source.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    tags.setdefault(key, []).append(value)
+        return tags
 
     def validate(
         self, directory: str | Path, manifest: list[dict], policy: dict
@@ -448,6 +466,25 @@ class AudioValidator:
         if sum(item["size"] for item in manifest) > policy["max_bytes"]:
             raise InvalidInput("manifest limits")
         values = [self.inspect(Path(directory) / item["name"]) for item in manifest]
+        for item, value in zip(manifest, values, strict=True):
+            expected = item.get("expected_tags")
+            if expected is None:
+                continue
+            if not isinstance(expected, dict):
+                raise InvalidInput("invalid expected audio tags")
+            tags = {}
+            for key, raw_values in value.get("tags", {}).items():
+                tag_values = (
+                    raw_values if isinstance(raw_values, list) else [raw_values]
+                )
+                tags.setdefault(str(key).casefold().replace("_", ""), []).extend(
+                    str(tag).strip() for tag in tag_values if isinstance(tag, str)
+                )
+            for key, wanted in expected.items():
+                if set(tags.get(key.casefold().replace("_", ""), [])) != {wanted}:
+                    raise InvalidInput(
+                        "captured audio tags do not match the frozen release"
+                    )
         if policy["profile"] == "lossless" and any(
             value["codec"] not in LOSSLESS_CODECS for value in values
         ):

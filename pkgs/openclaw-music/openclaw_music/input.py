@@ -11,6 +11,7 @@ MAX_TEXT = 512
 MAX_DEPTH = 12
 MAX_ITEMS = 128
 PROFILES = {"lossless", "lossless-preferred"}
+BACKENDS = {"slskd", "streamrip"}
 
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -104,7 +105,7 @@ def _request(command: str, data: dict) -> dict:
         "include_compilations",
     }
     if command == "submit":
-        fields |= {"idempotency_key", "quality_profile"}
+        fields |= {"idempotency_key", "quality_profile", "backend"}
     required = (
         {"idempotency_key", "artist", "release"}
         if command == "submit"
@@ -119,6 +120,11 @@ def _request(command: str, data: dict) -> dict:
             if not isinstance(profile, str) or profile not in PROFILES:
                 raise InvalidInput("unsupported quality_profile")
             output["quality_profile"] = profile
+        if "backend" in data:
+            backend = data["backend"]
+            if not isinstance(backend, str) or backend not in BACKENDS:
+                raise InvalidInput("unsupported backend")
+            output["backend"] = backend
     for name in ("edition", "medium"):
         if name in data:
             output[name] = _text(data[name], name, False)

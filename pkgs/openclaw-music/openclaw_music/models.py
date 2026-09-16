@@ -25,7 +25,7 @@ STATES = {
 TRANSITIONS = {
     "queued": {"resolving", "failed", "needs_review"},
     "resolving": {"needs_choice", "searching", "failed", "needs_review"},
-    "needs_choice": {"resolving", "searching", "failed", "needs_review"},
+    "needs_choice": {"resolving", "searching", "downloading", "failed", "needs_review"},
     "searching": {"needs_choice", "downloading", "failed", "needs_review"},
     "downloading": {"validating", "failed", "needs_review"},
     "validating": {"ready", "failed", "needs_review"},
@@ -103,6 +103,9 @@ def new_job(raw_request: dict, effective_policy: dict) -> dict:
             {k: v for k, v in raw_request.items() if k != "idempotency_key"}
         ),
         "policy": effective_policy,
+        # Missing backend in older records deliberately means slskd.  New records
+        # freeze the currently effective backend separately from the request digest.
+        "backend": raw_request.get("backend", "slskd"),
         "policy_digest": digest(effective_policy),
         "candidate_sets": {},
         "decisions": {},
