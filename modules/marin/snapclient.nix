@@ -1,29 +1,21 @@
+{ config, ... }:
 {
-  lib,
-  config,
-  ...
-}:
-{
-  configurations.nixos.marin.module =
-    { pkgs, ... }:
-    {
-      assertions = [
-        {
-          assertion = config.hosts.link.homeAddress != null;
-          message = "hosts.link.homeAddress must be set; snapclient is restricted to home LAN IPs only.";
-        }
-      ];
+  configurations.nixos.marin.module = {
+    assertions = [
+      {
+        assertion = config.hosts.link.homeAddress != null;
+        message = "hosts.link.homeAddress must be set; snapclient is restricted to home LAN IPs only.";
+      }
+    ];
 
-      systemd.user.services = {
-        snapclient = {
-          description = "SnapCast client";
-          after = [ "pipewire.service" ];
-          wants = [ "pipewire.service" ];
-          wantedBy = [ "multi-user.target" ];
-          serviceConfig = {
-            ExecStart = "${lib.getExe' pkgs.snapcast "snapclient"} --host ${config.hosts.link.homeAddress} --player pipewire";
-          };
-        };
-      };
+    infra.audioOutput.snapclient = {
+      enable = true;
+      server =
+        if config.hosts.link.homeAddress != null then
+          "tcp://${config.hosts.link.homeAddress}:1704"
+        else
+          null;
+      sink = null;
     };
+  };
 }
