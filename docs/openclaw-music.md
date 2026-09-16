@@ -4,9 +4,9 @@
 
 This is an asynchronous, narrow music-acquisition workflow. Its path is:
 
-`OpenClaw wrapper -> JSON ledger and serialized worker -> MusicBrainz -> slskd 0.26 batches -> validation -> stock beets -> existing mpdupdate`
+`OpenClaw wrapper -> JSON ledger and serialized worker -> MusicBrainz -> selected slskd or Streamrip retrieval -> validation -> stock beets -> existing mpdupdate`
 
-Each job gets its own slskd destination, `openclaw/<job UUID>`. Downloaded files are validated and staged, then the existing stock beets configuration, database, and library import the resolved release while holding the shared beets lock. Existing beets mpdupdate is the MPD notification mechanism.
+Each slskd job gets its own `openclaw/<job UUID>` destination. A Streamrip job instead has a private native runtime below `/volume1/Media/ImportMusic/Streamrip`; its private config, databases, and output are never generic beets watch inputs. Downloaded files are validated and staged, then the existing stock beets configuration, database, and library import the resolved release while holding the shared beets lock. Existing beets mpdupdate is the MPD notification mechanism.
 
 The only executable an agent may call is:
 
@@ -49,6 +49,7 @@ printf '%s\n' '<JSON>' | /etc/profiles/per-user/tunnel/bin/openclaw-music SUBCOM
   "artist": "Artist",
   "release": "Album",
   "quality_profile": "lossless-preferred",
+  "backend": "slskd",
   "edition": "optional text or null",
   "medium": "optional text or null",
   "include_live": false,
@@ -56,7 +57,7 @@ printf '%s\n' '<JSON>' | /etc/profiles/per-user/tunnel/bin/openclaw-music SUBCOM
 }
 ```
 
-`quality_profile` is optional and is either `lossless` or `lossless-preferred`. The installed default is `lossless-preferred`.
+`quality_profile` is optional and is either `lossless` or `lossless-preferred`. The installed default is `lossless-preferred`. `backend` is optional: omit it (or use `slskd`) for the existing slskd path; use `streamrip` only for an explicit Qobuz retrieval. There is no automatic cross-backend fallback.
 
 `choose` (only values returned in the current candidate set):
 
@@ -115,6 +116,16 @@ Generate a new random `idempotency_key` for each distinct user intent. Reuse tha
 
 For a candidate response, present the returned `candidate_set.stage` and its public candidates to the user (names/disambiguation, release date/media, or source quality as applicable). Ask for a selection. Send the exact returned `candidate_set.id`, candidate `id`, and `candidate_set.revision`; never manufacture or reuse an old ID/revision. A stale or different choice conflicts.
 
+### Streamrip rules
+
+Streamrip is Qobuz-only. It requests quality tier 3, but decoded media and the frozen MusicBrainz manifest remain the authoritative lossless/attribution checks. Its search metadata is discovery text, not edition or quality proof; even a singleton Streamrip result always requires the opaque, revision-checked choice flow.
+
+The protected master config is the authoritative credential source. For each explicit Streamrip job, the worker copies the required Qobuz fields into a private per-job config; that copy contains secret material and persists for diagnosis under 0600 files and 0700 runtime directories. The fixed-argv restricted launcher can write only the current job's native runtime; it cannot see the live master config, beets configuration/database, ledger, validated staging, library, or host home/SSH paths. It does mount the entire Nix store read-only, so non-secret generated Nix artifacts can be visible; credentials must never enter the store. Provider IDs, private config/runtime paths, database rows, raw stderr, and private workflow state are never agent-visible.
+
+Never replay an unacknowledged mutating download or import invocation in `calling`; timeout, nonzero exit, partial/ambiguous evidence, and edition-description conflicts are review-required and never sent to beets. Read-only Streamrip search recovery may be retried only by its bounded worker rules. Recovery from an uncertain mutation is human inspection of the isolated job followed, only after confirmed cleanup, by a new request and idempotency key.
+
+The Streamrip backend is optional. When it is enabled, all three adapter values (launcher, runtime root, and master credentials) are mandatory. Missing or malformed master credentials fail only an explicit Streamrip job; slskd and `status` remain usable.
+
 ## State and polling
 
 States are `queued`, `resolving`, `needs_choice`, `searching`, `downloading`, `validating`, `ready`, `importing`, `indexing`, `succeeded`, `failed`, and `needs_review`.
@@ -145,6 +156,7 @@ For automatically selected sources, up to five distinct peers are tried in froze
 - Do not request, expose, copy, or summarize credentials, secret files, or raw service logs in prompts.
 - Do not bypass the wrapper or use an alternate beets configuration/database.
 - The wrapper fixes all trusted runtime paths and scrubs ambient environment variables.
+- Streamrip credentials originate in `/home/tunnel/.config/streamrip/config.toml`; private 0600 per-job config copies also contain them for retained diagnosis. Never put credentials in JSON, Nix, the Nix store, or logs.
 
 ## Example: Steve Lacy
 
@@ -227,6 +239,14 @@ Trusted paths for a human operator are:
 - slskd downloads/batches: `/volume1/Media/ImportMusic/slskd/openclaw`
 - library: `/volume1/Media/Music`
 - beets config/lock: `/home/tunnel/.config/beets/config.yaml` and `/home/tunnel/.config/beets/.import.lock`
+- Streamrip protected master config: `/home/tunnel/.config/streamrip/config.toml`
+- Streamrip private native runtime: `/volume1/Media/ImportMusic/Streamrip`
+
+For a Streamrip review, a human operator inspects only the isolated runtime and public job status. Do not expose provider identifiers or raw tool output to an agent, and do not manually import native output. The existing beets receipt, shared import lock, and mpdupdate behavior are unchanged.
+
+## Controlled live-test policy
+
+Phase 2 wiring and offline checks are not live-provider approval. Any controlled Qobuz retrieval-only test disables or replaces the production importer and makes both the production beets database/config mutation surface and final library unavailable for writes; making only the library read-only is insufficient. Never duplicate the recovered Steve Lacy release. A first production import requires a separately approved release known to be absent from beets, with a separate approval before enabling writes. The validated Bubblewrap artifact is the repo-pinned 0.11.2 build, not an independently discovered unstable 0.12.0 package.
 
 ## Suggested OpenClaw skill workflow
 
