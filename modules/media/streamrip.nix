@@ -774,6 +774,92 @@ in
           PY
         '';
       };
+      beets-library-inventory-script = pkgs.writeText "beets-library-inventory.py" ''
+        import argparse, json, os, re, subprocess, sys, tempfile, unicodedata
+        from pathlib import Path
+
+        def norm(value):
+            value = unicodedata.normalize("NFKD", value)
+            value = "".join(char for char in value if not unicodedata.combining(char)).casefold()
+            value = value.replace("&", " and ")
+            return " ".join(re.sub(r"[\W_]+", " ", value).split())
+
+        def artist_equal(left, right):
+            def no_the(value):
+                return value[4:] if value.startswith("the ") else value
+            return norm(left) == norm(right) or no_the(norm(left)) == no_the(norm(right))
+
+        def stage(path, value):
+            target = Path(path)
+            fd, tmp = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+            try:
+                os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as output:
+                    json.dump(value, output, separators=(",", ":")); output.write("\n")
+                return tmp, target
+            except BaseException:
+                try: os.unlink(tmp)
+                except FileNotFoundError: pass
+                raise
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--beet", required=True)
+        parser.add_argument("--config", required=True)
+        parser.add_argument("--database", required=True)
+        parser.add_argument("--input", required=True)
+        parser.add_argument("--missing", required=True)
+        parser.add_argument("--owned", required=True)
+        args = parser.parse_args()
+        try:
+            records = json.loads(Path(args.input).read_text(encoding="utf-8"))
+            if not isinstance(records, list): raise ValueError("input must be an array")
+            seen = set()
+            for record in records:
+                if not isinstance(record, dict) or set(record) != {"spotify_id", "artist", "name", "spotify_url"} or not all(isinstance(record[key], str) and record[key] for key in record) or record["spotify_id"] in seen:
+                    raise ValueError("input has an invalid or duplicate Spotify album")
+                seen.add(record["spotify_id"])
+            environment = os.environ.copy()
+            environment.update({"HOME": "/home/tunnel", "LANG": "C", "LC_ALL": "C", "BEETSDIR": "/home/tunnel/.config/beets", "XDG_CONFIG_HOME": "/home/tunnel/.config", "XDG_CACHE_HOME": "/home/tunnel/.cache/beets"})
+            result = subprocess.run([args.beet, "-c", args.config, "-l", args.database, "list", "-a", "-f", "$albumartist\x1f$album\x1f$id"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, check=False)
+            if result.returncode:
+                detail = re.sub(r"[\x00-\x1f\x7f]+", " ", result.stderr).strip()[:240]
+                raise RuntimeError(f"beet list failed: {detail or 'no diagnostic'}")
+            inventory = []
+            for line in result.stdout.splitlines():
+                if not line:
+                    continue
+                fields = line.split("\x1f")
+                if len(fields) != 3 or not all(fields):
+                    raise RuntimeError("beet list returned malformed inventory output")
+                inventory.append((fields[2], fields[0], fields[1]))
+            inventory.sort(key=lambda row: row[0])
+            missing, owned = [], []
+            for record in records:
+                candidates = [row for row in inventory if norm(record["name"]) == norm(row[2] or "") and artist_equal(record["artist"], row[1] or "")]
+                if not candidates:
+                    missing.append(record); continue
+                album_id, albumartist, album = candidates[0]
+                owned.append({"spotify_id": record["spotify_id"], "artist": record["artist"], "album": record["name"], "spotify_url": record["spotify_url"], "beets_album_id": str(album_id), "beets_albumartist": albumartist, "beets_album": album, "candidate_count": len(candidates), "match_method": "normalized_albumartist_album"})
+            missing_tmp, missing_target = stage(args.missing, missing)
+            owned_tmp, owned_target = stage(args.owned, owned)
+            try:
+                os.replace(missing_tmp, missing_target)
+                os.replace(owned_tmp, owned_target)
+            except BaseException:
+                for tmp in (missing_tmp, owned_tmp):
+                    try: os.unlink(tmp)
+                    except FileNotFoundError: pass
+                raise
+        except Exception as exc:
+            print(f"beets-library-inventory: {type(exc).__name__}: {exc}", file=sys.stderr)
+            raise SystemExit(1)
+      '';
+      beets-library-inventory = pkgs.writeShellApplication {
+        name = "beets-library-inventory";
+        text = ''
+          exec ${lib.getExe pkgs.python3} ${beets-library-inventory-script} "$@"
+        '';
+      };
       spotify-qobuz-albums-inner = pkgs.writers.writeFishBin "spotify-qobuz-albums-inner" ''
         set -l curl ${lib.getExe pkgs.curl}
         set -l jq ${lib.getExe pkgs.jq}
@@ -783,6 +869,10 @@ in
         set -l mv ${lib.getExe' pkgs.coreutils "mv"}
         set -l rip ${lib.getExe pkgs.streamrip}
         set -l preflight ${lib.getExe streamrip-qobuz-preflight}
+        set -l beets_inventory ${lib.getExe beets-library-inventory}
+        set -l beet ${lib.getExe config.programs.beets.package}
+        set -l beets_config /home/tunnel/.config/beets/config.yaml
+        set -l beets_database /home/tunnel/.config/beets/library.db
         set -l streamrip_config ${lib.escapeShellArg "${config.xdg.configHome}/streamrip/config.toml"}
 
         function usage
@@ -813,9 +903,12 @@ in
         function record_unmatched
           set -l spotify "$argv[1]"
           set -l reason "$argv[2]"
-          set -l qobuz_id "$argv[3]"
+          set -l qobuz_id ""
+          if test (count $argv) -ge 3
+            set qobuz_id "$argv[3]"
+          end
           printf '%s\n' "$spotify" | ${lib.getExe pkgs.jq} -c --arg reason "$reason" --arg qobuz_id "$qobuz_id" '
-            {spotify_id, artist, album: .name, spotify_url, reason, qobuz_id: (if $qobuz_id == "" then null else $qobuz_id end)}
+            {spotify_id, artist, album: .name, spotify_url, reason: $reason, qobuz_id: (if $qobuz_id == "" then null else $qobuz_id end)}
           ' >> "$__spotify_qobuz_unmatched_jsonl"
         end
 
@@ -827,30 +920,31 @@ in
 
         function publish_unmatched
           ${lib.getExe pkgs.jq} -n --slurpfile immediate "$__spotify_qobuz_unmatched_jsonl" --slurpfile selected "$__spotify_qobuz_selected_jsonl" --slurpfile rejected "$__spotify_qobuz_rejected_manifest" '
-            $immediate as $immediate
+            ($immediate | map({spotify_id, artist, album, spotify_url, reason, qobuz_id: (.qobuz_id // null)})) as $immediate_records
             | $selected as $selected
-            | $rejected[0] as $rejected
+            | ($rejected[0] | if type == "array" then . else error("invalid rejected report") end) as $rejected
             | ($rejected | map(.id)) as $rejected_ids
             | ($selected | map(select(.qobuz_id as $id | ($rejected_ids | index($id))) | {
                 spotify_id, artist, album, spotify_url,
                 reason: "selected_qobuz_album_unavailable", qobuz_id
               })) as $stale
-            | ($immediate + $stale)
+            | ($immediate_records + $stale)
             | unique_by(.spotify_id)
             | sort_by([(.artist | ascii_downcase), (.album | ascii_downcase), .spotify_id])
-          ' "$__spotify_qobuz_unmatched_jsonl" "$__spotify_qobuz_selected_jsonl" "$__spotify_qobuz_rejected_manifest" > "$__spotify_qobuz_unmatched_manifest"
+          ' > "$__spotify_qobuz_unmatched_manifest"
           or die 'could not assemble unmatched Spotify album report'
           if not ${lib.getExe pkgs.jq} -e '
-            type == "array" and all(.[];
+            def valid_record:
               type == "object"
               and (keys | sort == ["album", "artist", "qobuz_id", "reason", "spotify_id", "spotify_url"])
-              and (.spotify_id | type == "string" and length > 0)
-              and (.artist | type == "string") and (.album | type == "string")
-              and (.spotify_url | type == "string" and length > 0)
-              and (.reason | type == "string" and length > 0)
-              and (.qobuz_id == null or (.qobuz_id | type == "string" and length > 0))
-            )
+              and ((.spotify_id | type) == "string" and (.spotify_id | length) > 0)
+              and ((.artist | type) == "string") and ((.album | type) == "string")
+              and ((.spotify_url | type) == "string" and (.spotify_url | length) > 0)
+              and ((.reason | type) == "string" and (.reason | length) > 0)
+              and (.qobuz_id == null or ((.qobuz_id | type) == "string" and (.qobuz_id | length) > 0));
+            type == "array" and all(.[]; valid_record)
           ' "$__spotify_qobuz_unmatched_manifest" >/dev/null
+            ${lib.getExe pkgs.jq} -c '[to_entries[] | select(.value | type != "object" or (keys | sort != ["album", "artist", "qobuz_id", "reason", "spotify_id", "spotify_url"]) or (.spotify_id | type != "string" or length == 0) or (.artist | type != "string") or (.album | type != "string") or (.spotify_url | type != "string" or length == 0) or (.reason | type != "string" or length == 0) or (.qobuz_id != null and (type != "string" or length == 0))) | {index: .key, keys: (.value | if type == "object" then keys else [] end), types: (.value | if type == "object" then with_entries(.value |= type) else {record: type} end), reason: (.value.reason? // null)}][0:3]' "$__spotify_qobuz_unmatched_manifest" >&2
             die 'unmatched Spotify album report has an invalid schema'
           end
           set -g __spotify_qobuz_albums_unmatched_tmp (${lib.getExe' pkgs.coreutils "mktemp"} "$__spotify_qobuz_output_dir/.spotify-qobuz-albums-unmatched.XXXXXX")
@@ -901,14 +995,17 @@ in
         set -l rejected_report
         set -l status_report
         set -l unmatched_report
+        set -l beets_report
         if string match -rq '\.json$' -- "$output"
           set rejected_report (string replace -r '\.json$' '.rejected.json' -- "$output")
           set status_report (string replace -r '\.json$' '.status.json' -- "$output")
           set unmatched_report (string replace -r '\.json$' '.unmatched.json' -- "$output")
+          set beets_report (string replace -r '\.json$' '.beets.json' -- "$output")
         else
           set rejected_report "$output.rejected.json"
           set status_report "$output.status.json"
           set unmatched_report "$output.unmatched.json"
+          set beets_report "$output.beets.json"
         end
 
         if not set -q SPOTIFY_CLIENT_ID; or test -z "$SPOTIFY_CLIENT_ID"
@@ -929,6 +1026,7 @@ in
         set -g __spotify_qobuz_albums_rejected_tmp ""
         set -g __spotify_qobuz_albums_status_tmp ""
         set -g __spotify_qobuz_albums_unmatched_tmp ""
+        set -g __spotify_qobuz_albums_beets_tmp ""
 
         function __spotify_qobuz_albums_cleanup --on-event fish_exit
           ${lib.getExe' pkgs.coreutils "rm"} -rf -- "$__spotify_qobuz_albums_tempdir"
@@ -944,6 +1042,9 @@ in
           if test -n "$__spotify_qobuz_albums_unmatched_tmp"
             ${lib.getExe' pkgs.coreutils "rm"} -f -- "$__spotify_qobuz_albums_unmatched_tmp"
           end
+          if test -n "$__spotify_qobuz_albums_beets_tmp"
+            ${lib.getExe' pkgs.coreutils "rm"} -f -- "$__spotify_qobuz_albums_beets_tmp"
+          end
         end
 
         $chmod 700 "$tempdir"
@@ -955,6 +1056,8 @@ in
         set -l page_file "$tempdir/page.json"
         set -l albums_jsonl "$tempdir/albums.jsonl"
         set -l albums_file "$tempdir/albums.json"
+        set -l missing_albums_file "$tempdir/missing-albums.json"
+        set -l owned_albums_file "$tempdir/owned-albums.json"
         set -l search_file "$tempdir/search.json"
         set -l resolved_jsonl "$tempdir/resolved.jsonl"
         set -l raw_manifest "$tempdir/raw-manifest.json"
@@ -1096,17 +1199,56 @@ in
           die 'Spotify album data did not match the expected schema'
         end
         set -l spotify_album_count ($jq -r 'length' "$albums_file")
+        if not $beets_inventory --beet "$beet" --config "$beets_config" --database "$beets_database" --input "$albums_file" --missing "$missing_albums_file" --owned "$owned_albums_file"
+          die 'Beets inventory failed; no Qobuz work was started'
+        end
+        $chmod 600 "$missing_albums_file" "$owned_albums_file"
+        or die 'could not secure Beets inventory results'
+        set -l beets_owned_count ($jq -r 'length' "$owned_albums_file")
+        set -l beets_missing_count ($jq -r 'length' "$missing_albums_file")
+        set -l beets_tmp ($mktemp "$output_dir/.spotify-qobuz-albums-beets.XXXXXX")
+        or die 'could not create temporary Beets report'
+        set -g __spotify_qobuz_albums_beets_tmp "$beets_tmp"
+        $chmod 600 "$beets_tmp"
+        or die 'could not secure temporary Beets report'
+        $jq . "$owned_albums_file" > "$beets_tmp"
+        or die 'could not write Beets report'
+        $mv -f -- "$beets_tmp" "$beets_report"
+        or die 'could not atomically publish Beets report'
+        set -g __spotify_qobuz_albums_beets_tmp ""
+        printf 'Beets inventory: %s already owned; %s missing\n' "$beets_owned_count" "$beets_missing_count"
+        printf 'Beets report: %s\n' "$beets_report"
+        if test "$beets_owned_count" -gt 0
+          $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe)"' "$owned_albums_file"
+        end
+        if test "$beets_missing_count" -eq 0
+          publish_unmatched
+          set -l status_tmp ($mktemp "$output_dir/.spotify-qobuz-albums-status.XXXXXX")
+          or die 'could not create temporary status report'
+          set -g __spotify_qobuz_albums_status_tmp "$status_tmp"
+          $chmod 600 "$status_tmp"
+          or die 'could not secure temporary status report'
+          $jq -n '[]' > "$status_tmp"
+          or die 'could not write empty status report'
+          $mv -f -- "$status_tmp" "$status_report"
+          or die 'could not atomically publish empty status report'
+          set -g __spotify_qobuz_albums_status_tmp ""
+          printf 'Unmatched Spotify albums: 0\n'
+          printf 'Unmatched report: %s\n' "$unmatched_report"
+          printf 'All %s Spotify albums are already present in Beets.\n' "$spotify_album_count"
+          exit 0
+        end
 
         set -l resolved_count 0
         set -l skipped_count 0
         set -l album_index 0
-        for album in ($jq -c '.[]' "$albums_file")
+        for album in ($jq -c '.[]' "$missing_albums_file")
           set -l album_name (printf '%s\n' "$album" | $jq -r '.name')
           set -l album_artist (printf '%s\n' "$album" | $jq -r '.artist')
           set -l spotify_url (printf '%s\n' "$album" | $jq -r '.spotify_url')
           set -l query "$album_name by $album_artist"
           set album_index (math $album_index + 1)
-          printf '[%s/%s] %s — %s\n' "$album_index" "$spotify_album_count" "$album_artist" "$album_name"
+          printf '[%s/%s] %s — %s\n' "$album_index" "$beets_missing_count" "$album_artist" "$album_name"
           printf 'Spotify: %s\n' "$spotify_url"
           $rm -f -- "$search_file"
           if not $rip search --output-file "$search_file" --num-results 10 qobuz album "$query" >/dev/null
@@ -1213,7 +1355,7 @@ in
           printf 'Unmatched Spotify albums: %s\n' "$__spotify_qobuz_unmatched_count"
           printf 'Unmatched report: %s\n' "$unmatched_report"
           if test "$__spotify_qobuz_unmatched_count" -gt 0
-            $jq -r '.[] | "\(.artist | gsub("[\\x00-\\x1f\\x7f]+"; " ")) — \(.album | gsub("[\\x00-\\x1f\\x7f]+"; " ")) [\(.reason)]"' "$unmatched_manifest"
+            $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe) [\(.reason)]"' "$unmatched_manifest"
           end
           die 'no Qobuz albums resolved; unmatched report was published'
         end
@@ -1331,9 +1473,9 @@ in
         printf 'Unmatched Spotify albums: %s\n' "$__spotify_qobuz_unmatched_count"
         printf 'Unmatched report: %s\n' "$unmatched_report"
         if test "$__spotify_qobuz_unmatched_count" -gt 0
-          $jq -r '.[] | "\(.artist | gsub("[\\x00-\\x1f\\x7f]+"; " ")) — \(.album | gsub("[\\x00-\\x1f\\x7f]+"; " ")) [\(.reason)]"' "$unmatched_manifest"
+          $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe) [\(.reason)]"' "$unmatched_manifest"
         end
-        set -l metadata_valid_matched_count (math $spotify_album_count - $__spotify_qobuz_unmatched_count)
+        set -l metadata_valid_matched_count (math $spotify_album_count - $beets_owned_count - $__spotify_qobuz_unmatched_count)
         printf 'Spotify unique albums: %s; metadata-valid matched: %s; unmatched: %s\n' \
           "$spotify_album_count" "$metadata_valid_matched_count" "$__spotify_qobuz_unmatched_count"
         if test "$cumulative_count" -eq 0

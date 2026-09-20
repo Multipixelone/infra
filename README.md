@@ -132,8 +132,8 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `musepack` — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`
 - [`noctalia-shell`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/noctalia.nix) — A sleek, customizable desktop shell crafted for Wayland. · `nix run github:Multipixelone/infra#noctalia-shell`
 - [`openclaw-music`](https://github.com/Multipixelone/infra/blob/main/modules/link/openclaw-music.nix) · `nix run github:Multipixelone/infra#openclaw-music`
-- [`openclaw-music-streamrip-confinement-probe`](https://github.com/Multipixelone/infra/blob/main/modules/link/openclaw-music.nix) · `nix run github:Multipixelone/infra#openclaw-music-streamrip-confinement-probe`
-- [`openclaw-music-streamrip-launcher`](https://github.com/Multipixelone/infra/blob/main/modules/link/openclaw-music.nix) · `nix run github:Multipixelone/infra#openclaw-music-streamrip-launcher`
+- [`openclaw-music-streamrip-confinement-probe`](https://github.com/Multipixelone/infra/blob/main/modules/media/streamrip.nix) · `nix run github:Multipixelone/infra#openclaw-music-streamrip-confinement-probe`
+- [`openclaw-music-streamrip-launcher`](https://github.com/Multipixelone/infra/blob/main/modules/media/streamrip.nix) · `nix run github:Multipixelone/infra#openclaw-music-streamrip-launcher`
 - [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
 - [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
 - [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`
