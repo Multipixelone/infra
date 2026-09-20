@@ -50,6 +50,19 @@
       );
       # use my custom build of beets with included plugins
       beets-plugins = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      beets-interactive = pkgs.writeShellApplication {
+        name = "beet";
+        text = ''
+          harmony_env=${lib.escapeShellArg hmArgs.config.age.secrets."beets-harmony".path}
+          if [ -r "$harmony_env" ]; then
+            set -a
+            # shellcheck disable=SC1090
+            . "$harmony_env"
+            set +a
+          fi
+          exec ${lib.getExe beets-plugins} "$@"
+        '';
+      };
       beets-import = pkgs.writeShellApplication {
         name = "beets-import";
         runtimeInputs = [
@@ -420,7 +433,7 @@
             ''
               export BEETSDIR="/tmp"
 
-              ${lib.getExe hmArgs.config.programs.beets.package} -l /tmp/db -c "$config" fish --output "$out"
+              ${lib.getExe beets-plugins} -l /tmp/db -c "$config" fish --output "$out"
             '';
         "whipper/whipper.conf".text = ''
           [drive:HL-DT-ST%3ADVDRAM%20GP65NB60%20%3ARF01]
@@ -432,6 +445,7 @@
         '';
       };
       age.secrets."beets-plex".file = "${inputs.secrets}/media/plexbeets.age";
+      age.secrets."beets-harmony".file = "${inputs.secrets}/media/beets-harmony.age";
       home.sessionVariables = {
         TRANSCODED_MUSIC = "/volume1/Media/TranscodedMusic";
       };
@@ -448,11 +462,11 @@
           #!/bin/fish
           set -l path (path resolve "$argv")
           ${lib.getExe md5_fixer} -r "$path"
-          ${lib.getExe beets-plugins} import "$path"
+          ${lib.getExe beets-interactive} import "$path"
         '';
         beets = {
           enable = true;
-          package = beets-plugins;
+          package = beets-interactive;
           mpdIntegration.enableUpdate = true;
           settings = {
             directory = music-dir;
@@ -475,6 +489,7 @@
               # "filetote"
               "fish"
               "fromfilename"
+              "harmony"
               "hook"
               "info"
               "inline"
@@ -544,6 +559,12 @@
               write = true;
               resume = false;
               log = "${beets-dir}/logs/import.log";
+            };
+            harmony = {
+              spotify_market = "US";
+              poll_timeout = 120;
+              osc52 = true;
+              qr = true;
             };
             match = {
               strong_rec_thresh = 0.075;
