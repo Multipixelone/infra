@@ -860,6 +860,291 @@ in
           exec ${lib.getExe pkgs.python3} ${beets-library-inventory-script} "$@"
         '';
       };
+      spotify-qobuz-match-cache-script = pkgs.writeText "spotify-qobuz-match-cache.py" ''
+        import argparse
+        import datetime
+        import fcntl
+        import json
+        import os
+        import sys
+        import tempfile
+        from pathlib import Path
+
+
+        VERSION = 1
+        SEED_UPDATED_AT = "1970-01-01T00:00:00Z"
+        KEYS = {
+            "spotify_id", "spotify_artist", "spotify_album", "spotify_url", "action",
+            "qobuz_id", "qobuz_desc", "selection", "updated_at",
+        }
+        SEEDS = [
+            ("0ORZb7kyr8aaP2LpL3mhuY", "match", "x0cf0opu8jjfc", "Violet Street by Local Natives"),
+            ("0X7S0TEZ5NJsSxmyTnfYi2", "match", "y6dkmd4zu5qpa", "O My Heart by Mother Mother"),
+            ("0an9lp4xk0aJ0T7VYqzTSa", "match", "qy9hkxfk6cdwb", "Omens by FUTURIST"),
+            ("177PSnUC3FKpxp9q9BIeyL", "match", "ecid4345gp0pb", "The One to Blame by c a n d i d !"),
+            ("1CsuCA05y9r7ftG9bGGtWV", "match", "fju8ck53r5mea", "Close To You by The Carpenters"),
+            ("1QhonXpNQq8wrGEKX0ofbk", "match", "0886443385559", "Walk The Moon by Walk The Moon"),
+            ("1xXSEeYg8T9UFaphdP9FtP", "match", "e053vwadpbbhc", "When I Was Younger by Colony House"),
+            ("1yghhl32AgveAekKwDx1ra", "match", "kng33ozva6slb", "Swimming with Bears by Swimming With Bears"),
+            ("34ozkv3AkFksZD8srOmOrX", "match", "0603497862962", "Greatest Hits by The Cure"),
+            ("3FTwVo3Ml09aCJAamSni5v", "match", "lu0n1nnl64zga", "Ruby by Mat Kerekes"),
+            ("3PYk8e7eo2t5CA1Y3AvhaG", "match", "0075679911971", "Home of the Strange by Young the Giant"),
+            ("3sOxmJRDEWeoD8zrIEIiwh", "match", "o386ex7emgweb", "Blue Sky by Quail"),
+            ("4z8zl1GzClr5KX2UoQ6uaI", "match", "zid52v7a930ka", "Stranger by Miki Fiki"),
+            ("5Y4IZySK48REQg8jUcwq2g", "match", "iioq7lznmr6oh", "All Over by CRUISR"),
+            ("5eySZ1pL3kVD26bX6X8CdH", "match", "mckcsc7dxkpxc", "Gold in a Brass Age by David Gray"),
+            ("5k4DDIEOEfXB082nr9pBRC", "match", "pmtwuhp4wgukc", "The Main Squeeze by The Main Squeeze"),
+            ("5vkMwuAnhyDNvVMCKH03vp", "match", "jq9g48d8xeqxa", "Stray Dogs by Relic"),
+            ("61wETuklUv5pmz7uV9YeST", "match", "kq72f5vk02tta", "Higher by Blanks"),
+            ("6TN2V73KewtB9SyRdVYK4x", "match", "bgw2job2jyhtc", "Moonbeau by Moonbeau"),
+            ("7FKb2Yu9idAGKrVpJy1BD9", "match", "bd5p5p604hwwa", "Juliana by The Good Years"),
+            ("7qSxcMI3rTQaD1oTi1vel0", "match", "ck25ov0teezha", "Vacation by The Go-Go's"),
+            ("47JVWX2u4ZCvlECxGFO9F1", "skip", None, None),
+        ]
+
+
+        class CacheError(ValueError):
+            pass
+
+
+        def fail(path, detail):
+            detail = " ".join(str(detail).split())[:240]
+            raise CacheError(f"match cache {path}: {detail}")
+
+
+        def string(value, name, path, nonempty=False):
+            if not isinstance(value, str) or (nonempty and not value):
+                fail(path, f"{name} has an invalid type or value")
+
+
+        def validate(cache, path):
+            if not isinstance(cache, dict) or set(cache) != {"version", "decisions"}:
+                fail(path, "must be an object with exactly version and decisions")
+            if isinstance(cache["version"], bool) or cache["version"] != VERSION:
+                fail(path, f"has unsupported version (expected {VERSION})")
+            if not isinstance(cache["decisions"], list):
+                fail(path, "decisions must be an array")
+            ids = set()
+            for index, decision in enumerate(cache["decisions"]):
+                if not isinstance(decision, dict) or set(decision) != KEYS:
+                    fail(path, f"decision {index} has an invalid key set")
+                for key in ("spotify_id", "spotify_artist", "spotify_album", "spotify_url", "action", "selection"):
+                    string(decision[key], f"decision {index}.{key}", path, key == "spotify_id")
+                if decision["spotify_id"] in ids:
+                    fail(path, f"has duplicate spotify_id {decision['spotify_id']!r}")
+                ids.add(decision["spotify_id"])
+                if decision["action"] not in ("match", "skip"):
+                    fail(path, f"decision {index}.action must be match or skip")
+                if decision["selection"] not in ("manual", "auto", "seed"):
+                    fail(path, f"decision {index}.selection is invalid")
+                updated_at = decision["updated_at"]
+                string(updated_at, f"decision {index}.updated_at", path, True)
+                try:
+                    datetime.datetime.strptime(updated_at, "%Y-%m-%dT%H:%M:%SZ")
+                except ValueError:
+                    fail(path, f"decision {index}.updated_at must be UTC ISO8601")
+                if decision["action"] == "match":
+                    string(decision["qobuz_id"], f"decision {index}.qobuz_id", path, True)
+                    string(decision["qobuz_desc"], f"decision {index}.qobuz_desc", path, True)
+                elif decision["qobuz_id"] is not None or decision["qobuz_desc"] is not None:
+                    fail(path, f"decision {index} skip must have null Qobuz fields")
+            return cache
+
+
+        def seed_decision(spotify_id, action, qobuz_id, qobuz_desc):
+            return {
+                "spotify_id": spotify_id, "spotify_artist": "", "spotify_album": "", "spotify_url": "",
+                "action": action, "qobuz_id": qobuz_id, "qobuz_desc": qobuz_desc,
+                "selection": "seed", "updated_at": SEED_UPDATED_AT,
+            }
+
+
+        def ensure_parent(path):
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if path.parent.is_symlink() or not path.parent.is_dir():
+                fail(path, "parent is not a directory")
+            os.chmod(path.parent, 0o700)
+
+
+        def read_cache(path):
+            if not path.exists():
+                return {"version": VERSION, "decisions": []}
+            if path.is_symlink() or not path.is_file():
+                fail(path, "is not a regular file")
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                fail(path, f"is not valid JSON ({type(exc).__name__})")
+            return validate(value, path)
+
+
+        def write_cache(path, value):
+            validate(value, path)
+            fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+            try:
+                os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as output:
+                    json.dump(value, output, sort_keys=True, separators=(",", ":"))
+                    output.write("\n")
+                os.replace(tmp, path)
+                os.chmod(path, 0o600)
+            except BaseException:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+                raise
+
+
+        def with_lock(path, operation):
+            ensure_parent(path)
+            lock_path = path.with_name(path.name + ".lock")
+            with os.fdopen(os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600), "r+") as lock:
+                os.fchmod(lock.fileno(), 0o600)
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+                return operation()
+
+
+        def spotify(value, path):
+            try:
+                record = json.loads(value)
+            except json.JSONDecodeError as exc:
+                fail(path, f"Spotify record is not valid JSON ({type(exc).__name__})")
+            if not isinstance(record, dict) or set(record) != {"spotify_id", "artist", "name", "spotify_url"}:
+                fail(path, "Spotify record has an invalid key set")
+            for key in ("spotify_id", "artist", "name", "spotify_url"):
+                string(record[key], f"Spotify record.{key}", path, True)
+            return record
+
+
+        def refreshed(decision, record):
+            decision = dict(decision)
+            decision.update({
+                "spotify_artist": record["artist"], "spotify_album": record["name"], "spotify_url": record["spotify_url"],
+            })
+            return decision
+
+
+        def now():
+            return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+        def main():
+            parser = argparse.ArgumentParser(prog="spotify-qobuz-match-cache")
+            parser.add_argument("operation", choices=("init", "lookup", "set", "delete", "invalidate"))
+            parser.add_argument("--cache", required=True)
+            parser.add_argument("--spotify")
+            parser.add_argument("--spotify-id")
+            parser.add_argument("--action", choices=("match", "skip"))
+            parser.add_argument("--qobuz-id")
+            parser.add_argument("--qobuz-desc")
+            parser.add_argument("--selection", choices=("manual", "auto", "seed"))
+            parser.add_argument("--qobuz-ids")
+            args = parser.parse_args()
+            path = Path(args.cache)
+
+            try:
+                if args.operation == "init":
+                    def init():
+                        cache = read_cache(path)
+                        present = {decision["spotify_id"] for decision in cache["decisions"]}
+                        additions = [seed_decision(*seed) for seed in SEEDS if seed[0] not in present]
+                        if additions or not path.exists():
+                            cache["decisions"].extend(additions)
+                            cache["decisions"].sort(key=lambda decision: decision["spotify_id"])
+                            write_cache(path, cache)
+                        else:
+                            os.chmod(path, 0o600)
+                        return {"seeded": len(additions), "decisions": len(cache["decisions"])}
+                    result = with_lock(path, init)
+                elif args.operation == "lookup":
+                    record = spotify(args.spotify or "", path)
+                    def lookup():
+                        cache = read_cache(path)
+                        for index, decision in enumerate(cache["decisions"]):
+                            if decision["spotify_id"] == record["spotify_id"]:
+                                updated = refreshed(decision, record)
+                                if updated != decision:
+                                    cache["decisions"][index] = updated
+                                    write_cache(path, cache)
+                                return {"found": True, "decision": updated}
+                        return {"found": False}
+                    result = with_lock(path, lookup)
+                elif args.operation == "set":
+                    record = spotify(args.spotify or "", path)
+                    if args.action is None:
+                        fail(path, "set requires action")
+                    if args.action == "match":
+                        string(args.qobuz_id, "qobuz_id", path, True)
+                        string(args.qobuz_desc, "qobuz_desc", path, True)
+                    elif args.qobuz_id is not None or args.qobuz_desc is not None:
+                        fail(path, "skip cannot have Qobuz fields")
+                    if args.selection is None:
+                        fail(path, "set requires selection")
+                    decision = {
+                        "spotify_id": record["spotify_id"], "spotify_artist": record["artist"], "spotify_album": record["name"], "spotify_url": record["spotify_url"],
+                        "action": args.action, "qobuz_id": args.qobuz_id, "qobuz_desc": args.qobuz_desc,
+                        "selection": args.selection, "updated_at": SEED_UPDATED_AT if args.selection == "seed" else now(),
+                    }
+                    def set_value():
+                        cache = read_cache(path)
+                        cache["decisions"] = [entry for entry in cache["decisions"] if entry["spotify_id"] != decision["spotify_id"]]
+                        cache["decisions"].append(decision)
+                        cache["decisions"].sort(key=lambda entry: entry["spotify_id"])
+                        write_cache(path, cache)
+                        return {"stored": True}
+                    result = with_lock(path, set_value)
+                elif args.operation == "delete":
+                    string(args.spotify_id, "spotify_id", path, True)
+                    def delete():
+                        cache = read_cache(path)
+                        decisions = [entry for entry in cache["decisions"] if entry["spotify_id"] != args.spotify_id]
+                        deleted = len(decisions) != len(cache["decisions"])
+                        if deleted:
+                            cache["decisions"] = decisions
+                            write_cache(path, cache)
+                        return {"deleted": deleted}
+                    result = with_lock(path, delete)
+                else:
+                    try:
+                        qobuz_ids = json.loads(args.qobuz_ids or "")
+                    except json.JSONDecodeError as exc:
+                        fail(path, f"Qobuz IDs are not valid JSON ({type(exc).__name__})")
+                    if not isinstance(qobuz_ids, list) or not all(isinstance(value, str) and value for value in qobuz_ids):
+                        fail(path, "Qobuz IDs must be a nonempty-string array")
+                    stale = set(qobuz_ids)
+                    def invalidate():
+                        cache = read_cache(path)
+                        decisions = [
+                            entry for entry in cache["decisions"]
+                            if not (entry["action"] == "match" and entry["qobuz_id"] in stale)
+                        ]
+                        invalidated = len(cache["decisions"]) - len(decisions)
+                        if invalidated:
+                            cache["decisions"] = decisions
+                            write_cache(path, cache)
+                        return {"invalidated": invalidated}
+                    result = with_lock(path, invalidate)
+            except CacheError as exc:
+                print(f"spotify-qobuz-match-cache: {exc}", file=sys.stderr)
+                return 1
+            except OSError as exc:
+                detail = " ".join(str(exc).split())[:240]
+                print(f"spotify-qobuz-match-cache: {path}: {type(exc).__name__}: {detail}", file=sys.stderr)
+                return 1
+            print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return 0
+
+
+        if __name__ == "__main__":
+            raise SystemExit(main())
+      '';
+      spotify-qobuz-match-cache = pkgs.writeShellApplication {
+        name = "spotify-qobuz-match-cache";
+        text = ''
+          exec ${lib.getExe pkgs.python3} ${spotify-qobuz-match-cache-script} "$@"
+        '';
+      };
       spotify-qobuz-albums-inner = pkgs.writers.writeFishBin "spotify-qobuz-albums-inner" ''
         set -l curl ${lib.getExe pkgs.curl}
         set -l jq ${lib.getExe pkgs.jq}
@@ -869,6 +1154,7 @@ in
         set -l mv ${lib.getExe' pkgs.coreutils "mv"}
         set -l rip ${lib.getExe pkgs.streamrip}
         set -l preflight ${lib.getExe streamrip-qobuz-preflight}
+        set -l match_cache_tool ${lib.getExe spotify-qobuz-match-cache}
         set -l beets_inventory ${lib.getExe beets-library-inventory}
         set -l beet ${lib.getExe config.programs.beets.package}
         set -l beets_config /home/tunnel/.config/beets/config.yaml
@@ -876,7 +1162,9 @@ in
         set -l streamrip_config ${lib.escapeShellArg "${config.xdg.configHome}/streamrip/config.toml"}
 
         function usage
-          printf '%s\n' 'Usage: spotify-qobuz-albums [--output FILE] [--no-download] [--retry-existing] [--yes] SPOTIFY_PLAYLIST_URL'
+          printf '%s\n' 'Usage: spotify-qobuz-albums [--output FILE] [--match-cache FILE] [--refresh-matches] [--no-download] [--retry-existing] [--yes] SPOTIFY_PLAYLIST_URL'
+          printf '%s\n' '  --match-cache FILE  Persistent Spotify-to-Qobuz selection cache.'
+          printf '%s\n' '  --refresh-matches   Forget each current cached selection before resolving it.'
           printf '%s\n' '  --retry-existing  Process all metadata-valid current albums; Streamrip still skips downloaded tracks.'
         end
 
@@ -918,6 +1206,12 @@ in
           ' >> "$__spotify_qobuz_selected_jsonl"
         end
 
+        function print_match_cache_summary
+          printf 'Match cache: %s\n' "$argv[1]"
+          printf 'Match cache summary: cached matches reused: %s; cached skips reused: %s; new decisions stored: %s; stale mappings invalidated: %s\n' \
+            "$argv[2]" "$argv[3]" "$argv[4]" "$argv[5]"
+        end
+
         function publish_unmatched
           ${lib.getExe pkgs.jq} -n --slurpfile immediate "$__spotify_qobuz_unmatched_jsonl" --slurpfile selected "$__spotify_qobuz_selected_jsonl" --slurpfile rejected "$__spotify_qobuz_rejected_manifest" '
             ($immediate | map({spotify_id, artist, album, spotify_url, reason, qobuz_id: (.qobuz_id // null)})) as $immediate_records
@@ -944,7 +1238,7 @@ in
               and (.qobuz_id == null or ((.qobuz_id | type) == "string" and (.qobuz_id | length) > 0));
             type == "array" and all(.[]; valid_record)
           ' "$__spotify_qobuz_unmatched_manifest" >/dev/null
-            ${lib.getExe pkgs.jq} -c '[to_entries[] | select(.value | type != "object" or (keys | sort != ["album", "artist", "qobuz_id", "reason", "spotify_id", "spotify_url"]) or (.spotify_id | type != "string" or length == 0) or (.artist | type != "string") or (.album | type != "string") or (.spotify_url | type != "string" or length == 0) or (.reason | type != "string" or length == 0) or (.qobuz_id != null and (type != "string" or length == 0))) | {index: .key, keys: (.value | if type == "object" then keys else [] end), types: (.value | if type == "object" then with_entries(.value |= type) else {record: type} end), reason: (.value.reason? // null)}][0:3]' "$__spotify_qobuz_unmatched_manifest" >&2
+            ${lib.getExe pkgs.jq} -c '[to_entries[] | select(.value | type != "object" or (keys | sort != ["album", "artist", "qobuz_id", "reason", "spotify_id", "spotify_url"]) or (.spotify_id | type != "string" or length == 0) or (.artist | type != "string") or (.album | type != "string") or (.spotify_url | type != "string" or length == 0) or (.reason | type != "string" or length == 0) or (.qobuz_id != null and ((.qobuz_id | type) != "string" or (.qobuz_id | length) == 0))) | {index: .key, keys: (.value | if type == "object" then keys else [] end), types: (.value | if type == "object" then with_entries(.value |= type) else {record: type} end), reason: (.value.reason? // null)}][0:3]' "$__spotify_qobuz_unmatched_manifest" >&2
             die 'unmatched Spotify album report has an invalid schema'
           end
           set -g __spotify_qobuz_albums_unmatched_tmp (${lib.getExe' pkgs.coreutils "mktemp"} "$__spotify_qobuz_output_dir/.spotify-qobuz-albums-unmatched.XXXXXX")
@@ -959,7 +1253,7 @@ in
           set -g __spotify_qobuz_unmatched_count (${lib.getExe pkgs.jq} -r 'length' "$__spotify_qobuz_unmatched_manifest")
         end
 
-        argparse -n spotify-qobuz-albums 'h/help' 'o/output=' 'no-download' 'retry-existing' 'yes' -- $argv
+        argparse -n spotify-qobuz-albums 'h/help' 'o/output=' 'match-cache=' 'refresh-matches' 'no-download' 'retry-existing' 'yes' -- $argv
         or begin
           usage >&2
           exit 2
@@ -988,6 +1282,13 @@ in
           end
           set output "$_flag_output"
         end
+        set -l match_cache ${lib.escapeShellArg "${config.xdg.stateHome}/spotify-qobuz-albums/matches.json"}
+        if set -q _flag_match_cache
+          if test -z "$_flag_match_cache"
+            die '--match-cache requires a non-empty file path'
+          end
+          set match_cache "$_flag_match_cache"
+        end
         set -l output_dir (path dirname "$output")
         if not test -d "$output_dir"
           die "output directory does not exist: $output_dir"
@@ -1007,6 +1308,15 @@ in
           set unmatched_report "$output.unmatched.json"
           set beets_report "$output.beets.json"
         end
+
+        if not $match_cache_tool init --cache "$match_cache" >/dev/null
+          die "could not initialize match cache: $match_cache"
+        end
+        set -l cached_match_reused 0
+        set -l cached_skip_reused 0
+        set -l new_decisions_stored 0
+        set -l stale_mappings_invalidated 0
+        printf 'Match cache: %s\n' "$match_cache"
 
         if not set -q SPOTIFY_CLIENT_ID; or test -z "$SPOTIFY_CLIENT_ID"
           die 'SPOTIFY_CLIENT_ID is not set'
@@ -1236,6 +1546,7 @@ in
           printf 'Unmatched Spotify albums: 0\n'
           printf 'Unmatched report: %s\n' "$unmatched_report"
           printf 'All %s Spotify albums are already present in Beets.\n' "$spotify_album_count"
+          print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
           exit 0
         end
 
@@ -1246,10 +1557,37 @@ in
           set -l album_name (printf '%s\n' "$album" | $jq -r '.name')
           set -l album_artist (printf '%s\n' "$album" | $jq -r '.artist')
           set -l spotify_url (printf '%s\n' "$album" | $jq -r '.spotify_url')
+          set -l spotify_id (printf '%s\n' "$album" | $jq -r '.spotify_id')
           set -l query "$album_name by $album_artist"
           set album_index (math $album_index + 1)
           printf '[%s/%s] %s — %s\n' "$album_index" "$beets_missing_count" "$album_artist" "$album_name"
           printf 'Spotify: %s\n' "$spotify_url"
+          if set -q _flag_refresh_matches
+            if not $match_cache_tool delete --cache "$match_cache" --spotify-id "$spotify_id" >/dev/null
+              die "could not refresh cached match for Spotify album: $spotify_id"
+            end
+          else
+            set -l cached_decision ($match_cache_tool lookup --cache "$match_cache" --spotify "$album")
+            or die "could not read cached match for Spotify album: $spotify_id"
+            set -l cached_action (printf '%s\n' "$cached_decision" | $jq -r 'if .found then .decision.action else "" end')
+            if test "$cached_action" = match
+              set -l cached_qobuz_id (printf '%s\n' "$cached_decision" | $jq -r '.decision.qobuz_id')
+              set -l cached_qobuz_desc (printf '%s\n' "$cached_decision" | $jq -r '.decision.qobuz_desc')
+              printf 'Cached Qobuz: %s [Qobuz ID: %s] https://open.qobuz.com/album/%s\n' \
+                (display_desc "$cached_qobuz_desc") "$cached_qobuz_id" "$cached_qobuz_id"
+              $jq -cn --arg id "$cached_qobuz_id" '{source: "qobuz", media_type: "album", id: $id}' >> "$resolved_jsonl"
+              or die 'could not record cached Qobuz album'
+              record_selected "$album" "$cached_qobuz_id"
+              set resolved_count (math $resolved_count + 1)
+              set cached_match_reused (math $cached_match_reused + 1)
+              continue
+            else if test "$cached_action" = skip
+              record_unmatched "$album" cached_selection_skipped
+              set skipped_count (math $skipped_count + 1)
+              set cached_skip_reused (math $cached_skip_reused + 1)
+              continue
+            end
+          end
           $rm -f -- "$search_file"
           if not $rip search --output-file "$search_file" --num-results 10 qobuz album "$query" >/dev/null
             warn "Qobuz search failed for: $query"
@@ -1271,7 +1609,7 @@ in
               and .source == "qobuz"
               and .media_type == "album"
               and (.id | type == "string" and length > 0)
-              and (.desc | type == "string")
+              and (.desc | type == "string" and length > 0)
             )
           ' "$search_file" >/dev/null
             warn "Qobuz returned invalid search data for: $query"
@@ -1300,12 +1638,14 @@ in
           end
           set -l match_count (count $matches)
           set -l chosen
+          set -l decision_selection ""
           if test "$candidate_count" -eq 1; and test "$match_count" -eq 1
             set chosen "$matches[1]"
             set -l chosen_desc (printf '%s\n' "$chosen" | $jq -r '.desc')
             set -l chosen_id (printf '%s\n' "$chosen" | $jq -r '.id')
             printf 'Auto-selected Qobuz: %s [Qobuz ID: %s] https://open.qobuz.com/album/%s\n' \
               (display_desc "$chosen_desc") "$chosen_id" "$chosen_id"
+            set decision_selection auto
           else
             printf 'Spotify: %s\n' "$spotify_url"
             set -l candidate_index 0
@@ -1329,12 +1669,17 @@ in
                 break
               end
               if test "$choice" = s
+                if not $match_cache_tool set --cache "$match_cache" --spotify "$album" --action skip --selection manual >/dev/null
+                  die "could not store skipped cached match for Spotify album: $spotify_id"
+                end
+                set new_decisions_stored (math $new_decisions_stored + 1)
                 record_unmatched "$album" selection_skipped
                 set skipped_count (math $skipped_count + 1)
                 break
               end
               if string match -rq '^[0-9]+$' -- "$choice"; and test "$choice" -ge 1; and test "$choice" -le "$candidate_count"
                 set chosen ($jq -c --arg choice "$choice" '.[(($choice | tonumber) - 1)]' "$search_file")
+                set decision_selection manual
                 break
               end
               printf 'Enter a number from 1 to %s, or s to skip.\n' "$candidate_count" >&2
@@ -1346,6 +1691,11 @@ in
           printf '%s\n' "$chosen" | $jq -c '{ source, media_type, id }' >> "$resolved_jsonl"
           or die 'could not record resolved Qobuz album'
           set -l selected_qobuz_id (printf '%s\n' "$chosen" | $jq -r '.id')
+          set -l selected_qobuz_desc (printf '%s\n' "$chosen" | $jq -r '.desc')
+          if not $match_cache_tool set --cache "$match_cache" --spotify "$album" --action match --qobuz-id "$selected_qobuz_id" --qobuz-desc "$selected_qobuz_desc" --selection "$decision_selection" >/dev/null
+            die "could not store cached match for Spotify album: $spotify_id"
+          end
+          set new_decisions_stored (math $new_decisions_stored + 1)
           record_selected "$album" "$selected_qobuz_id"
           set resolved_count (math $resolved_count + 1)
         end
@@ -1357,6 +1707,7 @@ in
           if test "$__spotify_qobuz_unmatched_count" -gt 0
             $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe) [\(.reason)]"' "$unmatched_manifest"
           end
+          print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
           die 'no Qobuz albums resolved; unmatched report was published'
         end
 
@@ -1416,6 +1767,11 @@ in
         end
         set -l preflight_valid_count ($jq -r 'length' "$valid_manifest")
         set -l preflight_rejected_count ($jq -r 'length' "$rejected_manifest")
+        set -l stale_qobuz_ids ($jq -c '[.[].id]' "$rejected_manifest")
+        set -l invalidation_result ($match_cache_tool invalidate --cache "$match_cache" --qobuz-ids "$stale_qobuz_ids")
+        or die 'could not invalidate stale cached Qobuz mappings'
+        set stale_mappings_invalidated (printf '%s\n' "$invalidation_result" | $jq -r '.invalidated')
+        printf 'Stale cached Qobuz mappings invalidated: %s\n' "$stale_mappings_invalidated"
         if not $jq -s '
           .[0] as $old
           | .[1] as $new
@@ -1478,6 +1834,7 @@ in
         set -l metadata_valid_matched_count (math $spotify_album_count - $beets_owned_count - $__spotify_qobuz_unmatched_count)
         printf 'Spotify unique albums: %s; metadata-valid matched: %s; unmatched: %s\n' \
           "$spotify_album_count" "$metadata_valid_matched_count" "$__spotify_qobuz_unmatched_count"
+        print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
         if test "$cumulative_count" -eq 0
           die 'no cumulative valid albums remain; rejected report was published'
         end
