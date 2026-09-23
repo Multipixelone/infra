@@ -55,7 +55,8 @@
           sol = "openai/gpt-5.6-sol";
           terra = "openai/gpt-5.6-terra-fast";
           luna = "openai/gpt-5.6-luna-fast";
-          spark = "openai/gpt-5.3-codex-spark";
+          # retired. rip
+          # spark = "openai/gpt-5.3-codex-spark";
 
           # opencode go
           # luna = "opencode-go/gpt-5.6-luna";
@@ -218,7 +219,7 @@
               (modelVariant "medium" models.sol)
               (modelVariant "xhigh" models.terra)
               (modelVariant "xhigh" models.luna)
-              (modelVariant "xhigh" models.spark)
+              # (modelVariant "xhigh" models.spark)
             ];
           };
           oracle = {
@@ -231,14 +232,14 @@
           librarian = {
             model = [
               (modelVariant "low" models.luna)
-              (modelVariant "low" models.spark)
+              # (modelVariant "low" models.spark)
               (modelVariant "low" models.deepseek-flash)
             ];
           };
           explorer = {
             model = [
               (modelVariant "low" models.luna)
-              (modelVariant "low" models.spark)
+              # (modelVariant "low" models.spark)
               (modelVariant "low" models.deepseek-flash)
             ];
           };
@@ -254,7 +255,7 @@
           fixer = {
             model = [
               (modelVariant "high" models.terra)
-              (modelVariant "high" models.spark)
+              # (modelVariant "high" models.spark)
               (modelVariant "high" models.sol)
               (modelVariant "high" models.luna)
             ];
@@ -457,7 +458,7 @@
             modelMaxLimits = {
               ${models.sol} = 780000;
               ${models.terra} = 780000;
-              ${models.spark} = 80000;
+              # ${models.spark} = 80000;
               ${models.luna} = 192000;
               ${models.kimi} = 192000;
               ${models.deepseek-flash} = 192000;
@@ -469,7 +470,7 @@
             modelMinLimits = {
               ${models.sol} = 700000;
               ${models.terra} = 700000;
-              ${models.spark} = 68000;
+              # ${models.spark} = 68000;
               ${models.luna} = 160000;
               ${models.kimi} = 160000;
               ${models.deepseek-flash} = 160000;
@@ -592,11 +593,11 @@
               };
               # OpenCode's models.dev catalog exposes Spark as 128k for each
               # required limit field.
-              "gpt-5.3-codex-spark".limit = {
-                context = 128000;
-                input = 128000;
-                output = 128000;
-              };
+              # "gpt-5.3-codex-spark".limit = {
+              #   context = 128000;
+              #   input = 128000;
+              #   output = 128000;
+              # };
             };
             model = models.sol;
             small_model = models.luna;

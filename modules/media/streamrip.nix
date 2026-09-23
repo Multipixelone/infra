@@ -1145,6 +1145,12 @@ in
           exec ${lib.getExe pkgs.python3} ${spotify-qobuz-match-cache-script} "$@"
         '';
       };
+      spotify-qobuz-match-evidence = pkgs.writeShellApplication {
+        name = "spotify-qobuz-match-evidence";
+        text = ''
+          exec ${lib.getExe pkgs.python3} ${rootPath}/pkgs/openclaw-music/openclaw_music/qobuz_matcher.py "$@"
+        '';
+      };
       spotify-qobuz-albums-inner = pkgs.writers.writeFishBin "spotify-qobuz-albums-inner" ''
         set -l curl ${lib.getExe pkgs.curl}
         set -l jq ${lib.getExe pkgs.jq}
@@ -1155,6 +1161,7 @@ in
         set -l rip ${lib.getExe pkgs.streamrip}
         set -l preflight ${lib.getExe streamrip-qobuz-preflight}
         set -l match_cache_tool ${lib.getExe spotify-qobuz-match-cache}
+        set -l match_evidence_tool ${lib.getExe spotify-qobuz-match-evidence}
         set -l beets_inventory ${lib.getExe beets-library-inventory}
         set -l beet ${lib.getExe config.programs.beets.package}
         set -l beets_config /home/tunnel/.config/beets/config.yaml
@@ -1253,6 +1260,48 @@ in
           set -g __spotify_qobuz_unmatched_count (${lib.getExe pkgs.jq} -r 'length' "$__spotify_qobuz_unmatched_manifest")
         end
 
+        function record_match_evidence
+          set -l source "$argv[1]"
+          set -l evidence_status "$argv[2]"
+          ${lib.getExe pkgs.jq} -cn \
+            --argjson source "$source" \
+            --arg status "$evidence_status" \
+            '
+              {
+                source: {
+                  spotify_id: $source.spotify_id,
+                  artist: $source.artist,
+                  album: ($source.album // $source.name),
+                  spotify_url: $source.spotify_url
+                },
+                status: $status
+              }
+            ' >> "$__spotify_qobuz_match_evidence_requests_jsonl"
+          or begin
+            warn 'could not queue Spotify-to-Qobuz match evidence; preserving previous evidence report'
+            set -g __spotify_qobuz_match_evidence_failed true
+          end
+        end
+
+        function finish_match_evidence
+          # The diagnostic runner is deliberately called only at a legacy exit
+          # boundary.  Its own failures retain the supplied legacy status.
+          set -l match_evidence_tool ${lib.getExe spotify-qobuz-match-evidence}
+          set -l rip ${lib.getExe pkgs.streamrip}
+          set -l legacy_status "$argv[1]"
+          if test "$__spotify_qobuz_match_evidence_failed" = true
+            warn 'could not queue complete Spotify-to-Qobuz match evidence; preserving previous evidence report'
+            return "$legacy_status"
+          end
+          $match_evidence_tool run-report \
+            --requests "$__spotify_qobuz_match_evidence_requests_jsonl" \
+            --destination "$__spotify_qobuz_match_evidence_report" \
+            --provider "$rip" \
+            --reporter "$match_evidence_tool" \
+            --legacy-exit-status "$legacy_status"
+          return "$legacy_status"
+        end
+
         argparse -n spotify-qobuz-albums 'h/help' 'o/output=' 'match-cache=' 'refresh-matches' 'no-download' 'retry-existing' 'yes' -- $argv
         or begin
           usage >&2
@@ -1297,16 +1346,26 @@ in
         set -l status_report
         set -l unmatched_report
         set -l beets_report
+        set -l match_evidence_report
         if string match -rq '\.json$' -- "$output"
           set rejected_report (string replace -r '\.json$' '.rejected.json' -- "$output")
           set status_report (string replace -r '\.json$' '.status.json' -- "$output")
           set unmatched_report (string replace -r '\.json$' '.unmatched.json' -- "$output")
           set beets_report (string replace -r '\.json$' '.beets.json' -- "$output")
+          set match_evidence_report (string replace -r '\.json$' '.match-evidence.json' -- "$output")
         else
           set rejected_report "$output.rejected.json"
           set status_report "$output.status.json"
           set unmatched_report "$output.unmatched.json"
           set beets_report "$output.beets.json"
+          set match_evidence_report "$output.match-evidence.json"
+        end
+
+        # This must run before cache initialization: an evidence destination
+        # is diagnostics only and must never alias a legacy mutable artifact.
+        if not $match_evidence_tool validate-destination --destination "$match_evidence_report" --against \
+          "$match_cache" "$output" "$rejected_report" "$status_report" "$unmatched_report" "$beets_report"
+          die 'match evidence report aliases a cache or legacy output artifact'
         end
 
         if not $match_cache_tool init --cache "$match_cache" >/dev/null
@@ -1337,6 +1396,8 @@ in
         set -g __spotify_qobuz_albums_status_tmp ""
         set -g __spotify_qobuz_albums_unmatched_tmp ""
         set -g __spotify_qobuz_albums_beets_tmp ""
+        set -g __spotify_qobuz_albums_match_evidence_tmp ""
+        set -g __spotify_qobuz_match_evidence_failed false
 
         function __spotify_qobuz_albums_cleanup --on-event fish_exit
           ${lib.getExe' pkgs.coreutils "rm"} -rf -- "$__spotify_qobuz_albums_tempdir"
@@ -1354,6 +1415,9 @@ in
           end
           if test -n "$__spotify_qobuz_albums_beets_tmp"
             ${lib.getExe' pkgs.coreutils "rm"} -f -- "$__spotify_qobuz_albums_beets_tmp"
+          end
+          if test -n "$__spotify_qobuz_albums_match_evidence_tmp"
+            ${lib.getExe' pkgs.coreutils "rm"} -f -- "$__spotify_qobuz_albums_match_evidence_tmp"
           end
         end
 
@@ -1382,15 +1446,19 @@ in
         set -l unmatched_jsonl "$tempdir/unmatched.jsonl"
         set -l selected_jsonl "$tempdir/selected.jsonl"
         set -l unmatched_manifest "$tempdir/unmatched-manifest.json"
+        set -l match_evidence_requests_jsonl "$tempdir/match-evidence-requests.jsonl"
         set -g __spotify_qobuz_unmatched_jsonl "$unmatched_jsonl"
         set -g __spotify_qobuz_selected_jsonl "$selected_jsonl"
         set -g __spotify_qobuz_rejected_manifest "$rejected_manifest"
         set -g __spotify_qobuz_unmatched_manifest "$unmatched_manifest"
         set -g __spotify_qobuz_unmatched_report "$unmatched_report"
+        set -g __spotify_qobuz_match_evidence_requests_jsonl "$match_evidence_requests_jsonl"
+        set -g __spotify_qobuz_match_evidence_report "$match_evidence_report"
         set -g __spotify_qobuz_output_dir "$output_dir"
         printf "" > "$albums_jsonl"
         printf "" > "$unmatched_jsonl"
         printf "" > "$selected_jsonl"
+        printf "" > "$match_evidence_requests_jsonl"
         printf '[]\n' > "$rejected_manifest"
         or die 'could not create temporary Spotify album list'
         if test -e "$output"
@@ -1530,6 +1598,9 @@ in
         printf 'Beets report: %s\n' "$beets_report"
         if test "$beets_owned_count" -gt 0
           $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe)"' "$owned_albums_file"
+          for owned_album in ($jq -c '.[]' "$owned_albums_file")
+            record_match_evidence "$owned_album" beets_owned
+          end
         end
         if test "$beets_missing_count" -eq 0
           publish_unmatched
@@ -1547,6 +1618,8 @@ in
           printf 'Unmatched report: %s\n' "$unmatched_report"
           printf 'All %s Spotify albums are already present in Beets.\n' "$spotify_album_count"
           print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
+          finish_match_evidence 0
+          printf 'Match evidence report: %s\n' "$match_evidence_report"
           exit 0
         end
 
@@ -1580,24 +1653,29 @@ in
               record_selected "$album" "$cached_qobuz_id"
               set resolved_count (math $resolved_count + 1)
               set cached_match_reused (math $cached_match_reused + 1)
+              record_match_evidence "$album" cached_match_reused
               continue
             else if test "$cached_action" = skip
               record_unmatched "$album" cached_selection_skipped
               set skipped_count (math $skipped_count + 1)
               set cached_skip_reused (math $cached_skip_reused + 1)
+              record_match_evidence "$album" cached_skip_reused
               continue
             end
           end
+
           $rm -f -- "$search_file"
           if not $rip search --output-file "$search_file" --num-results 10 qobuz album "$query" >/dev/null
             warn "Qobuz search failed for: $query"
             record_unmatched "$album" qobuz_search_failed
+            record_match_evidence "$album" selection_search_failed
             set skipped_count (math $skipped_count + 1)
             continue
           end
           if not test -f "$search_file"
             warn "no Qobuz album found for: $query"
             record_unmatched "$album" no_qobuz_results
+            record_match_evidence "$album" selection_no_results
             set skipped_count (math $skipped_count + 1)
             continue
           end
@@ -1614,6 +1692,7 @@ in
           ' "$search_file" >/dev/null
             warn "Qobuz returned invalid search data for: $query"
             record_unmatched "$album" invalid_qobuz_search_response
+            record_match_evidence "$album" selection_malformed_response
             set skipped_count (math $skipped_count + 1)
             continue
           end
@@ -1622,6 +1701,7 @@ in
           if test "$candidate_count" -eq 0
             warn "no Qobuz album found for: $query"
             record_unmatched "$album" no_qobuz_results
+            record_match_evidence "$album" selection_no_results
             set skipped_count (math $skipped_count + 1)
             continue
           end
@@ -1659,12 +1739,14 @@ in
             if not test -t 0
               warn "Qobuz result requires confirmation without a TTY: $query"
               record_unmatched "$album" ambiguous_noninteractive
+              record_match_evidence "$album" selection_ambiguous_noninteractive
               set skipped_count (math $skipped_count + 1)
               continue
             end
             while true
               if not read -l -P 'Choose a Qobuz album number, or s to skip: ' choice
                 record_unmatched "$album" selection_cancelled
+                record_match_evidence "$album" selection_cancelled
                 set skipped_count (math $skipped_count + 1)
                 break
               end
@@ -1674,6 +1756,7 @@ in
                 end
                 set new_decisions_stored (math $new_decisions_stored + 1)
                 record_unmatched "$album" selection_skipped
+                record_match_evidence "$album" selection_skipped
                 set skipped_count (math $skipped_count + 1)
                 break
               end
@@ -1695,6 +1778,11 @@ in
           if not $match_cache_tool set --cache "$match_cache" --spotify "$album" --action match --qobuz-id "$selected_qobuz_id" --qobuz-desc "$selected_qobuz_desc" --selection "$decision_selection" >/dev/null
             die "could not store cached match for Spotify album: $spotify_id"
           end
+          if test "$decision_selection" = auto
+            record_match_evidence "$album" selection_auto
+          else
+            record_match_evidence "$album" selection_manual
+          end
           set new_decisions_stored (math $new_decisions_stored + 1)
           record_selected "$album" "$selected_qobuz_id"
           set resolved_count (math $resolved_count + 1)
@@ -1708,6 +1796,8 @@ in
             $jq -r 'def safe: explode | map(if (. < 32 or . == 127) then 32 else . end) | implode | gsub(" +"; " "); .[] | "\(.artist | safe) — \(.album | safe) [\(.reason)]"' "$unmatched_manifest"
           end
           print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
+          finish_match_evidence 1
+          printf 'Match evidence report: %s\n' "$match_evidence_report"
           die 'no Qobuz albums resolved; unmatched report was published'
         end
 
@@ -1735,6 +1825,7 @@ in
         printf 'Current resolved IDs: %s; already listed: %s; newly listed: %s\n' \
           "$current_resolved_count" "$already_listed_count" "$newly_listed_count"
         if not $preflight --config "$streamrip_config" --input "$raw_manifest" --valid "$valid_manifest" --rejected "$rejected_manifest" --pending "$pending_manifest" --status "$status_manifest"
+          finish_match_evidence 1
           die 'Qobuz metadata preflight failed; manifests were not published'
         end
         $chmod 600 "$valid_manifest" "$rejected_manifest" "$pending_manifest" "$status_manifest"
@@ -1836,6 +1927,7 @@ in
           "$spotify_album_count" "$metadata_valid_matched_count" "$__spotify_qobuz_unmatched_count"
         print_match_cache_summary "$match_cache" "$cached_match_reused" "$cached_skip_reused" "$new_decisions_stored" "$stale_mappings_invalidated"
         if test "$cumulative_count" -eq 0
+          finish_match_evidence 1
           die 'no cumulative valid albums remain; rejected report was published'
         end
         set -l manifest_tmp ($mktemp "$output_dir/.spotify-qobuz-albums.XXXXXX")
@@ -1860,10 +1952,12 @@ in
         end
         if test "$download_count" -eq 0
           printf "All %s current albums are fully downloaded according to Streamrip's downloads database.\n" "$current_resolved_count"
+          finish_match_evidence 0
           exit 0
         end
 
         if set -q _flag_no_download
+          finish_match_evidence 0
           exit 0
         end
         set -l download false
@@ -1879,7 +1973,11 @@ in
         end
         if test "$download" = true
           $rip file "$download_manifest"
+          set -l download_status $status
+          finish_match_evidence "$download_status"
+          exit "$download_status"
         end
+        finish_match_evidence 0
       '';
       spotify-qobuz-albums = pkgs.writeShellApplication {
         name = "spotify-qobuz-albums";
