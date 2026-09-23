@@ -22,7 +22,7 @@
         # Keep the existing Codex defaults under Home Manager ownership now
         # that it generates ~/.codex/config.toml.
         settings = {
-          model = "gpt-5.6-sol";
+          model = "gpt-6-sol";
           model_reasoning_effort = "medium";
           service_tier = "default";
 

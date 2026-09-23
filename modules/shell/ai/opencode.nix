@@ -52,14 +52,14 @@
           # therefore kept only as a late fallback. Its 128k, text-only window
           # also makes it a poor orchestrator or observer despite its speed.
           astra = "openai/gpt-6-astra";
-          sol = "openai/gpt-5.6-sol";
+          sol = "openai/gpt-6-sol";
           terra = "openai/gpt-5.6-terra-fast";
-          luna = "openai/gpt-5.6-luna-fast";
+          luna = "openai/gpt-6-luna-fast";
           # retired. rip
           # spark = "openai/gpt-5.3-codex-spark";
 
           # opencode go
-          # luna = "opencode-go/gpt-5.6-luna";
+          # luna = "opencode-go/gpt-6-luna";
           kimi = "opencode-go/kimi-k3";
           deepseek-flash = "opencode-go/deepseek-v4-flash";
           glm = "opencode-go/glm-5.2";
@@ -581,7 +581,7 @@
               "opencode-go"
             ];
             provider.openai.models = {
-              "gpt-5.6-sol".limit = {
+              "gpt-6-sol".limit = {
                 context = 1050000;
                 input = 922000;
                 output = 128000;
