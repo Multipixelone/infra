@@ -84,6 +84,13 @@
       url = "github:anthropics/claude-code";
       flake = false;
     };
+    codex-nix = {
+      url = "github:SecBear/codex-nix";
+      inputs = {
+        flake-parts.follows = "flake-parts";
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
     colmena = {
       url = "github:zhaofengli/colmena/main";
       inputs.nixpkgs.follows = "nixpkgs";

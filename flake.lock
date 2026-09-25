@@ -290,11 +290,11 @@
     "beets-plexsync": {
       "flake": false,
       "locked": {
-        "lastModified": 1787328151,
-        "narHash": "sha256-EbNTEndJbjvb29NfhvEmaCBBBxyT3iA56446xsI4HDo=",
+        "lastModified": 1788959972,
+        "narHash": "sha256-tIvAWnaDdxEgxIP9+vdVocX1/V1tusV1CUUjDrRvgPo=",
         "owner": "arsaboo",
         "repo": "beets-plexsync",
-        "rev": "143d57d26ebd2df7ff004f0b6474ae07e1a1d2a8",
+        "rev": "7c2dc42833632031fc5494a1eb82d4f12074cab5",
         "type": "github"
       },
       "original": {
@@ -312,11 +312,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1789347566,
-        "narHash": "sha256-uBciPHCKijGZv5GRJe9EteqbiT9QKbkwR1YODxooPsQ=",
+        "lastModified": 1789880634,
+        "narHash": "sha256-fQKXwarIERdczIDIkvRIqII9MB3D0n9ARkoNTxfBmA4=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "5025b9501d9bfb148ae8f4bbc3d5087bee3d21f7",
+        "rev": "08fbd9a32e0db4dd956882b7c19902fec6f57e64",
         "type": "github"
       },
       "original": {
@@ -338,6 +338,7 @@
       "original": {
         "owner": "beetbox",
         "repo": "beets",
+        "rev": "63b69fa90656279bd3d41fa87ab68be1f98fdaae",
         "type": "github"
       }
     },
@@ -557,6 +558,29 @@
       "original": {
         "owner": "anthropics",
         "repo": "claude-code",
+        "type": "github"
+      }
+    },
+    "codex-nix": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790141555,
+        "narHash": "sha256-Pb7HjyBm6PrO/zz1qNbBXfZn8VClOQb71040DtxppM8=",
+        "owner": "SecBear",
+        "repo": "codex-nix",
+        "rev": "af259708d1e25955aa6c6a1d0cab40c8c56b4c2b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "SecBear",
+        "repo": "codex-nix",
         "type": "github"
       }
     },
@@ -3647,11 +3671,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1788316716,
-        "narHash": "sha256-bc7rSpXIdn9QWGNqfWcPZWOhEVF8NoeAZkWq0XWnf/k=",
+        "lastModified": 1789684949,
+        "narHash": "sha256-ZKhUe/2IJUq1JhKxKMu8rbkgSGmPP2ZCqlIPn40aGCM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "3ed67ec0a4d3c7ab4ae1f04f8ee8df07bfa506a2",
+        "rev": "e554fab72f81915600f3f449b786fd9af40439a5",
         "type": "github"
       },
       "original": {
@@ -4198,6 +4222,7 @@
         "catppuccin-helix": "catppuccin-helix",
         "claude-code-pkg": "claude-code-pkg",
         "claude-code-src": "claude-code-src",
+        "codex-nix": "codex-nix",
         "colmena": "colmena",
         "commutecompass": "commutecompass",
         "copyparty": "copyparty",
@@ -4417,11 +4442,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1789253474,
-        "narHash": "sha256-1HNU/xpuBSDXdd9H1mHF63E1glC0zlWTD0R05hf+bNk=",
+        "lastModified": 1789861080,
+        "narHash": "sha256-NjbU3KDwMQSDMTnOXtDjacgIexrpxjs9jrk+Nzg0k9I=",
         "ref": "refs/heads/main",
-        "rev": "97343b674bea073369f14981afe8245e4ccfbb4b",
-        "revCount": 151,
+        "rev": "6df84132a8642a6234b0b1f4e6ded9e2ee407e34",
+        "revCount": 152,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },

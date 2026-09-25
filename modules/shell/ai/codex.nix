@@ -1,8 +1,21 @@
 {
+  inputs,
+  ...
+}:
+{
+  flake-file.inputs.codex-nix = {
+    url = "github:SecBear/codex-nix";
+    inputs = {
+      flake-parts.follows = "flake-parts";
+      nixpkgs.follows = "nixpkgs";
+    };
+  };
+
   # OpenAI Codex — terminal coding agent, the OpenAI counterpart to Claude
-  # Code. Apache-2.0, so no unfree allowlisting needed. Both packages are
-  # cross-platform and pre-built in the binary cache for aarch64-darwin, so
-  # this lands on the Mac (hylia) via the shared homeManager `base` module.
+  # Code. Apache-2.0, so no unfree allowlisting needed. Both packages
+  # support aarch64-darwin, so this lands on the Mac (hylia) via the
+  # shared homeManager `base` module. Codex uses pinned upstream binaries
+  # from codex-nix because the locked nixpkgs package lags upstream.
   #
   #   codex      — the CLI agent (`codex`); auth via ChatGPT login or
   #                OPENAI_API_KEY.
@@ -16,7 +29,7 @@
       # just as it is for Claude Code and OpenCode.
       programs.codex = {
         enable = true;
-        package = pkgs.codex;
+        package = inputs.codex-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
         enableMcpIntegration = true;
 
         # Keep the existing Codex defaults under Home Manager ownership now
