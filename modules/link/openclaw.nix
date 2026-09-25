@@ -1,4 +1,9 @@
-{ inputs, rootPath, ... }:
+{
+  inputs,
+  lib,
+  rootPath,
+  ...
+}:
 let
   agentmail-scripts = ./agentmail-scripts;
 in
@@ -84,19 +89,44 @@ in
 
       ntn = pkgs.callPackage "${rootPath}/pkgs/ntn" { };
 
-      # --- OpenClaw release channel -------------------------------------------
-      # npm spec for the gateway's self-heal bootstrap (ExecStartPre below).
-      # MUST carry an explicit dist-tag or version: a bare `openclaw` resolves
-      # to `latest` (stable), so one failed `--version` check would silently
-      # reinstall stable over the beta. That breaks the `@openclaw/acpx`
-      # plugin, which pins `openclaw.compat.pluginApi` to its own version and
-      # is refused on an older host.
-      #
-      # Tracking `beta` because Opus 5 in the ACP runtime needs the beta's
-      # vendored claude-agent-sdk (>= 0.3.219 = Claude Code 2.1.219); stable
-      # 2026.7.1 vendors 2.1.198, which has no `claude-opus-5`.
-      # Set a concrete version (e.g. "openclaw@2026.8.1-beta.2") to freeze.
-      openclawNpmSpec = "openclaw@beta";
+      # --- OpenClaw gateway ---------------------------------------------------
+      # Keep the npm bootstrap pinned: a bare package name resolves to `latest`
+      # and would silently replace the compatible gateway on a failed check.
+      openclawVersion = "2026.9.5";
+      openclawNpmSpec = "openclaw@${openclawVersion}";
+      openclawPrefix = "/home/tunnel/.npm-global";
+      openclawBin = "${openclawPrefix}/bin/openclaw";
+      openclawStateDir = "/home/tunnel/.openclaw";
+      gatewayPath = lib.makeBinPath [
+        pkgs.bash
+        pkgs.coreutils
+        pkgs.nodejs
+      ];
+      openclawGatewayBootstrap = pkgs.writeShellScript "openclaw-gateway-bootstrap" ''
+        set -euo pipefail
+        ${pkgs.coreutils}/bin/mkdir -p "${openclawStateDir}" "${openclawPrefix}"
+
+        version_matches() {
+          local version
+          version="$("${openclawBin}" --version 2>/dev/null)" || return 1
+          [[ "$version" == "OpenClaw ${openclawVersion} ("* ]]
+        }
+
+        if [ ! -x "${openclawBin}" ] || ! version_matches; then
+          ${pkgs.nodejs}/bin/npm --prefix "${openclawPrefix}" install -g --allow-scripts=openclaw ${openclawNpmSpec}
+        fi
+
+        version_matches
+      '';
+      # OpenClaw's plugin/model workers allocate large generation trees in
+      # /tmp. A crash can bypass their in-process disposal; with Restart=always
+      # those stale trees otherwise accumulate once per restart.
+      openclawTempCleanup = pkgs.writeShellScript "openclaw-temp-cleanup" ''
+        set -euo pipefail
+        ${pkgs.findutils}/bin/find /tmp -mindepth 1 -maxdepth 1 -type d -user tunnel \
+          \( -name 'openclaw-plugin-build-*' -o -name 'openclaw-model-catalog-*' \) \
+          -exec ${pkgs.coreutils}/bin/rm -rf -- {} +
+      '';
     in
     {
 
@@ -163,18 +193,20 @@ in
             # `openclaw doctor` reads the raw unit file rather than the
             # runtime-expanded environment, and treats `%h` literally —
             # which makes its service-config and PATH validations fail.
-            ExecStartPre = ''
-              ${pkgs.bash}/bin/bash -lc 'set -euo pipefail; ${pkgs.coreutils}/bin/mkdir -p "$HOME/.openclaw" "$HOME/.npm-global"; NEED_INSTALL=0; if [ ! -x "$HOME/.npm-global/bin/openclaw" ]; then NEED_INSTALL=1; elif ! "$HOME/.npm-global/bin/openclaw" --version >/dev/null 2>&1; then NEED_INSTALL=1; fi; if [ "$NEED_INSTALL" = "1" ]; then ${pkgs.nodejs}/bin/npm --prefix "$HOME/.npm-global" install -g ${openclawNpmSpec}; fi'
-            '';
-            ExecStart = "/home/tunnel/.npm-global/bin/openclaw gateway --port 18789";
-            WorkingDirectory = "/home/tunnel/.openclaw";
+            ExecStartPre = [
+              "${openclawTempCleanup}"
+              "${openclawGatewayBootstrap}"
+            ];
+            ExecStart = "${openclawBin} gateway --port 18789";
+            ExecStopPost = "${openclawTempCleanup}";
+            WorkingDirectory = openclawStateDir;
             Restart = "always";
             RestartSec = "5s";
             Environment = [
               "HOME=/home/tunnel"
-              "PATH=/home/tunnel/.local/bin:/home/tunnel/.npm-global/bin:/home/tunnel/bin:/home/tunnel/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/home/tunnel/.nix-profile/bin:/nix/profile/bin:/home/tunnel/.local/state/nix/profile/bin:/etc/profiles/per-user/tunnel/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:${pkgs.coreutils}/bin:${pkgs.nodejs}/bin"
-              "NPM_CONFIG_PREFIX=/home/tunnel/.npm-global"
-              "OPENCLAW_STATE_DIR=/home/tunnel/.openclaw"
+              "PATH=/home/tunnel/.local/bin:${openclawPrefix}/bin:/home/tunnel/bin:${gatewayPath}"
+              "NPM_CONFIG_PREFIX=${openclawPrefix}"
+              "OPENCLAW_STATE_DIR=${openclawStateDir}"
             ];
           };
           Install.WantedBy = [ "default.target" ];
