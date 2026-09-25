@@ -17,7 +17,7 @@
     in
     {
       home.packages = with pkgs; [
-        reaper
+        (reaper.override { jackLibrary = pipewire.jack; })
         yabridge
         yabridgectl
         (izotope.override { location = "/home/tunnel/.izotope11"; })
