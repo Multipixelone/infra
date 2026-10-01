@@ -346,8 +346,8 @@
                   brightness = 1.1;
                   noise = 0.02;
                   contrast = 1;
-                  passes = 4;
-                  size = 10;
+                  passes = 6;
+                  size = 15;
                   ignore_opacity = true;
                   popups = true;
                   popups_ignorealpha = 0.6;

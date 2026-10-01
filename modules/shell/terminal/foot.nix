@@ -60,7 +60,7 @@ in
           beam-thickness = 1;
         };
         colors-dark = catppuccinColors // {
-          alpha = "0.85";
+          alpha = "0.92";
           # only cells at (or explicitly painted with) the default background
           # color are transparent - text/UI stay opaque so Hyprland's blur
           # reads as frosted glass instead of a washed-out, see-through
