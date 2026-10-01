@@ -571,11 +571,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790141555,
-        "narHash": "sha256-Pb7HjyBm6PrO/zz1qNbBXfZn8VClOQb71040DtxppM8=",
+        "lastModified": 1790814227,
+        "narHash": "sha256-ZQs4gYXv6JQIxlCll0Z3k9ebK//yUwTxen/xok5Jaiw=",
         "owner": "SecBear",
         "repo": "codex-nix",
-        "rev": "af259708d1e25955aa6c6a1d0cab40c8c56b4c2b",
+        "rev": "7302c80deec4e6ef252972252d6a1f55752019a2",
         "type": "github"
       },
       "original": {
