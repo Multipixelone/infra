@@ -1,10 +1,9 @@
 { lib, ... }:
 {
   configurations.nixos.iso.module = {
-    # `base` and `pc` silence boot for daily drivers. Recovery media has to be
-    # able to show why stage 1 failed, so undo that here. Duplicate kernel
-    # params are resolved last-wins, hence mkAfter rather than trying to drop
-    # the `quiet` that `pc` appends.
+    # Keep recovery media explicitly verbose, independent of role defaults,
+    # so it can show why stage 1 failed. Duplicate kernel params are resolved
+    # last-wins, hence mkAfter for these recovery-specific settings.
     boot.plymouth.enable = lib.mkForce false;
     boot.consoleLogLevel = lib.mkForce 4;
     boot.initrd.verbose = lib.mkForce true;

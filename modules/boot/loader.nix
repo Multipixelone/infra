@@ -32,8 +32,6 @@
           # lib.mkForce font = true;
           # timeoutStyle = "hidden";
         };
-        consoleLogLevel = 0;
-        initrd.verbose = false;
         # hide os choice
         loader.timeout = lib.mkDefault 3;
         kernelPackages = lib.mkDefault pkgs.linuxPackages_zen;
