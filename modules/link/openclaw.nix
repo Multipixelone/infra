@@ -92,7 +92,7 @@ in
       # --- OpenClaw gateway ---------------------------------------------------
       # Keep the npm bootstrap pinned: a bare package name resolves to `latest`
       # and would silently replace the compatible gateway on a failed check.
-      openclawVersion = "2026.9.5";
+      openclawVersion = "2026.9.6";
       openclawNpmSpec = "openclaw@${openclawVersion}";
       openclawPrefix = "/home/tunnel/.npm-global";
       openclawBin = "${openclawPrefix}/bin/openclaw";
@@ -204,7 +204,7 @@ in
             RestartSec = "5s";
             Environment = [
               "HOME=/home/tunnel"
-              "PATH=/home/tunnel/.local/bin:${openclawPrefix}/bin:/home/tunnel/bin:${gatewayPath}"
+              "PATH=/home/tunnel/.local/bin:/home/tunnel/.nix-profile/bin:${openclawPrefix}/bin:/home/tunnel/bin:${gatewayPath}"
               "NPM_CONFIG_PREFIX=${openclawPrefix}"
               "OPENCLAW_STATE_DIR=${openclawStateDir}"
             ];
