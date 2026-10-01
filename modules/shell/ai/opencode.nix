@@ -60,8 +60,8 @@
           # therefore kept only as a late fallback. Its 128k, text-only window
           # also makes it a poor orchestrator or observer despite its speed.
           astra = "openai/gpt-6-astra";
-          sol = "openai/gpt-6-sol";
-          terra = "openai/gpt-5.6-terra-fast";
+          sol = "openai/gpt-6.1-sol";
+          sol-fast = "openai/gpt-6.1-sol-fast";
           luna = "openai/gpt-6-luna-fast";
           # retired. rip
           # spark = "openai/gpt-5.3-codex-spark";
@@ -165,12 +165,12 @@
             variant = "low";
           };
           designer = {
-            model = "terra";
+            model = "sol";
             variant = "medium";
           };
           fixer = {
-            model = "terra";
-            variant = "high";
+            model = "sol-fast";
+            variant = "medium";
           };
           observer.model = "mimo";
           # Council has no per-agent fallback slot. Kimi K3 is retained as the
@@ -225,7 +225,6 @@
           orchestrator = {
             model = [
               (modelVariant "medium" models.sol)
-              (modelVariant "xhigh" models.terra)
               (modelVariant "xhigh" models.luna)
               # (modelVariant "xhigh" models.spark)
             ];
@@ -253,7 +252,6 @@
           };
           designer = {
             model = [
-              (modelVariant "medium" models.terra)
               (modelVariant "max" models.kimi)
               (modelVariant "medium" models.sol)
               (modelVariant "max" models.glm)
@@ -262,7 +260,7 @@
           };
           fixer = {
             model = [
-              (modelVariant "high" models.terra)
+              (modelVariant "high" models.sol-fast)
               # (modelVariant "high" models.spark)
               (modelVariant "high" models.sol)
               (modelVariant "high" models.luna)
@@ -465,7 +463,7 @@
             # Spark has 128k total, Go models are 256k-class.
             modelMaxLimits = {
               ${models.sol} = 780000;
-              ${models.terra} = 780000;
+              ${models.sol-fast} = 780000;
               # ${models.spark} = 80000;
               ${models.luna} = 192000;
               ${models.kimi} = 192000;
@@ -477,7 +475,7 @@
             };
             modelMinLimits = {
               ${models.sol} = 700000;
-              ${models.terra} = 700000;
+              ${models.sol-fast} = 700000;
               # ${models.spark} = 68000;
               ${models.luna} = 160000;
               ${models.kimi} = 160000;
@@ -589,12 +587,12 @@
               "opencode-go"
             ];
             provider.openai.models = {
-              "gpt-6-sol".limit = {
+              "gpt-6.1-sol".limit = {
                 context = 1050000;
                 input = 922000;
                 output = 128000;
               };
-              "gpt-5.6-terra".limit = {
+              "gpt-6.1-sol-fast".limit = {
                 context = 1050000;
                 input = 922000;
                 output = 128000;
