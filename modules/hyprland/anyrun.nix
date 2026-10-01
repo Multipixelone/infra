@@ -28,7 +28,7 @@
           plugins = with pkgs; [
             rofi-emoji
           ];
-          extraConfig = {
+          settings = {
             show-icons = true;
             steal-focus = true;
             matching = "fuzzy";
