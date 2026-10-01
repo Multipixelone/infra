@@ -11,6 +11,7 @@
   `nix-auto-follow`; they caused lock churn.
 - Never run `nix build` without an explicit installable, and never run
   `nixos-rebuild`.
+- For boot logs on any systemd host, run `sudo journalctl --list-boots` on the affected machine, then `sudo journalctl -b BOOT_ID -o short-monotonic > ~/boot-debug.log` (add `-k` for kernel-only logs); persistent journals live in `/var/log/journal` when enabled, but very early freezes may leave no saved log.
 - Leave full checks to CI by default. If local long-running or full validation
   is needed, delegate each validation task to a background `@fixer` and follow
   the inherited `agent-run-long` skill. Run it in the orchestrator foreground
