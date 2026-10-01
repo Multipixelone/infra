@@ -31,7 +31,15 @@
         # 1.3.13 and the node_modules are built for 1.3.13. Downgrade the
         # packageManager version in package.json so bun's semver check passes.
         # Drop once nixpkgs ships bun ≥ 1.3.14.
-        opencodePkg = upstreamOpencode.overrideAttrs (_old: {
+        opencodePkg = upstreamOpencode.overrideAttrs (old: {
+          # Upstream's x86_64-linux node_modules hash is stale; remove when fixed upstream.
+          node_modules =
+            if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
+              old.node_modules.override {
+                hash = "sha256-D1nVqPY9u0DpGZexj+AhYQ4lnsSfxqjCYgZ17DMA/1Q=";
+              }
+            else
+              old.node_modules;
           postConfigure = ''
             sed -i 's/"packageManager": "bun@1.3.14"/"packageManager": "bun@1.3.13"/' package.json
           '';
