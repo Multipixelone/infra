@@ -38,6 +38,7 @@
           model = "gpt-6-sol";
           model_reasoning_effort = "medium";
           service_tier = "default";
+          features.daemon_auto_start = false;
 
           # Keep Codex sandboxed to the workspace, but allow local Git
           # operations that need to update the repository metadata.
