@@ -101,6 +101,7 @@ in
         pkgs.bash
         pkgs.coreutils
         pkgs.nodejs
+        pkgs.bubblewrap # Codex native read-only sandbox dependency.
       ];
       openclawGatewayBootstrap = pkgs.writeShellScript "openclaw-gateway-bootstrap" ''
         set -euo pipefail
