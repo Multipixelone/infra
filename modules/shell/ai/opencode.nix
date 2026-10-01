@@ -25,6 +25,9 @@
       }:
       let
         aiConfig = config.flake.aiConfig;
+        # OpenCode fetches this npm plugin; update this version and its schema
+        # together here, not with the installer (which writes HM-managed files).
+        omoVersion = "3.0.1";
 
         upstreamOpencode = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
         # opencode's root package.json requires bun@1.3.14, but nixpkgs ships
@@ -188,19 +191,10 @@
         # directly. `master`/`master_fallback` are deprecated/ignored — the
         # synthesizer model is set via a `council` agent entry in the active
         # preset.
-        # Renamed: `councillors_timeout` → `timeout`. New: `councillor_execution_mode`,
-        # `councillor_retries`.
         councilConfig = {
           default_preset = "default";
-          # 180s was too tight — transient gateway flakiness on
-          # opencode-go left beta/gamma re-streaming silently until the
-          # wall clock expired. 300s gives councillors room to recover.
-          timeout = 300000;
-          councillor_execution_mode = "parallel";
-          councillor_retries = 3;
           # Keep deliberation on the strongest Go models from three different
-          # families; retries contain the impact of an intermittent Qwen Max
-          # stream.
+          # families.
           presets.default = {
             alpha = {
               model = models.glm;
@@ -513,22 +507,19 @@
         # ── Final assembled config ──────────────────────────────────────
 
         omoConfig = builtins.toJSON {
-          "$schema" = "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json";
+          "$schema" = "https://unpkg.com/oh-my-opencode-slim@${omoVersion}/oh-my-opencode-slim.schema.json";
+          autoUpdate = false;
           multiplexer.type = "zellij";
           preset = "go-codex";
           council = councilConfig;
           fallback = fallbackConfig;
           agents = agentFallbacks;
-          todoContinuation = {
-            autoEnable = true;
-            autoEnableThreshold = 4;
-            maxContinuations = 5;
-          };
+          # v3 lacks todoContinuation's prior threshold/cap controls; configure
+          # backgroundJobs.orchestratorWake only after verifying its v3 schema.
           # Enable observer agent (disabled by default upstream).
           # mimo-v2.5 is vision-capable, so the block below activates.
           disabled_agents = [ ];
-          lsp = lspServers;
-          presets.go-codex = presetGoCodex;
+          presets.go-codex.agents = presetGoCodex;
         };
       in
       {
@@ -575,7 +566,7 @@
             plugin = [
               "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
-              "oh-my-opencode-slim"
+              "oh-my-opencode-slim@${omoVersion}"
               # "true-mem"
               "opencode-history-search"
               "openrtk"
@@ -608,6 +599,8 @@
             model = models.sol;
             small_model = models.luna;
             autoupdate = false;
+            # Core OpenCode LSP server configuration, not plugin configuration.
+            lsp = lspServers;
             agent.build.permission.task = {
               "*" = "allow";
             };
