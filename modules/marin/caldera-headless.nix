@@ -4,20 +4,13 @@
   withSystem,
   ...
 }:
-{
-  nixpkgs.config.allowUnfreePackages = [ "caldera-headless" ];
-
-  perSystem =
-    { system, pkgs, ... }:
+let
+  calderaModule =
     {
-      # Caldera publishes a native x86_64 ELF only. Keep the package absent,
-      # rather than merely unavailable in metadata, on other evaluated systems.
-      packages = lib.optionalAttrs (system == "x86_64-linux") {
-        caldera-headless = pkgs.callPackage "${rootPath}/pkgs/caldera-headless" { };
-      };
-    };
-
-  configurations.nixos.marin.module =
+      playerName,
+      enable ? (_: true),
+      requireSpeakerUnmute ? false,
+    }:
     {
       config,
       pkgs,
@@ -25,7 +18,7 @@
       ...
     }:
     let
-      enabled = config.services.marin.headlessPlayer == "caldera";
+      enabled = enable config;
       caldera-headless = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.caldera-headless
       );
@@ -36,10 +29,9 @@
 
         deadline=$(${pkgs.coreutils}/bin/date +%s)
         deadline=$((deadline + 30))
-        while ! ${pkgs.systemd}/bin/systemctl --system is-active --quiet marin-speaker-unmute.service \
-          || ! ${pkgs.wireplumber}/bin/wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1; do
+        while ${lib.optionalString requireSpeakerUnmute "! ${pkgs.systemd}/bin/systemctl --system is-active --quiet marin-speaker-unmute.service || "}! ${pkgs.wireplumber}/bin/wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1; do
           if [ "$(${pkgs.coreutils}/bin/date +%s)" -ge "$deadline" ]; then
-            echo "Caldera audio readiness timed out: marin-speaker-unmute.service must be active and PipeWire must have a default audio sink." >&2
+            echo "Caldera audio readiness timed out: ${lib.optionalString requireSpeakerUnmute "marin-speaker-unmute.service must be active and "}PipeWire must have a default audio sink." >&2
             exit 1
           fi
           ${pkgs.coreutils}/bin/sleep 1
@@ -62,7 +54,7 @@
                 echo "usage: caldera-headless-control login" >&2
                 exit 64
               fi
-              args=(--login --player-name Marin)
+              args=(--login --player-name ${lib.escapeShellArg playerName})
               ;;
             list-devices)
               if [[ $# -ne 1 ]]; then
@@ -160,7 +152,7 @@
 
       # Static inspection found the standard Plex Companion HTTP listener and
       # GDM discovery listener. Xita's default 9999 exposure is not enabled
-      # here until live acceptance verifies its role on Marin's interfaces.
+      # here until live acceptance verifies its role on the host's interfaces.
       networking.firewall = {
         allowedTCPPorts = [ 32500 ];
         allowedUDPPorts = [ 32412 ];
@@ -200,4 +192,27 @@
         };
       };
     };
+in
+{
+  nixpkgs.config.allowUnfreePackages = [ "caldera-headless" ];
+
+  perSystem =
+    { system, pkgs, ... }:
+    {
+      # Caldera publishes a native x86_64 ELF only. Keep the package absent,
+      # rather than merely unavailable in metadata, on other evaluated systems.
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
+        caldera-headless = pkgs.callPackage "${rootPath}/pkgs/caldera-headless" { };
+      };
+    };
+
+  configurations.nixos.marin.module = calderaModule {
+    playerName = "Marin";
+    enable = config: config.services.marin.headlessPlayer == "caldera";
+    requireSpeakerUnmute = true;
+  };
+
+  configurations.nixos.link.module = calderaModule {
+    playerName = "Link";
+  };
 }
