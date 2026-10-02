@@ -29,10 +29,25 @@ source exists, so evaluation remains green before they land. HTTPS is
 TLS-only; no HTTP listener, public A/AAAA record, Cloudflare Tunnel, or public
 ingress is configured. Do not reuse a tunnel credential for ACME.
 
-The existing `telegram-deadman` environment is passed to Grafana only at
-runtime. Its contact point is provisioned but intentionally has no notification
-policy, so it cannot deliver during the seven-day review. Do not send a test or
-dry-run message.
+The seven-day notification review that began August 22, 2026 has ended with
+owner approval. Prometheus sends alerts to Alertmanager on `127.0.0.1:9093`;
+Alertmanager is the sole Telegram delivery path for Prometheus rules. Its API
+is loopback-only, clustering is disabled, and no firewall port is opened.
+The obsolete Grafana Telegram contact point is explicitly deleted by provisioning.
+
+Alertmanager consumes `config.age.secrets."telegram-deadman".path` as a runtime
+environment file containing `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Only
+placeholders enter the Nix store. The NixOS module substitutes them into a
+private runtime configuration restricted by `UMask=0077`; the chat ID is a
+numeric YAML value. Startup requires the two stack secrets above and the
+Telegram environment file, with nonempty token and nonzero numeric chat ID.
+Offline validation substitutes dummy values and never sends a message.
+
+Critical alerts page after a 30-second grouping delay, repeat every four hours,
+and send recovery notifications. Warnings use an empty `non-paging` receiver.
+`SloErrorBudgetExhausted` also uses that receiver even though critical: its
+seven-day window can remain exhausted after endpoint recovery. All rules
+remain visible in Prometheus and Grafana, including inhibited alerts.
 
 ## Network rollout
 
@@ -68,9 +83,13 @@ Prometheus storage-growth
 forecasting remains scoped to Link because Link owns the telemetry store.
 
 Each service-publication route contributes one internal HTTPS probe to the
-endpoint dashboards and rolling SLO. The direct backend check used before the
-local cutover is not retained as a second `private` series for the same logical
-endpoint. The recorded effective probe status treats either a completed-probe
+endpoint dashboards and rolling SLO. Pre-cutover backend checks are not retained
+as second SLO series. Plex has a separate diagnostic `blackbox-plex-direct` job
+checking Alexandria's unauthenticated `/identity`, with `access_path="direct"`;
+publication probes carry `access_path="published"`. This access-path identity
+is distinct from `resolver`. The direct job is excluded from existing
+endpoint/SLO aggregates; Media Health compares both paths side by side.
+The recorded effective probe status treats either a completed-probe
 failure or a failed Prometheus scrape of the Blackbox job as downtime.
 Seven-day budget and latency alerts also require the live probe to have a sample
 at the far edge of the window, so a new target cannot fire a full-window alert
@@ -249,11 +268,40 @@ aggregate-only labels. Roll back by deploying the previous known-good revision;
 removing the bundle also stops only Homepage and the two media exporters through
 their conditions.
 
-Keep Grafana's notification policy null. Enabling delivery is future work and
-requires at least 24 hours of clean aggregate telemetry plus deliberate firing
-and recovery tests for each media alert. Do not route or test Telegram during
-this cutover. Routine maintenance consists of digest review, checking exporter
+Alert delivery configuration is implemented; activation and live delivery
+verification require a separately approved deployment. This slice performs
+offline checks only and sends no Telegram test or dry-run messages.
+Routine maintenance consists of digest review, checking exporter
 release notes for metric/schema changes, and repeating the privacy fixtures.
+
+## Endpoint alert response
+
+Notifications include alert name, endpoint/service, start time, summary, and
+available hints/runbook links. Start time is evaluator state, not a durable
+incident timestamp. For `EndpointDown`, check the endpoint dashboard, internal
+DNS, and the publication route. For Plex, use Media Health's direct/published
+comparison first:
+
+- `PlexBackendDown`: direct `/identity` has failed for five minutes while its
+  scrape succeeds. Inspect Plex's listener, container health, and application
+  logs on Alexandria. This probe cannot establish a crash or its cause.
+- `PublishedRouteDown`: publication has failed for five minutes while the
+  direct probe succeeds. Inspect DNS, the serving proxy, and its connection to
+  Alexandria.
+- Missing direct results or failed direct scrapes remain unknown. The generic
+  published `EndpointDown` remains fallback coverage.
+
+The specific Plex alerts inhibit `EndpointDown` for the same endpoint, avoiding
+duplicate pages. Endpoint dependency labels come from the publication registry;
+they do not alter SLO identity. A host-exporter failure inhibits only endpoints
+with that same backend host. Link or Impa host-exporter failures therefore do
+not suppress Alexandria endpoints. All-DNS failure inhibits only published
+paths in the same site. Blackbox exporter failure inhibits only endpoint and
+publication alerts using that exporter. Neither signal suppresses the direct
+Plex backend alert. Every inhibition equality requires explicit nonempty labels.
+
+NAS telemetry, NAS/Plex and proxy log shipping, exporter collection freshness,
+an Alertmanager dead-man backstop, and Plex auto-heal remain separate follow-ups.
 
 ## DNS diagnostic telemetry
 

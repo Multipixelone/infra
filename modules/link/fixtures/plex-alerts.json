@@ -1,0 +1,125 @@
+[
+  {
+    "name": "healthy paths",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "probe": "1x10", "up": "1x10" },
+    "checks": [{ "at": "6m", "firing": [] }]
+  },
+  {
+    "name": "backend outage threshold and generic fallback",
+    "direct": { "probe": "0x10", "up": "1x10" },
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [
+      { "at": "4m", "firing": [] },
+      { "at": "5m", "firing": ["PlexBackendDown", "EndpointDown"] }
+    ],
+    "expressions": [
+      {
+        "at": "5m",
+        "expr": "count(endpoint:probe_success_unexcused)",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "published outage with healthy backend",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [
+      { "at": "4m", "firing": [] },
+      { "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }
+    ]
+  },
+  {
+    "name": "one published resolver copy fails",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "probe": "1x10", "up": "1x10", "impa_probe": "0x10" },
+    "checks": [{ "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }]
+  },
+  {
+    "name": "backend outage cannot enter published SLO",
+    "direct": { "probe": "0x10", "up": "1x10" },
+    "published": { "probe": "1x10", "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": ["PlexBackendDown"] }],
+    "expressions": [
+      {
+        "at": "5m",
+        "expr": "min(endpoint:probe_success_unexcused)",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "backend recovery resolves specific and generic alerts",
+    "direct": { "probe": "0x5 1x4", "up": "1x10" },
+    "published": { "probe": "0x5 1x4", "up": "1x10" },
+    "checks": [
+      { "at": "5m", "firing": ["PlexBackendDown", "EndpointDown"] },
+      { "at": "6m", "firing": [] }
+    ]
+  },
+  {
+    "name": "route recovery resolves alerts",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "probe": "0x5 1x4", "up": "1x10" },
+    "checks": [
+      { "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] },
+      { "at": "6m", "firing": [] }
+    ]
+  },
+  {
+    "name": "unreachable direct scrape is not backend failure",
+    "direct": { "probe": "0x10", "up": "0x10" },
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+  },
+  {
+    "name": "missing direct result is not healthy",
+    "direct": { "up": "1x10" },
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+  },
+  {
+    "name": "absent direct target preserves generic fallback",
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+  },
+  {
+    "name": "failed published scrape counts as route failure",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "probe": "1x10", "up": "0x10" },
+    "checks": [{ "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }]
+  },
+  {
+    "name": "missing published result remains unknown",
+    "direct": { "probe": "1x10", "up": "1x10" },
+    "published": { "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": [] }],
+    "expressions": [
+      {
+        "at": "5m",
+        "expr": "count(PUBLISHED_SUCCESS) or vector(0)",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "unknown endpoint metadata must not drop alert",
+    "endpoint": "unknown.example",
+    "published": { "probe": "0x10", "up": "1x10" },
+    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+  },
+  {
+    "name": "exporter failure owns monitoring outage",
+    "direct": { "up": "0x10" },
+    "published": { "up": "0x10" },
+    "extra_series": [
+      { "series": "up{job=\"blackbox\",instance=\"link\"}", "values": "0x10" }
+    ],
+    "checks": [
+      { "at": "0m", "firing": [] },
+      { "at": "1m", "firing": ["BlackboxExporterDown"] },
+      { "at": "5m", "firing": ["BlackboxExporterDown", "EndpointDown"] }
+    ]
+  }
+]

@@ -272,6 +272,20 @@ in
             return errors
 
 
+        def endpoint_probe_contract_problems(dashboard):
+            errors = []
+            for panel in dashboard.get("panels", []):
+                if dashboard.get("uid") == "media-health" and panel.get("title") == "Plex direct vs published":
+                    continue
+                for target in panel.get("targets", []):
+                    for selector in re.findall(r"\bprobe_[a-z_]+\{([^{}]*)\}", target.get("expr", "")):
+                        if re.search(r"\bendpoint\s*(?:=|!=|=~|!~)", selector) and not re.search(
+                            r'\bjob(?:=|=~)"(?:blackbox-internal|blackbox-private|blackbox-internal\|blackbox-private)"', selector
+                        ):
+                            errors.append(f"{panel.get('title')}: endpoint aggregate must exclude diagnostic probe jobs")
+            return errors
+
+
         for name, dashboard in sorted(dashboards.items()):
             # 42 is the final v1 dashboard schema. Emitting anything lower
             # makes Grafana rewrite datasource refs and panel fields on load.
@@ -459,6 +473,8 @@ in
                     if not defaults.get("mappings") and not thresholds:
                         fail(name, f"{title}: {ptype} needs mappings or thresholds to colour states")
 
+            for message in endpoint_probe_contract_problems(dashboard):
+                fail(name, message)
             if name == "alerts.json":
                 for message in alert_duration_contract_problems(dashboard):
                     fail(name, message)
@@ -506,6 +522,13 @@ in
             )
             if not dns_contract_problems(old_dns):
                 fail("dns.json", "fixture with canonical diagnostic job unexpectedly passed")
+
+        for metric in ["probe_success", "probe_duration_seconds", "probe_http_status_code"]:
+            unsafe_endpoint = {
+                "panels": [{"title": "Endpoints", "targets": [{"expr": f'{metric}{{endpoint!=""}}'}]}]
+            }
+            if not endpoint_probe_contract_problems(unsafe_endpoint):
+                fail("validator-self-test", f"broad {metric} selector should include diagnostics and fail")
 
         if problems:
             print("Grafana dashboard validation failed:", file=sys.stderr)

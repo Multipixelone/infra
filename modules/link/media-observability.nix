@@ -32,6 +32,12 @@ let
     "media"
     "provisioned"
   ];
+  # Match complete selector label names: access_path is bounded diagnostic
+  # metadata, while path is a potentially high-cardinality identity label.
+  hasSensitiveSelector =
+    expression:
+    builtins.match ".*[{,][[:space:]]*(user|title|path|request|issue|provider|server)[[:space:]]*(=|!=|=~|!~).*" expression
+    != null;
   # The blackbox `endpoint` label is the application's canonical hostname, so
   # deriving the selector from the inventory is both exact and self-maintaining.
   # The old hand-written `.*(plex|radarr|...).*` regex silently missed Seerr,
@@ -49,6 +55,32 @@ let
     in
     "${route.backend.scheme}://${route.backendAddress}:${toString route.backend.port}";
   browserUrl = application: "https://${inventory.applications.${application}.canonical}";
+
+  plexRoute = routeFor "plex";
+  plexEndpoint = inventory.applications.plex.canonical;
+  # Resolve relative to the monitoring host, not the serving proxy: a proxy
+  # moved onto Alexandria must not turn Link's direct target into loopback.
+  plexBackendAddress =
+    if plexRoute.backend.host == config.observability.hubHost then
+      "127.0.0.1"
+    else
+      config.hosts.${plexRoute.backend.host}.homeAddress;
+  plexDirectTarget = "${plexRoute.backend.scheme}://${plexBackendAddress}:${toString plexRoute.backend.port}${plexRoute.health.path}";
+  blackboxTarget = "${config.observability.endpoints.blackbox.backendAddress}:${toString config.observability.endpoints.blackbox.port}";
+  plexDirectSelector = ''job="blackbox-plex-direct",endpoint="${plexEndpoint}",access_path="direct"'';
+  plexPublishedSelector = ''job=~"blackbox-internal|blackbox-private",endpoint="${plexEndpoint}",access_path="published"'';
+  # A failed scrape is a monitoring failure, not evidence the backend failed.
+  plexDirectSuccess = "min by (endpoint) (probe_success{${plexDirectSelector}} and (up{${plexDirectSelector}} == 1))";
+  # Missing results from a healthy scrape stay unknown; only an explicitly
+  # failed scrape supplies a zero-valued fallback for the published route.
+  plexPublishedSuccess = "min by (endpoint) ((probe_success{${plexPublishedSelector}} and (up{${plexPublishedSelector}} == 1)) or (up{${plexPublishedSelector}} == 0))";
+  plexAlertLabels = {
+    severity = "critical";
+    service = "plex";
+    backend_host = config.hosts.${plexRoute.backend.host}.hostName;
+    site = plexRoute.site;
+    probe_exporter = config.observability.hubHost;
+  };
 
   mediaSecretSource = "${inputs.secrets}/grafana/media.age";
   mediaSecretAvailable = builtins.pathExists mediaSecretSource;
@@ -826,6 +858,30 @@ let
         [ (viz.row "Endpoint reachability") ]
         [
           (viz.panel {
+            title = "Plex direct vs published";
+            type = "stat";
+            w = 24;
+            h = 5;
+            description = "Direct /identity checks Plex on Alexandria; published checks the HTTPS route. Missing probe results stay unknown. Exporter failures do not prove Plex is unhealthy.";
+            targets = [
+              {
+                expr = plexDirectSuccess;
+                legendFormat = "Direct";
+                instant = true;
+              }
+              {
+                expr = plexPublishedSuccess;
+                legendFormat = "Published";
+                instant = true;
+              }
+            ];
+            unit = viz.units.none;
+            mappings = viz.boolMapping { };
+            noValue = "UNKNOWN";
+          })
+        ]
+        [
+          (viz.panel {
             title = "Media endpoints up";
             type = "stat";
             w = 6;
@@ -1536,6 +1592,32 @@ in
             interval = "1m";
             rules = [
               {
+                alert = "PlexBackendDown";
+                expr = "${plexDirectSuccess} == 0";
+                for = "5m";
+                labels = plexAlertLabels // {
+                  access_path = "direct";
+                };
+                annotations = {
+                  summary = "Plex backend {{ $labels.endpoint }} is unhealthy";
+                  description = "Alexandria's direct /identity probe is failing. Check Plex's listener, container health and logs on Alexandria; compare the published route in Media Health.";
+                  runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
+                };
+              }
+              {
+                alert = "PublishedRouteDown";
+                expr = "(${plexPublishedSuccess} == 0) and on (endpoint) (${plexDirectSuccess} == 1)";
+                for = "5m";
+                labels = plexAlertLabels // {
+                  access_path = "published";
+                };
+                annotations = {
+                  summary = "Published route for {{ $labels.endpoint }} is failing while Plex responds directly";
+                  description = "Plex's direct /identity probe succeeds. Check internal DNS, the serving proxy and its connection to Alexandria; compare both access paths in Media Health.";
+                  runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
+                };
+              }
+              {
                 alert = "MediaApplicationScrapeFailed";
                 expr = ''scraparr_services_up{instance="link"} == 0'';
                 for = "5m";
@@ -1700,6 +1782,39 @@ in
         ruleFiles = lib.mkAfter [ mediaRules ];
         scrapeConfigs = lib.mkAfter [
           {
+            job_name = "blackbox-plex-direct";
+            metrics_path = "/probe";
+            params.module = [ "plex_direct" ];
+            scrape_interval = "30s";
+            scrape_timeout = "${toString (plexRoute.health.timeoutSeconds + 2)}s";
+            static_configs = [
+              {
+                targets = [ plexDirectTarget ];
+                labels = {
+                  endpoint = plexEndpoint;
+                  access_path = "direct";
+                  service = "plex";
+                  backend_host = plexAlertLabels.backend_host;
+                  path = plexRoute.health.path;
+                };
+              }
+            ];
+            relabel_configs = [
+              {
+                source_labels = [ "__address__" ];
+                target_label = "__param_target";
+              }
+              {
+                source_labels = [ "endpoint" ];
+                target_label = "instance";
+              }
+              {
+                target_label = "__address__";
+                replacement = blackboxTarget;
+              }
+            ];
+          }
+          {
             job_name = "scraparr";
             scrape_interval = "60s";
             static_configs = [
@@ -1776,10 +1891,6 @@ in
           message = "media observability must preserve loopback-only Prometheus";
         }
         {
-          assertion = (config.services.grafana.provision.alerting.policies.settings or null) == null;
-          message = "media observability must not route Grafana notifications";
-        }
-        {
           assertion =
             lib.all (name: lib.hasInfix name (builtins.toJSON homepageWidgets)) homepageEnvironmentNames
             && lib.all (
@@ -1816,15 +1927,10 @@ in
         }
         {
           assertion =
-            !(lib.any (needle: lib.hasInfix needle dashboardPromql) [
-              "user="
-              "title="
-              "path="
-              "request="
-              "issue="
-              "provider="
-              "server="
-            ]);
+            !hasSensitiveSelector dashboardPromql
+            && !hasSensitiveSelector ''probe_success{access_path="direct"}''
+            && hasSensitiveSelector ''metric{job="example", path="/private"}''
+            && hasSensitiveSelector ''metric{user=~".+"}'';
           message = "media dashboard PromQL must not select high-cardinality identity labels";
         }
         {

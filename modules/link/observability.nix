@@ -68,8 +68,8 @@ let
         lib.sortOn (item: item.displayName) groupEntries
       );
     }) (builtins.groupBy (item: item.homepage.group) entries);
-  publicationSite =
-    config.servicePublication.sites.${config.servicePublication.applications.grafana.site};
+  publicationSiteName = config.servicePublication.applications.grafana.site;
+  publicationSite = config.servicePublication.sites.${publicationSiteName};
   effectiveTrustedCidrs =
     if localCutover then publicationSite.trustedClientCidrs else observability.trustedClientCidrs;
   hub = config.hosts.${observability.hubHost};
@@ -183,6 +183,15 @@ let
       ]
   );
   blackboxModules = {
+    plex_direct = {
+      prober = "http";
+      timeout = "${toString serviceInventory.routes."plex/root".health.timeoutSeconds}s";
+      http = {
+        preferred_ip_protocol = "ip4";
+        follow_redirects = false;
+        valid_status_codes = serviceInventory.routes."plex/root".health.expectedStatuses;
+      };
+    };
     http_internal = {
       prober = "http";
       timeout = "5s";
@@ -247,6 +256,7 @@ let
           inherit (probe) path;
           __probe_module = internalProbeModuleName (internalProbeContract probe);
           scope = "internal";
+          access_path = "published";
           slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
           resolver = probe.resolverHost;
         };
@@ -259,6 +269,7 @@ let
         labels = {
           endpoint = endpoint.dnsName;
           scope = "internal";
+          access_path = "direct";
           slo_class = endpoint.probe.sloClass;
         };
       }) probedEndpoints;
@@ -271,6 +282,7 @@ let
         labels = {
           endpoint = endpoint.dnsName;
           scope = "private";
+          access_path = "published";
           slo_class = endpoint.probe.sloClass;
         };
       }) (builtins.filter (endpoint: endpoint.probe.privatePath != null) probedEndpoints);
@@ -327,7 +339,16 @@ let
   endpointErrorBudgetRemainingExpr = "1 - ((1 - endpoint:availability_7d) / ${
     toString (1.0 - observability.slo.availability)
   })";
-  endpointDownExpr = "endpoint:probe_success_unexcused == 0";
+  # Dependency metadata is advisory: an unknown endpoint still alerts. Keep it
+  # out of the availability recordings, whose identity remains endpoint/SLO.
+  endpointDownExpr = ''
+    (endpoint:probe_success_unexcused == 0)
+      * on (endpoint, slo_class) group_left (backend_host, site, probe_exporter, access_path)
+        endpoint:alert_dependencies
+    or
+    ((endpoint:probe_success_unexcused == 0)
+      unless on (endpoint, slo_class) endpoint:alert_dependencies)
+  '';
   # Blackbox records the full timeout as a probe's *duration* when it gives up,
   # so percentiling the raw series turns every outage into a latency
   # regression: actual.nyc.finnrut.is reported a p95 of 1.95s while every
@@ -584,7 +605,7 @@ let
             type = "gauge";
             w = 5;
             h = 6;
-            expr = ''sum(min by (endpoint) (probe_success{endpoint!=""})) / count(min by (endpoint) (probe_success{endpoint!=""}))'';
+            expr = "sum(min by (endpoint) (probe_success{${sloProbeSelector}})) / count(min by (endpoint) (probe_success{${sloProbeSelector}}))";
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
@@ -2585,7 +2606,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = ''sum(min by (endpoint) (probe_success{endpoint!=""})) / count(min by (endpoint) (probe_success{endpoint!=""}))'';
+            expr = "sum(min by (endpoint) (probe_success{${sloProbeSelector}})) / count(min by (endpoint) (probe_success{${sloProbeSelector}}))";
             unit = viz.units.percentunit;
             min = 0;
             max = 1;
@@ -2610,7 +2631,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = ''count(min by (endpoint) (probe_success{endpoint!=""}) == 0) or vector(0)'';
+            expr = "count(min by (endpoint) (probe_success{${sloProbeSelector}}) == 0) or vector(0)";
             unit = viz.units.none;
             decimals = 0;
             thresholds = [
@@ -2630,7 +2651,7 @@ let
             type = "stat";
             w = 4;
             h = 6;
-            expr = ''max(probe_duration_seconds{endpoint!=""})'';
+            expr = "max(probe_duration_seconds{${sloProbeSelector}})";
             legend = "slowest";
             unit = viz.units.seconds;
             thresholds = [
@@ -2650,7 +2671,7 @@ let
             type = "stat";
             w = 6;
             h = 6;
-            expr = ''min(probe_ssl_earliest_cert_expiry{endpoint!=""} - time())'';
+            expr = "min(probe_ssl_earliest_cert_expiry{${sloProbeSelector}} - time())";
             unit = viz.units.duration;
             thresholds = [
               { color = "red"; }
@@ -2675,12 +2696,12 @@ let
             h = 6;
             targets = [
               {
-                expr = ''count(count by (endpoint) (probe_success{endpoint!="",scope="internal"}))'';
+                expr = ''count(count by (endpoint) (probe_success{${sloProbeSelector},scope="internal"}))'';
                 legend = "Internal";
               }
             ]
             ++ lib.optional (!localCutover) {
-              expr = ''count(count by (endpoint) (probe_success{endpoint!="",scope="private"}))'';
+              expr = ''count(count by (endpoint) (probe_success{${sloProbeSelector},scope="private"}))'';
               legend = "Private (TLS)";
             };
             unit = viz.units.none;
@@ -2703,27 +2724,27 @@ let
             description = "One row per logical endpoint. Resolver-level probes are collapsed to their worst result.";
             targets = [
               {
-                expr = ''min by (endpoint) (probe_success{endpoint!=""})'';
+                expr = "min by (endpoint) (probe_success{${sloProbeSelector}})";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''min by (endpoint) (avg_over_time(probe_success{endpoint!=""}[$__range]))'';
+                expr = "min by (endpoint) (avg_over_time(probe_success{${sloProbeSelector}}[$__range]))";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""})'';
+                expr = "max by (endpoint) (probe_duration_seconds{${sloProbeSelector}})";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''max by (endpoint) (probe_http_status_code{endpoint!=""})'';
+                expr = "max by (endpoint) (probe_http_status_code{${sloProbeSelector}})";
                 instant = true;
                 format = "table";
               }
               {
-                expr = ''min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()'';
+                expr = "min by (endpoint) (probe_ssl_earliest_cert_expiry{${sloProbeSelector}}) - time()";
                 instant = true;
                 format = "table";
               }
@@ -2991,7 +3012,7 @@ let
             title = "Probe duration";
             w = 12;
             h = 8;
-            expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""})'';
+            expr = "max by (endpoint) (probe_duration_seconds{${sloProbeSelector}})";
             legend = "{{endpoint}}";
             unit = viz.units.seconds;
             min = 0;
@@ -3013,7 +3034,7 @@ let
             w = 12;
             h = 8;
             description = "HTTP phases are additive, so stacking them shows the total and the split at once.";
-            expr = ''avg by (phase) (probe_http_duration_seconds{endpoint!=""})'';
+            expr = "avg by (phase) (probe_http_duration_seconds{${sloProbeSelector}})";
             legend = "{{phase}}";
             unit = viz.units.seconds;
             min = 0;
@@ -3129,7 +3150,7 @@ let
             description = "How probe latency is actually distributed, rather than just its average. Scaled to milliseconds because the bucket size is an integer.";
             # The panel buckets raw values client-side, so it wants the plain
             # series rather than a pre-bucketed histogram.
-            expr = ''max by (endpoint) (probe_duration_seconds{endpoint!=""}) * 1000'';
+            expr = "max by (endpoint) (probe_duration_seconds{${sloProbeSelector}}) * 1000";
             legend = "{{endpoint}}";
             unit = viz.units.milliseconds;
             custom = {
@@ -3148,7 +3169,7 @@ let
             h = 8;
             targets = [
               {
-                expr = ''(min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()) / 86400'';
+                expr = "(min by (endpoint) (probe_ssl_earliest_cert_expiry{${sloProbeSelector}}) - time()) / 86400";
                 legend = "{{endpoint}}";
                 instant = true;
               }
@@ -3178,7 +3199,7 @@ let
             title = "Certificate expiry over time";
             w = 12;
             h = 8;
-            expr = ''(min by (endpoint) (probe_ssl_earliest_cert_expiry{endpoint!=""}) - time()) / 86400'';
+            expr = "(min by (endpoint) (probe_ssl_earliest_cert_expiry{${sloProbeSelector}}) - time()) / 86400";
             legend = "{{endpoint}}";
             unit = "d";
             min = 0;
@@ -6639,6 +6660,33 @@ in
         identity: lib.elem identity objectiveSloIdentities
       ) probedSloIdentities;
 
+      endpointDependencyRules = map (
+        identity:
+        let
+          routes = builtins.filter (route: route.canonical == identity.endpoint) (
+            builtins.attrValues serviceInventory.routes
+          );
+          backendHosts = lib.unique (map (route: hostRegistry.${route.backend.host}.hostName) routes);
+          sites = lib.unique (map (route: route.site) routes);
+        in
+        {
+          record = "endpoint:alert_dependencies";
+          expr = "vector(1)";
+          labels =
+            identity
+            // {
+              probe_exporter = observability.hubHost;
+              access_path = if localCutover then "published" else "direct";
+            }
+            // lib.optionalAttrs (builtins.length backendHosts == 1) {
+              backend_host = builtins.head backendHosts;
+            }
+            // lib.optionalAttrs (builtins.length sites == 1) {
+              site = builtins.head sites;
+            };
+        }
+      ) probedSloIdentities;
+
       recordingAndAlertRules = yaml.generate "observability-rules.yaml" {
         groups = [
           {
@@ -6646,6 +6694,7 @@ in
             interval = "1m";
             rules =
               excusalRules
+              ++ endpointDependencyRules
               ++ [
                 {
                   record = "endpoint:excused";
@@ -6712,14 +6761,27 @@ in
                 expr = "up{${requiredNodeJobSelector}} == 0";
                 for = "5m";
                 labels.severity = "critical";
+                labels.backend_host = "{{ $labels.instance }}";
                 annotations.summary = "Node exporter on {{ $labels.instance }} is unreachable";
               }
               {
                 alert = "PrometheusScrapeTargetDown";
-                expr = ''up{job!~"blackbox-.*|${nodeJobRegex}|scraparr|tautulli-exporter"} == 0'';
+                expr = ''up{job!~"blackbox|blackbox-.*|${nodeJobRegex}|scraparr|tautulli-exporter"} == 0'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
+              }
+              {
+                alert = "BlackboxExporterDown";
+                expr = ''up{job="blackbox"} == 0'';
+                for = "1m";
+                labels = {
+                  severity = "critical";
+                  probe_exporter = observability.hubHost;
+                };
+                annotations.summary = "Blackbox exporter on {{ $labels.instance }} is unreachable";
+                annotations.description = "Check prometheus-blackbox-exporter on the probe host before investigating dependent endpoints.";
+                annotations.runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md";
               }
               {
                 alert = "DnsProbeFailed";
@@ -6737,6 +6799,7 @@ in
                 for = "1m";
                 labels.severity = "critical";
                 annotations.summary = "Every NYC internal DNS probe is failing";
+                labels.site = publicationSiteName;
               }
               {
                 alert = "DnsDiagnosticAssertionFailed";
@@ -6788,6 +6851,8 @@ in
                 for = "5m";
                 labels.severity = "critical";
                 annotations.summary = "Endpoint {{ $labels.endpoint }} is down";
+                annotations.description = "Check the endpoint dashboard, DNS and publication route. For Plex, compare the direct /identity probe before investigating the backend.";
+                annotations.runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
               }
               {
                 alert = "SystemdUnitFailed";
@@ -7034,7 +7099,6 @@ in
         cidr: "iptables -w -A nixos-observability -s ${cidr} -j nixos-fw-accept"
       ) effectiveTrustedCidrs;
 
-      telegramContactRouted = false;
       mcpArgs = [
         "--disable-write"
         "--enabled-tools=prometheus,loki"
@@ -7100,10 +7164,6 @@ in
           message = "Every application excusedWhen signal must be declared in observability.slo.excusals.";
         }
         {
-          assertion = !telegramContactRouted;
-          message = "The Telegram contact point must remain unrouted during the seven-day review.";
-        }
-        {
           assertion =
             observability.retention.prometheusTime == "30d"
             && observability.retention.prometheusSize == "2GB"
@@ -7130,10 +7190,6 @@ in
             && !config.services.grafana.settings.users.allow_sign_up
             && !config.services.grafana.settings.auth.disable_login_form;
           message = "Grafana must use local admin auth with anonymous access and signup disabled.";
-        }
-        {
-          assertion = config.services.grafana.provision.alerting.policies.settings == null;
-          message = "The Telegram contact point must have no notification policy during review.";
         }
         {
           assertion =
@@ -7339,21 +7395,12 @@ in
           };
           alerting.contactPoints.settings = {
             apiVersion = 1;
-            contactPoints = [
+            # Provisioning must delete the persisted receiver, not merely stop
+            # declaring it. Prometheus notifications now belong to Alertmanager.
+            deleteContactPoints = [
               {
                 orgId = 1;
-                name = "Telegram (disabled pending seven-day review)";
-                receivers = [
-                  {
-                    uid = "telegram-disabled-review";
-                    type = "telegram";
-                    disableResolveMessage = true;
-                    settings = {
-                      bottoken = "$TELEGRAM_BOT_TOKEN";
-                      chatid = "$TELEGRAM_CHAT_ID";
-                    };
-                  }
-                ];
+                uid = "telegram-disabled-review";
               }
             ];
           };
@@ -7362,7 +7409,6 @@ in
 
       systemd.services.grafana.serviceConfig.EnvironmentFile = [
         runtimeGrafanaSecret
-        config.age.secrets."telegram-deadman".path
       ];
 
       services.prometheus = {
