@@ -39,9 +39,10 @@ let
             send_resolved = true;
             parse_mode = "";
             message = ''
-              {{ range .Alerts }}{{ .Status }}: {{ .Labels.alertname }}
-              {{ if .Labels.endpoint }}{{ .Labels.endpoint }}{{ else if .Labels.service }}{{ .Labels.service }}{{ else if .Labels.instance }}{{ .Labels.instance }}{{ else }}unknown target{{ end }} — since {{ .StartsAt | date "2006-01-02 15:04 UTC" }}
-              {{ .Annotations.summary }}
+              {{ range .Alerts }}{{ if eq .Status "resolved" }}✅ RESOLVED{{ else }}🔴 FIRING{{ end }}: {{ .Labels.alertname }}
+              {{ if .Labels.endpoint }}{{ .Labels.endpoint }}{{ else if .Labels.service }}{{ .Labels.service }}{{ else if .Labels.instance }}{{ .Labels.instance }}{{ else }}unknown target{{ end }} — since {{ .StartsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
+              {{ if eq .Status "resolved" }}Ended: {{ .EndsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
+              {{ end }}{{ .Annotations.summary }}
               {{ if .Annotations.description }}Hint: {{ .Annotations.description }}
               {{ end }}{{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}
               {{ end }}{{ end }}
@@ -126,6 +127,7 @@ in
         };
       };
       systemd.services.alertmanager = {
+        environment.ZONEINFO = "${pkgs.tzdata}/share/zoneinfo";
         unitConfig.ConditionPathExists = requiredSecrets ++ [ telegramEnvironment ];
         serviceConfig = {
           UMask = "0077";
@@ -186,6 +188,7 @@ in
             ];
           }
           ''
+            export ZONEINFO=${pkgs.tzdata}/share/zoneinfo
             export TELEGRAM_BOT_TOKEN=test-only-no-delivery
             export TELEGRAM_CHAT_ID=-1
             envsubst -i ${rawConfig} -o alertmanager.json
@@ -193,6 +196,7 @@ in
             amtool config routes test --config.file=alertmanager.json --verify.receivers=telegram alertname=EndpointDown endpoint=plex.nyc.finnrut.is severity=critical
             amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=SloErrorBudgetExhausted severity=critical
             amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=EndpointDown severity=warning
+            amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=PrometheusScrapeTargetDown job=alertmanager severity=warning
             python3 ${./fixtures/check-alerting.py} inhibition alertmanager.json
             python3 ${./fixtures/check-alerting.py} render alertmanager.json
             touch "$out"
@@ -208,16 +212,20 @@ in
           ''
             promtool check rules ${lib.escapeShellArgs link.services.prometheus.ruleFiles}
             python3 ${./fixtures/check-alerting.py} rules ${fixtures} ${lib.escapeShellArg config.flake.servicePublicationInventory.applications.plex.canonical} ${lib.escapeShellArgs link.services.prometheus.ruleFiles}
-            promtool test rules suite.json
+            promtool test rules suite.json suite-reversed.json
             touch "$out"
           '';
       checks.prometheus-alerting-config =
         pkgs.runCommand "prometheus-alerting-config-check"
           {
-            nativeBuildInputs = [ pkgs.prometheus.cli ];
+            nativeBuildInputs = [
+              pkgs.prometheus.cli
+              python
+            ];
           }
           ''
             promtool check config ${prometheusConfig}
+            python3 ${./fixtures/check-alerting.py} config ${prometheusConfig}
             touch "$out"
           '';
     };

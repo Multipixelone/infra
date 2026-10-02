@@ -1,17 +1,40 @@
 [
   {
     "name": "healthy paths",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "probe": "1x10", "up": "1x10" },
-    "checks": [{ "at": "6m", "firing": [] }]
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "6m",
+        "firing": []
+      }
+    ]
   },
   {
-    "name": "backend outage threshold and generic fallback",
-    "direct": { "probe": "0x10", "up": "1x10" },
-    "published": { "probe": "0x10", "up": "1x10" },
+    "name": "backend outage owns paging from first evaluation",
+    "direct": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
     "checks": [
-      { "at": "4m", "firing": [] },
-      { "at": "5m", "firing": ["PlexBackendDown", "EndpointDown"] }
+      {
+        "at": "4m",
+        "firing": []
+      },
+      {
+        "at": "5m",
+        "firing": ["PlexBackendDown"]
+      }
     ],
     "expressions": [
       {
@@ -23,24 +46,59 @@
   },
   {
     "name": "published outage with healthy backend",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "probe": "0x10", "up": "1x10" },
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
     "checks": [
-      { "at": "4m", "firing": [] },
-      { "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }
+      {
+        "at": "4m",
+        "firing": []
+      },
+      {
+        "at": "5m",
+        "firing": ["PublishedRouteDown"]
+      }
     ]
   },
   {
     "name": "one published resolver copy fails",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "probe": "1x10", "up": "1x10", "impa_probe": "0x10" },
-    "checks": [{ "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }]
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "1x10",
+      "up": "1x10",
+      "impa_probe": "0x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["PublishedRouteDown"]
+      }
+    ]
   },
   {
     "name": "backend outage cannot enter published SLO",
-    "direct": { "probe": "0x10", "up": "1x10" },
-    "published": { "probe": "1x10", "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": ["PlexBackendDown"] }],
+    "direct": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["PlexBackendDown"]
+      }
+    ],
     "expressions": [
       {
         "at": "5m",
@@ -51,50 +109,124 @@
   },
   {
     "name": "backend recovery resolves specific and generic alerts",
-    "direct": { "probe": "0x5 1x4", "up": "1x10" },
-    "published": { "probe": "0x5 1x4", "up": "1x10" },
+    "direct": {
+      "probe": "0x5 1x4",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "0x5 1x4",
+      "up": "1x10"
+    },
     "checks": [
-      { "at": "5m", "firing": ["PlexBackendDown", "EndpointDown"] },
-      { "at": "6m", "firing": [] }
+      {
+        "at": "5m",
+        "firing": ["PlexBackendDown"]
+      },
+      {
+        "at": "6m",
+        "firing": []
+      }
     ]
   },
   {
     "name": "route recovery resolves alerts",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "probe": "0x5 1x4", "up": "1x10" },
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "0x5 1x4",
+      "up": "1x10"
+    },
     "checks": [
-      { "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] },
-      { "at": "6m", "firing": [] }
+      {
+        "at": "5m",
+        "firing": ["PublishedRouteDown"]
+      },
+      {
+        "at": "6m",
+        "firing": []
+      }
     ]
   },
   {
     "name": "unreachable direct scrape is not backend failure",
-    "direct": { "probe": "0x10", "up": "0x10" },
-    "published": { "probe": "0x10", "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+    "direct": {
+      "probe": "0x10",
+      "up": "0x10"
+    },
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["EndpointDown"]
+      }
+    ]
   },
   {
     "name": "missing direct result is not healthy",
-    "direct": { "up": "1x10" },
-    "published": { "probe": "0x10", "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+    "direct": {
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["EndpointDown"]
+      }
+    ]
   },
   {
     "name": "absent direct target preserves generic fallback",
-    "published": { "probe": "0x10", "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["EndpointDown"]
+      }
+    ]
   },
   {
     "name": "failed published scrape counts as route failure",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "probe": "1x10", "up": "0x10" },
-    "checks": [{ "at": "5m", "firing": ["PublishedRouteDown", "EndpointDown"] }]
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "probe": "1x10",
+      "up": "0x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["PublishedRouteDown"]
+      }
+    ]
   },
   {
     "name": "missing published result remains unknown",
-    "direct": { "probe": "1x10", "up": "1x10" },
-    "published": { "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": [] }],
+    "direct": {
+      "probe": "1x10",
+      "up": "1x10"
+    },
+    "published": {
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": []
+      }
+    ],
     "expressions": [
       {
         "at": "5m",
@@ -106,20 +238,113 @@
   {
     "name": "unknown endpoint metadata must not drop alert",
     "endpoint": "unknown.example",
-    "published": { "probe": "0x10", "up": "1x10" },
-    "checks": [{ "at": "5m", "firing": ["EndpointDown"] }]
+    "published": {
+      "probe": "0x10",
+      "up": "1x10"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": ["EndpointDown"]
+      }
+    ]
   },
   {
     "name": "exporter failure owns monitoring outage",
-    "direct": { "up": "0x10" },
-    "published": { "up": "0x10" },
+    "direct": {
+      "up": "0x10"
+    },
+    "published": {
+      "up": "0x10"
+    },
     "extra_series": [
-      { "series": "up{job=\"blackbox\",instance=\"link\"}", "values": "0x10" }
+      {
+        "series": "up{job=\"blackbox\",instance=\"link\"}",
+        "values": "0x10"
+      }
     ],
     "checks": [
-      { "at": "0m", "firing": [] },
-      { "at": "1m", "firing": ["BlackboxExporterDown"] },
-      { "at": "5m", "firing": ["BlackboxExporterDown", "EndpointDown"] }
+      {
+        "at": "0m",
+        "firing": []
+      },
+      {
+        "at": "1m",
+        "firing": ["BlackboxExporterDown"]
+      },
+      {
+        "at": "5m",
+        "firing": ["BlackboxExporterDown", "EndpointDown"]
+      }
+    ]
+  },
+  {
+    "name": "direct scrape becomes unavailable before specific alert fires",
+    "direct": {
+      "probe": "0x15",
+      "up": "1x3 0x11"
+    },
+    "published": {
+      "probe": "0x15",
+      "up": "1x15"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": []
+      },
+      {
+        "at": "9m",
+        "firing": ["EndpointDown"]
+      }
+    ]
+  },
+  {
+    "name": "route failure changes to backend failure without a generic page",
+    "direct": {
+      "probe": "1x3 0x11",
+      "up": "1x15"
+    },
+    "published": {
+      "probe": "0x15",
+      "up": "1x15"
+    },
+    "checks": [
+      {
+        "at": "5m",
+        "firing": []
+      },
+      {
+        "at": "8m",
+        "firing": []
+      },
+      {
+        "at": "9m",
+        "firing": ["PlexBackendDown"]
+      }
+    ]
+  },
+  {
+    "name": "Alertmanager scrape failure remains a single non-paging warning",
+    "extra_series": [
+      {
+        "series": "up{job=\"alertmanager\",instance=\"link\"}",
+        "values": "0x10 1x3"
+      }
+    ],
+    "checks": [
+      {
+        "at": "9m",
+        "firing": []
+      },
+      {
+        "at": "10m",
+        "firing": ["PrometheusScrapeTargetDown"]
+      },
+      {
+        "at": "11m",
+        "firing": []
+      }
     ]
   }
 ]

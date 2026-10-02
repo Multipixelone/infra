@@ -488,6 +488,25 @@ in
             # Regression fixtures mutate in-memory copies only. They prove this
             # narrow contract rejects the former sort label and timeline text.
             alerts = dashboards["alerts.json"]
+            delivery_panels = [
+                panel for panel in alerts["panels"]
+                if panel.get("title") == "Alertmanager notification attempts / failures"
+            ]
+            if len(delivery_panels) != 1:
+                fail("alerts.json", "expected one Alertmanager delivery panel")
+            else:
+                targets = delivery_panels[0].get("targets", [])
+                expected = {
+                    "{{integration}} attempts": "alertmanager_notifications_total",
+                    "{{integration}} failures": "alertmanager_notifications_failed_total",
+                }
+                if len(targets) != 2 or {t.get("legendFormat") for t in targets} != set(expected):
+                    fail("alerts.json", "delivery panel needs named attempts/failures per integration")
+                for target in targets:
+                    expression = target.get("expr", "")
+                    metric = expected.get(target.get("legendFormat"), "missing")
+                    if expression != 'sum by (integration) (increase(' + metric + '{job="alertmanager"}[1h]))':
+                        fail("alerts.json", "delivery panel must aggregate the loopback job without zero fallback")
             old_sort = copy.deepcopy(alerts)
             old_sort_table = next(
                 panel for panel in old_sort["panels"]

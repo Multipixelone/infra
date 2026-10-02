@@ -96,58 +96,97 @@ def render(config_path):
     message = receiver["telegram_configs"][0]["message"]
     with open("message.tmpl", "w") as output:
         output.write('{{ define "telegram" }}' + message + "{{ end }}")
-    for status in ["firing", "resolved"]:
-        for label in ["endpoint", "service", "instance"]:
-            with open("notification.json", "w") as output:
-                json.dump(
-                    {
-                        "receiver": "telegram",
-                        "status": status,
-                        "alerts": [
-                            {
-                                "status": status,
-                                "labels": {
-                                    "alertname": "ExampleAlert",
-                                    label: "example-target",
-                                },
-                                "startsAt": "2026-09-28T00:36:00Z",
-                                "endsAt": "2026-09-30T15:40:00Z",
-                                "annotations": {
-                                    "summary": "Example summary",
-                                    "description": "Example hint",
-                                    "runbook": "https://example.com/runbook",
-                                },
-                            }
-                        ],
-                    },
-                    output,
-                )
-            rendered = subprocess.run(
-                [
-                    "amtool",
-                    "template",
-                    "render",
-                    "--template.glob=message.tmpl",
-                    '--template.text={{ template "telegram" . }}',
-                    "--template.data=notification.json",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-            for expected in [
-                status,
-                "ExampleAlert",
-                "example-target",
-                "2026-09-28 00:36 UTC",
-                "Example summary",
-                "Example hint",
-                "https://example.com/runbook",
-            ]:
-                assert expected in rendered, (expected, rendered)
+    cases = [
+        (
+            "2026-09-28T00:36:00Z",
+            "2026-09-27 20:36 EDT",
+            "2026-09-30T15:40:00Z",
+            "2026-09-30 11:40 EDT",
+        ),
+        (
+            "2026-01-01T00:36:00Z",
+            "2025-12-31 19:36 EST",
+            "2026-01-02T15:40:00Z",
+            "2026-01-02 10:40 EST",
+        ),
+    ]
+    for starts_at, start_time, ends_at, end_time in cases:
+        for status in ["firing", "resolved"]:
+            for label in ["endpoint", "service", "instance"]:
+                with open("notification.json", "w") as output:
+                    json.dump(
+                        {
+                            "receiver": "telegram",
+                            "status": status,
+                            "alerts": [
+                                {
+                                    "status": status,
+                                    "labels": {
+                                        "alertname": "ExampleAlert",
+                                        label: "example-target",
+                                    },
+                                    "startsAt": starts_at,
+                                    "endsAt": ends_at,
+                                    "annotations": {
+                                        "summary": "Example summary",
+                                        "description": "Example hint",
+                                        "runbook": "https://example.com/runbook",
+                                    },
+                                }
+                            ],
+                        },
+                        output,
+                    )
+                rendered = subprocess.run(
+                    [
+                        "amtool",
+                        "template",
+                        "render",
+                        "--template.glob=message.tmpl",
+                        '--template.text={{ template "telegram" . }}',
+                        "--template.data=notification.json",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+                for expected in [
+                    "✅ RESOLVED" if status == "resolved" else "🔴 FIRING",
+                    "ExampleAlert",
+                    "example-target",
+                    start_time,
+                    "Example summary",
+                    "Example hint",
+                    "https://example.com/runbook",
+                ]:
+                    assert expected in rendered, (expected, rendered)
+                if status == "resolved":
+                    assert f"Ended: {end_time}" in rendered, rendered
+                else:
+                    assert "Ended:" not in rendered, rendered
     print(
-        "rendered six firing/resolved notifications with endpoint/service/instance identities offline"
+        "rendered 12 firing/resolved notifications with New York summer/winter times offline"
     )
+
+
+def prometheus_config(config_path):
+    with open(config_path) as source:
+        config = yaml.safe_load(source)
+    jobs = [
+        job for job in config["scrape_configs"] if job["job_name"] == "alertmanager"
+    ]
+    assert len(jobs) == 1
+    assert jobs[0]["static_configs"] == [
+        {"targets": ["127.0.0.1:9093"], "labels": {"instance": "link"}}
+    ], jobs[0]
+    targets = [
+        target
+        for manager in config["alerting"]["alertmanagers"]
+        for group in manager.get("static_configs", [])
+        for target in group["targets"]
+    ]
+    assert targets == ["127.0.0.1:9093"], targets
+    print("validated normalized loopback Alertmanager scrape and discovery targets")
 
 
 def rules(fixtures_path, plex_endpoint, rule_paths):
@@ -164,6 +203,7 @@ def rules(fixtures_path, plex_endpoint, rule_paths):
         "PlexBackendDown",
         "PublishedRouteDown",
         "BlackboxExporterDown",
+        "PrometheusScrapeTargetDown",
     ]
     with open(fixtures_path) as source:
         fixtures = json.load(source)
@@ -195,7 +235,9 @@ def rules(fixtures_path, plex_endpoint, rule_paths):
             for key, value in rule.get("annotations", {}).items()
         }
 
-    for name in tested_alerts:
+    assert alert_rules["PrometheusScrapeTargetDown"]["labels"]["severity"] == "warning"
+    assert alert_rules["PrometheusScrapeTargetDown"]["for"] == "10m"
+    for name in tested_alerts[:-1]:
         assert alert_rules[name]["labels"]["severity"] == "critical"
         assert alert_rules[name]["annotations"]["description"]
         assert alert_rules[name]["annotations"]["runbook"]
@@ -270,6 +312,8 @@ def rules(fixtures_path, plex_endpoint, rule_paths):
                                 probe_exporter="link",
                                 access_path="published",
                             )
+                    elif name == "PrometheusScrapeTargetDown":
+                        labels = {"job": "alertmanager", "instance": "link"}
                     elif name == "BlackboxExporterDown":
                         labels = {"job": "blackbox", "instance": "link"}
                     # Assert the produced labels, including annotation inputs,
@@ -316,7 +360,28 @@ def rules(fixtures_path, plex_endpoint, rule_paths):
             },
             output,
         )
-    print(f"prepared {len(tests)} scenarios against production rule files")
+    # Prove Plex ownership does not depend on which alert group evaluates first.
+    with open("suite.json") as source:
+        reversed_suite = json.load(source)
+    reversed_suite["group_eval_order"].reverse()
+    # The generic alert consumes a separate recording group. Reversing those
+    # groups makes its first pending evaluation one tick later; this is not
+    # the Plex race, whose ownership uses raw telemetry in either order.
+    for test in reversed_suite["tests"]:
+        generic_times = {
+            item["eval_time"]
+            for item in test["alert_rule_test"]
+            if item["alertname"] == "EndpointDown" and item["exp_alerts"]
+        }
+        for item in test["alert_rule_test"]:
+            if item["eval_time"] in generic_times:
+                assert item["eval_time"].endswith("m")
+                item["eval_time"] = f"{int(item['eval_time'][:-1]) + 1}m"
+    with open("suite-reversed.json", "w") as output:
+        json.dump(reversed_suite, output)
+    print(
+        f"prepared {len(tests)} scenarios against production rule files in both group orders"
+    )
 
 
 if __name__ == "__main__":
@@ -324,7 +389,9 @@ if __name__ == "__main__":
         inhibition(sys.argv[2])
     elif sys.argv[1] == "render":
         render(sys.argv[2])
+    elif sys.argv[1] == "config":
+        prometheus_config(sys.argv[2])
     elif sys.argv[1] == "rules":
         rules(sys.argv[2], sys.argv[3], sys.argv[4:])
     else:
-        raise SystemExit("expected inhibition or rules")
+        raise SystemExit("expected inhibition, render, config or rules")

@@ -5,6 +5,8 @@
   ...
 }:
 let
+  # Forgejo is authoritative (see modules/ci/forgejo.nix).
+  endpointRunbook = "https://git.finnrut.is/${config.flake.meta.owner.username}/${config.flake.meta.repo.name}/src/branch/${config.flake.meta.repo.defaultBranch}/docs/observability-phase1.md#endpoint-alert-response";
   inherit (config) observability;
   hostRegistry = config.hosts;
   # Named `viz`, not `grafana`: the module's inner `let` already binds
@@ -341,13 +343,20 @@ let
   })";
   # Dependency metadata is advisory: an unknown endpoint still alerts. Keep it
   # out of the availability recordings, whose identity remains endpoint/SLO.
+  # Specific Plex alerts own a known direct result from the first evaluation,
+  # rather than relying on Alertmanager seeing an inhibitor before group_wait.
+  # Missing/unreachable direct telemetry preserves the generic fallback.
+  plexDirectSelector = ''job="blackbox-plex-direct",endpoint="${serviceInventory.applications.plex.canonical}",access_path="direct"'';
+  plexDirectKnown = "min by (endpoint) ((probe_success{${plexDirectSelector}} == 0 or probe_success{${plexDirectSelector}} == 1) and (up{${plexDirectSelector}} == 1))";
   endpointDownExpr = ''
+    (
     (endpoint:probe_success_unexcused == 0)
       * on (endpoint, slo_class) group_left (backend_host, site, probe_exporter, access_path)
         endpoint:alert_dependencies
     or
     ((endpoint:probe_success_unexcused == 0)
       unless on (endpoint, slo_class) endpoint:alert_dependencies)
+    ) unless on (endpoint) (${plexDirectKnown})
   '';
   # Blackbox records the full timeout as a probe's *duration* when it gives up,
   # so percentiling the raw series turns every outage into a latency
@@ -1074,9 +1083,29 @@ let
         "provisioned"
         "alerts"
       ];
-      description = "Prometheus-side alerting rules. There is no Alertmanager: rules evaluate in Prometheus and surface here and as the ALERTS series. Ages and history describe Prometheus evaluator state, not durable incidents; missing samples and zero fallbacks do not confirm recovery.";
+      description = "Prometheus rules evaluate here and as the ALERTS series. Alertmanager delivers critical notifications to Telegram; warnings and exhausted SLO budgets remain non-paging. Ages and history describe Prometheus evaluator state, not durable incidents; missing samples and zero fallbacks do not confirm recovery.";
       from = "now-24h";
       rows = [
+        [
+          (viz.panel {
+            title = "Alertmanager notification attempts / failures";
+            description = "Notifications attempted and failed over 1h by integration. Attempts include failures; missing telemetry remains missing.";
+            w = 24;
+            h = 6;
+            unit = viz.units.short;
+            decimals = 0;
+            targets = [
+              {
+                expr = ''sum by (integration) (increase(alertmanager_notifications_total{job="alertmanager"}[1h]))'';
+                legend = "{{integration}} attempts";
+              }
+              {
+                expr = ''sum by (integration) (increase(alertmanager_notifications_failed_total{job="alertmanager"}[1h]))'';
+                legend = "{{integration}} failures";
+              }
+            ];
+          })
+        ]
         [ (viz.row "Right now") ]
         [
           (viz.panel {
@@ -6781,7 +6810,7 @@ in
                 };
                 annotations.summary = "Blackbox exporter on {{ $labels.instance }} is unreachable";
                 annotations.description = "Check prometheus-blackbox-exporter on the probe host before investigating dependent endpoints.";
-                annotations.runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md";
+                annotations.runbook = endpointRunbook;
               }
               {
                 alert = "DnsProbeFailed";
@@ -6852,7 +6881,7 @@ in
                 labels.severity = "critical";
                 annotations.summary = "Endpoint {{ $labels.endpoint }} is down";
                 annotations.description = "Check the endpoint dashboard, DNS and publication route. For Plex, compare the direct /identity probe before investigating the backend.";
-                annotations.runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
+                annotations.runbook = endpointRunbook;
               }
               {
                 alert = "SystemdUnitFailed";
@@ -7426,6 +7455,17 @@ in
               static_configs = [
                 {
                   targets = [ "${prometheus.backendAddress}:${toString prometheus.port}" ];
+                  labels.instance = "link";
+                }
+              ];
+            }
+            {
+              job_name = "alertmanager";
+              static_configs = [
+                {
+                  targets = [
+                    "${config.services.prometheus.alertmanager.listenAddress}:${toString config.services.prometheus.alertmanager.port}"
+                  ];
                   labels.instance = "link";
                 }
               ];

@@ -5,6 +5,8 @@
   ...
 }:
 let
+  # Forgejo is authoritative (see modules/ci/forgejo.nix).
+  endpointRunbook = "https://git.finnrut.is/${config.flake.meta.owner.username}/${config.flake.meta.repo.name}/src/branch/${config.flake.meta.repo.defaultBranch}/docs/observability-phase1.md#endpoint-alert-response";
   inventory = config.flake.servicePublicationInventory;
   serviceApplications = config.servicePublication.applications;
   routeKeys = [
@@ -1601,7 +1603,7 @@ in
                 annotations = {
                   summary = "Plex backend {{ $labels.endpoint }} is unhealthy";
                   description = "Alexandria's direct /identity probe is failing. Check Plex's listener, container health and logs on Alexandria; compare the published route in Media Health.";
-                  runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
+                  runbook = endpointRunbook;
                 };
               }
               {
@@ -1614,7 +1616,7 @@ in
                 annotations = {
                   summary = "Published route for {{ $labels.endpoint }} is failing while Plex responds directly";
                   description = "Plex's direct /identity probe succeeds. Check internal DNS, the serving proxy and its connection to Alexandria; compare both access paths in Media Health.";
-                  runbook = "https://github.com/Multipixelone/infra/blob/main/docs/observability-phase1.md#endpoint-alert-response";
+                  runbook = endpointRunbook;
                 };
               }
               {

@@ -291,9 +291,11 @@ comparison first:
 - Missing direct results or failed direct scrapes remain unknown. The generic
   published `EndpointDown` remains fallback coverage.
 
-The specific Plex alerts inhibit `EndpointDown` for the same endpoint, avoiding
-duplicate pages. Endpoint dependency labels come from the publication registry;
-they do not alter SLO identity. A host-exporter failure inhibits only endpoints
+A valid direct Plex result gives the specific alerts exclusive paging ownership
+from the first evaluation, eliminating a race with `EndpointDown`. Unknown direct
+telemetry retains generic fallback coverage. The specific alerts also inhibit
+`EndpointDown` for the same endpoint. Endpoint dependency labels come from the
+publication registry; they do not alter SLO identity. A host-exporter failure inhibits only endpoints
 with that same backend host. Link or Impa host-exporter failures therefore do
 not suppress Alexandria endpoints. All-DNS failure inhibits only published
 paths in the same site. Blackbox exporter failure inhibits only endpoint and
@@ -301,7 +303,31 @@ publication alerts using that exporter. Neither signal suppresses the direct
 Plex backend alert. Every inhibition equality requires explicit nonempty labels.
 
 NAS telemetry, NAS/Plex and proxy log shipping, exporter collection freshness,
-an Alertmanager dead-man backstop, and Plex auto-heal remain separate follow-ups.
+and Plex auto-heal remain separate follow-ups.
+
+## Independent alerting dead-man
+
+The lingering user timer in `modules/link/deadman.nix` checks the gateway and
+alerting pipeline every two minutes, independently of those services. Separate
+three-failure debounce state covers each system unit (`alertmanager.service`
+and `prometheus.service`, including skipped startup conditions), Alertmanager
+loopback health, Prometheus Alertmanager discovery, and increases in Telegram
+notification failures. The Alerts dashboard shows notification attempts and
+failures per integration; attempts include failures. An Alertmanager scrape
+outage produces the existing ten-minute non-paging warning.
+
+The timer's Telegram environment file is optional so missing credentials do
+not stop checks or journaling. Each condition queues one failure and one
+recovery notice; pending notices are persisted and retried until the bot API
+confirms delivery. Failure-counter resets establish a new baseline, and a flat
+counter alone does not prove successful delivery. Because this backstop shares
+Telegram and its credentials, it cannot deliver immediately while that sink is
+broken; it journals the condition and delivers queued notices after recovery.
+It does not send periodic reminders or an external Watchdog heartbeat.
+
+Alertmanager messages show America/New_York timestamps, including daylight
+saving time, and the end time for resolved alerts. Runbook links use the
+repository's authoritative Forgejo origin, `git.finnrut.is/tunnel/infra`.
 
 ## DNS diagnostic telemetry
 
