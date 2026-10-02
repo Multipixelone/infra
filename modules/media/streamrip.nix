@@ -1151,8 +1151,17 @@ in
           exec ${lib.getExe pkgs.python3} ${rootPath}/pkgs/openclaw-music/openclaw_music/qobuz_matcher.py "$@"
         '';
       };
-      spotify-qobuz-albums-inner = pkgs.writers.writeFishBin "spotify-qobuz-albums-inner" ''
-        set -l curl ${lib.getExe pkgs.curl}
+      spotify-exportify-csv-script = pkgs.writeText "spotify-exportify-csv.py" (
+        builtins.readFile ./spotify_exportify_csv.py
+      );
+      spotify-exportify-csv = pkgs.writeShellApplication {
+        name = "spotify-exportify-csv";
+        text = ''
+          exec ${lib.getExe pkgs.python3} ${spotify-exportify-csv-script} "$@"
+        '';
+      };
+      spotify-qobuz-albums = pkgs.writers.writeFishBin "spotify-qobuz-albums" ''
+        set -l csv_import ${lib.getExe spotify-exportify-csv}
         set -l jq ${lib.getExe pkgs.jq}
         set -l mktemp ${lib.getExe' pkgs.coreutils "mktemp"}
         set -l chmod ${lib.getExe' pkgs.coreutils "chmod"}
@@ -1163,16 +1172,21 @@ in
         set -l match_cache_tool ${lib.getExe spotify-qobuz-match-cache}
         set -l match_evidence_tool ${lib.getExe spotify-qobuz-match-evidence}
         set -l beets_inventory ${lib.getExe beets-library-inventory}
-        set -l beet ${lib.getExe config.programs.beets.package}
+        # Inventory is read-only and must not invoke the harmony secret wrapper.
+        set -l beet ${lib.getExe inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default}
         set -l beets_config /home/tunnel/.config/beets/config.yaml
         set -l beets_database /home/tunnel/.config/beets/library.db
         set -l streamrip_config ${lib.escapeShellArg "${config.xdg.configHome}/streamrip/config.toml"}
 
         function usage
-          printf '%s\n' 'Usage: spotify-qobuz-albums [--output FILE] [--match-cache FILE] [--refresh-matches] [--no-download] [--retry-existing] [--yes] SPOTIFY_PLAYLIST_URL'
+          printf '%s\n' 'Usage: spotify-qobuz-albums [--output FILE] [--match-cache FILE] [--refresh-matches] [--no-download] [--retry-existing] [--yes] EXPORTIFY.csv'
           printf '%s\n' '  --match-cache FILE  Persistent Spotify-to-Qobuz selection cache.'
           printf '%s\n' '  --refresh-matches   Forget each current cached selection before resolving it.'
           printf '%s\n' '  --retry-existing  Process all metadata-valid current albums; Streamrip still skips downloaded tracks.'
+          printf '%s\n' '  Export a playlist from https://exportify.app/ and pass its local CSV file; no Spotify credentials are needed.'
+          printf '%s\n' '  Beets library and Qobuz/Streamrip configuration are still required.'
+          printf '%s\n' '  --no-download still searches and verifies Qobuz metadata; it is not offline.'
+          printf '%s\n' '  Use -- before a CSV path beginning with a dash. ZIP, stdin, URLs, and multiple inputs are not supported.'
         end
 
         function die
@@ -1185,7 +1199,7 @@ in
         end
 
         function normalize_desc
-          set -l lowercase (string lower -- "$argv[1]")
+          set -l lowercase (string lower -- "$argv[1]" | string collect)
           string replace -ra '[^[:alnum:]]+' "" -- "$lowercase"
         end
 
@@ -1315,14 +1329,16 @@ in
 
         if test (count $argv) -ne 1
           usage >&2
-          die 'expected exactly one Spotify playlist URL'
+          die 'expected exactly one local Exportify CSV file'
         end
 
-        set -l playlist_url "$argv[1]"
-        if not string match -rq '^https?://open\.spotify\.com/playlist/[^/?#]+(?:\?[^#]*)?$' -- "$playlist_url"
-          die 'expected an open.spotify.com/playlist/<id> URL'
+        set -l csv_input "$argv[1]"
+        if string match -rq '^[A-Za-z][A-Za-z0-9+.-]*://' -- "$csv_input"
+          die 'URLs are no longer supported; export the playlist from https://exportify.app/ and pass its local CSV'
         end
-        set -l playlist_id (string replace -r '^https?://open\.spotify\.com/playlist/([^/?#]+)(?:\?[^#]*)?$' '$1' -- "$playlist_url")
+        if not test -f "$csv_input"; or not test -r "$csv_input"
+          die 'expected a regular readable Exportify CSV file'
+        end
 
         set -l output "$PWD/spotify-qobuz-albums.json"
         if set -q _flag_output
@@ -1359,32 +1375,6 @@ in
           set unmatched_report "$output.unmatched.json"
           set beets_report "$output.beets.json"
           set match_evidence_report "$output.match-evidence.json"
-        end
-
-        # This must run before cache initialization: an evidence destination
-        # is diagnostics only and must never alias a legacy mutable artifact.
-        if not $match_evidence_tool validate-destination --destination "$match_evidence_report" --against \
-          "$match_cache" "$output" "$rejected_report" "$status_report" "$unmatched_report" "$beets_report"
-          die 'match evidence report aliases a cache or legacy output artifact'
-        end
-
-        if not $match_cache_tool init --cache "$match_cache" >/dev/null
-          die "could not initialize match cache: $match_cache"
-        end
-        set -l cached_match_reused 0
-        set -l cached_skip_reused 0
-        set -l new_decisions_stored 0
-        set -l stale_mappings_invalidated 0
-        printf 'Match cache: %s\n' "$match_cache"
-
-        if not set -q SPOTIFY_CLIENT_ID; or test -z "$SPOTIFY_CLIENT_ID"
-          die 'SPOTIFY_CLIENT_ID is not set'
-        end
-        if not set -q SPOTIFY_CLIENT_SECRET; or test -z "$SPOTIFY_CLIENT_SECRET"
-          die 'SPOTIFY_CLIENT_SECRET is not set'
-        end
-        if string match -rq '[\r\n]' -- "$SPOTIFY_CLIENT_ID$SPOTIFY_CLIENT_SECRET"
-          die 'Spotify credentials contain an unsupported newline'
         end
 
         umask 077
@@ -1424,12 +1414,26 @@ in
         $chmod 700 "$tempdir"
         or die 'could not secure temporary directory'
 
-        set -l client_config "$tempdir/client.conf"
-        set -l token_config "$tempdir/token.conf"
-        set -l token_file "$tempdir/token.json"
-        set -l page_file "$tempdir/page.json"
-        set -l albums_jsonl "$tempdir/albums.jsonl"
         set -l albums_file "$tempdir/albums.json"
+        # Validate the entire CSV and every input/mutable-destination alias before
+        # touching persistent cache state, locks, reports, or downstream tools.
+        if not $csv_import --input="$csv_input" --output="$albums_file" \
+          --against="$output" --against="$rejected_report" --against="$status_report" \
+          --against="$unmatched_report" --against="$beets_report" --against="$match_evidence_report" \
+          --against="$match_cache" --against="$match_cache.lock"
+          die 'could not import Exportify CSV; persistent state was not changed'
+        end
+        $chmod 600 "$albums_file"
+        or die 'could not secure imported album metadata'
+        set -l checked_destinations
+        for destination in "$output" "$rejected_report" "$status_report" "$unmatched_report" "$beets_report" "$match_cache" "$match_cache.lock" "$match_evidence_report"
+          if test (count $checked_destinations) -gt 0
+            if not $match_evidence_tool validate-destination --destination "$destination" --against $checked_destinations
+              die 'mutable importer destinations alias one another'
+            end
+          end
+          set -a checked_destinations "$destination"
+        end
         set -l missing_albums_file "$tempdir/missing-albums.json"
         set -l owned_albums_file "$tempdir/owned-albums.json"
         set -l search_file "$tempdir/search.json"
@@ -1455,7 +1459,6 @@ in
         set -g __spotify_qobuz_match_evidence_requests_jsonl "$match_evidence_requests_jsonl"
         set -g __spotify_qobuz_match_evidence_report "$match_evidence_report"
         set -g __spotify_qobuz_output_dir "$output_dir"
-        printf "" > "$albums_jsonl"
         printf "" > "$unmatched_jsonl"
         printf "" > "$selected_jsonl"
         printf "" > "$match_evidence_requests_jsonl"
@@ -1506,64 +1509,6 @@ in
         $chmod 600 "$old_manifest" "$old_rejected_manifest"
         or die 'could not secure existing manifest snapshots'
 
-        set -l escaped_credentials (string replace -a '\\' '\\\\' -- "$SPOTIFY_CLIENT_ID:$SPOTIFY_CLIENT_SECRET")
-        set escaped_credentials (string replace -a '"' '\\"' -- "$escaped_credentials")
-        printf 'user = "%s"\n' "$escaped_credentials" > "$client_config"
-        or die 'could not write Spotify authentication configuration'
-        $chmod 600 "$client_config"
-        or die 'could not secure Spotify authentication configuration'
-
-        if not $curl --retry 3 --retry-all-errors --fail-with-body --silent --show-error --config "$client_config" --data 'grant_type=client_credentials' --output "$token_file" 'https://accounts.spotify.com/api/token'
-          die 'Spotify authentication failed'
-        end
-        if not $jq -e '(.access_token | type == "string" and length > 0)' "$token_file" >/dev/null
-          die 'Spotify returned an invalid authentication response'
-        end
-        set -l spotify_token ($jq -r '.access_token' "$token_file")
-        if string match -rq '[\r\n]' -- "$spotify_token"
-          die 'Spotify returned an invalid access token'
-        end
-        set -l escaped_token (string replace -a '\\' '\\\\' -- "$spotify_token")
-        set escaped_token (string replace -a '"' '\\"' -- "$escaped_token")
-        printf 'header = "Authorization: Bearer %s"\n' "$escaped_token" > "$token_config"
-        or die 'could not write Spotify request configuration'
-        $chmod 600 "$token_config"
-        or die 'could not secure Spotify request configuration'
-        set -e spotify_token escaped_credentials escaped_token
-
-        set -l next_url "https://api.spotify.com/v1/playlists/$playlist_id/items?limit=50"
-        while test -n "$next_url"
-          if not $curl --retry 3 --retry-all-errors --fail-with-body --silent --show-error --config "$token_config" --output "$page_file" "$next_url"
-            die 'could not fetch Spotify playlist items'
-          end
-          if not $jq -e '(.items | type == "array") and (.next == null or (.next | type == "string"))' "$page_file" >/dev/null
-            die 'Spotify returned an invalid playlist response'
-          end
-          $jq -c '
-            .items[]?
-            | select(.track != null and .is_local != true and .track.is_local != true and .track.type == "track")
-            | .track.album as $album
-            | select(
-                $album != null
-                and ($album.id | type == "string" and length > 0)
-                and ($album.name | type == "string" and length > 0)
-                and ($album.artists | type == "array" and length > 0)
-                and ($album.artists[0].name | type == "string" and length > 0)
-              )
-            | {
-                spotify_id: $album.id,
-                name: $album.name,
-                artist: $album.artists[0].name,
-                spotify_url: ($album.external_urls.spotify // ("https://open.spotify.com/album/" + $album.id))
-              }
-          ' "$page_file" >> "$albums_jsonl"
-          or die 'could not extract Spotify albums from playlist response'
-          set next_url ($jq -r '.next // empty' "$page_file")
-        end
-
-        if not $jq -s 'unique_by(.spotify_id) | sort_by(.spotify_id)' "$albums_jsonl" > "$albums_file"
-          die 'could not prepare Spotify album list'
-        end
         if not $jq -e '
           type == "array"
           and all(.[];
@@ -1576,6 +1521,14 @@ in
         ' "$albums_file" >/dev/null
           die 'Spotify album data did not match the expected schema'
         end
+        if not $match_cache_tool init --cache "$match_cache" >/dev/null
+          die "could not initialize match cache: $match_cache"
+        end
+        set -l cached_match_reused 0
+        set -l cached_skip_reused 0
+        set -l new_decisions_stored 0
+        set -l stale_mappings_invalidated 0
+        printf 'Match cache: %s\n' "$match_cache"
         set -l spotify_album_count ($jq -r 'length' "$albums_file")
         if not $beets_inventory --beet "$beet" --config "$beets_config" --database "$beets_database" --input "$albums_file" --missing "$missing_albums_file" --owned "$owned_albums_file"
           die 'Beets inventory failed; no Qobuz work was started'
@@ -1627,13 +1580,14 @@ in
         set -l skipped_count 0
         set -l album_index 0
         for album in ($jq -c '.[]' "$missing_albums_file")
-          set -l album_name (printf '%s\n' "$album" | $jq -r '.name')
-          set -l album_artist (printf '%s\n' "$album" | $jq -r '.artist')
+          set -l album_name (printf '%s\n' "$album" | $jq -j '.name' | string collect --no-trim-newlines)
+          set -l album_artist (printf '%s\n' "$album" | $jq -j '.artist' | string collect --no-trim-newlines)
           set -l spotify_url (printf '%s\n' "$album" | $jq -r '.spotify_url')
           set -l spotify_id (printf '%s\n' "$album" | $jq -r '.spotify_id')
           set -l query "$album_name by $album_artist"
+          set -l query_label (display_desc "$query")
           set album_index (math $album_index + 1)
-          printf '[%s/%s] %s — %s\n' "$album_index" "$beets_missing_count" "$album_artist" "$album_name"
+          printf '[%s/%s] %s — %s\n' "$album_index" "$beets_missing_count" (display_desc "$album_artist") (display_desc "$album_name")
           printf 'Spotify: %s\n' "$spotify_url"
           if set -q _flag_refresh_matches
             if not $match_cache_tool delete --cache "$match_cache" --spotify-id "$spotify_id" >/dev/null
@@ -1645,7 +1599,7 @@ in
             set -l cached_action (printf '%s\n' "$cached_decision" | $jq -r 'if .found then .decision.action else "" end')
             if test "$cached_action" = match
               set -l cached_qobuz_id (printf '%s\n' "$cached_decision" | $jq -r '.decision.qobuz_id')
-              set -l cached_qobuz_desc (printf '%s\n' "$cached_decision" | $jq -r '.decision.qobuz_desc')
+              set -l cached_qobuz_desc (printf '%s\n' "$cached_decision" | $jq -j '.decision.qobuz_desc' | string collect --no-trim-newlines)
               printf 'Cached Qobuz: %s [Qobuz ID: %s] https://open.qobuz.com/album/%s\n' \
                 (display_desc "$cached_qobuz_desc") "$cached_qobuz_id" "$cached_qobuz_id"
               $jq -cn --arg id "$cached_qobuz_id" '{source: "qobuz", media_type: "album", id: $id}' >> "$resolved_jsonl"
@@ -1666,14 +1620,14 @@ in
 
           $rm -f -- "$search_file"
           if not $rip search --output-file "$search_file" --num-results 10 qobuz album "$query" >/dev/null
-            warn "Qobuz search failed for: $query"
+            warn "Qobuz search failed for: $query_label"
             record_unmatched "$album" qobuz_search_failed
             record_match_evidence "$album" selection_search_failed
             set skipped_count (math $skipped_count + 1)
             continue
           end
           if not test -f "$search_file"
-            warn "no Qobuz album found for: $query"
+            warn "no Qobuz album found for: $query_label"
             record_unmatched "$album" no_qobuz_results
             record_match_evidence "$album" selection_no_results
             set skipped_count (math $skipped_count + 1)
@@ -1690,7 +1644,7 @@ in
               and (.desc | type == "string" and length > 0)
             )
           ' "$search_file" >/dev/null
-            warn "Qobuz returned invalid search data for: $query"
+            warn "Qobuz returned invalid search data for: $query_label"
             record_unmatched "$album" invalid_qobuz_search_response
             record_match_evidence "$album" selection_malformed_response
             set skipped_count (math $skipped_count + 1)
@@ -1699,7 +1653,7 @@ in
 
           set -l candidate_count ($jq -r 'length' "$search_file")
           if test "$candidate_count" -eq 0
-            warn "no Qobuz album found for: $query"
+            warn "no Qobuz album found for: $query_label"
             record_unmatched "$album" no_qobuz_results
             record_match_evidence "$album" selection_no_results
             set skipped_count (math $skipped_count + 1)
@@ -1710,7 +1664,7 @@ in
           set -l expected_normalized (normalize_desc "$expected")
           set -l matches
           for candidate in ($jq -c '.[]' "$search_file")
-            set -l candidate_desc (printf '%s\n' "$candidate" | $jq -r '.desc')
+            set -l candidate_desc (printf '%s\n' "$candidate" | $jq -j '.desc' | string collect --no-trim-newlines)
             set -l candidate_normalized (normalize_desc "$candidate_desc")
             if test "$candidate_normalized" = "$expected_normalized"
               set -a matches "$candidate"
@@ -1721,7 +1675,7 @@ in
           set -l decision_selection ""
           if test "$candidate_count" -eq 1; and test "$match_count" -eq 1
             set chosen "$matches[1]"
-            set -l chosen_desc (printf '%s\n' "$chosen" | $jq -r '.desc')
+            set -l chosen_desc (printf '%s\n' "$chosen" | $jq -j '.desc' | string collect --no-trim-newlines)
             set -l chosen_id (printf '%s\n' "$chosen" | $jq -r '.id')
             printf 'Auto-selected Qobuz: %s [Qobuz ID: %s] https://open.qobuz.com/album/%s\n' \
               (display_desc "$chosen_desc") "$chosen_id" "$chosen_id"
@@ -1731,13 +1685,13 @@ in
             set -l candidate_index 0
             for candidate in ($jq -c '.[]' "$search_file")
               set candidate_index (math $candidate_index + 1)
-              set -l candidate_desc (printf '%s\n' "$candidate" | $jq -r '.desc')
+              set -l candidate_desc (printf '%s\n' "$candidate" | $jq -j '.desc' | string collect --no-trim-newlines)
               set -l candidate_id (printf '%s\n' "$candidate" | $jq -r '.id')
               printf '%s. %s [Qobuz ID: %s] https://open.qobuz.com/album/%s\n' \
                 "$candidate_index" (display_desc "$candidate_desc") "$candidate_id" "$candidate_id"
             end
             if not test -t 0
-              warn "Qobuz result requires confirmation without a TTY: $query"
+              warn "Qobuz result requires confirmation without a TTY: $query_label"
               record_unmatched "$album" ambiguous_noninteractive
               record_match_evidence "$album" selection_ambiguous_noninteractive
               set skipped_count (math $skipped_count + 1)
@@ -1774,7 +1728,7 @@ in
           printf '%s\n' "$chosen" | $jq -c '{ source, media_type, id }' >> "$resolved_jsonl"
           or die 'could not record resolved Qobuz album'
           set -l selected_qobuz_id (printf '%s\n' "$chosen" | $jq -r '.id')
-          set -l selected_qobuz_desc (printf '%s\n' "$chosen" | $jq -r '.desc')
+          set -l selected_qobuz_desc (printf '%s\n' "$chosen" | $jq -j '.desc' | string collect --no-trim-newlines)
           if not $match_cache_tool set --cache "$match_cache" --spotify "$album" --action match --qobuz-id "$selected_qobuz_id" --qobuz-desc "$selected_qobuz_desc" --selection "$decision_selection" >/dev/null
             die "could not store cached match for Spotify album: $spotify_id"
           end
@@ -1979,34 +1933,6 @@ in
         end
         finish_match_evidence 0
       '';
-      spotify-qobuz-albums = pkgs.writeShellApplication {
-        name = "spotify-qobuz-albums";
-        text = ''
-          case "''${1:-}" in
-            -h|--help)
-              exec ${lib.getExe spotify-qobuz-albums-inner} "$@"
-              ;;
-          esac
-          harmony_env=${lib.escapeShellArg config.age.secrets."beets-harmony".path}
-          if [ ! -r "$harmony_env" ]; then
-            printf '%s\n' 'spotify-qobuz-albums: cannot read beets-harmony secret' >&2
-            exit 1
-          fi
-          set -a
-          # shellcheck disable=SC1090
-          if ! . "$harmony_env"; then
-            set +a
-            printf '%s\n' 'spotify-qobuz-albums: could not load beets-harmony secret' >&2
-            exit 1
-          fi
-          set +a
-          if [ -z "''${SPOTIFY_CLIENT_ID:-}" ] || [ -z "''${SPOTIFY_CLIENT_SECRET:-}" ]; then
-            printf '%s\n' 'spotify-qobuz-albums: beets-harmony secret lacks Spotify credentials' >&2
-            exit 1
-          fi
-          exec ${lib.getExe spotify-qobuz-albums-inner} "$@"
-        '';
-      };
     in
     {
       home.packages = [
