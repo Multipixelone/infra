@@ -12,7 +12,13 @@ let
         jq
         gawk
       ];
-      text = builtins.readFile ./scripts/deadman.sh;
+      text =
+        (import ../../lib/alert-format.nix)
+        + "\n"
+        + ''
+          export TZDIR=${pkgs.tzdata}/share/zoneinfo
+        ''
+        + builtins.readFile ./scripts/deadman.sh;
     };
 in
 {
@@ -22,7 +28,7 @@ in
     # the same missing secret prevents Alertmanager startup.
     home-manager.users.tunnel.systemd.user = {
       services.openclaw-deadman = {
-        Unit.Description = "Dead-man checks for OpenClaw and the alerting pipeline";
+        Unit.Description = "Independent checks for the alerting pipeline";
         Service = {
           Type = "oneshot";
           ExecStart = "${deadmanScript pkgs}/bin/openclaw-deadman";
@@ -32,7 +38,7 @@ in
         };
       };
       timers.openclaw-deadman = {
-        Unit.Description = "Periodic independent gateway and alerting checks";
+        Unit.Description = "Periodic independent alerting pipeline checks";
         Timer = {
           OnBootSec = "2min";
           OnUnitActiveSec = "2min";
@@ -49,6 +55,7 @@ in
       checks.alerting-deadman =
         pkgs.runCommand "alerting-deadman-check"
           {
+            TZDIR = "${pkgs.tzdata}/share/zoneinfo";
             # Building the actual application runs writeShellApplication's shellcheck.
             nativeBuildInputs = [
               (deadmanScript pkgs)
@@ -62,7 +69,7 @@ in
             ];
           }
           ''
-            python3 ${./fixtures/check-deadman.py} ${./scripts/deadman.sh}
+            python3 ${./fixtures}/check-deadman.py ${./scripts/deadman.sh} ${pkgs.writeText "alert-format.sh" (import ../../lib/alert-format.nix)}
             touch "$out"
           '';
     };

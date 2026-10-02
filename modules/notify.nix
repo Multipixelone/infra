@@ -1,19 +1,21 @@
-{ lib, inputs, ... }:
 {
-  # Reusable fail-loud sink: any system unit can add
-  #   onFailure = [ "notify-telegram@%n.service" ];
-  # and its failure (plus a journal tail) lands on the phone via the Telegram
-  # bot API. Same delivery path as the deadman switch (modules/link/deadman.nix)
-  # and deliberately independent of openclaw — the alert must not depend on
-  # anything it might be reporting about.
-  # On `base`, not `pc`: the headless hosts are the ones with nobody watching a
-  # screen, so an `onFailure` there is worth more than on the desktop. While
-  # this sat on `pc` it silently reached only link and zelda, and any
-  # onFailure = [ "notify-telegram@%n.service" ] written on impa, iot or marin
-  # would have pointed at a unit that does not exist on that host.
+  lib,
+  inputs,
+  config,
+  ...
+}:
+let
+  scrapedHosts = map (host: config.hosts.${host}.hostName) (
+    builtins.attrNames config.observability.nodes
+  );
+in
+{
+  # onFailure remains the declarative opt-in. Registry hosts page through
+  # Alertmanager; other hosts use the direct backstop.
   flake.modules.nixos.base =
     { pkgs, config, ... }:
     let
+      managed = lib.elem config.networking.hostName scrapedHosts;
       notify-telegram = pkgs.writeShellApplication {
         name = "notify-telegram";
         runtimeInputs = [
@@ -21,12 +23,16 @@
           pkgs.coreutils
           pkgs.systemd
         ];
-        text = ''
+        text = (import ../lib/alert-format.nix) + ''
+          export TZDIR=${pkgs.tzdata}/share/zoneinfo
           unit="$1"
-          tail=$(journalctl -u "$unit" -n 15 --no-pager -o cat 2>/dev/null | tail -c 3500 || true)
-          msg="🚨 FAILED: $unit on ${config.networking.hostName}
-
-          ''${tail:-<no journal output>}"
+          journal_tail=$(journalctl -u "$unit" -n 15 --no-pager -o cat 2>/dev/null | tail -c 2000 || true)
+          msg=$(render_alert firing OptedInUnitFailed "$unit on ${config.networking.hostName}" "$(date +%s)" "" \
+            "Systemd unit $unit failed on ${config.networking.hostName}" \
+            "Run journalctl -u $unit -n 50 on ${config.networking.hostName}")
+          msg="$msg
+          Journal:
+          ''${journal_tail:-<no journal output>}"
           curl -fsS -m 10 \
             "https://api.telegram.org/bot''${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=''${TELEGRAM_CHAT_ID}" \
@@ -50,13 +56,19 @@
         };
 
         systemd.services."notify-telegram@" = {
-          description = "Telegram alert for failed unit %i";
+          description =
+            if managed then
+              "Failure paging owned by Alertmanager (%i)"
+            else
+              "Telegram alert for failed unit %i";
           serviceConfig = {
             Type = "oneshot";
             # systemd reads EnvironmentFile as root, so the tunnel-owned 0400
             # secret works for this root-run unit.
+            ExecStart = if managed then "${pkgs.coreutils}/bin/true" else "${lib.getExe notify-telegram} %i";
+          }
+          // lib.optionalAttrs (!managed) {
             EnvironmentFile = config.age.secrets."telegram-deadman".path;
-            ExecStart = "${lib.getExe notify-telegram} %i";
           };
         };
       };

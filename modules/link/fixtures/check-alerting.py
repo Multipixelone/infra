@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import yaml
+from alert_format_contract import check_message
 
 
 def inhibition(config_path):
@@ -89,7 +90,7 @@ def inhibition(config_path):
     )
 
 
-def render(config_path):
+def render(config_path, formatter):
     with open(config_path) as source:
         config = json.load(source)
     receiver = next(item for item in config["receivers"] if item["name"] == "telegram")
@@ -112,7 +113,10 @@ def render(config_path):
     ]
     for starts_at, start_time, ends_at, end_time in cases:
         for status in ["firing", "resolved"]:
-            for label in ["endpoint", "service", "instance"]:
+            for label in ["endpoint", "service", "instance", "unit"]:
+                target = (
+                    "fixture.service on link" if label == "unit" else "example-target"
+                )
                 with open("notification.json", "w") as output:
                     json.dump(
                         {
@@ -123,7 +127,10 @@ def render(config_path):
                                     "status": status,
                                     "labels": {
                                         "alertname": "ExampleAlert",
-                                        label: "example-target",
+                                        label: "fixture.service"
+                                        if label == "unit"
+                                        else "example-target",
+                                        **({"host": "link"} if label == "unit" else {}),
                                     },
                                     "startsAt": starts_at,
                                     "endsAt": ends_at,
@@ -153,19 +160,46 @@ def render(config_path):
                 for expected in [
                     "✅ RESOLVED" if status == "resolved" else "🔴 FIRING",
                     "ExampleAlert",
-                    "example-target",
+                    target,
                     start_time,
                     "Example summary",
                     "Example hint",
                     "https://example.com/runbook",
                 ]:
                     assert expected in rendered, (expected, rendered)
-                if status == "resolved":
-                    assert f"Ended: {end_time}" in rendered, rendered
-                else:
-                    assert "Ended:" not in rendered, rendered
+                check_message(
+                    rendered,
+                    "ExampleAlert",
+                    target,
+                    status,
+                    since=start_time,
+                    ended=end_time,
+                )
+                shell = subprocess.run(
+                    [
+                        "bash",
+                        "-euo",
+                        "pipefail",
+                        "-c",
+                        'source "$1"; render_alert "$2" ExampleAlert "$3" "$(date -d "$4" +%s)" "$(date -d "$5" +%s)" "Example summary" "Example hint"',
+                        "offline",
+                        formatter,
+                        status,
+                        target,
+                        starts_at,
+                        ends_at,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+                # Optional runbook output follows the same required prefix.
+                assert rendered.strip().split("Runbook:")[0].strip() == shell.strip(), (
+                    rendered,
+                    shell,
+                )
     print(
-        "rendered 12 firing/resolved notifications with New York summer/winter times offline"
+        "rendered 16 firing/resolved notifications matching the shell renderer with New York summer/winter times offline"
     )
 
 
@@ -388,7 +422,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "inhibition":
         inhibition(sys.argv[2])
     elif sys.argv[1] == "render":
-        render(sys.argv[2])
+        render(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "config":
         prometheus_config(sys.argv[2])
     elif sys.argv[1] == "rules":

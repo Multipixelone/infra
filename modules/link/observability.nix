@@ -6885,17 +6885,32 @@ in
               }
               {
                 alert = "SystemdUnitFailed";
-                expr = ''node_systemd_unit_state{${requiredNodeJobSelector},state="failed"} == 1'';
+                expr = ''(node_systemd_unit_state{${requiredNodeJobSelector},state="failed"} == 1) unless on (instance, name) ALERTS{alertname="OptedInUnitFailed",alertstate="firing"}'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Systemd unit {{ $labels.name }} is failed on {{ $labels.instance }}";
               }
               {
                 alert = "OpenClawGatewayDown";
-                expr = ''openclaw_gateway_active{instance="link"} != 1'';
+                expr = ''
+                  max by (instance) (
+                    (openclaw_gateway_active{job="link-node",instance="link"} != 1)
+                    or (openclaw_gateway_healthy{job="link-node",instance="link"} != 1)
+                    or (time() - openclaw_metrics_last_update_timestamp_seconds{job="link-node",instance="link"} > 180)
+                    or absent(openclaw_gateway_active{job="link-node",instance="link"})
+                    or absent(openclaw_gateway_healthy{job="link-node",instance="link"})
+                    or absent(openclaw_metrics_last_update_timestamp_seconds{job="link-node",instance="link"})
+                  ) and on (instance) (up{job="link-node",instance="link"} == 1)
+                '';
                 for = "5m";
-                labels.severity = "warning";
-                annotations.summary = "OpenClaw gateway service health is degraded";
+                labels = {
+                  severity = "critical";
+                  host = "link";
+                  unit = "openclaw-gateway.service";
+                };
+                annotations.summary = "OpenClaw gateway is down or its health telemetry is unavailable";
+                annotations.description = "On link as tunnel, run journalctl --user -u openclaw-gateway.service -n 50; check http://127.0.0.1:18789/health and systemctl status openclaw-service-metrics.timer openclaw-service-metrics.service";
+                annotations.runbook = "https://git.finnrut.is/tunnel/infra/src/branch/main/docs/observability-phase1.md#gateway-alert-response";
               }
               {
                 alert = "RootDiskPressure";
@@ -7027,6 +7042,8 @@ in
       '';
 
       openclawMetricsRuntimeInputs = [
+        pkgs.curl
+        pkgs.jq
         pkgs.coreutils
         pkgs.gawk
         pkgs.systemd
@@ -7061,7 +7078,16 @@ in
           case "$memory" in (*[!0-9]*|"") memory=0;; esac
           case "$cpu_ns" in (*[!0-9]*|"") cpu_ns=0;; esac
 
+          healthy=0
+          if curl -fsS -m 5 http://127.0.0.1:18789/health | jq -e '.ok == true' >/dev/null 2>&1; then healthy=1; fi
+
           {
+            echo '# HELP openclaw_gateway_healthy Whether the gateway HTTP health endpoint reports ok.'
+            echo '# TYPE openclaw_gateway_healthy gauge'
+            echo "openclaw_gateway_healthy $healthy"
+            echo '# HELP openclaw_metrics_last_update_timestamp_seconds Last completed service/HTTP observation.'
+            echo '# TYPE openclaw_metrics_last_update_timestamp_seconds gauge'
+            echo "openclaw_metrics_last_update_timestamp_seconds $(date +%s)"
             echo '# HELP openclaw_gateway_active Whether the OpenClaw gateway user service is active.'
             echo '# TYPE openclaw_gateway_active gauge'
             echo "openclaw_gateway_active $active"

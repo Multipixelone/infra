@@ -43,8 +43,9 @@ numeric YAML value. Startup requires the two stack secrets above and the
 Telegram environment file, with nonempty token and nonzero numeric chat ID.
 Offline validation substitutes dummy values and never sends a message.
 
-Critical alerts page after a 30-second grouping delay, repeat every four hours,
-and send recovery notifications. Warnings use an empty `non-paging` receiver.
+Critical alerts normally page after a 30-second grouping delay; opted-in systemd
+failures use an immediate route. Both repeat every four hours and send recovery
+notifications. Warnings use an empty `non-paging` receiver.
 `SloErrorBudgetExhausted` also uses that receiver even though critical: its
 seven-day window can remain exhausted after endpoint recovery. All rules
 remain visible in Prometheus and Grafana, including inhibited alerts.
@@ -187,7 +188,7 @@ Alloy drops journal entries carrying `_SYSTEMD_USER_UNIT` before they reach
 Loki and redacts common authorization, token, password, secret, API-key,
 Bearer, and Telegram-bot patterns. OpenClaw contributes no logs or payloads;
 the only OpenClaw data is a textfile metric set containing service active,
-failed, restart count, CPU, and memory values.
+failed, restart count, CPU, memory, bounded HTTP health, and metrics-update time values. HTTP response bodies are never stored or exported.
 
 `mcp-grafana` is local stdio, connects only to loopback Grafana, and starts with
 `--disable-write --enabled-tools=prometheus,loki`. PromQL and LogQL query scope
@@ -305,9 +306,78 @@ Plex backend alert. Every inhibition equality requires explicit nonempty labels.
 NAS telemetry, NAS/Plex and proxy log shipping, exporter collection freshness,
 and Plex auto-heal remain separate follow-ups.
 
+## Single notification delivery model
+
+Alertmanager owns critical Prometheus notifications, including gateway outages
+and explicitly opted-in systemd failures on hosts in `observability.nodes`
+(currently Link, Impa, IoT, and Marin). `onFailure = [
+"notify-telegram@%n.service" ];` remains the declarative opt-in. The unit set is
+derived from each host's evaluated enabled systemd declarations, including
+merged definitions and template instances; no second unit inventory is kept.
+The template succeeds without sending or loading Telegram credentials on these
+hosts. Collector filters explicitly cover opted-in units. The generic
+`SystemdUnitFailed` warning stays non-paging and excludes opted-in firing alerts.
+
+`OptedInUnitFailed` uses a two-minute failed-state lookback, zero pending delay,
+and an immediate Alertmanager route grouped by host and unit. This preserves a
+single observed failed sample through evaluation and delivery, with resolution
+after that sample leaves the window. A failure that recovers before any scrape
+remains unobservable; this is polling coverage, not a durable failure-event log.
+Existing four-hour Alertmanager reminders still apply to sustained incidents.
+
+NixOS hosts outside the scrape registry, including Zelda, retain direct
+`notify-telegram@` delivery with the same alert identity and format, including
+a 15-line journal tail capped at 2,000 bytes. Hylia is a Darwin host and has no
+systemd notification template. The independent pipeline dead-man
+is the other direct-delivery exception because a broken Prometheus/Alertmanager
+pipeline cannot report reliably through itself. There is no direct gateway page.
+
+### Notification format contract
+
+All three paths render plain text with this required structure for these alerts:
+
+```text
+🔴 FIRING: <alertname>
+<target> — since YYYY-MM-DD HH:MM EDT/EST
+<summary>
+Hint: <next diagnostic action>
+```
+
+Recovery uses `✅ RESOLVED` and adds `Ended: YYYY-MM-DD HH:MM EDT/EST`
+between the target and summary. Unit targets are `<unit> on <host>`; pipeline
+targets are `alerting pipeline on link`. Times use America/New_York, including
+daylight saving time. Optional `Runbook:` and `Logs:` lines follow the hint;
+direct unit notifications append `Journal:` and the bounded tail. Existing
+Prometheus alerts retain their endpoint/service/instance target fallback and
+omit optional annotations when absent. The shell paths share a renderer;
+offline fixtures compare actual Alertmanager output to that renderer and assert
+the same contract against direct notifications and dead-man transitions.
+
+## Systemd alert response
+
+Run `journalctl -u <unit> -n 50` on the notification's host. Link notifications
+also link to Grafana Explore with the Loki datasource and exact host/unit
+filters. Impa, IoT, and Marin do not currently ship these journals to Loki;
+use their local journals. Successful activation requires deploying the collector
+and no-op template changes on all registry hosts, in addition to Link's rules.
+
+## Gateway alert response
+
+`OpenClawGatewayDown` covers an inactive user service, a failed bounded HTTP
+`/health` observation, missing gateway metrics, or a textfile update older than
+three minutes, sustained for five minutes. This prevents a stopped writer from
+leaving a stale healthy gauge indefinitely. The initial two-minute timer delay
+and normal one-minute refreshes do not page. Checks require a healthy Link node
+scrape; exporter outages remain owned by the host-exporter alert.
+
+On Link as `tunnel`, inspect `journalctl --user -u openclaw-gateway.service -n 50`
+and the loopback health endpoint. Inspect the system
+`openclaw-service-metrics.service` and timer if telemetry is missing or stale.
+OpenClaw user journals remain excluded from Loki.
+
 ## Independent alerting dead-man
 
-The lingering user timer in `modules/link/deadman.nix` checks the gateway and
+The lingering user timer in `modules/link/deadman.nix` checks the
 alerting pipeline every two minutes, independently of those services. Separate
 three-failure debounce state covers each system unit (`alertmanager.service`
 and `prometheus.service`, including skipped startup conditions), Alertmanager
@@ -316,8 +386,14 @@ notification failures. The Alerts dashboard shows notification attempts and
 failures per integration; attempts include failures. An Alertmanager scrape
 outage produces the existing ten-minute non-paging warning.
 
+An incident opens when any check fails three consecutive times. Changing or
+additional failed checks are journaled without another page; recovery requires
+all checks to be healthy. The persisted start time is retained through retries.
+On first activation of this delivery model, legacy gateway/per-check counters
+and queued notices are retired once, and current conditions are checked afresh.
+
 The timer's Telegram environment file is optional so missing credentials do
-not stop checks or journaling. Each condition queues one failure and one
+not stop checks or journaling. Overlapping checks share one pipeline incident and queue one failure and one
 recovery notice; pending notices are persisted and retried until the bot API
 confirms delivery. Failure-counter resets establish a new baseline, and a flat
 counter alone does not prove successful delivery. Because this backstop shares

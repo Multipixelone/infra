@@ -1,6 +1,5 @@
 { config, lib, ... }:
 let
-  hubHost = config.observability.hubHost;
   nonempty = label: ''${label}=~".+"'';
   publishedAlerts = ''alertname=~"EndpointDown|PublishedRouteDown"'';
   alertmanagerSettings = {
@@ -19,6 +18,20 @@ let
         {
           matchers = [ ''alertname="SloErrorBudgetExhausted"'' ];
           receiver = "non-paging";
+        }
+        {
+          matchers = [
+            ''alertname="OptedInUnitFailed"''
+            ''severity="critical"''
+          ];
+          receiver = "telegram";
+          group_by = [
+            "alertname"
+            "host"
+            "unit"
+          ];
+          group_wait = "0s";
+          group_interval = "1m";
         }
         {
           matchers = [ ''severity="critical"'' ];
@@ -40,11 +53,12 @@ let
             parse_mode = "";
             message = ''
               {{ range .Alerts }}{{ if eq .Status "resolved" }}✅ RESOLVED{{ else }}🔴 FIRING{{ end }}: {{ .Labels.alertname }}
-              {{ if .Labels.endpoint }}{{ .Labels.endpoint }}{{ else if .Labels.service }}{{ .Labels.service }}{{ else if .Labels.instance }}{{ .Labels.instance }}{{ else }}unknown target{{ end }} — since {{ .StartsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
+              {{ if and .Labels.host .Labels.unit }}{{ .Labels.unit }} on {{ .Labels.host }}{{ else if .Labels.endpoint }}{{ .Labels.endpoint }}{{ else if .Labels.service }}{{ .Labels.service }}{{ else if .Labels.instance }}{{ .Labels.instance }}{{ else }}unknown target{{ end }} — since {{ .StartsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
               {{ if eq .Status "resolved" }}Ended: {{ .EndsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
               {{ end }}{{ .Annotations.summary }}
               {{ if .Annotations.description }}Hint: {{ .Annotations.description }}
               {{ end }}{{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}
+              {{ end }}{{ if .Annotations.logs }}Logs: {{ .Annotations.logs }}
               {{ end }}{{ end }}
             '';
           }
@@ -182,6 +196,8 @@ in
         pkgs.runCommand "alertmanager-config-check"
           {
             nativeBuildInputs = [
+              pkgs.bash
+              pkgs.coreutils
               pkgs.envsubst
               pkgs.prometheus-alertmanager
               python
@@ -189,6 +205,7 @@ in
           }
           ''
             export ZONEINFO=${pkgs.tzdata}/share/zoneinfo
+            export TZDIR=${pkgs.tzdata}/share/zoneinfo
             export TELEGRAM_BOT_TOKEN=test-only-no-delivery
             export TELEGRAM_CHAT_ID=-1
             envsubst -i ${rawConfig} -o alertmanager.json
@@ -197,8 +214,11 @@ in
             amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=SloErrorBudgetExhausted severity=critical
             amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=EndpointDown severity=warning
             amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=PrometheusScrapeTargetDown job=alertmanager severity=warning
-            python3 ${./fixtures/check-alerting.py} inhibition alertmanager.json
-            python3 ${./fixtures/check-alerting.py} render alertmanager.json
+            amtool config routes test --config.file=alertmanager.json --verify.receivers=telegram alertname=OptedInUnitFailed host=impa unit=forgejo-dump.service severity=critical
+            amtool config routes test --config.file=alertmanager.json --verify.receivers=telegram alertname=OpenClawGatewayDown severity=critical
+            amtool config routes test --config.file=alertmanager.json --verify.receivers=non-paging alertname=SystemdUnitFailed severity=warning
+            python3 ${./fixtures}/check-alerting.py inhibition alertmanager.json
+            python3 ${./fixtures}/check-alerting.py render alertmanager.json ${pkgs.writeText "alert-format.sh" (import ../../lib/alert-format.nix)}
             touch "$out"
           '';
       checks.prometheus-alerting-rules =
@@ -211,7 +231,7 @@ in
           }
           ''
             promtool check rules ${lib.escapeShellArgs link.services.prometheus.ruleFiles}
-            python3 ${./fixtures/check-alerting.py} rules ${fixtures} ${lib.escapeShellArg config.flake.servicePublicationInventory.applications.plex.canonical} ${lib.escapeShellArgs link.services.prometheus.ruleFiles}
+            python3 ${./fixtures}/check-alerting.py rules ${fixtures} ${lib.escapeShellArg config.flake.servicePublicationInventory.applications.plex.canonical} ${lib.escapeShellArgs link.services.prometheus.ruleFiles}
             promtool test rules suite.json suite-reversed.json
             touch "$out"
           '';
@@ -225,7 +245,7 @@ in
           }
           ''
             promtool check config ${prometheusConfig}
-            python3 ${./fixtures/check-alerting.py} config ${prometheusConfig}
+            python3 ${./fixtures}/check-alerting.py config ${prometheusConfig}
             touch "$out"
           '';
     };

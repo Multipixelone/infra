@@ -8,6 +8,9 @@ import tempfile
 from pathlib import Path
 
 script = Path(sys.argv[1]).resolve()
+formatter = Path(sys.argv[2]).resolve()
+from alert_format_contract import check_message
+
 mock = """#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
@@ -31,7 +34,6 @@ if url.startswith("https://api.telegram.org/"):
         print('{"ok":false}')
     sys.exit(0)
 responses = {
-    "http://localhost:18789/health": ("gateway", '{"ok":true}'),
     "http://127.0.0.1:9093/-/healthy": ("health", "OK"),
     "http://127.0.0.1:9090/api/v1/query": ("discovery", json.dumps({
         "status": "success", "data": {"resultType": "vector", "result": [
@@ -74,7 +76,16 @@ class Timer:
     def run(self, **case):
         (self.root / "case.json").write_text(json.dumps(case))
         result = subprocess.run(
-            ["bash", "-euo", "pipefail", str(script)],
+            [
+                "bash",
+                "-euo",
+                "pipefail",
+                "-c",
+                'source "$1"; source "$2"',
+                "offline",
+                str(formatter),
+                str(script),
+            ],
             env=self.env,
             check=True,
             capture_output=True,
@@ -153,8 +164,11 @@ with tempfile.TemporaryDirectory() as temp:
             timer.run(**{key: value})
         assert len(timer.messages()) == 1, timer.messages()
         assert expected in timer.messages()[0]
-        assert (
-            "Grafana alerts will NOT reach Telegram until fixed" in timer.messages()[0]
+        check_message(
+            timer.messages()[0],
+            "AlertingPipelineDown",
+            "alerting pipeline on link",
+            "firing",
         )
         timer.run()
         timer.run()
@@ -176,7 +190,6 @@ with tempfile.TemporaryDirectory() as temp:
 
     timer = Timer(root / "independent")
     broken = {
-        "gateway": None,
         "alertmanager.service": False,
         "prometheus.service": False,
         "health": None,
@@ -186,7 +199,7 @@ with tempfile.TemporaryDirectory() as temp:
     }
     for _ in range(5):
         timer.run(**broken)
-    assert len(timer.pending()) == 6
+    assert len(timer.pending()) == 1
     calls = (timer.root / "calls").read_text().splitlines()
     for url in [
         "http://127.0.0.1:9093/-/healthy",
@@ -196,14 +209,24 @@ with tempfile.TemporaryDirectory() as temp:
         assert calls.count(url) == 5
     # Recovery while delivery is broken must retain BOTH transitions in order.
     timer.run(delivery=False)
-    assert len(timer.pending()) == 12 and not timer.messages()
+    assert len(timer.pending()) == 2 and not timer.messages()
     timer.run()
     timer.run()
-    assert not timer.pending() and len(timer.messages()) == 12
-    assert all(text.startswith("🚨") for text in timer.messages()[:6])
-    assert all(text.startswith("✅") for text in timer.messages()[6:])
+    assert not timer.pending() and len(timer.messages()) == 2
+    check_message(
+        timer.messages()[0],
+        "AlertingPipelineDown",
+        "alerting pipeline on link",
+        "firing",
+    )
+    check_message(
+        timer.messages()[1],
+        "AlertingPipelineDown",
+        "alerting pipeline on link",
+        "resolved",
+    )
     timer.run()
-    assert len(timer.messages()) == 12
+    assert len(timer.messages()) == 2
 
     timer = Timer(root / "missing-credentials")
     timer.env.pop("TELEGRAM_BOT_TOKEN")
@@ -217,22 +240,28 @@ with tempfile.TemporaryDirectory() as temp:
     timer.run()
     assert len(timer.messages()) == 2 and not timer.pending()
 
-    timer = Timer(root / "gateway")
-    for _ in range(2):
-        timer.run(gateway=None)
-    assert not timer.messages()
-    timer.run(gateway=None)
+    # Changes in broken checks must not close/reopen an existing incident.
+    timer = Timer(root / "overlap")
+    for _ in range(3):
+        timer.run(**{"alertmanager.service": False})
+    timer.run(**{"prometheus.service": False})
+    timer.run(**{"prometheus.service": False})
     assert len(timer.messages()) == 1
-    assert "failed 3× (≥3/2min)" in timer.messages()[0]
-    assert (timer.state / "alerted").exists()
-    timer.run(gateway=None)
-    timer.run()
     timer.run()
     assert len(timer.messages()) == 2
-    assert "openclaw-gateway recovered" in timer.messages()[1]
+
+    # Obsolete state and queued gateway messages are retired exactly once.
+    timer = Timer(root / "legacy")
+    (timer.state / "pending").mkdir(parents=True)
+    (timer.state / "pending" / "old.txt").write_text("obsolete gateway failure")
+    (timer.state / "alerted").touch()
+    (timer.state / "fail_count").write_text("100")
+    timer.run()
+    assert not timer.pending() and not timer.messages()
     assert not (timer.state / "alerted").exists()
-    assert (timer.state / "fail_count").read_text().strip() == "0"
+    assert not (timer.state / "fail_count").exists()
+    assert "18789" not in (timer.root / "calls").read_text()
 
 print(
-    "dead-man: debounce, independent failures, recovery, counter resets, missing secrets and durable delivery retries passed (offline)"
+    "dead-man: debounce, consolidated failures, recovery, legacy-state retirement, counter resets, missing secrets and durable delivery retries passed (offline)"
 )
