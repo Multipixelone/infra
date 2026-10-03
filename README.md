@@ -103,7 +103,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (66)</summary>
+<summary>Packages exposed by this flake (67)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -127,6 +127,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`ipod-sync`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync`
 - [`ipod-sync-inner`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync-inner`
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
+- [`listen`](https://github.com/Multipixelone/infra/blob/main/modules/link/listen.nix) · `nix run github:Multipixelone/infra#listen`
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
 - `musepack` — Encoder for the musepack format · `nix run github:Multipixelone/infra#musepack`

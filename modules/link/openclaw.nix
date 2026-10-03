@@ -97,7 +97,41 @@ in
       openclawPrefix = "/home/tunnel/.npm-global";
       openclawBin = "${openclawPrefix}/bin/openclaw";
       openclawStateDir = "/home/tunnel/.openclaw";
+      # Immutable GGML large-v3-turbo (MIT), 1,624,555,275 bytes. Kept in the
+      # service closure; never downloaded by a mutable runtime bootstrap.
+      whisperModel = pkgs.fetchurl {
+        name = "ggml-large-v3-turbo.bin";
+        url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/98aa99a0a9db05ae2342309f5096248665f7cba3/ggml-large-v3-turbo.bin";
+        hash = "sha256-H8cPd0046xaZk6w5Huo1fvR8iHV+9y7llDh5t+jivGk=";
+      };
+      # The pinned Vulkan CLI already decodes OGG/Opus via built-in FFmpeg.
+      # Keep only a small wrapper for explicit nonzero/missing-artifact failures,
+      # private output cleanup, and transcript-free stderr diagnostics. OpenClaw
+      # also falls back on empty CLI stdout; this makes the failure contract explicit.
+      openclawWhisper = pkgs.writeTextFile {
+        name = "openclaw-whisper";
+        destination = "/bin/openclaw-whisper";
+        executable = true;
+        text = ''
+          #!${pkgs.python3}/bin/python3 -I
+        ''
+        +
+          builtins.replaceStrings
+            [ "@WHISPER@" "@MODEL@" ]
+            [ "${pkgs.whisper-cpp-vulkan}/bin/whisper-cli" "${whisperModel}" ]
+            (builtins.readFile ./openclaw_whisper.py);
+      };
+      openclawAudioConfigPatch = pkgs.writeTextFile {
+        name = "openclaw-audio-config-patch";
+        destination = "/bin/openclaw-audio-config-patch";
+        executable = true;
+        text = ''
+          #!${pkgs.python3}/bin/python3 -I
+        ''
+        + builtins.readFile ./openclaw_audio_config_patch.py;
+      };
       gatewayPath = lib.makeBinPath [
+        openclawWhisper
         pkgs.bash
         pkgs.coreutils
         pkgs.nodejs
@@ -143,7 +177,9 @@ in
       };
 
       home-manager.users.tunnel = {
+        home.file.".local/share/openclaw-whisper/ggml-large-v3-turbo.bin".source = whisperModel;
         home.packages = [
+          openclawWhisper
           pkgs.nodejs
           pkgs.gogcli
           (pkgs.writeShellScriptBin "gog-bootstrap-auth" ''
@@ -197,6 +233,7 @@ in
             ExecStartPre = [
               "${openclawTempCleanup}"
               "${openclawGatewayBootstrap}"
+              "${openclawAudioConfigPatch}/bin/openclaw-audio-config-patch ${openclawStateDir}/openclaw.json ${openclawWhisper}/bin/openclaw-whisper"
             ];
             ExecStart = "${openclawBin} gateway --port 18789";
             ExecStopPost = "${openclawTempCleanup}";
