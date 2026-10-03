@@ -13,10 +13,8 @@
       # every nix-eval-jobs worker restart. Nothing else about this filter was
       # load-bearing: on x86_64 it excluded nothing at all.
       #
-      # beets-plugins pulls in essentia-extractor (x86_64/i686 only) — a
-      # transitively restricted dependency that only surfaces when drvPath is
-      # forced, which is what the old tryEval was for. izotope and
-      # plexamp-headless are x86_64-only binaries.
+      # beets-plugins disables xtractor outside x86_64-linux. izotope and
+      # plexamp-headless remain x86_64-only binaries.
       #
       # The cost of hardcoding: a newly unportable package now fails its own
       # aarch64 check instead of quietly leaving the check set. That leg is
@@ -24,7 +22,6 @@
       # but it does mean this list has to be extended by hand.
       unavailable = {
         aarch64-linux = [
-          "beets-plugins"
           "izotope"
           "plexamp-headless"
         ];

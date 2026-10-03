@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import signal
 import stat
 import subprocess
 from contextlib import contextmanager
@@ -46,6 +47,8 @@ class ImportAdapter(Protocol):
 
 MAX_OUTPUT = 64 * 1024
 DIAGNOSTIC = 512
+LIST_TIMEOUT = 120
+IMPORT_TIMEOUT = 30 * 60
 ROW_FIELDS = (
     "id",
     "album_id",
@@ -115,6 +118,8 @@ class DirectBeetsImportAdapter:
     def _locked(self):
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
         try:
+            # Blocking by design: a manual backfill owns this lock for its
+            # whole run. The subprocess timeout starts only after acquisition.
             fcntl.flock(fd, fcntl.LOCK_EX)
             yield
         finally:
@@ -136,17 +141,45 @@ class DirectBeetsImportAdapter:
             return value.decode("utf-8", "replace")
         return value if isinstance(value, str) else ""
 
-    def _run_unlocked(self, argv: list[str], *, mutation: bool = False):
+    def _run_process(self, argv: list[str], timeout: int):
+        process = subprocess.Popen(
+            argv,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=self.environment,
+            start_new_session=True,
+        )
         try:
-            # subprocess.run kills and waits for its child on TimeoutExpired.
-            result = self.run(
-                argv,
-                text=True,
-                capture_output=True,
-                timeout=120,
-                env=self.environment,
-                check=False,
-            )
+            stdout, stderr = process.communicate(timeout=timeout)
+            return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+        finally:
+            # Killing only beet can leave Essentia running after the shared
+            # import lock is released. Own and stop the entire process group,
+            # including on cancellation, before returning to the lock holder.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            process.stdout.close()
+            process.stderr.close()
+
+    def _run_unlocked(self, argv: list[str], *, mutation: bool = False):
+        timeout = IMPORT_TIMEOUT if mutation else LIST_TIMEOUT
+        try:
+            if self.run is subprocess.run:
+                result = self._run_process(argv, timeout)
+            else:
+                result = self.run(
+                    argv,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout,
+                    env=self.environment,
+                    check=False,
+                )
         except subprocess.TimeoutExpired as exc:
             excerpt = self._excerpt(
                 self._output_text(exc.stdout) + "\n" + self._output_text(exc.stderr)

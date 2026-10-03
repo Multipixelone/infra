@@ -34,7 +34,9 @@
       package = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.openclaw-music
       );
-      beets-plugins = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      beets-plugins = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.beets-plugins
+      );
       beets-path =
         lib.makeBinPath [
           beets-plugins
@@ -71,9 +73,12 @@
             ${lib.getExe package} "$@"
         '';
       };
-      worker = pkgs.writeShellScript "openclaw-music-worker" ''
-        printf '%s\n' '{"schema":1}' | ${lib.getExe openclaw-music} worker
-      '';
+      worker = pkgs.writeShellApplication {
+        name = "openclaw-music-worker";
+        text = ''
+          printf '%s\n' '{"schema":1}' | ${lib.getExe openclaw-music} worker
+        '';
+      };
     in
     {
       assertions = [
@@ -125,7 +130,10 @@
             };
             Service = {
               Type = "oneshot";
-              ExecStart = worker;
+              ExecStart = lib.getExe worker;
+              # Lock acquisition may wait behind a manual xtractor backfill.
+              # The adapter bounds the import itself, after acquiring the lock.
+              TimeoutStartSec = "infinity";
               UMask = "0077";
               NoNewPrivileges = true;
               PrivateTmp = true;

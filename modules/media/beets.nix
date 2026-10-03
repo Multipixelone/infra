@@ -4,11 +4,27 @@
   withSystem,
   ...
 }:
+let
+  supportsXtractor = system: system == "x86_64-linux";
+  beetsPackage =
+    system:
+    let
+      package = inputs.beets-plugins.packages.${system}.default;
+    in
+    if supportsXtractor system then
+      package
+    else
+      package.override (args: {
+        pluginOverrides = args.pluginOverrides // {
+          xtractor.enable = false;
+        };
+      });
+in
 {
   perSystem =
     { system, ... }:
     lib.optionalAttrs (lib.hasSuffix "-linux" system) {
-      packages.beets-plugins = inputs.beets-plugins.packages.${system}.default;
+      packages.beets-plugins = beetsPackage system;
     };
   flake-file.inputs = {
     beets-plugins = {
@@ -39,19 +55,29 @@
       explo-import-dir = "${media-drive}/ImportMusic/Explo";
       music-dir = "${media-drive}/Music";
       transcoded-music = "${media-drive}/TranscodedMusic";
-      beets-dir = "/home/tunnel/.config/beets";
+      beets-dir = "${hmArgs.config.xdg.configHome}/beets";
       beets-library = "${beets-dir}/library.db";
       beets-config = "${beets-dir}/config.yaml";
       beets-lock = "${beets-dir}/.import.lock";
+      xtractor-enabled = supportsXtractor pkgs.stdenv.hostPlatform.system;
+      xtractor-output = "${beets-dir}/xtractor";
+      xtractor-state = pkgs.writeShellApplication {
+        name = "beets-xtractor-state";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          install -d -m 0700 -- ${lib.escapeShellArg xtractor-output}
+        '';
+      };
       detect-file = "${download-dir}/download-finished";
       ffmpeg = lib.getExe pkgs.ffmpeg-full;
       convert-mpc = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.convert-mpc
       );
       # use my custom build of beets with included plugins
-      beets-plugins = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      beets-plugins = beetsPackage pkgs.stdenv.hostPlatform.system;
       beets-interactive = pkgs.writeShellApplication {
         name = "beet";
+        runtimeInputs = [ pkgs.util-linux ];
         text = ''
           harmony_env=${lib.escapeShellArg hmArgs.config.age.secrets."beets-harmony".path}
           if [ -r "$harmony_env" ]; then
@@ -60,6 +86,9 @@
             . "$harmony_env"
             set +a
           fi
+          # Serialize manual imports/backfills with the automated importers.
+          exec {lock_fd}>${lib.escapeShellArg beets-lock}
+          flock --exclusive "$lock_fd"
           exec ${lib.getExe beets-plugins} "$@"
         '';
       };
@@ -324,6 +353,11 @@
       };
     in
     {
+      home.activation.beetsXtractorState = lib.mkIf xtractor-enabled (
+        hmArgs.lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          run ${lib.getExe xtractor-state}
+        ''
+      );
       # Plex API token for playlist-downloader
       age.secrets."plexapi".file = "${inputs.secrets}/media/plexapi.age";
       home.sessionVariables.PLEXAPI_CONFIG_PATH = hmArgs.config.age.secrets."plexapi".path;
@@ -513,7 +547,8 @@
               "the"
               "types"
               "importsource"
-            ];
+            ]
+            ++ lib.optional xtractor-enabled "xtractor";
             clutter = [
               "Thumbs.DB"
               ".DS_Store"
@@ -565,6 +600,26 @@
               poll_timeout = 120;
               osc52 = true;
               qr = true;
+            };
+            xtractor = lib.mkIf xtractor-enabled {
+              auto = true;
+              write = hmArgs.config.programs.beets.settings.import.write;
+              threads = 2;
+              quiet = true;
+              output_path = xtractor-output;
+              essentia_extractor =
+                lib.getExe' inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.xtractor.extractor
+                  "essentia_streaming_extractor_music";
+              # Merge with the packaged profile: retain low-level extraction and
+              # all twelve Gaia/beta5 SVM histories used by Listen's album fields.
+              extractor_profile.highlevel.compute = 1;
+              # Include Listen's optional targets in the completeness check;
+              # zero scores count as present and must not trigger reanalysis.
+              high_level_targets =
+                lib.genAttrs ([ "is_instrumental" ] ++ map (i: "mood_mirex_cluster_${toString i}") (lib.range 1 5))
+                  (_: {
+                    required = true;
+                  });
             };
             match = {
               strong_rec_thresh = 0.075;
