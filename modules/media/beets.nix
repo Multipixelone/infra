@@ -854,6 +854,7 @@
               ];
             };
             # these album and item fields lovingly borrowed from http://github.com/trapd00r/configs
+            types.listened_at = "date";
             album_fields = {
               disambig = ''
                 o = []
@@ -933,7 +934,8 @@
                 else:
                   return str(media) + ', '
               '';
-            };
+            }
+            // builtins.fromJSON (builtins.readFile ../../pkgs/listen/listen_queue/album_fields.json);
             item_fields.disc_and_track = ''
               if not track or (tracktotal and tracktotal == 1):
                 return ""

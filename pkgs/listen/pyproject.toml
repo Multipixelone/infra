@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "listen-queue"
+version = "0.1.0"
+description = "Album listening queue for a beets library"
+requires-python = ">=3.11"
+
+[project.scripts]
+listen = "listen_queue.cli:main"
+
+[tool.setuptools]
+packages = ["listen_queue"]
+
+[tool.setuptools.package-data]
+listen_queue = ["album_fields.json"]
