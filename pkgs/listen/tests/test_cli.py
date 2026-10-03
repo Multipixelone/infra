@@ -113,6 +113,18 @@ class LibraryCase(unittest.TestCase):
 
 
 class CommandTests(LibraryCase):
+    def test_seed_missing_configuration_json(self):
+        self.create({"album": "One"})
+        self.env["LISTEN_PLEX_SOURCE"] = "listen list:)"
+        self.env["LISTEN_PLEX_DONE_SOURCE"] = "albums im rocking w"
+        for variable in ("LISTEN_PLEX_SOURCE", "LISTEN_PLEX_DONE_SOURCE"):
+            value = self.env.pop(variable)
+            error = self.invoke("seed-plex", exit_code=78)
+            self.assertEqual(error["code"], "configuration_invalid")
+            self.assertIn(variable, error["message"])
+            self.assertFalse((self.root / "state").exists())
+            self.env[variable] = value
+
     def test_add_diacritics_and_ambiguous(self):
         first, second = self.create(
             {"album": "Álbum", "artist": "Björk"},

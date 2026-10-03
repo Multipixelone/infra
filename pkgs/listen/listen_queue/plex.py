@@ -1,7 +1,9 @@
 """Read-only Plex discovery and conservative album matching."""
 
+import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from .errors import ListenError
 from .library import normalize, now_stamp
@@ -45,20 +47,46 @@ def musicbrainz_ids(guids):
     return releases, groups
 
 
-def discover(plex):
+def configured_sources():
+    sources = {}
+    for state, variable in (
+        ("queued", "LISTEN_PLEX_SOURCE"),
+        ("listened", "LISTEN_PLEX_DONE_SOURCE"),
+    ):
+        title = os.environ.get(variable, "")
+        if not normalize(title):
+            raise ListenError(
+                "configuration_invalid",
+                f"Set {variable} to an exact Plex source title.",
+                78,
+            )
+        sources[state] = title
+    if normalize(sources["queued"]) == normalize(sources["listened"]):
+        raise ListenError(
+            "configuration_invalid",
+            "Plex queue and done source titles must differ.",
+            78,
+        )
+    return sources
+
+
+def discover(plex, title):
     containers = []
-    needle = "albums i should listen to"
+    needle = normalize(title)
     for playlist in plex.playlists(playlistType="audio"):
-        if needle in normalize(playlist.title):
+        if needle == normalize(playlist.title):
             containers.append(("playlist", playlist))
     for section in plex.library.sections():
         if section.type == "artist":
             for collection in section.collections():
-                if needle in normalize(collection.title):
+                if needle == normalize(collection.title):
                     containers.append(("collection", collection))
     if not containers:
         raise ListenError(
-            "not_found", "No Plex listen collection or playlist was found.", 65
+            "not_found",
+            "No Plex collection or playlist matched the configured title.",
+            65,
+            title=title,
         )
     sources, albums, unsupported = [], {}, []
     for kind, container in containers:
@@ -146,10 +174,13 @@ def seed(queue, apply=False, plex=None):
     receipt = queue.state.read("plex-seed.json")
     if apply and receipt:
         raise ListenError("already_seeded", "Plex seeding has already been applied.")
+    titles = configured_sources()
+    discovered = {}
     try:
-        sources, plex_albums, unmatched = discover(
-            plex if plex is not None else connect()
-        )
+        server = plex if plex is not None else connect()
+        # Resolve both sources before matching or mutating anything.
+        for state, title in titles.items():
+            discovered[state] = discover(server, title)
     except ListenError:
         raise
     except Exception as exc:
@@ -161,45 +192,88 @@ def seed(queue, apply=False, plex=None):
         ) from exc
     albums = list(queue.lib.albums())
     identifiers = {album.id: library_identifiers(album) for album in albums}
-    matched, queued = [], {}
-    for plex_album in plex_albums:
-        candidates, method = match(plex_album, albums, identifiers)
-        if len(candidates) == 1:
-            album = candidates[0]
-            queued[album.id] = album
-            matched.append(
-                {
-                    "plex_album": plex_album.metadata(),
-                    "album": queue.metadata(album),
-                    "method": method,
-                }
-            )
-        else:
-            unmatched.append(
-                {
-                    "plex_album": plex_album.metadata(),
-                    "reason": "ambiguous" if candidates else "not_found",
-                    "candidates": [queue.metadata(a) for a in candidates],
-                }
+    groups, updates = {}, {}
+    for state, (sources, plex_albums, unmatched) in discovered.items():
+        matched, selected = [], {}
+        for plex_album in plex_albums:
+            candidates, method = match(plex_album, albums, identifiers)
+            if len(candidates) == 1:
+                album = candidates[0]
+                selected[album.id] = album
+                matched.append(
+                    {
+                        "plex_album": plex_album.metadata(),
+                        "album": queue.metadata(album),
+                        "method": method,
+                        "target_state": state,
+                    }
+                )
+            else:
+                unmatched.append(
+                    {
+                        "plex_album": plex_album.metadata(),
+                        "reason": "ambiguous" if candidates else "not_found",
+                        "candidates": [queue.metadata(a) for a in candidates],
+                    }
+                )
+        for result in unmatched:
+            result["target_state"] = state
+        updates[state] = selected
+        groups[state] = {
+            "sources": [dict(source, target_state=state) for source in sources],
+            "matched": matched,
+            "unmatched": unmatched,
+        }
+    overlap = sorted(updates["queued"].keys() & updates["listened"].keys())
+    for album_id in overlap:
+        del updates["queued"][album_id]
+    for state, group in groups.items():
+        group["planned_ids"] = sorted(updates[state])
+        group["counts"] = {
+            "matched": len(group["matched"]),
+            "unmatched": len(group["unmatched"]),
+            "ambiguous": sum(r["reason"] == "ambiguous" for r in group["unmatched"]),
+            "planned": len(updates[state]),
+        }
+        for result in group["matched"]:
+            result["effective_state"] = (
+                "listened" if result["album"]["id"] in updates["listened"] else "queued"
             )
     if apply:
+        pick = queue.state.read("last-pick.json")
+        listened_at = datetime.now(timezone.utc).timestamp()
         with queue.lib.transaction():
-            for album in queued.values():
-                album["listen_state"] = "queued"
-                album.store(inherit=False)
+            for state, selected in updates.items():
+                for album in selected.values():
+                    album["listen_state"] = state
+                    if state == "listened":
+                        album["listened_at"] = listened_at
+                    album.store(inherit=False)
+        if pick and pick.get("album_id") in updates["listened"]:
+            queue.state.clear_pick()
         queue.state.write(
             "plex-seed.json",
             applied_at=now_stamp(),
-            sources=sources,
-            queued_ids=sorted(queued),
+            sources=[
+                source for group in groups.values() for source in group["sources"]
+            ],
+            queued_ids=sorted(updates["queued"]),
+            listened_ids=sorted(updates["listened"]),
         )
-        for result in matched:
-            result["album"] = queue.metadata(queued[result["album"]["id"]])
+        for group in groups.values():
+            for result in group["matched"]:
+                album = updates[result["effective_state"]][result["album"]["id"]]
+                result["album"] = queue.metadata(album)
     return {
         "applied": apply,
         "already_seeded": bool(receipt),
-        "sources": sources,
-        "matched": matched,
-        "unmatched": unmatched,
-        "queued_ids": sorted(queued) if apply else [],
+        "groups": groups,
+        "sources": [source for group in groups.values() for source in group["sources"]],
+        "matched": [result for group in groups.values() for result in group["matched"]],
+        "unmatched": [
+            result for group in groups.values() for result in group["unmatched"]
+        ],
+        "overlap_ids": overlap,
+        "queued_ids": sorted(updates["queued"]) if apply else [],
+        "listened_ids": sorted(updates["listened"]) if apply else [],
     }

@@ -22,6 +22,12 @@ Configuration: LISTEN_BEETS_CONFIG (default ~/.config/beets/config.yaml),
 LISTEN_BEETS_LOCK (default config directory/.import.lock),
 LISTEN_STATE_DIR (default $XDG_STATE_HOME/listen or ~/.local/state/listen),
 PLEXAPI_CONFIG_PATH (existing python-plexapi configuration).
+LISTEN_PLEX_SOURCE (queue title) and LISTEN_PLEX_DONE_SOURCE (listened title)
+are required for seed-plex; exact titles after case/diacritic/whitespace
+normalization, preserving punctuation. There are no default source titles.
+Seed conflicts become listened. Apply sets listened_at to the import time,
+updates beets album fields and a local receipt, never Plex; further applies
+are refused once the receipt exists. Dry-runs remain repeatable.
 No command writes media tags. No arbitrary beets query syntax is accepted.
 """
 
@@ -266,21 +272,35 @@ def human(command, data):
         print(
             "Applied."
             if data["applied"]
-            else "Dry-run; use --apply once to queue matches."
+            else "Dry-run; use --apply once to seed matches."
         )
         if data["already_seeded"]:
             print("Already seeded; further apply runs are refused.")
-        for source in data["sources"]:
-            print(f"Source: {source['kind']} {source['title']} [{source['id']}]")
-        for result in data["matched"]:
-            print(f"Matched ({result['method']}): {album_line(result['album'])}")
-        for result in data["unmatched"]:
-            item = result["plex_album"]
+        for state, group in data["groups"].items():
+            counts = group["counts"]
             print(
-                f"Unmatched ({result['reason']}): {item['albumartist']} — {item['album']}"
+                f"{state}: {counts['matched']} matched, {counts['unmatched']} unresolved "
+                f"({counts['ambiguous']} ambiguous), {counts['planned']} planned albums"
             )
-            for album in result["candidates"]:
-                print(album_line(album))
+            for source in group["sources"]:
+                print(f"Source: {source['kind']} {source['title']} [{source['id']}]")
+            for result in group["matched"]:
+                print(
+                    f"Matched ({result['method']}; target {result['effective_state']}): "
+                    + album_line(result["album"])
+                )
+            for result in group["unmatched"]:
+                item = result["plex_album"]
+                print(
+                    f"Unmatched ({result['reason']}): {item['albumartist']} — {item['album']}"
+                )
+                for album in result["candidates"]:
+                    print(album_line(album))
+        if data["overlap_ids"]:
+            print(
+                "In both sources; listened wins: "
+                + ", ".join(map(str, data["overlap_ids"]))
+            )
 
 
 def main(argv=None):
