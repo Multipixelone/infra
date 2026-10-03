@@ -11,7 +11,7 @@ from unittest.mock import patch
 from listen_queue.cli import human, parser
 from listen_queue.errors import ListenError
 from listen_queue.library import Queue
-from listen_queue.plex import discover, seed
+from listen_queue.plex import discover, seed, sync
 from test_cli import LibraryCase
 
 RELEASE = "11111111-1111-1111-1111-111111111111"
@@ -438,3 +438,227 @@ class PlexTests(LibraryCase):
         self.assertIn("LISTEN_PLEX_SOURCE", help_text)
         self.assertIn("LISTEN_PLEX_DONE_SOURCE", help_text)
         self.assertIn("There are no default source titles", help_text)
+
+
+class SyncTests(LibraryCase):
+    def setUp(self):
+        super().setUp()
+        sources = patch.dict(
+            os.environ,
+            {
+                "LISTEN_PLEX_SOURCE": "listen list:)",
+                "LISTEN_PLEX_DONE_SOURCE": "albums im rocking w",
+            },
+        )
+        sources.start()
+        self.addCleanup(sources.stop)
+
+    def queue(self):
+        return Queue(self.config, self.root / "state")
+
+    def test_existing_states_timestamps_receipts_and_media_are_preserved(self):
+        states = ("queued", "listened", "dropped", "future_state")
+        ids = self.create(*({"album": state, "state": state} for state in states))
+        queue = self.queue()
+        for album in queue.lib.albums():
+            album["listened_at"] = 1767225600
+            album.store(inherit=False)
+        queue.choose(ids[0])
+        # Sync must not even read the one-time seed receipt.
+        (self.root / "state/plex-seed.json").write_text("{invalid receipt}")
+        before_db = (self.root / "library.db").read_bytes()
+        before_state = {p.name: p.read_bytes() for p in (self.root / "state").iterdir()}
+        before_media = {
+            p.name: (p.read_bytes(), p.stat().st_mtime_ns)
+            for p in (self.root / "music").iterdir()
+        }
+        server = plex_server(
+            [
+                container(
+                    "playlist",
+                    [plex_album(str(i), title=s) for i, s in enumerate(states)],
+                )
+            ],
+            done_items=[plex_album(str(i + 10), title=s) for i, s in enumerate(states)],
+        )
+        for apply in (False, True, True):
+            result = sync(queue, apply=apply, plex=server)
+            self.assertEqual(result["queued_ids"], [])
+            self.assertEqual(result["listened_ids"], [])
+            self.assertEqual(result["overlap_ids"], [])
+            for group in result["groups"].values():
+                self.assertEqual(group["skipped_ids"], ids)
+                self.assertEqual(group["planned_ids"], [])
+                self.assertEqual(group["counts"]["skipped"], 4)
+                for match in group["matched"]:
+                    self.assertTrue(match["skipped"])
+                    self.assertEqual(match["reason"], "existing_state")
+                    self.assertEqual(
+                        match["effective_state"], match["album"]["listen_state"]
+                    )
+            self.assertEqual((self.root / "library.db").read_bytes(), before_db)
+        self.assertEqual(
+            {p.name: p.read_bytes() for p in (self.root / "state").iterdir()},
+            before_state,
+        )
+        self.assertEqual(
+            {
+                p.name: (p.read_bytes(), p.stat().st_mtime_ns)
+                for p in (self.root / "music").iterdir()
+            },
+            before_media,
+        )
+        for album_id, state in zip(ids, states):
+            album = queue.lib.get_album(album_id)
+            self.assertEqual(album.get("listen_state"), state)
+            self.assertEqual(album.get("listened_at"), 1767225600)
+
+    def test_new_albums_precedence_dry_run_and_repeated_apply(self):
+        queued, listened, both, empty, later = self.create(
+            {"album": "Queue"},
+            {"album": "Done"},
+            {"album": "Both"},
+            {"album": "Empty"},
+            {"album": "Later"},
+        )
+        queue = self.queue()
+        album = queue.lib.get_album(empty)
+        album["listen_state"] = ""
+        album.store(inherit=False)
+        server = plex_server(
+            [
+                container(
+                    "playlist",
+                    [plex_album("1", title="Queue"), plex_album("2", title="Both")],
+                )
+            ],
+            done_items=[
+                plex_album("3", title="Done"),
+                plex_album("4", title="Both"),
+                plex_album("5", title="Empty"),
+            ],
+        )
+        before = (self.root / "library.db").read_bytes()
+        result = sync(queue, plex=server)
+        self.assertFalse(result["applied"])
+        self.assertEqual(result["groups"]["queued"]["planned_ids"], [queued])
+        self.assertEqual(
+            result["groups"]["listened"]["planned_ids"], [listened, both, empty]
+        )
+        self.assertEqual(result["overlap_ids"], [both])
+        self.assertEqual(
+            result["groups"]["queued"]["matched"][1]["effective_state"], "listened"
+        )
+        self.assertEqual(result["queued_ids"], [])
+        self.assertEqual(result["listened_ids"], [])
+        self.assertEqual((self.root / "library.db").read_bytes(), before)
+        self.assertFalse((self.root / "state").exists())
+        rendered = StringIO()
+        with redirect_stdout(rendered):
+            human("sync-plex", result)
+        self.assertIn("use --apply to import new matches", rendered.getvalue())
+        self.assertIn("listened wins", rendered.getvalue())
+        result = sync(queue, apply=True, plex=server)
+        self.assertEqual(result["queued_ids"], [queued])
+        self.assertEqual(result["listened_ids"], [listened, both, empty])
+        self.assertEqual(queue.lib.get_album(queued).get("listen_state"), "queued")
+        self.assertIsNone(queue.lib.get_album(queued).get("listened_at"))
+        timestamps = {
+            queue.lib.get_album(i).get("listened_at") for i in (listened, both, empty)
+        }
+        self.assertEqual(len(timestamps), 1)
+        self.assertTrue(all(timestamps))
+        self.assertFalse((self.root / "state").exists())
+        before = (self.root / "library.db").read_bytes()
+        repeated = sync(queue, apply=True, plex=server)
+        self.assertEqual(repeated["queued_ids"], [])
+        self.assertEqual(repeated["listened_ids"], [])
+        self.assertEqual((self.root / "library.db").read_bytes(), before)
+        result = sync(
+            queue,
+            apply=True,
+            plex=plex_server(
+                [container("playlist", [plex_album(title="Later")])],
+                done_items=[plex_album(title="Queue")],
+            ),
+        )
+        self.assertEqual(result["queued_ids"], [later])
+        self.assertEqual(result["listened_ids"], [])
+        self.assertEqual(queue.lib.get_album(queued).get("listen_state"), "queued")
+        for track in queue.lib.items():
+            self.assertIsNone(track.get("listen_state", with_album=False))
+            self.assertIsNone(track.get("listened_at", with_album=False))
+            self.assertEqual(
+                Path(os.fsdecode(track.path)).read_bytes(), b"untouched media"
+            )
+
+    def test_identifier_precedence_ambiguity_and_missing_source(self):
+        intended, _duplicate, _other = self.create(
+            {"album": "Different", "identifiers": {"mb_albumid": RELEASE}},
+            {"album": "One"},
+            {"album": "One"},
+        )
+        queue = self.queue()
+        server = plex_server(
+            [
+                container(
+                    "playlist",
+                    [
+                        plex_album("1", guids=["mbid://" + RELEASE]),
+                        plex_album("2"),
+                        plex_album("3", title="Missing"),
+                    ],
+                )
+            ]
+        )
+        result = sync(queue, apply=True, plex=server)
+        self.assertEqual(result["queued_ids"], [intended])
+        self.assertEqual(result["matched"][0]["method"], "mb_albumid")
+        self.assertEqual(
+            [entry["reason"] for entry in result["unmatched"]],
+            ["ambiguous", "not_found"],
+        )
+        self.assertEqual(len(result["unmatched"][0]["candidates"]), 2)
+        before = (self.root / "library.db").read_bytes()
+        server.library.sections = list
+        with self.assertRaises(ListenError) as error:
+            sync(queue, apply=True, plex=server)
+        self.assertEqual(error.exception.code, "not_found")
+        self.assertEqual((self.root / "library.db").read_bytes(), before)
+
+    def test_cli_schema_and_sanitized_backend_failure(self):
+        self.create({"album": "One"})
+        from listen_queue.cli import main
+
+        server = plex_server([container("playlist", [plex_album()])])
+        environment = {
+            **self.env,
+            "LISTEN_PLEX_SOURCE": "listen list:)",
+            "LISTEN_PLEX_DONE_SOURCE": "albums im rocking w",
+        }
+        for args in (("sync-plex", "--json"), ("--json", "sync-plex", "--apply")):
+            output = StringIO()
+            with (
+                patch.dict(os.environ, environment),
+                patch("listen_queue.plex.connect", return_value=server),
+                redirect_stdout(output),
+            ):
+                self.assertEqual(main(list(args)), 0)
+            envelope = json.loads(output.getvalue())
+            self.assertEqual(set(envelope), {"schema", "command", "ok", "data"})
+            self.assertEqual(envelope["schema"], 1)
+            self.assertEqual(envelope["command"], "sync-plex")
+            self.assertTrue(envelope["ok"])
+        output = StringIO()
+        with (
+            patch.dict(os.environ, environment),
+            patch(
+                "listen_queue.plex.connect", side_effect=RuntimeError("secret-token")
+            ),
+            redirect_stdout(output),
+        ):
+            self.assertEqual(main(["sync-plex", "--json"]), 75)
+        self.assertNotIn("secret-token", output.getvalue())
+        self.assertEqual(
+            json.loads(output.getvalue())["error"]["code"], "backend_unavailable"
+        )

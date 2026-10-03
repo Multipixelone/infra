@@ -25,7 +25,7 @@ def normalize(text):
 def number(value, *, positive=False, score=False):
     try:
         result = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(result) or (positive and result <= 0):
         return None
@@ -50,6 +50,18 @@ def timestamp(value):
 
 def now_stamp():
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def play_count(item):
+    """Prefer current lastimport counts; retain legacy counts without summing."""
+    for field in ("lastfm_play_count", "play_count"):
+        raw = item.get(field, None, with_album=False)
+        if isinstance(raw, bool):
+            continue
+        value = number(raw)
+        if value is not None and value >= 0 and value.is_integer():
+            return int(value)
+    return 0
 
 
 @contextmanager
@@ -140,6 +152,7 @@ class Queue:
     def metadata(self, album):
         items = list(album.items())
         lengths = [number(item.length, positive=True) for item in items]
+        plays = sum(play_count(item) for item in items)
         scores = {
             name: self.score(album, field)
             for name, field in sorted(self.fields.items())
@@ -155,6 +168,8 @@ class Queue:
             "album": album.album,
             "year": album.year or None,
             "track_count": len(items),
+            "play_count": plays,
+            "plays_per_track": plays / len(items) if items else None,
             "length_seconds": sum(lengths)
             if lengths and all(v is not None for v in lengths)
             else None,
@@ -193,6 +208,23 @@ class Queue:
             for album in self.lib.albums()
             if state == "all" or album.get("listen_state") == state
         ]
+
+    def most_played(self, listened_only=False):
+        albums = [
+            self.metadata(album)
+            for album in self.albums("listened" if listened_only else "all")
+        ]
+        if not listened_only:
+            albums = [album for album in albums if album["play_count"] > 0]
+        albums.sort(
+            key=lambda album: (
+                -album["play_count"],
+                normalize(album["albumartist"]),
+                normalize(album["album"]),
+                album["id"],
+            )
+        )
+        return {"basis": "listened" if listened_only else "played", "albums": albums}
 
     def resolve(self, text=None, album_id=None):
         if album_id is not None:

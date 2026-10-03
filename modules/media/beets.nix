@@ -47,7 +47,12 @@ in
     # };
   };
   flake.modules.homeManager.media =
-    hmArgs@{ pkgs, ... }:
+    hmArgs@{
+      pkgs,
+      hosts,
+      osConfig ? { },
+      ...
+    }:
     let
       media-drive = "/volume1/Media";
       download-dir = "${media-drive}/ImportMusic/slskd";
@@ -90,6 +95,17 @@ in
           exec {lock_fd}>${lib.escapeShellArg beets-lock}
           flock --exclusive "$lock_fd"
           exec ${lib.getExe beets-plugins} "$@"
+        '';
+      };
+      beets-lastimport = pkgs.writeShellApplication {
+        name = "beets-lastimport";
+        runtimeInputs = [ pkgs.util-linux ];
+        text = ''
+          exec {lock_fd}>${lib.escapeShellArg beets-lock}
+          flock --exclusive --timeout 300 --conflict-exit-code 75 "$lock_fd"
+          # Pinned lastimport only calls Item.store(), never Item.write(). Load
+          # it alone so database_change hooks cannot write tags or call Plex.
+          exec ${lib.getExe beets-plugins} -c ${lib.escapeShellArg beets-config} -p lastimport lastimport
         '';
       };
       beets-import = pkgs.writeShellApplication {
@@ -401,6 +417,15 @@ in
           };
         };
         timers = {
+          beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+            Unit.Description = "Refresh last.fm play counts overnight";
+            Install.WantedBy = [ "timers.target" ];
+            Timer = {
+              OnCalendar = "*-*-* 04:00:00";
+              Persistent = true;
+              RandomizedDelaySec = "20m";
+            };
+          };
           transcode-music = {
             Install.WantedBy = [ "timers.target" ];
             Timer = {
@@ -421,6 +446,14 @@ in
           };
         };
         services = {
+          beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+            Unit.Description = "Import last.fm play counts into the beets database";
+            Service = {
+              Type = "oneshot";
+              TimeoutStartSec = "30m";
+              ExecStart = lib.getExe beets-lastimport;
+            };
+          };
           transcode-music = {
             Unit.Description = "Automatically transcode music for my iPod";
             Service = {

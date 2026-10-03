@@ -170,10 +170,8 @@ def match(plex_album, albums, identifiers):
     return candidates, "albumartist_album"
 
 
-def seed(queue, apply=False, plex=None):
-    receipt = queue.state.read("plex-seed.json")
-    if apply and receipt:
-        raise ListenError("already_seeded", "Plex seeding has already been applied.")
+def plan_matches(queue, plex=None):
+    """Discover both sources and match them without changing library or state."""
     titles = configured_sources()
     discovered = {}
     try:
@@ -239,6 +237,14 @@ def seed(queue, apply=False, plex=None):
             result["effective_state"] = (
                 "listened" if result["album"]["id"] in updates["listened"] else "queued"
             )
+    return groups, updates, overlap
+
+
+def seed(queue, apply=False, plex=None):
+    receipt = queue.state.read("plex-seed.json")
+    if apply and receipt:
+        raise ListenError("already_seeded", "Plex seeding has already been applied.")
+    groups, updates, overlap = plan_matches(queue, plex)
     if apply:
         pick = queue.state.read("last-pick.json")
         listened_at = datetime.now(timezone.utc).timestamp()
@@ -267,6 +273,53 @@ def seed(queue, apply=False, plex=None):
     return {
         "applied": apply,
         "already_seeded": bool(receipt),
+        "groups": groups,
+        "sources": [source for group in groups.values() for source in group["sources"]],
+        "matched": [result for group in groups.values() for result in group["matched"]],
+        "unmatched": [
+            result for group in groups.values() for result in group["unmatched"]
+        ],
+        "overlap_ids": overlap,
+        "queued_ids": sorted(updates["queued"]) if apply else [],
+        "listened_ids": sorted(updates["listened"]) if apply else [],
+    }
+
+
+def sync(queue, apply=False, plex=None):
+    """Import only unmarked albums; existing listen decisions always win."""
+    groups, updates, overlap = plan_matches(queue, plex)
+    for state, group in groups.items():
+        skipped = set()
+        for result in group["matched"]:
+            album_id = result["album"]["id"]
+            existing = result["album"]["listen_state"]
+            result["skipped"] = bool(existing)
+            if existing:
+                result["reason"] = "existing_state"
+                result["effective_state"] = existing
+                skipped.add(album_id)
+                updates[state].pop(album_id, None)
+        group["skipped_ids"] = sorted(skipped)
+        group["planned_ids"] = sorted(updates[state])
+        group["counts"].update(skipped=len(skipped), planned=len(updates[state]))
+    # Report precedence only for new albums; existing decisions are preserved.
+    overlap = [album_id for album_id in overlap if album_id in updates["listened"]]
+    if apply:
+        listened_at = datetime.now(timezone.utc).timestamp()
+        with queue.lib.transaction():
+            for state, selected in updates.items():
+                for album in selected.values():
+                    album["listen_state"] = state
+                    if state == "listened":
+                        album["listened_at"] = listened_at
+                    album.store(inherit=False)
+        for group in groups.values():
+            for result in group["matched"]:
+                if not result["skipped"]:
+                    album = updates[result["effective_state"]][result["album"]["id"]]
+                    result["album"] = queue.metadata(album)
+    return {
+        "applied": apply,
         "groups": groups,
         "sources": [source for group in groups.values() for source in group["sources"]],
         "matched": [result for group in groups.values() for result in group["matched"]],

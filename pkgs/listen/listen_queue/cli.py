@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .errors import ListenError, invalid
 from .library import Queue, number, shared_lock
-from .plex import seed
+from .plex import seed, sync
 from .selection import pick
 
 EXIT_HELP = """Exit codes: 0 success; 64 invalid arguments/mood; 65 not found;
@@ -23,11 +23,19 @@ LISTEN_BEETS_LOCK (default config directory/.import.lock),
 LISTEN_STATE_DIR (default $XDG_STATE_HOME/listen or ~/.local/state/listen),
 PLEXAPI_CONFIG_PATH (existing python-plexapi configuration).
 LISTEN_PLEX_SOURCE (queue title) and LISTEN_PLEX_DONE_SOURCE (listened title)
-are required for seed-plex; exact titles after case/diacritic/whitespace
+are required for seed-plex and sync-plex; exact titles after case/diacritic/whitespace
 normalization, preserving punctuation. There are no default source titles.
 Seed conflicts become listened. Apply sets listened_at to the import time,
 updates beets album fields and a local receipt, never Plex; further applies
 are refused once the receipt exists. Dry-runs remain repeatable.
+sync-plex is repeatable and dry-run by default. Apply imports only unmarked
+albums; every existing listen_state is preserved, including dropped. New
+albums in both sources become listened. Sync never changes the seed receipt.
+most-played sums track lastfm_play_count (fallback: legacy play_count) and
+sorts descending, with ties by normalized artist/title, then album ID.
+Its default is any album with plays > 0; --listened-only instead includes
+all marked-listened albums, even with zero plays. plays_per_track divides
+by all album tracks. Play counts describe tracks played, not full album listens.
 No command writes media tags. No arbitrary beets query syntax is accepted.
 """
 
@@ -65,7 +73,17 @@ def parser():
         "--json", action="store_true", help="emit a schema 1 JSON envelope"
     )
     commands = root.add_subparsers(dest="command", required=True)
-    for command in ("add", "done", "drop", "list", "pick", "moods", "seed-plex"):
+    for command in (
+        "add",
+        "done",
+        "drop",
+        "list",
+        "pick",
+        "moods",
+        "most-played",
+        "seed-plex",
+        "sync-plex",
+    ):
         sub = commands.add_parser(
             command,
             epilog=EXIT_HELP,
@@ -88,11 +106,18 @@ def parser():
                 choices=["queued", "listened", "dropped", "all"],
                 default="queued",
             )
-        elif command == "seed-plex":
+        elif command == "most-played":
+            sub.add_argument(
+                "--listened-only",
+                action="store_true",
+                help="rank marked-listened albums, including those with zero plays",
+            )
+        elif command in ("seed-plex", "sync-plex"):
             sub.add_argument(
                 "--apply",
                 action="store_true",
-                help="apply once; otherwise dry-run (never writes to Plex)",
+                help=("apply once" if command == "seed-plex" else "apply new matches")
+                + "; otherwise dry-run (never writes to Plex)",
             )
         elif command == "pick":
             sub.add_argument(
@@ -210,6 +235,10 @@ def dispatch(args, queue, argv):
         }
     if args.command == "seed-plex":
         return seed(queue, args.apply)
+    if args.command == "sync-plex":
+        return sync(queue, args.apply)
+    if args.command == "most-played":
+        return queue.most_played(args.listened_only)
     if args.choose is not None:
         if any(
             value.startswith("--") and value.split("=")[0] not in ("--json", "--choose")
@@ -251,13 +280,23 @@ def human(command, data):
         print(f"{data['album']['listen_state']}: {album_line(data['album'])}")
     elif command == "pick" and data["mode"] == "choose":
         print("Chosen: " + album_line(data["chosen"]))
-    elif command in ("pick", "list"):
+    elif command in ("pick", "list", "most-played"):
         if command == "pick":
             cap = data["cap"]
             print(
                 f"Cap: {cap['minutes']:g} minutes ({cap['source']}{': ' + cap['reason'] if cap['reason'] else ''})"
             )
         for album in data["albums"]:
+            if command == "most-played":
+                average = album["plays_per_track"]
+                print(
+                    f"{album['play_count']} plays; "
+                    + (
+                        f"{average:.2f} per track"
+                        if average is not None
+                        else "no tracks"
+                    )
+                )
             print(album_line(album))
         if not data["albums"]:
             print("No albums.")
@@ -272,21 +311,31 @@ def human(command, data):
         print(
             "Applied."
             if data["applied"]
-            else "Dry-run; use --apply once to seed matches."
+            else (
+                "Dry-run; use --apply once to seed matches."
+                if command == "seed-plex"
+                else "Dry-run; use --apply to import new matches."
+            )
         )
-        if data["already_seeded"]:
+        if data.get("already_seeded"):
             print("Already seeded; further apply runs are refused.")
         for state, group in data["groups"].items():
             counts = group["counts"]
             print(
                 f"{state}: {counts['matched']} matched, {counts['unmatched']} unresolved "
                 f"({counts['ambiguous']} ambiguous), {counts['planned']} planned albums"
+                + (
+                    f", {counts['skipped']} existing albums skipped"
+                    if command == "sync-plex"
+                    else ""
+                )
             )
             for source in group["sources"]:
                 print(f"Source: {source['kind']} {source['title']} [{source['id']}]")
             for result in group["matched"]:
                 print(
-                    f"Matched ({result['method']}; target {result['effective_state']}): "
+                    ("Skipped existing" if result.get("skipped") else "Matched")
+                    + f" ({result['method']}; target {result['effective_state']}): "
                     + album_line(result["album"])
                 )
             for result in group["unmatched"]:
@@ -309,7 +358,18 @@ def main(argv=None):
     candidate = next((value for value in argv if value != "--json"), None)
     command = (
         candidate
-        if candidate in ("add", "done", "drop", "list", "pick", "moods", "seed-plex")
+        if candidate
+        in (
+            "add",
+            "done",
+            "drop",
+            "list",
+            "pick",
+            "moods",
+            "most-played",
+            "seed-plex",
+            "sync-plex",
+        )
         else None
     )
     try:
