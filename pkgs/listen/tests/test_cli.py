@@ -309,7 +309,7 @@ class SelectionTests(LibraryCase):
             {
                 "minutes": 45,
                 "source": "default",
-                "reason": "commute_duration_unavailable",
+                "reason": "commute_command_unavailable",
             },
         )
         self.assertEqual(data["albums"], [])

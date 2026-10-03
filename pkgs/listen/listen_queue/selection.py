@@ -2,6 +2,7 @@
 
 import itertools
 import json
+import math
 import os
 import random
 import re
@@ -13,10 +14,22 @@ from .library import normalize, number
 
 
 def next_commute_duration():
-    """Only adapter for commutecompass; never infer travel from event start.
+    """Return persisted travel_minutes for the earliest future departure.
 
-    The pinned status plans expose leave_at/start, but no route duration.
-    A future travel_minutes field can be consumed here without changing pick.
+    Compare timezone-aware leave_at instants against the current UTC clock;
+    equal departures retain payload order. Status covers the current logical
+    NYC day. Skip unusable departures, but do not substitute a later trip if
+    the next trip's duration is missing (commute_duration_missing), null
+    (commute_duration_unavailable), or invalid (commute_duration_invalid).
+
+    travel_minutes excludes scheduling buffers and preserves fractional minutes.
+    It can be available independently of arrive_at or a plan error. Never infer
+    travel from event start or arrival timestamps, including cached arrivals.
+
+    Failures return (None, reason): commute_command_unavailable,
+    commute_command_failed, commute_timeout, commute_invalid_payload,
+    commute_no_plans, or commute_no_upcoming_plan. The caller keeps its 45-minute
+    fallback. This adapter never invokes routing or modifies saved plans.
     """
     try:
         result = subprocess.run(
@@ -30,11 +43,58 @@ def next_commute_duration():
             timeout=5,
             check=False,
         )
-        if result.returncode == 0:
-            json.loads(result.stdout)
-    except (OSError, subprocess.TimeoutExpired, ValueError):
-        pass
-    return None, "commute_duration_unavailable"
+    except subprocess.TimeoutExpired:
+        return None, "commute_timeout"
+    except UnicodeError:
+        return None, "commute_invalid_payload"
+    except (OSError, ValueError):
+        return None, "commute_command_unavailable"
+    if result.returncode != 0:
+        return None, "commute_command_failed"
+    try:
+        payload = json.loads(result.stdout)
+    except (TypeError, ValueError, RecursionError):
+        return None, "commute_invalid_payload"
+    if not isinstance(payload, dict) or not isinstance(payload.get("plans"), list):
+        return None, "commute_invalid_payload"
+    plans = payload["plans"]
+    if any(not isinstance(plan, dict) for plan in plans):
+        return None, "commute_invalid_payload"
+    if not plans:
+        return None, "commute_no_plans"
+
+    now = datetime.now(timezone.utc)
+    upcoming = []
+    for plan in plans:
+        leave_at = plan.get("leave_at")
+        if not isinstance(leave_at, str):
+            continue
+        try:
+            departure = datetime.fromisoformat(leave_at)
+            if departure.utcoffset() is None:
+                continue
+            departure = departure.astimezone(timezone.utc)
+        except (ValueError, OverflowError):
+            continue
+        if departure > now:
+            upcoming.append((departure, plan))
+    if not upcoming:
+        return None, "commute_no_upcoming_plan"
+    plan = min(upcoming, key=lambda candidate: candidate[0])[1]
+    if "travel_minutes" not in plan:
+        return None, "commute_duration_missing"
+    value = plan["travel_minutes"]
+    if value is None:
+        return None, "commute_duration_unavailable"
+    if type(value) not in (int, float):
+        return None, "commute_duration_invalid"
+    try:
+        minutes = float(value)
+    except (ValueError, OverflowError):
+        return None, "commute_duration_invalid"
+    if not math.isfinite(minutes) or minutes <= 0:
+        return None, "commute_duration_invalid"
+    return minutes, None
 
 
 def cap_for(max_minutes):

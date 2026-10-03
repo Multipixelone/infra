@@ -312,11 +312,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1789880634,
-        "narHash": "sha256-fQKXwarIERdczIDIkvRIqII9MB3D0n9ARkoNTxfBmA4=",
+        "lastModified": 1791015577,
+        "narHash": "sha256-CnD7DF1RNjhF6nFoE56zt0Xqxci9U+LPW0heJP0NuE0=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "08fbd9a32e0db4dd956882b7c19902fec6f57e64",
+        "rev": "ee1be41a852eabe9d4937240669a79cf073767ab",
         "type": "github"
       },
       "original": {
@@ -571,11 +571,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790814227,
-        "narHash": "sha256-ZQs4gYXv6JQIxlCll0Z3k9ebK//yUwTxen/xok5Jaiw=",
+        "lastModified": 1790901222,
+        "narHash": "sha256-5beDMvBUQz0MZ/5pePGUcTzihKCeK9oW4bqG3zavcT4=",
         "owner": "SecBear",
         "repo": "codex-nix",
-        "rev": "7302c80deec4e6ef252972252d6a1f55752019a2",
+        "rev": "cfe50861b92b0b8fcc8119bda17cc9b3ca9c8ced",
         "type": "github"
       },
       "original": {
@@ -615,11 +615,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1783385946,
-        "narHash": "sha256-v7MalKNNdM7RE1lo04W1kudsom47eRnEp39gLy4afII=",
+        "lastModified": 1791029531,
+        "narHash": "sha256-l3rOOK0Hh1wZ5VgCkDK0Ff7ZDdoxsCbyLvPFORGuFQ4=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "b825b1004e7b418cdf97f6fb0c10d87be73469ba",
+        "rev": "625d4fab99203836f2d6de0095bc4433d37bb74f",
         "type": "github"
       },
       "original": {
