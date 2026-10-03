@@ -17,9 +17,13 @@
     };
 
   configurations.nixos.link.module =
-    { pkgs, ... }:
+    { config, pkgs, ... }:
     let
       package = withSystem pkgs.stdenv.hostPlatform.system (args: args.config.packages.listen);
+      # Upstream exposes no skill package option; reuse its installed wrapper.
+      commutecompassSkill = lib.findFirst (
+        package: lib.getName package == "commutecompass-skill"
+      ) null config.environment.systemPackages;
     in
     {
       home-manager.users.tunnel =
@@ -35,6 +39,9 @@
                 export PLEXAPI_CONFIG_PATH=${lib.escapeShellArg config.age.secrets.plexapi.path}
                 export LISTEN_PLEX_SOURCE=${lib.escapeShellArg "listen list:)"}
                 export LISTEN_PLEX_DONE_SOURCE=${lib.escapeShellArg "albums im rocking w"}
+                ${lib.optionalString (commutecompassSkill != null) ''
+                  export LISTEN_COMMUTECOMPASS=${lib.escapeShellArg (lib.getExe' commutecompassSkill "commutecompass-skill")}
+                ''}
                 exec ${lib.getExe package} "$@"
               '';
             })
