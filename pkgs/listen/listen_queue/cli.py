@@ -5,11 +5,11 @@ import json
 import os
 import sqlite3
 import sys
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 
 from .errors import ListenError, invalid
-from .library import Queue, number, shared_lock
+from .library import Queue, number, retry_busy, shared_lock, state_lock, timeout_setting
 from .plex import seed, sync
 from .selection import pick
 
@@ -20,8 +20,14 @@ JSON schema 1: {schema, command, ok, data} or
 {schema, command, ok, error: {code, message, details}}.
 Configuration: LISTEN_BEETS_CONFIG (default ~/.config/beets/config.yaml),
 LISTEN_BEETS_LOCK (default config directory/.import.lock),
+LISTEN_BEETS_LOCK_TIMEOUT (seconds, default 30; 0 fails immediately if busy),
+LISTEN_SQLITE_BUSY_TIMEOUT (read retry seconds, default 10),
 LISTEN_STATE_DIR (default $XDG_STATE_HOME/listen or ~/.local/state/listen),
 PLEXAPI_CONFIG_PATH (existing python-plexapi configuration).
+Read commands and Plex dry-runs open beets read-only without the import lock.
+Plain pick never saves a choice; pick --choose writes only private state,
+using a separate state lock (5-second wait). Beets writers use the exclusive
+import lock; receipt writers also use the state lock. Busy failures exit 75.
 LISTEN_PLEX_SOURCE (queue title) and LISTEN_PLEX_DONE_SOURCE (listened title)
 are required for seed-plex and sync-plex; exact titles after case/diacritic/whitespace
 normalization, preserving punctuation. There are no default source titles.
@@ -249,6 +255,39 @@ def dispatch(args, queue, argv):
     return pick(queue, args)
 
 
+def access_mode(args):
+    """Return (writes beets, writes private state) for every CLI command."""
+    if args.command in ("add", "done", "drop"):
+        return True, args.command != "add"
+    if args.command in ("seed-plex", "sync-plex"):
+        return args.apply, args.apply and args.command == "seed-plex"
+    return False, args.command == "pick" and args.choose is not None
+
+
+def execute(args, config, state, lock, argv):
+    writes_beets, writes_state = access_mode(args)
+    lock_timeout = timeout_setting("LISTEN_BEETS_LOCK_TIMEOUT", 30)
+    read_timeout = timeout_setting("LISTEN_SQLITE_BUSY_TIMEOUT", 10)
+
+    def operation():
+        queue = Queue(config, state, read_only=not writes_beets)
+        try:
+            return dispatch(args, queue, argv)
+        finally:
+            queue.close()
+
+    with ExitStack() as stack:
+        # This order is shared by all writers. State-only choices cannot hold
+        # the private lock while waiting for the import lock.
+        if writes_beets:
+            stack.enter_context(shared_lock(lock, lock_timeout))
+        if writes_state:
+            stack.enter_context(state_lock(state))
+        if writes_beets:
+            return operation()
+        return retry_busy(operation, read_timeout)
+
+
 def album_line(album):
     length = album["length_seconds"]
     duration = f"{length / 60:.1f} min" if length is not None else "length unknown"
@@ -395,9 +434,8 @@ def main(argv=None):
                 "configuration_invalid", "Beets configuration is missing.", 78
             )
         # Third-party diagnostics must never corrupt the single JSON envelope.
-        with redirect_stdout(sys.stderr), shared_lock(lock):
-            queue = Queue(config, state)
-            data = dispatch(args, queue, argv)
+        with redirect_stdout(sys.stderr):
+            data = execute(args, config, state, lock, argv)
         envelope = {"schema": 1, "command": command, "ok": True, "data": data}
         if as_json:
             print(json.dumps(envelope, ensure_ascii=False, allow_nan=False))

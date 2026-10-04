@@ -4,7 +4,9 @@ import fcntl
 import json
 import math
 import os
+import sqlite3
 import tempfile
+import time
 import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -64,15 +66,130 @@ def play_count(item):
     return 0
 
 
+def timeout_setting(name, default):
+    value = number(os.environ.get(name, default))
+    if value is None or value < 0:
+        raise ListenError(
+            "configuration_invalid", f"{name} must be finite and nonnegative.", 78
+        )
+    return value
+
+
 @contextmanager
-def shared_lock(path):
+def shared_lock(path, timeout=30, *, message=None):
+    """Acquire an exclusive lock without waiting indefinitely."""
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise ListenError(
+                        "backend_unavailable",
+                        message
+                        or "Beets is busy (import/backfill running); try again later.",
+                        75,
+                    ) from None
+                time.sleep(min(0.05, remaining))
         yield
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
+
+
+@contextmanager
+def state_lock(root):
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with shared_lock(
+        root / ".lock", 5, message="Listen state is busy; try again later."
+    ):
+        yield
+
+
+def retry_busy(operation, timeout):
+    """Retry a read operation, never a database mutation, on SQLite contention."""
+    deadline = time.monotonic() + timeout
+    delay = 0.05
+    while True:
+        try:
+            return operation()
+        except sqlite3.OperationalError as exc:
+            code = getattr(exc, "sqlite_errorcode", None)
+            # Mask extended result codes (e.g. SQLITE_BUSY_SNAPSHOT). The
+            # message fallback covers SQLite errors raised by beets/tests.
+            busy = (
+                code & 0xFF in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+                if code is not None
+                else str(exc).lower()
+                in (
+                    "database is locked",
+                    "database is busy",
+                    "database table is locked",
+                )
+            )
+            if not busy:
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ListenError(
+                    "backend_unavailable",
+                    "Beets database is busy; read retry limit reached. Try again later.",
+                    75,
+                ) from None
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, 0.5)
+
+
+def open_library(path, directory, read_only):
+    from beets.library import Library
+
+    class ReadOnlyLibrary(Library):
+        """Adapter for pinned beets, whose constructor otherwise runs DDL."""
+
+        def _create_connection(self):
+            # Keep self.path as the real path for beets; URI encoding also
+            # handles filenames containing '?' or '#'. Do not use immutable:
+            # the library can change underneath this reader, including in WAL.
+            conn = sqlite3.connect(
+                Path(self.path).resolve().as_uri() + "?mode=ro",
+                uri=True,
+                timeout=0,
+                check_same_thread=False,
+            )
+            conn.row_factory = sqlite3.Row
+            self.add_functions(conn)
+            return conn
+
+        def _ensure_migration_state_table(self):
+            pass
+
+        def _make_table(self, table, fields):
+            pass
+
+        def _make_attribute_table(self, flex_table):
+            pass
+
+        def _create_indices(self, table, indices):
+            pass
+
+        def _migrate(self):
+            pass
+
+    cls = ReadOnlyLibrary if read_only else Library
+    # Close partially initialized libraries too if constructor/schema access
+    # fails, so a retry cannot retain connections or SQLite locks.
+    library = cls.__new__(cls)
+    try:
+        cls.__init__(library, path, directory)
+    except BaseException:
+        if hasattr(library, "_connections"):
+            library._close()
+        raise
+    return library
 
 
 class State:
@@ -115,10 +232,9 @@ class State:
 
 
 class Queue:
-    def __init__(self, config_path, state_root):
+    def __init__(self, config_path, state_root, *, read_only=False):
         import beets
         from beets import plugins
-        from beets.library import Library
 
         if not Path(config_path).is_file():
             raise ListenError(
@@ -139,7 +255,6 @@ class Queue:
             raise ListenError(
                 "configuration_invalid", "Beets library database is missing.", 78
             )
-        self.lib = Library(dbpath, beets.config["directory"].as_filename())
         self.state = State(state_root, dbpath)
         self.fields = {
             name.removeprefix("listen_"): name
@@ -148,6 +263,16 @@ class Queue:
             and name.removeprefix("listen_") not in RESERVED
             and not name.endswith("_scored_tracks")
         }
+        # Never inherit an hours-long SQLite timeout from the import config.
+        beets.config["timeout"] = (
+            0 if read_only else min(5, max(0, beets.config["timeout"].as_number()))
+        )
+        self.lib = open_library(
+            dbpath, beets.config["directory"].as_filename(), read_only
+        )
+
+    def close(self):
+        self.lib._close()
 
     def metadata(self, album):
         items = list(album.items())
@@ -286,5 +411,8 @@ class Queue:
         album = self.resolve(album_id=album_id)
         if album.get("listen_state") != "queued":
             raise ListenError("not_queued", "Only queued albums can be chosen.")
+        # Complete every database read before writing: read retries must never
+        # replay a receipt mutation after a late busy error in metadata().
+        chosen = self.metadata(album)
         self.state.write("last-pick.json", album_id=album.id, picked_at=now_stamp())
-        return {"mode": "choose", "chosen": self.metadata(album)}
+        return {"mode": "choose", "chosen": chosen}

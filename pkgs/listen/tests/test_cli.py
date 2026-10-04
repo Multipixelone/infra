@@ -76,6 +76,8 @@ class LibraryCase(unittest.TestCase):
             "LISTEN_BEETS_LOCK": str(self.root / ".import.lock"),
             "LISTEN_STATE_DIR": str(self.root / "state"),
             "LISTEN_COMMUTECOMPASS": str(self.root / "no-commutecompass"),
+            "LISTEN_BEETS_LOCK_TIMEOUT": "2",
+            "LISTEN_SQLITE_BUSY_TIMEOUT": "2",
         }
 
     def create(self, *rows):
@@ -85,6 +87,7 @@ class LibraryCase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
@@ -96,6 +99,7 @@ class LibraryCase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=15,
         )
         self.assertEqual(result.returncode, exit_code, result.stderr + result.stdout)
         envelope = json.loads(result.stdout)
