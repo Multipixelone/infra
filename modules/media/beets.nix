@@ -769,6 +769,10 @@ in
               "^-" = "";
             };
             per_disc_numbering = true;
+            # External readers can block commit(); Transaction.__exit__ then leaves
+            # _db_lock held on timeout, deadlocking workers (2026-10-05 backfill).
+            # Allow ordinary concurrent reads time to finish.
+            timeout = 60;
             lastfm.user = "Tunnelmaker";
             lastimport.user = "Tunnelmaker";
             mbsubmit.picard_path = lib.getExe pkgs.picard;
