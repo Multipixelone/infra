@@ -55,7 +55,7 @@
       };
 
       services.prem-tweet = {
-        enable = true;
+        enable = false;
 
         # Both posting identities. `finn` is @multipixelone — Finn's personal
         # account, which upstream ships as a second registered account with its
