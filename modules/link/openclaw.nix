@@ -92,7 +92,7 @@ in
       # --- OpenClaw gateway ---------------------------------------------------
       # Keep the npm bootstrap pinned: a bare package name resolves to `latest`
       # and would silently replace the compatible gateway on a failed check.
-      openclawVersion = "2026.9.7";
+      openclawVersion = "2026.9.8";
       openclawNpmSpec = "openclaw@${openclawVersion}";
       openclawPrefix = "/home/tunnel/.npm-global";
       openclawBin = "${openclawPrefix}/bin/openclaw";
