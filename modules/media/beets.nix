@@ -537,12 +537,13 @@ in
                 };
               };
           beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
-            Unit.Description = "Refresh last.fm play counts after the nightly backfill";
+            Unit.Description = "Refresh last.fm play counts quarterly after the backfill";
             Install.WantedBy = [ "timers.target" ];
             Timer = {
-              # Backfill releases the lock by 09:00; leave a queued openclaw
+              # Run quarterly to avoid hammering last.fm's full-history API.
+              # Backfill releases the lock by 09:00; 09:45 leaves a queued openclaw
               # import its 30-minute timeout plus 15 minutes of margin.
-              OnCalendar = "*-*-* 09:45:00";
+              OnCalendar = "*-01,04,07,10-01 09:45:00";
               Persistent = true;
               RandomizedDelaySec = "20m";
             };
