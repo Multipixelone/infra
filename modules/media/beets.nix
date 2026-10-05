@@ -108,6 +108,100 @@ in
           exec ${lib.getExe beets-plugins} -c ${lib.escapeShellArg beets-config} -p lastimport lastimport
         '';
       };
+      # The CLI overlay is applied after config.yaml and its includes. Loading
+      # only xtractor also excludes database_change hooks that could write tags.
+      backfill-count-config = pkgs.writeText "beets-xtractor-backfill-count.json" (
+        builtins.toJSON {
+          xtractor = {
+            write = false;
+            force = false;
+          };
+        }
+      );
+      backfill-run = pkgs.writeShellApplication {
+        name = "beets-xtractor-backfill-run";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.findutils
+          pkgs.jq
+          pkgs.util-linux
+        ];
+        text = ''
+          export BEETSDIR=${lib.escapeShellArg beets-dir}
+          beet=${lib.escapeShellArg (lib.getExe beets-plugins)}
+          output_root=${lib.escapeShellArg xtractor-output}
+
+          # Pinned xtractor reports its count through the logger (stderr).
+          if count_output=$("$beet" -c ${backfill-count-config} -p xtractor xt --count-only 2>&1); then
+            count=""
+            while IFS= read -r line; do
+              if [[ "$line" =~ ^(xtractor:\ )?Number\ of\ items\ to\ be\ processed:\ ([0-9]+)$ ]]; then
+                if [[ -n "$count" ]]; then
+                  echo "Ambiguous xtractor count" >&2
+                  exit 1
+                fi
+                count="''${BASH_REMATCH[2]}"
+              fi
+            done <<< "$count_output"
+            if [[ -z "$count" ]]; then
+              printf 'Unrecognized xtractor count: %s\n' "$count_output" >&2
+              exit 1
+            fi
+          else
+            status=$?
+            printf '%s\n' "$count_output" >&2
+            exit "$status"
+          fi
+          if [[ "$count" == 0 ]]; then
+            echo "Xtractor backfill complete; nothing to do"
+            exit 0
+          fi
+
+          exec {lock_fd}>"$BEETSDIR/.import.lock"
+          if flock --exclusive --timeout 300 --conflict-exit-code 75 "$lock_fd"; then
+            :
+          else
+            status=$?
+            if [[ "$status" == 75 ]]; then
+              echo "Beets import lock busy; skipping tonight's backfill"
+              exit 0
+            fi
+            exit "$status"
+          fi
+
+          # Never reuse cached JSON: stock xtractor trusts an existing file,
+          # even if termination left it incomplete. Only reclaim our own dirs.
+          install -d -m 0700 -- "$output_root"
+          find "$output_root" -mindepth 1 -maxdepth 1 -type d -name 'backfill-*' \
+            -exec rm -rf -- {} +
+          run_dir=$(mktemp -d "$output_root/backfill-XXXXXXXX")
+          trap 'rm -rf -- "$run_dir"' EXIT
+          trap 'exit 143' TERM
+          trap 'exit 130' INT
+          jq -n --arg output "$run_dir" \
+            '{xtractor: {write: false, force: false, output_path: $output}}' > "$run_dir/config.json"
+          # The shell retains the lock until beet exits and cleanup finishes.
+          "$beet" -c "$run_dir/config.json" -p xtractor xt -t 12
+        '';
+      };
+      beets-xtractor-backfill = pkgs.writeShellApplication {
+        name = "beets-xtractor-backfill";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          now=$(date +%s)
+          start=$(date --date='today 01:00:00' +%s)
+          # Reserve the last minute for SIGKILL escalation. Convert today's
+          # local wall time to an epoch; an eight-hour duration is wrong on DST.
+          stop=$(date --date='today 08:59:00' +%s)
+          if (( now < start || now >= stop )); then
+            echo "Outside the nightly xtractor backfill window; skipping"
+            exit 0
+          fi
+          remaining=$((stop - now))
+          # Bound everything, including count-only and lock acquisition.
+          exec timeout --signal=TERM --kill-after=60s "''${remaining}s" ${lib.getExe backfill-run}
+        '';
+      };
       beets-import = pkgs.writeShellApplication {
         name = "beets-import";
         runtimeInputs = [
@@ -417,11 +511,38 @@ in
           };
         };
         timers = {
-          beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
-            Unit.Description = "Refresh last.fm play counts overnight";
+          beets-xtractor-backfill = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+            Unit.Description = "Schedule the nightly DB-only xtractor backfill";
             Install.WantedBy = [ "timers.target" ];
             Timer = {
-              OnCalendar = "*-*-* 04:00:00";
+              OnCalendar = "*-*-* 01:00:00";
+              Persistent = false;
+              RandomizedDelaySec = 0;
+              AccuracySec = "1s";
+            };
+          };
+          beets-xtractor-backfill-stop =
+            lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName)
+              {
+                Unit.Description = "Enforce the local-time xtractor backfill cutoff";
+                Install.WantedBy = [ "timers.target" ];
+                Timer = {
+                  # GNU timeout's relative clock pauses during suspend. A calendar
+                  # timer also stops an existing run immediately on a late resume.
+                  # Allow one second of timer slack, then 60 seconds for SIGKILL.
+                  OnCalendar = "*-*-* 08:58:59";
+                  Persistent = false;
+                  RandomizedDelaySec = 0;
+                  AccuracySec = "1s";
+                };
+              };
+          beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+            Unit.Description = "Refresh last.fm play counts after the nightly backfill";
+            Install.WantedBy = [ "timers.target" ];
+            Timer = {
+              # Backfill releases the lock by 09:00; leave a queued openclaw
+              # import its 30-minute timeout plus 15 minutes of margin.
+              OnCalendar = "*-*-* 09:45:00";
               Persistent = true;
               RandomizedDelaySec = "20m";
             };
@@ -446,6 +567,38 @@ in
           };
         };
         services = {
+          beets-xtractor-backfill = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+            Unit.Description = "Backfill xtractor analysis in the beets database";
+            Service = {
+              Type = "exec";
+              ExecStart = lib.getExe beets-xtractor-backfill;
+              RuntimeMaxSec = "8h";
+              Nice = 10;
+              CPUWeight = 10;
+              IOSchedulingClass = "idle";
+              KillSignal = "SIGTERM";
+              KillMode = "control-group";
+              TimeoutStopSec = "60s";
+              # Expected exits from GNU timeout or the calendar stop; a forced
+              # kill of hung work remains visible as a failure.
+              SuccessExitStatus = [
+                "124"
+                "143"
+              ];
+              Restart = "no";
+              UMask = "0077";
+            };
+          };
+          beets-xtractor-backfill-stop =
+            lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName)
+              {
+                Unit.Description = "Stop the nightly xtractor backfill before 09:00 local";
+                Service = {
+                  Type = "oneshot";
+                  ExecStart = "${lib.getExe' pkgs.systemd "systemctl"} --user stop beets-xtractor-backfill.service";
+                  TimeoutStartSec = "90s";
+                };
+              };
           beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
             Unit.Description = "Import last.fm play counts into the beets database";
             Service = {
