@@ -4,16 +4,18 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import signal
 import sqlite3
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
 from listen_queue.errors import ListenError
-from listen_queue.library import open_library, retry_busy
+from listen_queue.library import retry_busy
 
-PLAYED_QUERY = ("lastfm_play_count::^[1-9][0-9]*$",)
+PLAYED_COUNT = re.compile(r"^[1-9][0-9]*$")
 
 
 def report(event, **values):
@@ -36,23 +38,120 @@ def store_lock(store):
         os.close(descriptor)
 
 
-def stage_snapshot(config, manifest, query=(), busy_timeout=10):
-    from beetsplug.embed import snapshot
+def snapshot_metadata(config, busy_timeout=600, hold_timeout=15):
+    """Acquire SHARED once; release it before processing the captured rows."""
+    deadline = time.monotonic() + busy_timeout
+    attempts = 0
 
     def operation():
-        library = open_library(config["library"], config["directory"], read_only=True)
+        nonlocal attempts
+        attempts += 1
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ListenError(
+                "backend_unavailable", "Embedding snapshot read deadline reached.", 75
+            )
+        connection = sqlite3.connect(
+            Path(config["library"]).resolve().as_uri() + "?mode=ro",
+            uri=True,
+            timeout=min(60, remaining),
+        )
+        connection.row_factory = sqlite3.Row
+        waiting = time.monotonic()
         try:
-            # Truncate on every retry: never retain a partial snapshot or duplicate
-            # pages. Native snapshot queries release their transaction every 512 IDs.
-            with manifest.open("w") as output:
-                for track in snapshot(library, query):
-                    output.write(json.dumps(track, ensure_ascii=True) + "\n")
-        finally:
-            library._close()
+            connection.execute("BEGIN")
+            # BEGIN is deferred: this first read actually acquires SHARED. No
+            # beets transaction contexts may commit between the following reads.
+            connection.execute("SELECT id FROM items LIMIT 1").fetchone()
+            acquired = time.monotonic()
+            hold_deadline = min(deadline, acquired + hold_timeout)
 
-    # This uses listen's zero-wait SQLite connections and bounded busy retry,
-    # never the long timeout inherited from the importer configuration.
-    retry_busy(operation, busy_timeout)
+            def expired():
+                return time.monotonic() >= hold_deadline
+
+            connection.set_progress_handler(expired, 1000)
+            try:
+                # Match the native snapshot's minimal columns. The generic
+                # played query materializes every item's full flexible metadata
+                # on every page; only one flexible field is needed here.
+                tracks = connection.execute(
+                    "SELECT id,path,album_id,artist,albumartist,album,title "
+                    "FROM items WHERE id>=0 ORDER BY id"
+                ).fetchall()
+                # Existing unique indexes are (entity_id, key), not key alone.
+                # CROSS JOIN fixes the master-table-first order so this performs
+                # indexed lookups rather than scanning all xtractor attributes.
+                plays = connection.execute(
+                    "SELECT a.entity_id,a.value,0 AS from_album "
+                    "FROM items AS i CROSS JOIN item_attributes AS a "
+                    "WHERE a.entity_id=i.id AND a.key=? "
+                    "UNION ALL SELECT a.entity_id,a.value,1 AS from_album "
+                    "FROM albums AS i CROSS JOIN album_attributes AS a "
+                    "WHERE a.entity_id=i.id AND a.key=?",
+                    ("lastfm_play_count", "lastfm_play_count"),
+                ).fetchall()
+            except sqlite3.OperationalError as exc:
+                if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_INTERRUPT:
+                    raise
+                raise ListenError(
+                    "backend_unavailable",
+                    "Embedding snapshot read hold limit reached.",
+                    75,
+                ) from exc
+            if expired():
+                raise ListenError(
+                    "backend_unavailable",
+                    "Embedding snapshot read hold limit reached.",
+                    75,
+                )
+            connection.set_progress_handler(None, 0)
+            connection.commit()
+            released = time.monotonic()
+            return tracks, plays, acquired - waiting, released - acquired
+        finally:
+            connection.set_progress_handler(None, 0)
+            try:
+                connection.rollback()
+            finally:
+                connection.close()
+
+    tracks, plays, waiting, held = retry_busy(operation, busy_timeout)
+    report(
+        "snapshot",
+        selected=len(tracks),
+        attempts=attempts,
+        wait_seconds=round(waiting, 3),
+        read_hold_seconds=round(held, 3),
+    )
+    return tracks, plays
+
+
+def stage_snapshots(
+    config, manifest, played_manifest, busy_timeout=600, hold_timeout=15
+):
+    tracks, plays = snapshot_metadata(config, busy_timeout, hold_timeout)
+    item_plays = {
+        row["entity_id"]: row["value"] for row in plays if not row["from_album"]
+    }
+    album_plays = {row["entity_id"]: row["value"] for row in plays if row["from_album"]}
+    # Filesystem access and JSON serialization happen after COMMIT and close.
+    # Normalize paths exactly like the native SQL snapshot; absolute paths keep
+    # their root, while relative paths resolve against the music directory.
+    with manifest.open("w") as output, played_manifest.open("w") as played_output:
+        for row in tracks:
+            track = dict(row)
+            track["path"] = os.path.normpath(
+                os.path.join(
+                    os.fsdecode(config["directory"]), os.fsdecode(track["path"])
+                )
+            )
+            line = json.dumps(track, ensure_ascii=True) + "\n"
+            output.write(line)
+            # An explicit item value (including zero) overrides the album, just
+            # like Item.get in the native played query.
+            plays = item_plays.get(track["id"], album_plays.get(track["album_id"]))
+            if PLAYED_COUNT.search(str(plays)):
+                played_output.write(line)
 
 
 def rows(manifest):
@@ -66,7 +165,7 @@ def counts(manifest, store):
     return count_pending(rows(manifest), str(store), model_ids())
 
 
-def run(config, store, threads, busy_timeout=10):
+def run(config, store, threads, busy_timeout=600):
     import beets
     from beets import plugins
 
@@ -82,13 +181,12 @@ def run(config, store, threads, busy_timeout=10):
     with tempfile.TemporaryDirectory(prefix="beets-embed-backfill-") as temporary:
         all_tracks = Path(temporary) / "all.jsonl"
         played_tracks = Path(temporary) / "played.jsonl"
-        stage_snapshot(config, all_tracks, busy_timeout=busy_timeout)
+        stage_snapshots(config, all_tracks, played_tracks, busy_timeout=busy_timeout)
         before = counts(all_tracks, store)
         report("initial", **before)
         if before["pending"] == 0:
             report("complete", **before)
             return 1 if before["unreadable"] else 0
-        stage_snapshot(config, played_tracks, PLAYED_QUERY, busy_timeout)
         # No beets connection survives snapshot staging, including device probing.
         worker, device = select_worker("auto", WORKER)
         report("device", device=device, threads=threads, batch_size=8)
