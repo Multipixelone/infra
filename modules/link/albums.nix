@@ -7,6 +7,8 @@
 let
   owner = config.flake.meta.owner.username;
   stateDirectory = "/var/lib/beets-album-graph";
+  coversDirectory = "${stateDirectory}/covers";
+  launchers = import ../../lib/album-graph-launchers.nix;
 in
 {
   servicePublication.applications.albums = {
@@ -49,8 +51,9 @@ in
         name = "beets-album-graph-serve";
         text = ''
           export BEETS_GRAPH_STATE=${lib.escapeShellArg stateDirectory}
+          export BEETS_GRAPH_COVERS=${lib.escapeShellArg coversDirectory}
           export BEETS_GRAPH_VIEWER=${lib.escapeShellArg (lib.getExe viewerPackage)}
-          ${builtins.readFile ./scripts/albums-viewer.sh}
+          ${launchers.viewer}
         '';
       };
       exportGraph = pkgs.writeShellApplication {
@@ -58,10 +61,11 @@ in
         runtimeInputs = [ pkgs.coreutils ];
         text = ''
           export BEETS_GRAPH_STATE=${lib.escapeShellArg stateDirectory}
+          export BEETS_GRAPH_COVERS=${lib.escapeShellArg coversDirectory}
           export BEETS_GRAPH_STORE=${lib.escapeShellArg store}
           export BEETS_GRAPH_CONFIG=${lib.escapeShellArg "${beetsDirectory}/config.yaml"}
           export BEETS_GRAPH_LAUNCHER=${lib.escapeShellArg (lib.getExe home.programs.beets.package)}
-          ${builtins.readFile ./scripts/albums-export.sh}
+          ${launchers.export}
         '';
       };
       storeAvailable = pkgs.writeShellApplication {
@@ -98,7 +102,10 @@ in
         group = "album-graph";
       };
       users.groups.album-graph = { };
-      systemd.tmpfiles.rules = [ "d ${stateDirectory} 0750 ${owner} album-graph - -" ];
+      systemd.tmpfiles.rules = [
+        "d ${stateDirectory} 0750 ${owner} album-graph - -"
+        "d ${coversDirectory} 0750 ${owner} album-graph - -"
+      ];
 
       systemd.services.beets-album-graph = {
         description = "Private album similarity graph viewer";
@@ -111,6 +118,7 @@ in
           Restart = "on-failure";
           RestartSec = "5s";
           ProtectHome = true;
+          # Includes the covers cache; the viewer cannot modify it.
           ReadOnlyPaths = [ stateDirectory ];
           RestrictAddressFamilies = [ "AF_INET" ];
           IPAddressDeny = "any";
@@ -145,10 +153,12 @@ in
           ProtectHome = "read-only";
           ReadOnlyPaths = [
             beetsDirectory
+            # Stored artwork paths resolve relative to /volume1/Media/Music.
             home.programs.beets.settings.directory
             "-${store}"
           ];
           ReadWritePaths = [
+            # Covers are maintained in place, outside the temporary JSON staging.
             stateDirectory
             "-${beetsDirectory}/.import.lock"
           ];
@@ -173,18 +183,31 @@ in
 
   perSystem =
     { pkgs, ... }:
+    let
+      fixtureExport = pkgs.writeShellApplication {
+        name = "album-graph-fixture-export";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = launchers.export;
+      };
+      fixtureViewer = pkgs.writeShellApplication {
+        name = "album-graph-fixture-viewer";
+        text = launchers.viewer;
+      };
+      fixturePython = pkgs.python3.withPackages (packages: [ packages.pillow ]);
+    in
     {
       checks.beets-album-graph-host =
         pkgs.runCommand "beets-album-graph-host-check"
           {
             nativeBuildInputs = [
-              pkgs.python3
-              pkgs.bash
-              pkgs.coreutils
+              fixturePython
             ];
           }
           ''
-            python3 ${./tests/albums_test.py} ${./scripts}
+            export PYTHONDONTWRITEBYTECODE=1
+            python3 ${./tests/albums_test.py} \
+              ${lib.getExe fixtureExport} ${lib.getExe fixtureViewer} \
+              ${inputs.beets-plugins}/plugins/embed/beets_embed/covers.py
             touch "$out"
           '';
     };
