@@ -31,6 +31,9 @@
         ## Rules
         System config: Nix only in `/home/tunnel/Documents/Git/infra`. Read repo `CLAUDE.md` / `AGENTS.md` before edits.
 
+        ## Commits
+        Always use Conventional Commits: `type(scope): imperative summary`. Types: feat/fix/refactor/perf/docs/test/build/ci/chore/revert. Add a scope when useful (host/module); lowercase summary, no trailing period, header ≤72 characters. Explain why in the body when non-obvious; mark breaking changes with `!` and/or `BREAKING CHANGE:`. One logical change per commit.
+
         ## Env
         Nix-managed NixOS+HM. Shell-scripts: prefer fish (no bash syntax). Terminal: foot+zellij. Bash tool: zsh, not fish — prefix `eval "$(direnv export zsh 2>/dev/null)"` when needed.
 

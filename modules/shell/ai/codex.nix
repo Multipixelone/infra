@@ -1,4 +1,5 @@
 {
+  config,
   inputs,
   ...
 }:
@@ -29,6 +30,7 @@
       # just as it is for Claude Code and OpenCode.
       programs.codex = {
         enable = true;
+        context = config.flake.aiConfig.context;
         package = inputs.codex-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
         enableMcpIntegration = true;
 
