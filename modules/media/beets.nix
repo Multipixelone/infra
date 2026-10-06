@@ -65,6 +65,8 @@ in
       beets-config = "${beets-dir}/config.yaml";
       beets-lock = "${beets-dir}/.import.lock";
       xtractor-enabled = supportsXtractor pkgs.stdenv.hostPlatform.system;
+      backfill-workers = osConfig.services.beets.xtractorBackfill.workers or 8;
+      backfill-cpu-quota = osConfig.services.beets.xtractorBackfill.cpuQuotaPercent or 600;
       xtractor-output = "${beets-dir}/xtractor";
       xtractor-state = pkgs.writeShellApplication {
         name = "beets-xtractor-state";
@@ -181,7 +183,10 @@ in
           jq -n --arg output "$run_dir" \
             '{xtractor: {write: false, force: false, output_path: $output}}' > "$run_dir/config.json"
           # The shell retains the lock until beet exits and cleanup finishes.
-          "$beet" -c "$run_dir/config.json" -p xtractor xt -t 12
+          # -t bounds Essentia subprocess concurrency, not just Python threads.
+          export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+          export NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+          "$beet" -c "$run_dir/config.json" -p xtractor xt -t ${toString backfill-workers}
         '';
       };
       beets-xtractor-backfill = pkgs.writeShellApplication {
@@ -576,6 +581,7 @@ in
               RuntimeMaxSec = "8h";
               Nice = 10;
               CPUWeight = 10;
+              CPUQuota = "${toString backfill-cpu-quota}%";
               IOSchedulingClass = "idle";
               KillSignal = "SIGTERM";
               KillMode = "control-group";
