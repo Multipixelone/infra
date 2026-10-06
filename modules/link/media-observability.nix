@@ -1432,6 +1432,7 @@ in
         romm = 7;
         notifiarr = 8;
         snapweb = 9;
+        albums = 10;
       };
       homepageServices =
         let

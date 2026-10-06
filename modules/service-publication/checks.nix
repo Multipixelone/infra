@@ -594,6 +594,19 @@ let
         && !hasIotFirewallAccept 3000 "192.168.6.50/32"
       )
       "IoT remote-backend firewall rules must allow Home Assistant's proxy and direct clients without leaking them to other ports";
+    assert lib.assertMsg (
+      inventory.applications.albums.canonical == "albums.nyc.finnrut.is"
+      && !inventory.applications.albums.public
+      && inventory.routes."albums/root".proxy.host == "link"
+      && inventory.routes."albums/root".backendAddress == "127.0.0.1"
+      && inventory.blockyRecords."albums.nyc.finnrut.is" == registry.hosts.link.addresses.lan
+      && lib.elem "albums.nyc.finnrut.is" inventory.nginxByHost.link.certificateNames
+      &&
+        builtins.length (lib.filter (probe: probe.routeKey == "albums/root") inventory.internalProbes) == 2
+      && !(builtins.hasAttr "albums" inventory.cloudflare.dnsRecords)
+      && lib.all (application: application.key != "albums") inventory.cloudflare.tunnel.applications
+      && !(hasAccessApplicationFor "albums" inventory)
+    ) "albums must stay private with Link loopback proxying, internal DNS, TLS, and probes";
     inventory;
 in
 {
