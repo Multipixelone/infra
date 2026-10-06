@@ -176,9 +176,9 @@ os.execv({shutil.which("timeout")!r}, ['timeout', *args])
         path.chmod(0o700)
         return path
 
-    def run_launcher(self, **env):
+    def run_launcher(self, mode=None, **env):
         return subprocess.run(
-            [str(self.launcher)],
+            [str(self.launcher)] + ([] if mode is None else [mode]),
             env=self.env | env,
             capture_output=True,
             text=True,
@@ -229,6 +229,24 @@ os.execv({shutil.which("timeout")!r}, ['timeout', *args])
                 self.assertEqual(self.recorded(), [])
                 self.assertFalse((self.beets / ".import.lock").exists())
 
+    def test_manual_runs_outside_window_with_elapsed_budget(self):
+        for now in ("89", "10000", "10001"):
+            with self.subTest(now=now):
+                result = self.run_launcher(mode="now", CLOCK_NOW=now)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = json.loads(self.timeout_calls.read_text().splitlines()[-1])
+                self.assertEqual(args[2], "28740s")
+        self.assertEqual(
+            [call["op"] for call in self.recorded()], ["count", "analysis"] * 3
+        )
+        self.assertEqual(len(self.flock_calls.read_text().splitlines()), 3)
+        self.assertFalse(list(self.output.glob("backfill-*")))
+
+    def test_unknown_mode_fails_without_work(self):
+        self.assertEqual(self.run_launcher(mode="invalid").returncode, 2)
+        self.assertEqual(self.recorded(), [])
+        self.assertFalse((self.beets / ".import.lock").exists())
+
     def test_zero_items_does_not_wait_for_lock_or_create_output(self):
         result = self.run_launcher(ITEM_COUNT="0")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -252,7 +270,7 @@ os.execv({shutil.which("timeout")!r}, ['timeout', *args])
     def test_deadline_uses_local_wall_time_across_dst_changes(self):
         for day, budget in (
             ("2026-03-08", 6 * 3600 + 59 * 60),
-            ("2026-11-01", 8 * 3600 + 59 * 60),
+            ("2026-11-01", 8 * 3600 - 60),
         ):
             with self.subTest(day=day):
                 now = subprocess.check_output(

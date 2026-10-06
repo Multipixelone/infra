@@ -186,7 +186,7 @@ in
           else
             status=$?
             if [[ "$status" == 75 ]]; then
-              echo "Beets import lock busy; skipping tonight's backfill"
+              echo "Beets import lock busy; skipping this backfill"
               exit 0
             fi
             exit "$status"
@@ -214,16 +214,26 @@ in
         name = "beets-xtractor-backfill";
         runtimeInputs = [ pkgs.coreutils ];
         text = ''
-          now=$(date +%s)
-          start=$(date --date='today 01:00:00' +%s)
-          # Reserve the last minute for SIGKILL escalation. Convert today's
-          # local wall time to an epoch; an eight-hour duration is wrong on DST.
-          stop=$(date --date='today 08:59:00' +%s)
-          if (( now < start || now >= stop )); then
-            echo "Outside the nightly xtractor backfill window; skipping"
-            exit 0
-          fi
-          remaining=$((stop - now))
+          mode="''${1:-nightly}"
+          # Reserve the last minute of the eight-hour budget for escalation.
+          remaining=$((8 * 3600 - 60))
+          case "$mode" in
+            nightly)
+              now=$(date +%s)
+              start=$(date --date='today 01:00:00' +%s)
+              stop=$(date --date='today 08:59:00' +%s)
+              if (( now < start || now >= stop )); then
+                echo "Outside the nightly xtractor backfill window; skipping"
+                exit 0
+              fi
+              wall_remaining=$((stop - now))
+              if (( wall_remaining < remaining )); then
+                remaining=$wall_remaining
+              fi
+              ;;
+            now) ;;
+            *) echo "Unknown backfill mode: $mode" >&2; exit 2 ;;
+          esac
           # Bound everything, including count-only and lock acquisition.
           exec timeout --signal=TERM --kill-after=60s "''${remaining}s" ${lib.getExe backfill-run}
         '';
@@ -495,7 +505,7 @@ in
             type = lib.types.package;
             internal = true;
             readOnly = true;
-            description = "DB-only nightly xtractor launcher, consumed by link's system service.";
+            description = "DB-only xtractor launcher with nightly and manual modes, consumed by link's system services.";
           };
         })
       ];

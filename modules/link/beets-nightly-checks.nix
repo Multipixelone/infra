@@ -17,11 +17,13 @@
             "batch-nix.slice"
             "batch-beets.slice"
             "beets-nightly.target"
+            "beets-nightly-now.target"
           ]
           ++ lib.concatMap (
             job:
             map (suffix: "${job}${suffix}") [
               ".service"
+              "-now.service"
               ".timer"
               "-stop.service"
               "-stop.timer"
@@ -39,6 +41,8 @@
           transcodeService = cfg.home-manager.users.tunnel.systemd.user.services.transcode-music.Service;
           runtimeDirectorySize = cfg.services.logind.settings.Login.RuntimeDirectorySize or "10%";
           kernelVersion = cfg.boot.kernelPackages.kernel.version;
+          tmpfiles = cfg.systemd.tmpfiles.rules;
+          manualTimers = lib.filter (lib.hasSuffix "-now") (builtins.attrNames cfg.systemd.timers);
           units = lib.genAttrs names (name: cfg.systemd.units.${name}.text);
         };
       fixtureData = {
@@ -64,6 +68,7 @@
               modules = [ { services.beets.embedBackfill.enable = false; } ];
             }).config;
       };
+      modeLock = import ../../lib/beets-backfill-mode-lock.nix { inherit pkgs; };
       fixture = pkgs.writeText "link-beets-nightly-fixtures.json" (builtins.toJSON fixtureData);
     in
     lib.optionalAttrs (system == "x86_64-linux") {
@@ -88,6 +93,7 @@
             proot -b "$TMPDIR/test-run:/run" \
               -b ${pkgs.tzdata}/share/zoneinfo:/etc/zoneinfo \
               python3 ${./tests/beets_nightly_units_test.py} ${fixture}
+            python3 ${./tests/beets_backfill_mode_lock_test.py} ${lib.getExe modeLock}
             touch "$out"
           '';
     };

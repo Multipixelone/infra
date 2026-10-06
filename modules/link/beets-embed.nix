@@ -44,7 +44,8 @@ in
       home = config.home-manager.users.${owner};
       store = home.programs.beets.settings.embed.store;
       storeDirectory = builtins.dirOf store;
-      scratchDirectory = "/run/beets-embed-tmp";
+      modeLock = import ../../lib/beets-backfill-mode-lock.nix { inherit pkgs; };
+      lockDirectory = "/run/beets-backfill-locks";
       cacheDirectory = "/var/cache/beets-embed";
       package = withSystem pkgs.stdenv.hostPlatform.system (
         args: args.config.packages.beets-embed-backfill
@@ -71,6 +72,100 @@ in
           ${launcher}
         '';
       };
+      embedService =
+        mode:
+        let
+          target = if mode == "now" then "beets-nightly-now.target" else "beets-nightly.target";
+          runtimeDirectory = if mode == "now" then "beets-embed-now-tmp" else "beets-embed-tmp";
+          scratchDirectory = "/run/${runtimeDirectory}";
+        in
+        lib.mkIf cfg.enable {
+          description = "Backfill Style and Text embeddings without locking beets imports";
+          after = [ "systemd-tmpfiles-setup.service" ];
+          requires = [ target ];
+          partOf = [ target ];
+          environment = {
+            HOME = home.home.homeDirectory;
+            TMPDIR = scratchDirectory;
+            XDG_CACHE_HOME = cacheDirectory;
+            MIOPEN_CUSTOM_CACHE_DIR = "${cacheDirectory}/miopen";
+            MIOPEN_USER_DB_PATH = "${cacheDirectory}/miopen-db";
+            PYTHONDONTWRITEBYTECODE = "1";
+            TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          };
+          serviceConfig = {
+            Type = "exec";
+            User = owner;
+            Slice = "batch-beets.slice";
+            SupplementaryGroups = [
+              "render"
+              "video"
+            ];
+            ExecStart = "${lib.getExe modeLock} ${lockDirectory} ${mode} ${lib.getExe run} ${mode}";
+            RuntimeMaxSec = "${toString cfg.budgetHours}h";
+            CPUQuota = "${toString cfg.cpuQuotaPercent}%";
+            # Includes scratch shmem and all model/runtime descendants. The
+            # measured 13.5 GiB peak plus the 2 GiB scratch cap fits below 20 GiB.
+            MemoryAccounting = true;
+            MemoryMax = "20G";
+            Nice = 10;
+            CPUWeight = 10;
+            IOSchedulingClass = "idle";
+            KillSignal = "SIGTERM";
+            KillMode = "control-group";
+            TimeoutStopSec = "60s";
+            SuccessExitStatus = [
+              "124"
+              "143"
+            ];
+            Restart = "no";
+            UMask = "0077";
+            NoNewPrivileges = true;
+            CapabilityBoundingSet = "";
+            PrivateTmp = true;
+            RuntimeDirectory = runtimeDirectory;
+            RuntimeDirectoryMode = "0700";
+            # Pinned embed overlaps one preparation with one inference, even
+            # with four inference threads and batch-size 8. Conservatively keep
+            # all three mono f32 rates for two 30-minute tracks:
+            # 2 * 1800 * (48000 + 16000 + 24000) * 4 = 1.18 GiB.
+            # 2 GiB leaves 69% headroom for manifests and preparation overhead.
+            # noswap keeps scratch from becoming SSD writes under RAM pressure;
+            # anonymous model/runtime allocations may still use ordinary swap.
+            TemporaryFileSystem = [ "${scratchDirectory}:rw,size=2G,mode=1777,noswap" ];
+            # Persist compiled GPU kernels rather than rebuilding them nightly
+            # or allowing caches to consume the audio scratch allowance.
+            CacheDirectory = "beets-embed";
+            CacheDirectoryMode = "0700";
+            # PrivateDevices would hide the GPU and force CPU fallback.
+            PrivateDevices = false;
+            DevicePolicy = "closed";
+            DeviceAllow = [
+              "/dev/kfd rw"
+              "char-drm rw"
+            ];
+            ProtectSystem = "strict";
+            ProtectHome = "read-only";
+            ReadOnlyPaths = [
+              home.programs.beets.settings.directory
+              (builtins.dirOf home.programs.beets.settings.library)
+            ];
+            ReadWritePaths = [
+              storeDirectory
+              scratchDirectory
+              lockDirectory
+            ];
+            ProtectKernelTunables = true;
+            ProtectKernelModules = true;
+            ProtectKernelLogs = true;
+            ProtectControlGroups = true;
+            RestrictNamespaces = true;
+            RestrictSUIDSGID = true;
+            LockPersonality = true;
+            PrivateNetwork = true;
+            RestrictAddressFamilies = [ "AF_UNIX" ];
+          };
+        };
     in
     {
       options.services.beets = {
@@ -86,7 +181,7 @@ in
           budgetHours = lib.mkOption {
             type = lib.types.ints.between 1 8;
             default = 8;
-            description = "Maximum elapsed nightly budget, including shutdown; always finish before 09:00 America/New_York.";
+            description = "Maximum elapsed budget for nightly and manual runs, including shutdown; nightly runs also finish before 09:00 America/New_York.";
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
@@ -118,92 +213,8 @@ in
         systemd.tmpfiles.rules = lib.mkIf cfg.enable [
           "d ${storeDirectory} 0700 ${owner} users - -"
         ];
-        systemd.services.beets-embed-backfill = lib.mkIf cfg.enable {
-          description = "Backfill Style and Text embeddings without locking beets imports";
-          after = [ "systemd-tmpfiles-setup.service" ];
-          requires = [ "beets-nightly.target" ];
-          partOf = [ "beets-nightly.target" ];
-          environment = {
-            HOME = home.home.homeDirectory;
-            TMPDIR = scratchDirectory;
-            XDG_CACHE_HOME = cacheDirectory;
-            MIOPEN_CUSTOM_CACHE_DIR = "${cacheDirectory}/miopen";
-            MIOPEN_USER_DB_PATH = "${cacheDirectory}/miopen-db";
-            PYTHONDONTWRITEBYTECODE = "1";
-            TZDIR = "${pkgs.tzdata}/share/zoneinfo";
-          };
-          serviceConfig = {
-            Type = "exec";
-            User = owner;
-            Slice = "batch-beets.slice";
-            SupplementaryGroups = [
-              "render"
-              "video"
-            ];
-            ExecStart = lib.getExe run;
-            RuntimeMaxSec = "${toString cfg.budgetHours}h";
-            CPUQuota = "${toString cfg.cpuQuotaPercent}%";
-            # Includes scratch shmem and all model/runtime descendants. The
-            # measured 13.5 GiB peak plus the 2 GiB scratch cap fits below 20 GiB.
-            MemoryAccounting = true;
-            MemoryMax = "20G";
-            Nice = 10;
-            CPUWeight = 10;
-            IOSchedulingClass = "idle";
-            KillSignal = "SIGTERM";
-            KillMode = "control-group";
-            TimeoutStopSec = "60s";
-            SuccessExitStatus = [
-              "124"
-              "143"
-            ];
-            Restart = "no";
-            UMask = "0077";
-            NoNewPrivileges = true;
-            CapabilityBoundingSet = "";
-            PrivateTmp = true;
-            RuntimeDirectory = "beets-embed-tmp";
-            RuntimeDirectoryMode = "0700";
-            # Pinned embed overlaps one preparation with one inference, even
-            # with four inference threads and batch-size 8. Conservatively keep
-            # all three mono f32 rates for two 30-minute tracks:
-            # 2 * 1800 * (48000 + 16000 + 24000) * 4 = 1.18 GiB.
-            # 2 GiB leaves 69% headroom for manifests and preparation overhead.
-            # noswap keeps scratch from becoming SSD writes under RAM pressure;
-            # anonymous model/runtime allocations may still use ordinary swap.
-            TemporaryFileSystem = [ "${scratchDirectory}:rw,size=2G,mode=1777,noswap" ];
-            # Persist compiled GPU kernels rather than rebuilding them nightly
-            # or allowing caches to consume the audio scratch allowance.
-            CacheDirectory = "beets-embed";
-            CacheDirectoryMode = "0700";
-            # PrivateDevices would hide the GPU and force CPU fallback.
-            PrivateDevices = false;
-            DevicePolicy = "closed";
-            DeviceAllow = [
-              "/dev/kfd rw"
-              "char-drm rw"
-            ];
-            ProtectSystem = "strict";
-            ProtectHome = "read-only";
-            ReadOnlyPaths = [
-              home.programs.beets.settings.directory
-              (builtins.dirOf home.programs.beets.settings.library)
-            ];
-            ReadWritePaths = [
-              storeDirectory
-              scratchDirectory
-            ];
-            ProtectKernelTunables = true;
-            ProtectKernelModules = true;
-            ProtectKernelLogs = true;
-            ProtectControlGroups = true;
-            RestrictNamespaces = true;
-            RestrictSUIDSGID = true;
-            LockPersonality = true;
-            PrivateNetwork = true;
-            RestrictAddressFamilies = [ "AF_UNIX" ];
-          };
-        };
+        systemd.services.beets-embed-backfill = embedService "nightly";
+        systemd.services.beets-embed-backfill-now = embedService "now";
         systemd.timers.beets-embed-backfill = lib.mkIf cfg.enable {
           description = "Schedule the concurrent nightly embedding backfill";
           wantedBy = [ "timers.target" ];

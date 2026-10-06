@@ -50,13 +50,14 @@ class WindowTest(unittest.TestCase):
         path.write_text(f"#!{sys.executable}\n" + source)
         path.chmod(0o700)
 
-    def run_launcher(self, **env):
+    def run_launcher(self, mode=None, **env):
         # writeShellApplication prefixes PATH; running its body keeps fixture
         # tools ahead of runtimeInputs while exercising the identical shell code.
         source = Path(LAUNCHER).read_text()
         body = source[source.index("export TZ=America/New_York") :]
         return subprocess.run(
-            [shutil.which("bash"), "-eu", "-o", "pipefail", "-c", body],
+            [shutil.which("bash"), "-eu", "-o", "pipefail", "-c", body, "launcher"]
+            + ([] if mode is None else [mode]),
             env=self.env | env,
             capture_output=True,
             text=True,
@@ -86,6 +87,19 @@ class WindowTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("Outside", result.stdout)
             self.assertFalse(self.args.exists())
+
+    def test_manual_ignores_calendar_but_preserves_budget(self):
+        for now in ("999", "29740", "40000"):
+            with self.subTest(now=now):
+                result = self.run_launcher(mode="now", CLOCK_NOW=now)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(self.args.read_text())[2], "28740s")
+        self.run_launcher(mode="now", BEETS_EMBED_BUDGET_SECONDS="7200")
+        self.assertEqual(json.loads(self.args.read_text())[2], "7140s")
+
+    def test_unknown_mode_fails_without_work(self):
+        self.assertEqual(self.run_launcher(mode="invalid").returncode, 2)
+        self.assertFalse(self.args.exists())
 
     def test_dst_uses_wall_clock_cutoff_and_elapsed_ceiling(self):
         date = shutil.which("date")

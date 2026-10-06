@@ -41,7 +41,7 @@ The separate Limine boot-debug entry stays available.
 
 ## Nightly controls and eventual migration
 
-Both jobs retain their 01:00 America/New_York schedule, wall-clock cutoff,
+The nightly jobs retain their 01:00 America/New_York schedule, wall-clock cutoff,
 per-job quotas, kill escalation, and private scratch handling. Xtractor keeps
 its shared import lock, DB-only analysis, and read-only music sandbox; it can
 write its SQLite state, import lock, and disposable analysis output. Embedding
@@ -57,21 +57,48 @@ systemctl --user stop beets-xtractor-backfill.timer beets-xtractor-backfill-stop
 The updated Home Manager configuration removes those user units. Subsequently:
 
 ```console
-sudo systemctl start beets-nightly.target
-sudo systemctl stop beets-nightly.target
-sudo systemctl status beets-nightly.target batch-beets.slice
+sudo systemctl start beets-nightly-now.target
+sudo systemctl stop beets-nightly-now.target
+sudo systemctl status beets-nightly-now.target batch-beets.slice
 ```
 
 Let existing Nix builds finish before eventual activation relocates the daemon
 to its new slice; old connection-handling processes can outlive a daemon restart.
 
-Starting either worker also pulls in the group. Outside the nightly window,
-launchers skip work. Stopping the target stops both jobs, but leaves their
-next-night timers enabled; stop both start timers too to suspend scheduling.
-A job finishing or failing does not stop its sibling. The target becomes
-inactive when neither worker needs it. Cutoff timers still stop each job before
-09:00, including after resume. Existing embedding-store revalidation guidance
-remains a separate manual operation; this change resets no real data.
+`beets-nightly-now.target` starts both enabled backfills immediately, at any
+hour. Its workers are `beets-xtractor-backfill-now.service` and
+`beets-embed-backfill-now.service`; starting either also pulls in the manual
+group. Both share the same `batch-beets.slice`, default 1200% aggregate quota,
+per-worker CPU and memory limits, sandboxing, and import/store locking as their
+nightly counterparts. Manual embedding uses a separate 2 GiB `noswap` scratch
+tmpfs at `/run/beets-embed-now-tmp`, with the same persistent GPU cache.
+
+Manual xtractor has an eight-hour elapsed budget. Manual embedding uses
+`services.beets.embedBackfill.budgetHours`, also eight hours by default. Both
+reserve the final minute for shutdown escalation. Manual work can finish early
+and has no 08:59 wall-clock cutoff; the nightly cutoff timers address only the
+nightly services.
+
+The existing `beets-nightly.target` and unsuffixed worker services remain
+window-gated: directly starting them outside 01:00–08:59 America/New_York skips
+work. This explicit separation makes the CLI show whether a run is manual or
+scheduled, without environment overrides or timer-trigger detection.
+
+A shared mode lock keeps an active run in place: both workers of the same mode
+may run concurrently, while workers of the other mode log a skip and exit
+successfully. Scheduled starts therefore skip while manual work is active, and
+manual starts skip while nightly work is active. Skipped work is not queued;
+retry after the active run finishes, or explicitly stop its target first.
+Admission locks live under `/run/beets-backfill-locks`; do not remove these
+files while workers are running. The existing import and embedding-store locks
+remain in effect too.
+
+Stopping either target stops its workers and leaves the next-night timers
+enabled; stop both start timers too to suspend scheduling. A job finishing or
+failing does not stop its sibling. Each target becomes inactive when neither
+worker needs it. Nightly cutoff timers still stop each nightly job before 09:00,
+including after resume. Existing embedding-store revalidation guidance remains
+a separate manual operation; these controls reset no real data.
 
 ## Finn's BIOS and firmware actions
 
@@ -107,9 +134,9 @@ Follow Finn's existing plan: boot 5–6 times, scrub, and watch for hardware err
   `/`, `/nix`, `/volume1/Media`, and `/media/SlowData`; inspect
   `sudo btrfs scrub status MOUNT` and all error counters. Other subvolume mounts
   on the same filesystem do not need duplicate scrubs.
-- After eventual adoption, confirm both workers report `Slice=batch-beets.slice`,
+- After eventual adoption, confirm both nightly and manual workers report `Slice=batch-beets.slice`,
   the slice reports CPUQuotaPerSecUSec=12s (1200%), and target start/stop controls
-  both. Watch temperatures via k10temp/hwmon and desktop responsiveness during
+  both workers in the selected mode. Watch temperatures via k10temp/hwmon and desktop responsiveness during
   concurrent work. Complete burn-in before un-parking this branch.
 - After deploy, run `systemctl status batch.slice batch-ci.slice batch-nix.slice batch-beets.slice`
   and `systemctl show -p Slice -p ControlGroup forgejo-runner-link.service nix-daemon.service`.

@@ -19,7 +19,24 @@ def unit(case, name):
     parser = configparser.ConfigParser(interpolation=None, strict=False)
     parser.optionxform = str
     parser.read_string(case["units"][name])
+    # systemd accumulates repeated path declarations; ConfigParser otherwise
+    # keeps only the last one, hiding sandbox paths from these assertions.
+    paths = re.findall(r"^ReadWritePaths=(.*)$", case["units"][name], re.MULTILINE)
+    if paths:
+        parser["Service"]["ReadWritePaths"] = " ".join(paths)
     return parser
+
+
+def environment(case, unit_name):
+    return dict(
+        value.split("=", 1)
+        for declaration in re.findall(
+            r"^Environment=(.*)$",
+            case["units"][unit_name],
+            flags=re.MULTILINE,
+        )
+        for value in shlex.split(declaration)
+    )
 
 
 class NightlyUnitsTest(unittest.TestCase):
@@ -58,8 +75,12 @@ class NightlyUnitsTest(unittest.TestCase):
                 self.assertEqual(service["CacheDirectoryMode"], "0700")
                 cache = "/var/cache/beets-embed"
                 self.assertEqual(environment["XDG_CACHE_HOME"], cache)
-                self.assertEqual(environment["MIOPEN_CUSTOM_CACHE_DIR"], cache + "/miopen")
-                self.assertEqual(environment["MIOPEN_USER_DB_PATH"], cache + "/miopen-db")
+                self.assertEqual(
+                    environment["MIOPEN_CUSTOM_CACHE_DIR"], cache + "/miopen"
+                )
+                self.assertEqual(
+                    environment["MIOPEN_USER_DB_PATH"], cache + "/miopen-db"
+                )
 
     def test_transcode_uses_shared_user_runtime_without_namespace(self):
         for name, case in CASES.items():
@@ -138,6 +159,79 @@ class NightlyUnitsTest(unittest.TestCase):
                     self.assertNotIn(
                         "beets-nightly.target", dependencies.get("After", "").split()
                     )
+
+    def test_manual_target_and_worker_parity(self):
+        for name, case in CASES.items():
+            with self.subTest(case=name):
+                target_name = "beets-nightly-now.target"
+                target = unit(case, target_name)["Unit"]
+                self.assertEqual(target["StopWhenUnneeded"], "true")
+                self.assertEqual(
+                    set(target["Wants"].split()),
+                    {job + "-now.service" for job in case["jobs"]},
+                )
+                self.assertEqual(case["manualTimers"], [])
+                lock_directory = "/run/beets-backfill-locks"
+                self.assertIn(
+                    f"d {lock_directory} 0700 tunnel users - -", case["tmpfiles"]
+                )
+                for job in case["jobs"]:
+                    nightly = unit(case, job + ".service")["Service"]
+                    manual_unit = unit(case, job + "-now.service")
+                    manual = manual_unit["Service"]
+                    dependencies = manual_unit["Unit"]
+                    self.assertIn(target_name, dependencies["Requires"].split())
+                    self.assertIn(target_name, dependencies["PartOf"].split())
+                    self.assertNotIn(target_name, dependencies.get("After", "").split())
+                    self.assertNotIn("Conflicts", dependencies)
+                    varying = {
+                        "ExecStart",
+                        "Environment",
+                        "RuntimeDirectory",
+                        "TemporaryFileSystem",
+                        "ReadWritePaths",
+                    }
+                    self.assertEqual(
+                        {k: v for k, v in nightly.items() if k not in varying},
+                        {k: v for k, v in manual.items() if k not in varying},
+                    )
+                    for mode, service in (("nightly", nightly), ("now", manual)):
+                        args = shlex.split(service["ExecStart"])
+                        self.assertTrue(
+                            args[0].endswith("/bin/beets-backfill-mode-lock")
+                        )
+                        self.assertEqual(args[1:3], [lock_directory, mode])
+                        self.assertEqual(args[-1], mode)
+                        self.assertIn(
+                            lock_directory, shlex.split(service["ReadWritePaths"])
+                        )
+                    if job == "beets-embed-backfill":
+                        self.assertEqual(
+                            manual["RuntimeDirectory"], "beets-embed-now-tmp"
+                        )
+                        self.assertEqual(
+                            manual["TemporaryFileSystem"],
+                            "/run/beets-embed-now-tmp:rw,size=2G,mode=1777,noswap",
+                        )
+                        replacements = lambda value: value.replace(
+                            "/run/beets-embed-now-tmp", "/run/beets-embed-tmp"
+                        )
+                        self.assertEqual(
+                            replacements(manual["ReadWritePaths"]),
+                            nightly["ReadWritePaths"],
+                        )
+                    else:
+                        self.assertEqual(
+                            manual["ReadWritePaths"], nightly["ReadWritePaths"]
+                        )
+
+                    manual_env = environment(case, job + "-now.service")
+                    if job == "beets-embed-backfill":
+                        self.assertEqual(
+                            manual_env["TMPDIR"], "/run/beets-embed-now-tmp"
+                        )
+                        manual_env["TMPDIR"] = "/run/beets-embed-tmp"
+                    self.assertEqual(manual_env, environment(case, job + ".service"))
 
     def test_start_and_cutoff_timers_are_unchanged(self):
         for name, case in CASES.items():
