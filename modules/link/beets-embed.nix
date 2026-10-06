@@ -131,7 +131,7 @@ in
           serviceConfig = {
             Type = "exec";
             User = owner;
-            Slice = "beets-nightly.slice";
+            Slice = "batch-beets.slice";
             SupplementaryGroups = [
               "render"
               "video"

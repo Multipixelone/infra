@@ -31,12 +31,8 @@ in
         };
       };
       config = {
-        # The hyphen nests nightly below beets: both levels need low weights.
-        systemd.slices.beets.sliceConfig = {
-          CPUWeight = 10;
-          IOWeight = 10;
-        };
-        systemd.slices.beets-nightly.sliceConfig = {
+        # A direct batch child shares one budget across both nightly jobs.
+        systemd.slices.batch-beets.sliceConfig = {
           CPUQuota = "${toString cfg.cpuQuotaPercent}%";
           CPUWeight = 10;
           IOWeight = 10;
@@ -68,7 +64,7 @@ in
             Type = "exec";
             User = owner;
             Group = "users";
-            Slice = "beets-nightly.slice";
+            Slice = "batch-beets.slice";
             ExecStart = lib.getExe home.programs.beets.xtractorBackfillPackage;
             RuntimeMaxSec = "8h";
             Nice = 10;

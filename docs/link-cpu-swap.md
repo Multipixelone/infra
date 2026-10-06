@@ -5,8 +5,8 @@ No deployment, activation, merge, or push is part of preparing it.
 
 `link.cpu.threads` defaults to 32. Nightly xtractor uses 12 workers at 800%
 CPUQuota; embedding uses 4 threads at 400%. Both run as tunnel in the system
-manager's `beets-nightly.slice`, with a default aggregate quota of 1200% and
-low CPU/IO weights on that slice and its `beets.slice` parent. The aggregate
+manager's `batch-beets.slice`, a direct child of `batch.slice`, with a default
+aggregate quota of 1200% and CPU/IO weights of 10. The aggregate
 quota follows the two job quota options and may be overridden through
 `services.beets.nightly.cpuQuotaPercent`. `memoryHigh` defaults to null until
 measured. These quotas limit CPU time, not reserved cores or guaranteed
@@ -21,10 +21,12 @@ System `batch.slice` has CPUWeight=20 and IOWeight=20. Its `batch-ci.slice`
 child contains the Forgejo runner and retains the 8G/12G memory thresholds;
 `batch-nix.slice` contains nix-daemon and its builders without those memory
 limits. Neither batch nor the Nix child has a CPU quota: idle builds can use
-the whole CPU. GameMode fences both children to two complete physical cores
+the whole CPU. GameMode fences the CI and Nix children to two complete physical cores
 and sets their weights to 1, then clears the masks and restores CI weights
-to 20 and Nix weights to 100 on exit. Nightly backfills remain in the separate
-`beets-nightly.slice`; album export and user-manager units are not moved.
+to 20 and Nix weights to 100 on exit. The nightly jobs share `batch-beets.slice`;
+one slice is sufficient for their common quota and target, so there is no
+intermediate Beets parent. Backfills retain their quota and low weights without
+joining the gaming affinity fence. Album export and user-manager units are not moved.
 
 Sandboxed builders inherit nix-daemon's cgroup. If Nix's `use-cgroups` setting
 is enabled, its per-build cgroups remain descendants of the daemon service,
@@ -57,7 +59,7 @@ The updated Home Manager configuration removes those user units. Subsequently:
 ```console
 sudo systemctl start beets-nightly.target
 sudo systemctl stop beets-nightly.target
-sudo systemctl status beets-nightly.target beets-nightly.slice
+sudo systemctl status beets-nightly.target batch-beets.slice
 ```
 
 Let existing Nix builds finish before eventual activation relocates the daemon
@@ -105,11 +107,11 @@ Follow Finn's existing plan: boot 5–6 times, scrub, and watch for hardware err
   `/`, `/nix`, `/volume1/Media`, and `/media/SlowData`; inspect
   `sudo btrfs scrub status MOUNT` and all error counters. Other subvolume mounts
   on the same filesystem do not need duplicate scrubs.
-- After eventual adoption, confirm both workers report `Slice=beets-nightly.slice`,
+- After eventual adoption, confirm both workers report `Slice=batch-beets.slice`,
   the slice reports CPUQuotaPerSecUSec=12s (1200%), and target start/stop controls
   both. Watch temperatures via k10temp/hwmon and desktop responsiveness during
   concurrent work. Complete burn-in before un-parking this branch.
-- After deploy, run `systemctl status batch.slice batch-ci.slice batch-nix.slice`
+- After deploy, run `systemctl status batch.slice batch-ci.slice batch-nix.slice batch-beets.slice`
   and `systemctl show -p Slice -p ControlGroup forgejo-runner-link.service nix-daemon.service`.
   During an ordinary build, run `sudo systemd-cgls /batch.slice` and confirm
   the runner is under `batch-ci.slice`, and the daemon and build processes
@@ -118,3 +120,5 @@ Follow Finn's existing plan: boot 5–6 times, scrub, and watch for hardware err
   a sandbox's cgroup namespace may report its own cgroup as `/`.
   Verify both child slices' `AllowedCPUs` masks are cleared after GameMode exits,
   and their CPU/IO weights return to 20 for CI and 100 for Nix.
+  During nightly work, confirm both backfill services are under the direct
+  `batch-beets.slice` child, retaining its 1200% quota and CPU/IO weights of 10.
