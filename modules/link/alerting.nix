@@ -55,11 +55,11 @@ let
               {{ range .Alerts }}{{ if eq .Status "resolved" }}✅ RESOLVED{{ else }}🔴 FIRING{{ end }}: {{ .Labels.alertname }}
               {{ if and .Labels.host .Labels.unit }}{{ .Labels.unit }} on {{ .Labels.host }}{{ else if .Labels.endpoint }}{{ .Labels.endpoint }}{{ else if .Labels.service }}{{ .Labels.service }}{{ else if .Labels.instance }}{{ .Labels.instance }}{{ else }}unknown target{{ end }} — since {{ .StartsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
               {{ if eq .Status "resolved" }}Ended: {{ .EndsAt | tz "America/New_York" | date "2006-01-02 15:04 MST" }}
-              {{ end }}{{ .Annotations.summary }}
+              {{ else }}{{ .Annotations.summary }}
               {{ if .Annotations.description }}Hint: {{ .Annotations.description }}
               {{ end }}{{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}
               {{ end }}{{ if .Annotations.logs }}Logs: {{ .Annotations.logs }}
-              {{ end }}{{ end }}
+              {{ end }}{{ end }}{{ end }}
             '';
           }
         ];

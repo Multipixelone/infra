@@ -15,7 +15,10 @@
       printf '🔴 FIRING: %s\n' "$alertname"
     fi
     printf '%s — since %s\n' "$target" "$(alert_time "$started")"
-    if [[ "$status" == resolved ]]; then printf 'Ended: %s\n' "$(alert_time "$ended")"; fi
-    printf '%s\nHint: %s\n' "$summary" "$hint"
+    if [[ "$status" == resolved ]]; then
+      printf 'Ended: %s\n' "$(alert_time "$ended")"
+    else
+      printf '%s\nHint: %s\n' "$summary" "$hint"
+    fi
   }
 ''

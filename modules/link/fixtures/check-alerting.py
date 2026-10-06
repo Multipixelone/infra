@@ -97,6 +97,26 @@ def render(config_path, formatter):
     message = receiver["telegram_configs"][0]["message"]
     with open("message.tmpl", "w") as output:
         output.write('{{ define "telegram" }}' + message + "{{ end }}")
+
+    def render_notification(alerts, status):
+        with open("notification.json", "w") as output:
+            json.dump(
+                {"receiver": "telegram", "status": status, "alerts": alerts}, output
+            )
+        return subprocess.run(
+            [
+                "amtool",
+                "template",
+                "render",
+                "--template.glob=message.tmpl",
+                '--template.text={{ template "telegram" . }}',
+                "--template.data=notification.json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
     cases = [
         (
             "2026-09-28T00:36:00Z",
@@ -138,6 +158,7 @@ def render(config_path, formatter):
                                         "summary": "Example summary",
                                         "description": "Example hint",
                                         "runbook": "https://example.com/runbook",
+                                        "logs": "https://example.com/logs",
                                     },
                                 }
                             ],
@@ -162,11 +183,15 @@ def render(config_path, formatter):
                     "ExampleAlert",
                     target,
                     start_time,
-                    "Example summary",
-                    "Example hint",
-                    "https://example.com/runbook",
                 ]:
                     assert expected in rendered, (expected, rendered)
+                for diagnostic in [
+                    "Example summary",
+                    "Hint: Example hint",
+                    "Runbook: https://example.com/runbook",
+                    "Logs: https://example.com/logs",
+                ]:
+                    assert (diagnostic in rendered) == (status == "firing"), rendered
                 check_message(
                     rendered,
                     "ExampleAlert",
@@ -198,8 +223,78 @@ def render(config_path, formatter):
                     rendered,
                     shell,
                 )
+
+    # Group status is firing, but diagnostics must depend on each alert's status.
+    alerts = [
+        {
+            "status": status,
+            "labels": {
+                "alertname": f"Mixed{status.title()}",
+                "endpoint": "mixed-target",
+            },
+            "startsAt": cases[0][0],
+            "endsAt": cases[0][2],
+            "annotations": {
+                "summary": f"{status} summary",
+                "description": f"{status} hint",
+                "runbook": f"https://example.com/{status}/runbook",
+                "logs": f"https://example.com/{status}/logs",
+            },
+        }
+        for status in ["resolved", "firing"]
+    ]
+    for batch in [alerts, list(reversed(alerts))]:
+        rendered = render_notification(batch, "firing")
+        sections = re.findall(r"[✅🔴].*?(?=[✅🔴]|\Z)", rendered, re.DOTALL)
+        assert len(sections) == 2, rendered
+        for alert, section in zip(batch, sections):
+            status = alert["status"]
+            check_message(
+                section,
+                alert["labels"]["alertname"],
+                "mixed-target",
+                status,
+                since=cases[0][1],
+                ended=cases[0][3],
+            )
+            for diagnostic in [
+                f"{status} summary",
+                f"Hint: {status} hint",
+                f"Runbook: https://example.com/{status}/runbook",
+                f"Logs: https://example.com/{status}/logs",
+            ]:
+                assert (diagnostic in section) == (status == "firing"), section
+
+    # Missing annotations and target labels remain safe in both states.
+    for status in ["firing", "resolved"]:
+        rendered = render_notification(
+            [
+                {
+                    "status": status,
+                    "labels": {"alertname": "UnknownTarget"},
+                    "startsAt": cases[0][0],
+                    "endsAt": cases[0][2],
+                    "annotations": {},
+                }
+            ],
+            status,
+        )
+        if status == "resolved":
+            check_message(
+                rendered,
+                "UnknownTarget",
+                "unknown target",
+                status,
+                since=cases[0][1],
+                ended=cases[0][3],
+            )
+        else:
+            assert rendered.strip().splitlines() == [
+                "🔴 FIRING: UnknownTarget",
+                f"unknown target — since {cases[0][1]}",
+            ], rendered
     print(
-        "rendered 16 firing/resolved notifications matching the shell renderer with New York summer/winter times offline"
+        "rendered 16 firing/resolved notifications matching the shell renderer with New York summer/winter times, plus mixed-state and missing-annotation/target cases offline"
     )
 
 

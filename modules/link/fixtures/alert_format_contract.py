@@ -16,9 +16,11 @@ def check_message(text, alertname, target, status, since=None, ended=None):
         assert re.fullmatch("Ended: " + pattern, lines[2]), lines
         if ended:
             assert lines[2] == f"Ended: {ended}", lines
-        offset += 1
+        # Recovery contains only identity, target, and incident timestamps:
+        # no original summary or Hint/Runbook/Logs/Journal diagnostics.
+        assert len(lines) == 3, lines
     else:
         assert not any(line.startswith("Ended:") for line in lines), lines
-    assert lines[offset] and not lines[offset].startswith("Hint:"), lines
-    assert lines[offset + 1].startswith("Hint: "), lines
+        assert lines[offset] and not lines[offset].startswith("Hint:"), lines
+        assert lines[offset + 1].startswith("Hint: "), lines
     assert "🚨" not in lines[0]

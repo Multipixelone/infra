@@ -343,12 +343,22 @@ All three paths render plain text with this required structure for these alerts:
 Hint: <next diagnostic action>
 ```
 
-Recovery uses `✅ RESOLVED` and adds `Ended: YYYY-MM-DD HH:MM EDT/EST`
-between the target and summary. Unit targets are `<unit> on <host>`; pipeline
+Recovery contains only status/alert name, target, and start/end timestamps:
+
+```text
+✅ RESOLVED: <alertname>
+<target> — since YYYY-MM-DD HH:MM EDT/EST
+Ended: YYYY-MM-DD HH:MM EDT/EST
+```
+
+Resolved notifications omit the original summary, `Hint:`, `Runbook:`, `Logs:`,
+and `Journal:` diagnostics, including in mixed firing/resolved batches.
+Unit targets are `<unit> on <host>`; pipeline
 targets are `alerting pipeline on link`. Times use America/New_York, including
-daylight saving time. Optional `Runbook:` and `Logs:` lines follow the hint;
-direct unit notifications append `Journal:` and the bounded tail. Existing
-Prometheus alerts retain their endpoint/service/instance target fallback and
+daylight saving time. For firing alerts, optional `Runbook:` and `Logs:` lines
+follow the hint; direct unit notifications append `Journal:` and the bounded
+tail. Existing Prometheus alerts retain their host+unit/endpoint/service/instance
+target fallback (or `unknown target` if none are present) and
 omit optional annotations when absent. The shell paths share a renderer;
 offline fixtures compare actual Alertmanager output to that renderer and assert
 the same contract against direct notifications and dead-man transitions.
