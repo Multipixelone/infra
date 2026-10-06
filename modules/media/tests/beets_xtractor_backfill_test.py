@@ -2,7 +2,8 @@
 
 Run with Python 3; requires bash, coreutils, findutils, jq and flock.
 Only Nix path substitutions and the clock/beet/timeout/flock tools are replaced.
-All fixture data stays in a temporary directory inside this worktree.
+All fixture data stays in a temporary directory. An optional source-file
+argument also allows running the tests against immutable Nix store sources.
 """
 
 import fcntl
@@ -18,8 +19,11 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
-SOURCE = (ROOT / "modules/media/beets.nix").read_text()
+SOURCE = (
+    Path(sys.argv.pop(1))
+    if len(sys.argv) > 1
+    else Path(__file__).resolve().parents[1] / "beets.nix"
+).read_text()
 
 
 def shell_body(binding):
@@ -72,9 +76,7 @@ sys.exit(int(os.environ.get('ANALYSIS_EXIT', '0')))
 
 class BackfillTest(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(
-            prefix=".beets-backfill-test-", dir=ROOT
-        )
+        self.temp = tempfile.TemporaryDirectory(prefix="beets-backfill-test-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.bin = self.root / "bin"

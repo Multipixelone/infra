@@ -31,6 +31,7 @@ in
         in
         pkgs.runCommand "beets-embed-window-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
           export PYTHONDONTWRITEBYTECODE=1
+          export TZDIR=${pkgs.tzdata}/share/zoneinfo
           python3 ${./tests/beets_embed_window_test.py} ${lib.getExe fixture}
           touch "$out"
         '';
@@ -123,6 +124,7 @@ in
             MIOPEN_CUSTOM_CACHE_DIR = "/tmp/beets-embed-cache/miopen";
             MIOPEN_USER_DB_PATH = "/tmp/beets-embed-cache/miopen-db";
             PYTHONDONTWRITEBYTECODE = "1";
+            TZDIR = "${pkgs.tzdata}/share/zoneinfo";
           };
           serviceConfig = {
             Type = "exec";

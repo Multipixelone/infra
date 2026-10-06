@@ -22,9 +22,27 @@ let
 in
 {
   perSystem =
-    { system, ... }:
+    { system, pkgs, ... }:
     lib.optionalAttrs (lib.hasSuffix "-linux" system) {
       packages.beets-plugins = beetsPackage system;
+      checks.beets-xtractor-backfill =
+        pkgs.runCommand "beets-xtractor-backfill-check"
+          {
+            nativeBuildInputs = [
+              pkgs.python3
+              pkgs.bash
+              pkgs.coreutils
+              pkgs.findutils
+              pkgs.jq
+              pkgs.util-linux
+            ];
+          }
+          ''
+            export PYTHONDONTWRITEBYTECODE=1
+            export TZDIR=${pkgs.tzdata}/share/zoneinfo
+              python3 ${./tests/beets_xtractor_backfill_test.py} ${./beets.nix}
+              touch "$out"
+          '';
     };
   flake-file.inputs = {
     beets-plugins = {
@@ -520,7 +538,7 @@ in
             Unit.Description = "Schedule the nightly DB-only xtractor backfill";
             Install.WantedBy = [ "timers.target" ];
             Timer = {
-              OnCalendar = "*-*-* 01:00:00";
+              OnCalendar = "*-*-* 01:00:00 America/New_York";
               Persistent = false;
               RandomizedDelaySec = 0;
               AccuracySec = "1s";
@@ -535,7 +553,7 @@ in
                   # GNU timeout's relative clock pauses during suspend. A calendar
                   # timer also stops an existing run immediately on a late resume.
                   # Allow one second of timer slack, then 60 seconds for SIGKILL.
-                  OnCalendar = "*-*-* 08:58:59";
+                  OnCalendar = "*-*-* 08:58:59 America/New_York";
                   Persistent = false;
                   RandomizedDelaySec = 0;
                   AccuracySec = "1s";
@@ -578,6 +596,10 @@ in
             Service = {
               Type = "exec";
               ExecStart = lib.getExe beets-xtractor-backfill;
+              Environment = [
+                "TZ=America/New_York"
+                "TZDIR=${pkgs.tzdata}/share/zoneinfo"
+              ];
               RuntimeMaxSec = "8h";
               Nice = 10;
               CPUWeight = 10;
