@@ -612,8 +612,29 @@ in
 {
   perSystem =
     { pkgs, ... }:
+    let
+      issuingHosts = lib.attrNames (
+        lib.filterAttrs (hostName: _: registry.hosts.${hostName}.managedByNixOS) inventory.nginxByHost
+      );
+      hasPublicAcmeResolver =
+        hostName:
+        let
+          certificate =
+            config.flake.nixosConfigurations.${hostName}.config.security.acme.certs."service-publication-${hostName}"
+              or null;
+        in
+        certificate != null && certificate.dnsResolver == "1.1.1.1:53";
+    in
     {
       files.file."infra/service-publication/registry.json".text = builtins.toJSON checkedInventory + "\n";
+
+      checks.service-publication-acme-resolvers =
+        assert lib.assertMsg (
+          !registry.rollout.enableLocalCutover || lib.all hasPublicAcmeResolver issuingHosts
+        ) "service-publication certificates must check DNS propagation through the public resolver";
+        pkgs.runCommand "service-publication-acme-resolvers-check" { } ''
+          touch "$out"
+        '';
 
       checks.service-publication-registry =
         pkgs.runCommand "service-publication-registry-check"

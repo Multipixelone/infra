@@ -263,6 +263,8 @@ let
                 domain = primaryCertificateName;
                 extraDomainNames = builtins.tail certificateNames;
                 dnsProvider = "cloudflare";
+                # Internal DNS shadows challenge subdomains; check public propagation directly.
+                dnsResolver = "1.1.1.1:53";
                 environmentFile = runtimeAcmeSecret;
                 group = "nginx";
               };
