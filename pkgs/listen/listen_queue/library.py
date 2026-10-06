@@ -274,13 +274,29 @@ class Queue:
     def close(self):
         self.lib._close()
 
-    def metadata(self, album):
-        items = list(album.items())
+    def metadata(
+        self,
+        album,
+        *,
+        score_names=None,
+        tracks=True,
+        play_history=True,
+        bpm=True,
+        classifiers=True,
+    ):
+        """Project only needed fields while ranking; defaults return full metadata.
+
+        Inline fields each query album tracks, so library-wide graph queries must
+        not evaluate every classifier before selecting a handful of results.
+        Discovery hydrates those results with the default projection afterward.
+        """
+        items = list(album.items()) if tracks else []
         lengths = [number(item.length, positive=True) for item in items]
-        plays = sum(play_count(item) for item in items)
+        plays = sum(play_count(item) for item in items) if play_history else 0
         scores = {
             name: self.score(album, field)
             for name, field in sorted(self.fields.items())
+            if score_names is None or name in score_names
         }
         genre_values = list(album.get("genres") or [])
         if isinstance(album.get("genres"), str):
@@ -301,20 +317,28 @@ class Queue:
             "genres": sorted(set(genre_values)),
             "label": album.label or None,
             "added": timestamp(album.added),
-            "bpm": number(album.get("listen_bpm"), positive=True),
+            "bpm": number(album.get("listen_bpm"), positive=True) if bpm else None,
             "listen_state": album.get("listen_state") or None,
             "listened_at": timestamp(album.get("listened_at")),
             "scores": scores,
             "mood_mirex": {
-                "cluster": album.get("listen_mirex_cluster"),
+                "cluster": album.get("listen_mirex_cluster") if classifiers else None,
                 "scores": {
                     str(i): self.score(album, f"listen_mirex_{i}") for i in range(1, 6)
-                },
+                }
+                if classifiers
+                else {},
             },
             "genre_rosamerica": {
-                "genre": album.get("listen_rosamerica") or None,
-                "present": bool(album.get("listen_rosamerica")),
-                "scored_tracks": int(album.get("listen_rosamerica_scored_tracks") or 0),
+                "genre": (album.get("listen_rosamerica") or None)
+                if classifiers
+                else None,
+                "present": bool(album.get("listen_rosamerica"))
+                if classifiers
+                else False,
+                "scored_tracks": int(album.get("listen_rosamerica_scored_tracks") or 0)
+                if classifiers
+                else 0,
             },
         }
 

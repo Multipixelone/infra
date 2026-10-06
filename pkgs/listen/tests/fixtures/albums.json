@@ -1,0 +1,167 @@
+{
+  "schema_version": 3,
+  "model_id": "style:fixture",
+  "text_model_id": "text:fixture",
+  "vector_encoding": "int8-base64",
+  "vector_dimension": 4,
+  "text_vector_encoding": "int8-base64",
+  "text_vector_dimension": 512,
+  "sound_encoding": "catalog-pairs-v1",
+  "essentia_fields": ["danceable", "voice_instrumental"],
+  "exported_at": "2026-10-06T12:00:00+00:00",
+  "labels": [
+    {
+      "id": "style:Jazz",
+      "source": "style",
+      "label": "Jazz",
+      "kind": "probability",
+      "axis": null,
+      "min": 0,
+      "max": 1,
+      "scores": "FRAEAQ=="
+    },
+    {
+      "id": "instruments:piano",
+      "source": "instruments",
+      "label": "piano",
+      "kind": "probability",
+      "axis": null,
+      "min": 0,
+      "max": 1,
+      "scores": "5jTMAA=="
+    },
+    {
+      "id": "clap:lo-fi",
+      "source": "clap",
+      "label": "lo-fi",
+      "kind": "zscore",
+      "axis": "production/texture",
+      "min": -4,
+      "max": 4,
+      "scores": "v6BgQQ=="
+    },
+    {
+      "id": "clap:piano",
+      "source": "clap",
+      "label": "piano",
+      "kind": "zscore",
+      "axis": "instrumentation",
+      "min": -4,
+      "max": 4,
+      "scores": "oN+/IQ=="
+    },
+    {
+      "id": "essentia:danceable",
+      "source": "essentia",
+      "label": "danceable",
+      "kind": "probability",
+      "axis": null,
+      "min": 0,
+      "max": 1,
+      "scores": "zJk0AA=="
+    }
+  ],
+  "albums": [
+    {
+      "id": 1,
+      "album": "Alpha",
+      "albumartist": "Artist",
+      "year": 2020,
+      "genre": "Jazz",
+      "track_count": 1,
+      "embedded_tracks": 1,
+      "text_embedded_tracks": 1,
+      "vector": "fwAAAA==",
+      "text_vector": "fwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "essentia": [
+        [0.8, 1],
+        ["instrumental", 1, 1]
+      ],
+      "sound": {
+        "style": {
+          "labels": [],
+          "count": 1
+        }
+      },
+      "summed_plays": 0,
+      "mean_plays": 0,
+      "cover": null,
+      "cover_large": null
+    },
+    {
+      "id": 2,
+      "album": "Bravo",
+      "albumartist": "Artist",
+      "year": 2020,
+      "genre": "Jazz",
+      "track_count": 1,
+      "embedded_tracks": 1,
+      "text_embedded_tracks": 1,
+      "vector": "eCgAAA==",
+      "text_vector": "PG4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "essentia": [
+        [0.6, 1],
+        ["vocal", 1, 1]
+      ],
+      "sound": {
+        "style": {
+          "labels": [],
+          "count": 1
+        }
+      },
+      "summed_plays": 0,
+      "mean_plays": 0,
+      "cover": null,
+      "cover_large": null
+    },
+    {
+      "id": 3,
+      "album": "Charlie",
+      "albumartist": "Artist",
+      "year": 2020,
+      "genre": "Jazz",
+      "track_count": 1,
+      "embedded_tracks": 1,
+      "text_embedded_tracks": 1,
+      "vector": "AH8AAA==",
+      "text_vector": "eCgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "essentia": [
+        [0.2, 1],
+        ["instrumental", 1, 1]
+      ],
+      "sound": {
+        "style": {
+          "labels": [],
+          "count": 1
+        }
+      },
+      "summed_plays": 0,
+      "mean_plays": 0,
+      "cover": null,
+      "cover_large": null
+    },
+    {
+      "id": 4,
+      "album": "Delta",
+      "albumartist": "Artist",
+      "year": 2020,
+      "genre": "Jazz",
+      "track_count": 1,
+      "embedded_tracks": 1,
+      "text_embedded_tracks": 1,
+      "vector": "gQAAAA==",
+      "text_vector": "gQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "essentia": [null, null],
+      "sound": {
+        "style": {
+          "labels": [],
+          "count": 1
+        }
+      },
+      "summed_plays": 0,
+      "mean_plays": 0,
+      "cover": null,
+      "cover_large": null
+    }
+  ]
+}

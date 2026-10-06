@@ -1,10 +1,8 @@
 """Structured filtering and random album selection; no beets query strings."""
 
-import itertools
 import json
 import math
 import os
-import random
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -225,12 +223,7 @@ def filter_reasons(album, filters):
         ("genre", album["genres"]),
         ("label", [album["label"] or ""]),
     ):
-        includes = filters[key]
         excludes = filters["exclude_" + key]
-        if includes and not any(
-            normalize(term) in normalize(value) for term in includes for value in values
-        ):
-            reasons.append(key)
         if excludes and any(
             normalize(term) in normalize(value) for term in excludes for value in values
         ):
@@ -266,10 +259,6 @@ def filter_reasons(album, filters):
         and album["mood_mirex"]["cluster"] not in filters["mirex_clusters"]
     ):
         reasons.append("mirex-cluster")
-    if filters["rosamerica"] and normalize(
-        album["genre_rosamerica"]["genre"] or ""
-    ) not in {normalize(v) for v in filters["rosamerica"]}:
-        reasons.append("rosamerica")
     requested = (
         set(filters["moods"] + filters["avoid_moods"])
         | filters["min_scores"].keys()
@@ -285,66 +274,3 @@ def filter_reasons(album, filters):
             if value is not None and (value < bound if minimum else value > bound):
                 reasons.append("min-score" if minimum else "max-score")
     return sorted(set(reasons))
-
-
-def weight(album, filters):
-    values = []
-    for key, avoid in (("moods", False), ("avoid_moods", True)):
-        for name in filters[key]:
-            value = album["scores"][name]["score"]
-            values.append(0.5 if value is None else 1 - value if avoid else value)
-    return 1 + sum(values) / len(values) if values else 1
-
-
-def sample(albums, count, filters, rng):
-    remaining = list(albums)
-    chosen = []
-    while remaining and len(chosen) < count:
-        picked = rng.choices(
-            remaining, weights=[weight(a, filters) for a in remaining]
-        )[0]
-        chosen.append(picked)
-        remaining.remove(picked)
-    return chosen
-
-
-def pick(queue, args, rng=None):
-    filters = filters_for(args, set(queue.fields))
-    cap = cap_for(args.max_minutes)
-    albums = []
-    for model in queue.albums():
-        album = queue.metadata(model)
-        length = album["length_seconds"]
-        reasons = filter_reasons(album, filters)
-        album.update(
-            {
-                "fits": length <= cap["minutes"] * 60 if length is not None else None,
-                "over_minutes": max(0, length / 60 - cap["minutes"])
-                if length is not None
-                else None,
-                "matches_filters": not reasons,
-                "filter_reasons": reasons,
-            }
-        )
-        albums.append(album)
-    unknown = [a["id"] for a in albums if a["length_seconds"] is None]
-    if not args.pool:
-        rng = rng or random.SystemRandom()
-        eligible = [a for a in albums if a["matches_filters"]]
-        chosen = sample([a for a in eligible if a["fits"]], args.count, filters, rng)
-        over = sorted(
-            (a for a in eligible if a["fits"] is False), key=lambda a: a["over_minutes"]
-        )
-        for _, tied in itertools.groupby(over, key=lambda a: a["over_minutes"]):
-            chosen.extend(sample(list(tied), args.count - len(chosen), filters, rng))
-            if len(chosen) >= args.count:
-                break
-        albums = chosen
-    return {
-        "mode": "pool" if args.pool else "suggestions",
-        "cap": cap,
-        "filters": filters,
-        "requested_count": None if args.pool else args.count,
-        "albums": albums,
-        "unknown_length_ids": unknown,
-    }

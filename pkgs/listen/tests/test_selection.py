@@ -4,7 +4,8 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from listen_queue.selection import cap_for, next_commute_duration, sample, weight
+from listen_queue.discovery import percentiles, ranked_sample
+from listen_queue.selection import cap_for, next_commute_duration
 
 
 class AdapterTests(unittest.TestCase):
@@ -222,22 +223,13 @@ class AdapterTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_weighting_and_selection_without_replacement(self):
-        albums = [
-            {
-                "id": i,
-                "scores": {"happy": {"score": value}, "aggressive": {"score": None}},
-            }
-            for i, value in enumerate((0, 1, None))
-        ]
-        filters = {"moods": ["happy"], "avoid_moods": []}
-        self.assertEqual([weight(a, filters) for a in albums], [1, 2, 1.5])
-        filters["avoid_moods"] = ["aggressive"]
-        self.assertEqual(weight(albums[1], filters), 1.75)
+        self.assertEqual(percentiles({1: 0, 2: 1, 3: None}), {1: 0, 2: 1, 3: 0.5})
+        albums = [{"id": i, "score": score} for i, score in enumerate((1, 0.5, 0))]
 
         class Highest:
             def choices(self, population, weights):
                 return [population[weights.index(max(weights))]]
 
-        chosen = sample(albums, 10, filters, Highest())
-        self.assertEqual([a["id"] for a in chosen], [1, 2, 0])
+        chosen = ranked_sample(albums, 10, Highest())
+        self.assertEqual([a["id"] for a in chosen], [0, 1, 2])
         self.assertEqual(len(albums), 3)

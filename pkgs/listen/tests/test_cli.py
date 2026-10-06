@@ -43,6 +43,8 @@ for index, row in enumerate(json.loads(os.environ['LISTEN_FIXTURES'])):
     album = lib.add_album(items)
     if row.get('state'):
         album['listen_state'] = row['state']
+    if row.get('listened_at'):
+        album['listened_at'] = row['listened_at']
     album['added'] = row.get('added', 1767225600)
     album.store(inherit=False)
     ids.append(album.id)
@@ -78,6 +80,9 @@ class LibraryCase(unittest.TestCase):
             "LISTEN_COMMUTECOMPASS": str(self.root / "no-commutecompass"),
             "LISTEN_BEETS_LOCK_TIMEOUT": "2",
             "LISTEN_SQLITE_BUSY_TIMEOUT": "2",
+            "LISTEN_ALBUM_GRAPH": str(self.root / "albums.json"),
+            "LISTEN_TEXT_ENDPOINT": "http://127.0.0.1:1/api/embed-text",
+            "LISTEN_TEXT_TIMEOUT": "1",
         }
 
     def create(self, *rows):
@@ -308,9 +313,11 @@ class SelectionTests(LibraryCase):
         self.assertEqual(
             data["cap"], {"minutes": 30.0, "source": "flag", "reason": None}
         )
-        self.assertEqual([a["id"] for a in data["albums"]], ids[:3])
-        self.assertEqual([a["over_minutes"] for a in data["albums"]], [0, 5, 15])
-        pool = self.invoke("pick", "--pool", "--max-minutes", 30, "--artist", "Nobody")
+        self.assertEqual([a["id"] for a in data["albums"]], ids[:1])
+        self.assertEqual([a["over_minutes"] for a in data["albums"]], [0])
+        pool = self.invoke(
+            "pick", "--pool", "--max-minutes", 30, "--require", "artist=Nobody"
+        )
         self.assertEqual(len(pool["albums"]), 5)
         self.assertIsNone(pool["requested_count"])
         self.assertTrue(all(not a["matches_filters"] for a in pool["albums"]))
@@ -428,13 +435,15 @@ class SelectionTests(LibraryCase):
         self.assertEqual(data["filters"]["year_to"], 1999)
         pool = self.invoke("pick", "--pool", *options)
         rejected = next(a for a in pool["albums"] if a["id"] == other)
-        self.assertIn("label", rejected["filter_reasons"])
+        self.assertNotIn("label", rejected["filter_reasons"])
         self.assertIn("bpm-min", rejected["filter_reasons"])
         self.assertEqual(
             self.invoke(
                 "pick",
                 "--label",
                 "editions",
+                "--require",
+                "label=editions",
                 "--exclude-label",
                 "editions",
                 "--max-minutes",
