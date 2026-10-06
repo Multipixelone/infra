@@ -4,6 +4,7 @@ import configparser
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,56 @@ def unit(case, name):
 
 
 class NightlyUnitsTest(unittest.TestCase):
+    def test_embed_scratch_and_persistent_caches(self):
+        for name, case in CASES.items():
+            with self.subTest(case=name):
+                # noswap is available starting with Linux 6.4.
+                version = tuple(map(int, case["kernelVersion"].split(".")[:2]))
+                self.assertGreaterEqual(version, (6, 4))
+                if "beets-embed-backfill" not in case["jobs"]:
+                    continue
+                service = unit(case, "beets-embed-backfill.service")["Service"]
+                environment = dict(
+                    value.split("=", 1)
+                    for declaration in re.findall(
+                        r"^Environment=(.*)$",
+                        case["units"]["beets-embed-backfill.service"],
+                        flags=re.MULTILINE,
+                    )
+                    for value in shlex.split(declaration)
+                )
+                scratch = "/run/beets-embed-tmp"
+                self.assertEqual(environment["TMPDIR"], scratch)
+                self.assertEqual(service["PrivateTmp"], "true")
+                self.assertEqual(service["RuntimeDirectory"], "beets-embed-tmp")
+                self.assertEqual(service["RuntimeDirectoryMode"], "0700")
+                self.assertEqual(
+                    service["TemporaryFileSystem"],
+                    f"{scratch}:rw,size=2G,mode=1777,noswap",
+                )
+                self.assertIn(scratch, shlex.split(service["ReadWritePaths"]))
+                self.assertEqual(service["MemoryAccounting"], "true")
+                self.assertEqual(service["MemoryMax"], "20G")
+                self.assertNotIn("MemorySwapMax", service)
+                self.assertEqual(service["CacheDirectory"], "beets-embed")
+                self.assertEqual(service["CacheDirectoryMode"], "0700")
+                cache = "/var/cache/beets-embed"
+                self.assertEqual(environment["XDG_CACHE_HOME"], cache)
+                self.assertEqual(environment["MIOPEN_CUSTOM_CACHE_DIR"], cache + "/miopen")
+                self.assertEqual(environment["MIOPEN_USER_DB_PATH"], cache + "/miopen-db")
+
+    def test_transcode_uses_shared_user_runtime_without_namespace(self):
+        for name, case in CASES.items():
+            with self.subTest(case=name):
+                service = case["transcodeService"]
+                self.assertEqual(service["RuntimeDirectory"], "transcode-music")
+                self.assertEqual(service["RuntimeDirectoryMode"], "0700")
+                self.assertIn("TMPDIR=%t/transcode-music", service["Environment"])
+                self.assertTrue(service["MemoryAccounting"])
+                self.assertNotIn("PrivateUsers", service)
+                self.assertNotIn("TemporaryFileSystem", service)
+                self.assertEqual(case["runtimeDirectorySize"], "10%")
+
     def test_shared_budget_and_direct_batch_child(self):
         for name, case in CASES.items():
             with self.subTest(case=name):

@@ -36,6 +36,9 @@
           );
           workers = cfg.services.beets.xtractorBackfill.workers;
           threads = cfg.services.beets.embedBackfill.threads;
+          transcodeService = cfg.home-manager.users.tunnel.systemd.user.services.transcode-music.Service;
+          runtimeDirectorySize = cfg.services.logind.settings.Login.RuntimeDirectorySize or "10%";
+          kernelVersion = cfg.boot.kernelPackages.kernel.version;
           units = lib.genAttrs names (name: cfg.systemd.units.${name}.text);
         };
       fixtureData = {
@@ -71,13 +74,20 @@
               pkgs.python3
               pkgs.systemd
               pkgs.coreutils
+              pkgs.proot
             ];
             # Allow the same evaluated cases to be checked without building a check.
             passthru = { inherit fixtureData; };
           }
           ''
             export PYTHONDONTWRITEBYTECODE=1
-            python3 ${./tests/beets_nightly_units_test.py} ${fixture}
+            # Newer systemd verifies with a manager runtime directory even in
+            # test mode. Supply private /run and timezone data inside the Nix
+            # sandbox while retaining system-manager dependency verification.
+            mkdir -p "$TMPDIR/test-run"
+            proot -b "$TMPDIR/test-run:/run" \
+              -b ${pkgs.tzdata}/share/zoneinfo:/etc/zoneinfo \
+              python3 ${./tests/beets_nightly_units_test.py} ${fixture}
             touch "$out"
           '';
     };

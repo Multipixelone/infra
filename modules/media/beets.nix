@@ -597,6 +597,17 @@ in
                 transcoded-music
               ];
               ExecStart = "${lib.getExe' euphony-wrapped "euphony"} transcode --bare-terminal";
+            }
+            // lib.optionalAttrs ((osConfig.networking.hostName or "") == hosts.link.hostName) {
+              # convert-mpc uses mktemp for a 48 kHz stereo s16 WAV. Four
+              # concurrent 30-minute tracks need 1.29 GiB. The user's existing
+              # /run/user/<uid> tmpfs defaults to 10% of RAM (~6 GiB on link),
+              # shared with the session. Avoid a mount/user namespace here so
+              # music and NAS access keep the user's normal credentials.
+              RuntimeDirectory = "transcode-music";
+              RuntimeDirectoryMode = "0700";
+              Environment = [ "TMPDIR=%t/transcode-music" ];
+              MemoryAccounting = true;
             };
           };
           playlist-downloader = {

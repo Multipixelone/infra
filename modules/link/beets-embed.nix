@@ -44,6 +44,8 @@ in
       home = config.home-manager.users.${owner};
       store = home.programs.beets.settings.embed.store;
       storeDirectory = builtins.dirOf store;
+      scratchDirectory = "/run/beets-embed-tmp";
+      cacheDirectory = "/var/cache/beets-embed";
       package = withSystem pkgs.stdenv.hostPlatform.system (
         args: args.config.packages.beets-embed-backfill
       );
@@ -61,6 +63,7 @@ in
           inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-embed-worker-rocm
         ];
         text = ''
+          install -d -m 0700 -- "$MIOPEN_CUSTOM_CACHE_DIR" "$MIOPEN_USER_DB_PATH"
           export BEETS_EMBED_BUDGET_SECONDS=${toString (cfg.budgetHours * 3600)}
           export BEETS_EMBED_THREADS=${toString cfg.threads}
           export BEETS_EMBED_CONFIG=${lib.escapeShellArg jobConfig}
@@ -122,9 +125,10 @@ in
           partOf = [ "beets-nightly.target" ];
           environment = {
             HOME = home.home.homeDirectory;
-            XDG_CACHE_HOME = "/tmp/beets-embed-cache";
-            MIOPEN_CUSTOM_CACHE_DIR = "/tmp/beets-embed-cache/miopen";
-            MIOPEN_USER_DB_PATH = "/tmp/beets-embed-cache/miopen-db";
+            TMPDIR = scratchDirectory;
+            XDG_CACHE_HOME = cacheDirectory;
+            MIOPEN_CUSTOM_CACHE_DIR = "${cacheDirectory}/miopen";
+            MIOPEN_USER_DB_PATH = "${cacheDirectory}/miopen-db";
             PYTHONDONTWRITEBYTECODE = "1";
             TZDIR = "${pkgs.tzdata}/share/zoneinfo";
           };
@@ -139,6 +143,10 @@ in
             ExecStart = lib.getExe run;
             RuntimeMaxSec = "${toString cfg.budgetHours}h";
             CPUQuota = "${toString cfg.cpuQuotaPercent}%";
+            # Includes scratch shmem and all model/runtime descendants. The
+            # measured 13.5 GiB peak plus the 2 GiB scratch cap fits below 20 GiB.
+            MemoryAccounting = true;
+            MemoryMax = "20G";
             Nice = 10;
             CPUWeight = 10;
             IOSchedulingClass = "idle";
@@ -154,6 +162,20 @@ in
             NoNewPrivileges = true;
             CapabilityBoundingSet = "";
             PrivateTmp = true;
+            RuntimeDirectory = "beets-embed-tmp";
+            RuntimeDirectoryMode = "0700";
+            # Pinned embed overlaps one preparation with one inference, even
+            # with four inference threads and batch-size 8. Conservatively keep
+            # all three mono f32 rates for two 30-minute tracks:
+            # 2 * 1800 * (48000 + 16000 + 24000) * 4 = 1.18 GiB.
+            # 2 GiB leaves 69% headroom for manifests and preparation overhead.
+            # noswap keeps scratch from becoming SSD writes under RAM pressure;
+            # anonymous model/runtime allocations may still use ordinary swap.
+            TemporaryFileSystem = [ "${scratchDirectory}:rw,size=2G,mode=1777,noswap" ];
+            # Persist compiled GPU kernels rather than rebuilding them nightly
+            # or allowing caches to consume the audio scratch allowance.
+            CacheDirectory = "beets-embed";
+            CacheDirectoryMode = "0700";
             # PrivateDevices would hide the GPU and force CPU fallback.
             PrivateDevices = false;
             DevicePolicy = "closed";
@@ -167,7 +189,10 @@ in
               home.programs.beets.settings.directory
               (builtins.dirOf home.programs.beets.settings.library)
             ];
-            ReadWritePaths = [ storeDirectory ];
+            ReadWritePaths = [
+              storeDirectory
+              scratchDirectory
+            ];
             ProtectKernelTunables = true;
             ProtectKernelModules = true;
             ProtectKernelLogs = true;
