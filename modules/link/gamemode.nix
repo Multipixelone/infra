@@ -58,6 +58,8 @@ in
         name = "gamemode-end";
         runtimeInputs = programs;
         text = ''
+          # Restore EPP before any unrelated hook command can fail.
+          systemctl start link-cpu-idle-policy.service
           SECRET=$(cat "${config.age.secrets."syncthing".path}")
           HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
           export HYPRLAND_INSTANCE_SIGNATURE
@@ -99,6 +101,9 @@ in
           enableRenice = true;
           settings = {
             general = {
+              desiredgov = "performance";
+              defaultgov = "powersave";
+              igpu_power_threshold = -1;
               softrealtime = "auto";
               renice = 15;
               inhibit_screensaver = 0;
@@ -189,14 +194,14 @@ in
           Unit = "gamemode-excusal-metrics.service";
         };
       };
-      # GameMode hooks run as tunnel and may only ask systemd to start this
-      # narrow metric writer; they cannot write the textfile directly.
+      # GameMode hooks run as tunnel and may start only these narrow helpers;
+      # they cannot write CPU policy controls or the metric textfile directly.
       security.polkit = {
         enable = true;
         extraConfig = ''
           polkit.addRule(function(action, subject) {
               if (action.id == "org.freedesktop.systemd1.manage-units" && subject.user == "${username}") {
-                  if (action.lookup("unit") == "gamemode-excusal-metrics.service") {
+                  if (action.lookup("unit") == "gamemode-excusal-metrics.service" || action.lookup("unit") == "link-cpu-idle-policy.service") {
                       if (action.lookup("verb") == "start") {
                           return polkit.Result.YES;
                       }

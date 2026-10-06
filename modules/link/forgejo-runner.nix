@@ -16,9 +16,14 @@ in
       ...
     }:
     let
-      # Cores 6 and 7 with their SMT siblings — verified against lscpu -e on
-      # link, where siblings are (n, n+8). The game keeps 0-5 and 8-13.
-      ciCpus = "6,7,14,15";
+      selectCpus = pkgs.writeShellApplication {
+        name = "link-ci-cpus";
+        runtimeInputs = [
+          pkgs.util-linux
+          pkgs.gawk
+        ];
+        text = import ../../lib/link-ci-cpus.nix;
+      };
 
       throttle = pkgs.writeShellApplication {
         name = "forgejo-ci-throttle";
@@ -27,8 +32,9 @@ in
           # Nix builders are forked by nix-daemon.service, not by the runner
           # unit, so they land in a different cgroup entirely. Fencing only the
           # runner would leave the actual compile work unconstrained.
-          systemctl set-property --runtime ci.slice           CPUWeight=1 IOWeight=1 AllowedCPUs=${ciCpus}
-          systemctl set-property --runtime nix-daemon.service CPUWeight=1 IOWeight=1 AllowedCPUs=${ciCpus}
+          ciCpus=$(${lib.getExe selectCpus})
+          systemctl set-property --runtime ci.slice           CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
+          systemctl set-property --runtime nix-daemon.service CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
         '';
       };
 

@@ -84,7 +84,10 @@ in
       beets-lock = "${beets-dir}/.import.lock";
       xtractor-enabled = supportsXtractor pkgs.stdenv.hostPlatform.system;
       backfill-workers = osConfig.services.beets.xtractorBackfill.workers or 8;
-      backfill-cpu-quota = osConfig.services.beets.xtractorBackfill.cpuQuotaPercent or 600;
+      cpuThreads = osConfig.link.cpu.threads or null;
+      mediaWorkers = if cpuThreads == null then 6 else lib.max 1 (builtins.div cpuThreads 4);
+      transcodeThreads = if cpuThreads == null then 3 else lib.max 1 (builtins.div cpuThreads 8);
+      importWorkers = if cpuThreads == null then 2 else lib.max 1 (builtins.div cpuThreads 8 + 1);
       xtractor-output = "${beets-dir}/xtractor";
       xtractor-state = pkgs.writeShellApplication {
         name = "beets-xtractor-state";
@@ -472,7 +475,7 @@ in
 
         [aggregated_library]
         path = "${transcoded-music}"
-        transcode_threads = 3
+        transcode_threads = ${toString transcodeThreads}
         failure_max_retries = 2
         failure_delay_seconds = 2
       '';
@@ -486,6 +489,17 @@ in
       };
     in
     {
+      imports = [
+        ({ lib, ... }: {
+          options.programs.beets.xtractorBackfillPackage = lib.mkOption {
+            type = lib.types.package;
+            internal = true;
+            readOnly = true;
+            description = "DB-only nightly xtractor launcher, consumed by link's system service.";
+          };
+        })
+      ];
+      programs.beets.xtractorBackfillPackage = beets-xtractor-backfill;
       home.activation.beetsXtractorState = lib.mkIf xtractor-enabled (
         hmArgs.lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           run ${lib.getExe xtractor-state}
@@ -534,31 +548,6 @@ in
           };
         };
         timers = {
-          beets-xtractor-backfill = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
-            Unit.Description = "Schedule the nightly DB-only xtractor backfill";
-            Install.WantedBy = [ "timers.target" ];
-            Timer = {
-              OnCalendar = "*-*-* 01:00:00 America/New_York";
-              Persistent = false;
-              RandomizedDelaySec = 0;
-              AccuracySec = "1s";
-            };
-          };
-          beets-xtractor-backfill-stop =
-            lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName)
-              {
-                Unit.Description = "Enforce the local-time xtractor backfill cutoff";
-                Install.WantedBy = [ "timers.target" ];
-                Timer = {
-                  # GNU timeout's relative clock pauses during suspend. A calendar
-                  # timer also stops an existing run immediately on a late resume.
-                  # Allow one second of timer slack, then 60 seconds for SIGKILL.
-                  OnCalendar = "*-*-* 08:58:59 America/New_York";
-                  Persistent = false;
-                  RandomizedDelaySec = 0;
-                  AccuracySec = "1s";
-                };
-              };
           beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
             Unit.Description = "Refresh last.fm play counts quarterly after the backfill";
             Install.WantedBy = [ "timers.target" ];
@@ -591,43 +580,6 @@ in
           };
         };
         services = {
-          beets-xtractor-backfill = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
-            Unit.Description = "Backfill xtractor analysis in the beets database";
-            Service = {
-              Type = "exec";
-              ExecStart = lib.getExe beets-xtractor-backfill;
-              Environment = [
-                "TZ=America/New_York"
-                "TZDIR=${pkgs.tzdata}/share/zoneinfo"
-              ];
-              RuntimeMaxSec = "8h";
-              Nice = 10;
-              CPUWeight = 10;
-              CPUQuota = "${toString backfill-cpu-quota}%";
-              IOSchedulingClass = "idle";
-              KillSignal = "SIGTERM";
-              KillMode = "control-group";
-              TimeoutStopSec = "60s";
-              # Expected exits from GNU timeout or the calendar stop; a forced
-              # kill of hung work remains visible as a failure.
-              SuccessExitStatus = [
-                "124"
-                "143"
-              ];
-              Restart = "no";
-              UMask = "0077";
-            };
-          };
-          beets-xtractor-backfill-stop =
-            lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName)
-              {
-                Unit.Description = "Stop the nightly xtractor backfill before 09:00 local";
-                Service = {
-                  Type = "oneshot";
-                  ExecStart = "${lib.getExe' pkgs.systemd "systemctl"} --user stop beets-xtractor-backfill.service";
-                  TimeoutStartSec = "90s";
-                };
-              };
           beets-lastimport = lib.mkIf ((osConfig.networking.hostName or "") == hosts.link.hostName) {
             Unit.Description = "Import last.fm play counts into the beets database";
             Service = {
@@ -823,7 +775,7 @@ in
             xtractor = lib.mkIf xtractor-enabled {
               auto = true;
               write = hmArgs.config.programs.beets.settings.import.write;
-              threads = 2;
+              threads = importWorkers;
               quiet = true;
               output_path = xtractor-output;
               essentia_extractor =
@@ -911,7 +863,7 @@ in
             convert = {
               auto = true;
               never_convert_lossy_files = true;
-              threads = 6;
+              threads = mediaWorkers;
               format = "flac";
               embed = true;
               delete_originals = true;
@@ -1024,7 +976,7 @@ in
               per_disc = true;
               backend = "ffmpeg";
               command = ffmpeg;
-              threads = 6;
+              threads = mediaWorkers;
             };
             plexsync = {
               manual_search = true;

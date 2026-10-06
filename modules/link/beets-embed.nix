@@ -87,24 +87,24 @@ in
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
-            default = 2;
+            default = lib.min 16 (lib.max 1 (builtins.div config.link.cpu.threads 8));
             description = "Native ONNX/Torch inference threads; preparation uses one worker and FFmpeg one decode thread.";
           };
           cpuQuotaPercent = lib.mkOption {
             type = lib.types.ints.positive;
-            default = 200;
+            default = config.services.beets.embedBackfill.threads * 100;
             description = "Aggregate systemd CPU quota for embedding, preparation and all descendants; 100 is one logical CPU.";
           };
         };
         xtractorBackfill = {
           workers = lib.mkOption {
             type = lib.types.ints.positive;
-            default = 8;
+            default = lib.max 1 (builtins.div (config.link.cpu.threads * 3) 8);
             description = "Nightly xt -t concurrency: maximum simultaneous Essentia subprocesses. Zero/automatic CPU detection is disallowed.";
           };
           cpuQuotaPercent = lib.mkOption {
             type = lib.types.ints.positive;
-            default = 600;
+            default = 100 * lib.max 1 (builtins.div config.link.cpu.threads 4);
             description = "Aggregate systemd CPU quota for the nightly xtractor worker tree; independent of its worker count.";
           };
         };
@@ -118,6 +118,8 @@ in
         systemd.services.beets-embed-backfill = lib.mkIf cfg.enable {
           description = "Backfill Style and Text embeddings without locking beets imports";
           after = [ "systemd-tmpfiles-setup.service" ];
+          requires = [ "beets-nightly.target" ];
+          partOf = [ "beets-nightly.target" ];
           environment = {
             HOME = home.home.homeDirectory;
             XDG_CACHE_HOME = "/tmp/beets-embed-cache";
@@ -129,6 +131,7 @@ in
           serviceConfig = {
             Type = "exec";
             User = owner;
+            Slice = "beets-nightly.slice";
             SupplementaryGroups = [
               "render"
               "video"
