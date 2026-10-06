@@ -33,8 +33,9 @@ in
           # unit, so they land in a different cgroup entirely. Fencing only the
           # runner would leave the actual compile work unconstrained.
           ciCpus=$(${lib.getExe selectCpus})
-          systemctl set-property --runtime ci.slice           CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
-          systemctl set-property --runtime nix-daemon.service CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
+          # Fence ancestors so delegated per-build cgroups are covered too.
+          systemctl set-property --runtime batch-ci.slice  CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
+          systemctl set-property --runtime batch-nix.slice CPUWeight=1 IOWeight=1 AllowedCPUs="$ciCpus"
         '';
       };
 
@@ -43,8 +44,8 @@ in
         runtimeInputs = [ pkgs.systemd ];
         text = ''
           # An empty AllowedCPUs= resets the mask to every CPU.
-          systemctl set-property --runtime ci.slice           CPUWeight=20  IOWeight=20  AllowedCPUs=
-          systemctl set-property --runtime nix-daemon.service CPUWeight=100 IOWeight=100 AllowedCPUs=
+          systemctl set-property --runtime batch-ci.slice  CPUWeight=20  IOWeight=20  AllowedCPUs=
+          systemctl set-property --runtime batch-nix.slice CPUWeight=100 IOWeight=100 AllowedCPUs=
         '';
       };
     in
@@ -152,7 +153,12 @@ in
         ];
       };
 
-      systemd.slices.ci.sliceConfig = {
+      systemd.slices.batch.sliceConfig = {
+        CPUWeight = 20;
+        IOWeight = 20;
+      };
+
+      systemd.slices.batch-ci.sliceConfig = {
         # user.slice sits at the default weight of 100, and that is where the
         # game runs. A whole-flake `nix eval` runs in the client process, i.e.
         # inside this slice, and is the likeliest thing to OOM Grafana and
@@ -162,6 +168,22 @@ in
         MemoryHigh = "8G";
         MemoryMax = "12G";
         TasksMax = 4096;
+      };
+
+      # Keep builders outside the runner's memory limits. Weights only: idle
+      # builds can use the entire CPU, while batch as a whole yields to users.
+      systemd.slices.batch-nix.sliceConfig = {
+        CPUWeight = 100;
+        IOWeight = 100;
+      };
+      systemd.services.nix-daemon.serviceConfig = {
+        Slice = "batch-nix.slice";
+        # Nix creates per-build cgroups below its service when enabled. UID-range
+        # builds can also use them with the cgroups feature enabled.
+        Delegate = lib.mkIf (
+          (config.nix.settings.use-cgroups or false)
+          || lib.elem "cgroups" config.nix.settings.experimental-features
+        ) true;
       };
 
       systemd.services."forgejo-runner-link" = lib.mkIf hasRunnerSecret {
@@ -175,7 +197,7 @@ in
         # the attic login is not re-done every run.
         environment.HOME = "/var/lib/forgejo-runner/link";
         serviceConfig = {
-          Slice = "ci.slice";
+          Slice = "batch-ci.slice";
           Nice = 10;
           IOSchedulingClass = "idle";
           TimeoutStopSec = 60;

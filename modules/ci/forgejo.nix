@@ -126,7 +126,7 @@ let
   # is paid once instead of 86 times.
   #
   # Two eval workers at 3 GiB rather than the old four at 2 GiB: the ceiling
-  # that matters is ci.slice's MemoryHigh=8G, and 2×3 GiB sits under it where
+  # that matters is batch-ci.slice's MemoryHigh=8G, and 2×3 GiB sits under it where
   # the old 4×2 GiB sat exactly on it — twice over, since `capacity = 2` let
   # two of these run at once. Consolidation removes the second evaluator
   # outright. Fewer, larger workers also restart less often, and a restart

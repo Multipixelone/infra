@@ -17,6 +17,20 @@ derived from the host capacity. Host Nix keeps max-jobs=auto and cores=0;
 CI's existing job/core and memory budgets stay unchanged. GameMode's CI fence
 now selects two complete online physical cores from runtime topology.
 
+System `batch.slice` has CPUWeight=20 and IOWeight=20. Its `batch-ci.slice`
+child contains the Forgejo runner and retains the 8G/12G memory thresholds;
+`batch-nix.slice` contains nix-daemon and its builders without those memory
+limits. Neither batch nor the Nix child has a CPU quota: idle builds can use
+the whole CPU. GameMode fences both children to two complete physical cores
+and sets their weights to 1, then clears the masks and restores CI weights
+to 20 and Nix weights to 100 on exit. Nightly backfills remain in the separate
+`beets-nightly.slice`; album export and user-manager units are not moved.
+
+Sandboxed builders inherit nix-daemon's cgroup. If Nix's `use-cgroups` setting
+is enabled, its per-build cgroups remain descendants of the daemon service,
+inside `batch-nix.slice`. Daemon delegation is enabled when `use-cgroups` or
+the `cgroups` experimental feature is enabled; this change enables neither.
+
 ucodenix uses automatic CPU/stepping selection and still provides early AMD
 microcode loading. Active amd_pstate stays enabled. Idle policy is powersave
 plus balance_performance EPP; GameMode selects performance and reapplies idle
@@ -45,6 +59,9 @@ sudo systemctl start beets-nightly.target
 sudo systemctl stop beets-nightly.target
 sudo systemctl status beets-nightly.target beets-nightly.slice
 ```
+
+Let existing Nix builds finish before eventual activation relocates the daemon
+to its new slice; old connection-handling processes can outlive a daemon restart.
 
 Starting either worker also pulls in the group. Outside the nightly window,
 launchers skip work. Stopping the target stops both jobs, but leaves their
@@ -92,3 +109,12 @@ Follow Finn's existing plan: boot 5–6 times, scrub, and watch for hardware err
   the slice reports CPUQuotaPerSecUSec=12s (1200%), and target start/stop controls
   both. Watch temperatures via k10temp/hwmon and desktop responsiveness during
   concurrent work. Complete burn-in before un-parking this branch.
+- After deploy, run `systemctl status batch.slice batch-ci.slice batch-nix.slice`
+  and `systemctl show -p Slice -p ControlGroup forgejo-runner-link.service nix-daemon.service`.
+  During an ordinary build, run `sudo systemd-cgls /batch.slice` and confirm
+  the runner is under `batch-ci.slice`, and the daemon and build processes
+  are under `batch-nix.slice`. If `use-cgroups` is enabled, expect
+  `nix-build-*` descendants below `nix-daemon.service`. Inspect from the host:
+  a sandbox's cgroup namespace may report its own cgroup as `/`.
+  Verify both child slices' `AllowedCPUs` masks are cleared after GameMode exits,
+  and their CPU/IO weights return to 20 for CI and 100 for Nix.
