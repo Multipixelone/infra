@@ -43,7 +43,7 @@
                     "add-paths": "flake.lock\npkgs/firefox-addons/generated.nix\n",
                     "assignees": "Multipixelone",
                     "branch": "update_flake_lock_action",
-                    "commit-message": "⚙️ bump flake.lock",
+                    "commit-message": "chore(deps): update flake inputs and firefox addons",
                     "labels": "automated",
                     "title": "chore: update flake.lock",
                     "token": "${{ secrets.GH_TOKEN_FOR_UPDATES }}",

@@ -483,7 +483,7 @@ in
                     git config user.name  "${owner.name}"
                     git config user.email "${owner.email}"
                     git add -- $paths
-                    git commit -m "⚙️ bump flake.lock"
+                    git commit -m "chore(deps): update flake inputs and firefox addons"
                   fi
 
                   if [ "$changed" = false ] && [ -z "$PR_INDEX" ]; then
