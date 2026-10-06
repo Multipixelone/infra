@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 
-def patch_config(config, command):
+def patch_config(config, command, browser_command=None):
     result = copy.deepcopy(config)
     try:
         models = result["tools"]["media"]["models"]
@@ -55,6 +55,42 @@ def patch_config(config, command):
             "capabilities": ["audio"],
         }
     ] + retained
+    if browser_command is not None:
+        if not isinstance(browser_command, str) or not browser_command:
+            raise ValueError("browser command must be a nonempty string")
+        browser = result.setdefault("browser", {})
+        if not isinstance(browser, dict):
+            raise TypeError("browser must be an object")
+        for key in ("enabled", "headless"):
+            if key in browser and not isinstance(browser[key], bool):
+                raise TypeError("browser flags must be booleans")
+        if "executablePath" in browser and not isinstance(
+            browser["executablePath"], str
+        ):
+            raise TypeError("browser executablePath must be a string")
+        profiles = browser.get("profiles", {})
+        if not isinstance(profiles, dict):
+            raise TypeError("browser profiles must be an object")
+        overrides = 0
+        for profile in profiles.values():
+            if not isinstance(profile, dict):
+                raise TypeError("browser profile must be an object")
+            if "executablePath" in profile:
+                if not isinstance(profile["executablePath"], str):
+                    raise TypeError("browser profile executablePath must be a string")
+                if (
+                    profile["executablePath"]
+                    and profile["executablePath"] != browser_command
+                ):
+                    overrides += 1
+        if overrides:
+            # No profile names, paths or config contents in startup diagnostics.
+            print(
+                "openclaw browser config: preserved profile executable overrides "
+                "may shadow the managed global executablePath",
+                file=sys.stderr,
+            )
+        browser.update(enabled=True, headless=True, executablePath=browser_command)
     return result
 
 
@@ -81,7 +117,7 @@ def identity(metadata):
     )
 
 
-def patch_file(filename, command):
+def patch_file(filename, command, browser_command=None):
     path = Path(filename)
     original_stat = path.lstat()
     if not stat.S_ISREG(original_stat.st_mode) or original_stat.st_uid != os.getuid():
@@ -95,7 +131,7 @@ def patch_file(filename, command):
         object_pairs_hook=reject_duplicates,
         parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite JSON")),
     )
-    updated = patch_config(config, command)
+    updated = patch_config(config, command, browser_command)
     if updated == config:
         return False
     replacement = (json.dumps(updated, ensure_ascii=False, indent=2) + "\n").encode()
@@ -138,11 +174,16 @@ def patch_file(filename, command):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("usage: openclaw-audio-config-patch CONFIG COMMAND", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(
+            "usage: openclaw-audio-config-patch CONFIG COMMAND [BROWSER_COMMAND]",
+            file=sys.stderr,
+        )
         return 2
     try:
-        patch_file(sys.argv[1], sys.argv[2])
+        patch_file(
+            sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None
+        )
     except (OSError, ValueError, TypeError) as error:
         # Do not print JSON contents (which can contain credentials).
         print(

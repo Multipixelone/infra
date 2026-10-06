@@ -17,6 +17,7 @@ import openclaw_audio_config_patch as config_patch  # pyright: ignore[reportImpl
 import openclaw_whisper as whisper  # pyright: ignore[reportImplicitRelativeImport]
 
 COMMAND = "/nix/store/fixture-openclaw-whisper/bin/openclaw-whisper"
+BROWSER_COMMAND = "/nix/store/fixture-openclaw-chromium/bin/openclaw-chromium"
 
 
 def fixture() -> dict[str, Any]:
@@ -63,6 +64,110 @@ def fixture() -> dict[str, Any]:
 
 
 class ConfigTests(unittest.TestCase):
+    def test_browser_fields_preservation_and_idempotency(self):
+        original = fixture()
+        original["browser"] = {
+            "enabled": False,
+            "headless": False,
+            "executablePath": "/desktop/chromium",
+            "noSandbox": False,
+            "defaultProfile": "custom",
+            "extraArgs": ["--keep-this"],
+            "profiles": {
+                "custom": {"executablePath": "/private/override", "cdpPort": 19000},
+                "remote": {"cdpUrl": "http://127.0.0.1:19001", "color": "#123456"},
+            },
+        }
+        untouched = copy.deepcopy(original)
+        with patch("sys.stderr", io.StringIO()) as diagnostics:
+            result = config_patch.patch_config(original, COMMAND, BROWSER_COMMAND)
+            self.assertEqual(
+                config_patch.patch_config(result, COMMAND, BROWSER_COMMAND), result
+            )
+        self.assertIn("may shadow", diagnostics.getvalue())
+        self.assertNotIn("/private/override", diagnostics.getvalue())
+        self.assertEqual(original, untouched)
+        expected = config_patch.patch_config(original, COMMAND)
+        expected["browser"].update(
+            enabled=True, headless=True, executablePath=BROWSER_COMMAND
+        )
+        self.assertEqual(result, expected)
+
+    def test_browser_creation_and_old_audio_only_interface(self):
+        original = fixture()
+        audio_only = config_patch.patch_config(original, COMMAND)
+        self.assertNotIn("browser", audio_only)
+        result = config_patch.patch_config(original, COMMAND, BROWSER_COMMAND)
+        self.assertEqual(
+            result["browser"],
+            {"enabled": True, "headless": True, "executablePath": BROWSER_COMMAND},
+        )
+        # Audio-only callers must not inspect or mutate even an invalid browser.
+        original["browser"] = None
+        self.assertIsNone(config_patch.patch_config(original, COMMAND)["browser"])
+
+    def test_browser_malformed_fails_without_writes(self):
+        invalids = [
+            None,
+            [],
+            "secret",
+            1,
+            {"profiles": None},
+            {"profiles": []},
+            {"profiles": {"custom": None}},
+            {"profiles": {"custom": {"executablePath": 1}}},
+            {"enabled": "true"},
+            {"headless": 1},
+            {"executablePath": []},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "openclaw.json"
+            for browser in invalids:
+                with self.subTest(browser=browser):
+                    config = fixture()
+                    config["browser"] = browser
+                    original = json.dumps(config).encode()
+                    path.write_bytes(original)
+                    path.chmod(0o600)
+                    with self.assertRaises((ValueError, TypeError)):
+                        config_patch.patch_file(path, COMMAND, BROWSER_COMMAND)
+                    self.assertEqual(path.read_bytes(), original)
+                    self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_browser_file_backup_and_cli_compatibility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "openclaw.json"
+            original = json.dumps(fixture()).encode()
+            path.write_bytes(original)
+            path.chmod(0o600)
+            with (
+                patch("sys.argv", ["patch", str(path), COMMAND]),
+                patch("sys.stderr", io.StringIO()),
+            ):
+                self.assertEqual(config_patch.main(), 0)
+            self.assertNotIn("browser", json.loads(path.read_bytes()))
+            before_browser = path.read_bytes()
+            with (
+                patch("sys.argv", ["patch", str(path), COMMAND, BROWSER_COMMAND]),
+                patch("sys.stderr", io.StringIO()),
+            ):
+                self.assertEqual(config_patch.main(), 0)
+                inode = path.stat().st_ino
+                self.assertEqual(config_patch.main(), 0)
+            self.assertEqual(path.stat().st_ino, inode)
+            self.assertEqual(
+                json.loads(path.read_bytes())["browser"]["executablePath"],
+                BROWSER_COMMAND,
+            )
+            backups = list(Path(directory).glob("*.pre-whisper-*"))
+            self.assertEqual(len(backups), 2)
+            self.assertEqual(
+                {p.read_bytes() for p in backups}, {original, before_browser}
+            )
+            self.assertTrue(
+                all(stat.S_IMODE(p.stat().st_mode) == 0o600 for p in [path] + backups)
+            )
+
     def test_deep_invariants_and_idempotency(self):
         original = fixture()
         untouched = copy.deepcopy(original)

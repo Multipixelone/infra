@@ -97,6 +97,13 @@ in
       openclawPrefix = "/home/tunnel/.npm-global";
       openclawBin = "${openclawPrefix}/bin/openclaw";
       openclawStateDir = "/home/tunnel/.openclaw";
+      # Use the packaged sandbox/loader wrapper, not HM's desktop flag wrapper.
+      # Scrub overlays only for browser children; audio keeps its GPU environment.
+      openclawChromium = pkgs.writeShellScriptBin "openclaw-chromium" ''
+        unset MANGOHUD MANGOHUD_DLSYM MANGOHUD_CONFIG MANGOHUD_CONFIGFILE
+        unset NIXOS_OZONE_WL
+        exec ${pkgs.ungoogled-chromium}/bin/chromium "$@"
+      '';
       # Immutable GGML large-v3-turbo (MIT), 1,624,555,275 bytes. Kept in the
       # service closure; never downloaded by a mutable runtime bootstrap.
       whisperModel = pkgs.fetchurl {
@@ -132,6 +139,7 @@ in
       };
       gatewayPath = lib.makeBinPath [
         openclawWhisper
+        openclawChromium
         pkgs.bash
         pkgs.coreutils
         pkgs.nodejs
@@ -180,6 +188,7 @@ in
         home.file.".local/share/openclaw-whisper/ggml-large-v3-turbo.bin".source = whisperModel;
         home.packages = [
           openclawWhisper
+          openclawChromium
           pkgs.nodejs
           pkgs.gogcli
           (pkgs.writeShellScriptBin "gog-bootstrap-auth" ''
@@ -233,7 +242,7 @@ in
             ExecStartPre = [
               "${openclawTempCleanup}"
               "${openclawGatewayBootstrap}"
-              "${openclawAudioConfigPatch}/bin/openclaw-audio-config-patch ${openclawStateDir}/openclaw.json ${openclawWhisper}/bin/openclaw-whisper"
+              "${openclawAudioConfigPatch}/bin/openclaw-audio-config-patch ${openclawStateDir}/openclaw.json ${openclawWhisper}/bin/openclaw-whisper ${openclawChromium}/bin/openclaw-chromium"
             ];
             ExecStart = "${openclawBin} gateway --port 18789";
             ExecStopPost = "${openclawTempCleanup}";
