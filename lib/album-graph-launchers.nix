@@ -11,7 +11,8 @@
     trap 'rm -rf -- "$staging"' EXIT
     "$BEETS_GRAPH_LAUNCHER" -c "$BEETS_GRAPH_CONFIG" -p embed \
       embed-graph-export --store "$BEETS_GRAPH_STORE" --model style \
-      --covers-dir "$BEETS_GRAPH_COVERS" -o "$staging/albums.json"
+      --covers-dir "$BEETS_GRAPH_COVERS" --cache-dir "$BEETS_GRAPH_CACHE" \
+      -o "$staging/albums.json"
 
     # Covers and their ownership manifest stay in the persistent cache. Only
     # JSON is staged; upstream owns thumbnail writes, reuse, and pruning.
@@ -21,7 +22,7 @@
   '';
 
   viewer = ''
-    args=(--port 8765 --covers "$BEETS_GRAPH_COVERS")
+    args=(--port 8765 --covers "$BEETS_GRAPH_COVERS" --cache-dir "$BEETS_GRAPH_CACHE")
     if [[ -f "$BEETS_GRAPH_STATE/albums.json" ]]; then
       args+=(--data "$BEETS_GRAPH_STATE/albums.json")
     fi

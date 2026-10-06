@@ -8,7 +8,44 @@ let
   owner = config.flake.meta.owner.username;
   stateDirectory = "/var/lib/beets-album-graph";
   coversDirectory = "${stateDirectory}/covers";
+  cacheDirectory = "${stateDirectory}/cache";
+  queryDirectory = "${cacheDirectory}/query";
+  canonical = config.flake.servicePublicationInventory.applications.albums.canonical;
+  publicationEnabled = config.servicePublication.rollout.enableLocalCutover;
   launchers = import ../../lib/album-graph-launchers.nix;
+  # Shared with the HTTP fixture so it exercises the actual Origin and proxy
+  # rules. Reuse the generated root ACL rather than adding an unguarded route.
+  textProxy =
+    { canonical, rootLocation }:
+    {
+      httpConfig = ''
+        map $http_origin $album_graph_query_origin {
+          default invalid;
+          "" "";
+          "https://${canonical}" "http://127.0.0.1:8765";
+        }
+      '';
+      location = {
+        inherit (rootLocation) proxyPass;
+        # A location's own headers replace inherited headers. Avoid appending
+        # nixpkgs' Host=$host after the localhost Host required by the server.
+        recommendedProxySettings = false;
+        extraConfig =
+          rootLocation.extraConfig
+          + "\n"
+          + ''
+            if ($album_graph_query_origin = invalid) {
+              return 403;
+            }
+            client_max_body_size 4k;
+            proxy_read_timeout 130s;
+            proxy_cache off;
+            proxy_set_header Host 127.0.0.1:8765;
+            proxy_set_header Origin $album_graph_query_origin;
+            proxy_set_header Connection "";
+          '';
+      };
+    };
 in
 {
   servicePublication.applications.albums = {
@@ -47,11 +84,17 @@ in
       beetsDirectory = "${home.xdg.configHome}/beets";
       store = home.programs.beets.settings.embed.store;
       viewerPackage = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-album-graph;
+      proxy = textProxy {
+        inherit canonical;
+        rootLocation = config.services.nginx.virtualHosts.${canonical}.locations."/";
+      };
       viewer = pkgs.writeShellApplication {
         name = "beets-album-graph-serve";
         text = ''
           export BEETS_GRAPH_STATE=${lib.escapeShellArg stateDirectory}
           export BEETS_GRAPH_COVERS=${lib.escapeShellArg coversDirectory}
+          export BEETS_GRAPH_CACHE=${lib.escapeShellArg cacheDirectory}
+          # The packaged viewer supplies the absolute CPU --text-worker path.
           export BEETS_GRAPH_VIEWER=${lib.escapeShellArg (lib.getExe viewerPackage)}
           ${launchers.viewer}
         '';
@@ -62,6 +105,7 @@ in
         text = ''
           export BEETS_GRAPH_STATE=${lib.escapeShellArg stateDirectory}
           export BEETS_GRAPH_COVERS=${lib.escapeShellArg coversDirectory}
+          export BEETS_GRAPH_CACHE=${lib.escapeShellArg cacheDirectory}
           export BEETS_GRAPH_STORE=${lib.escapeShellArg store}
           export BEETS_GRAPH_CONFIG=${lib.escapeShellArg "${beetsDirectory}/config.yaml"}
           export BEETS_GRAPH_LAUNCHER=${lib.escapeShellArg (lib.getExe home.programs.beets.package)}
@@ -105,7 +149,14 @@ in
       systemd.tmpfiles.rules = [
         "d ${stateDirectory} 0750 ${owner} album-graph - -"
         "d ${coversDirectory} 0750 ${owner} album-graph - -"
+        "d ${cacheDirectory} 2770 ${owner} album-graph - -"
+        "d ${queryDirectory} 0700 album-graph album-graph - -"
       ];
+
+      services.nginx = lib.mkIf publicationEnabled {
+        commonHttpConfig = proxy.httpConfig;
+        virtualHosts.${canonical}.locations."= /api/embed-text" = proxy.location;
+      };
 
       systemd.services.beets-album-graph = {
         description = "Private album similarity graph viewer";
@@ -114,16 +165,28 @@ in
         serviceConfig = hardening // {
           User = "album-graph";
           Group = "album-graph";
+          # Phrase queries are interactive; the CPU child inherits this cgroup
+          # and sandbox rather than competing inside the batch hierarchy.
+          Slice = "system.slice";
           ExecStart = lib.getExe viewer;
           Restart = "on-failure";
           RestartSec = "5s";
           ProtectHome = true;
           # Includes the covers cache; the viewer cannot modify it.
           ReadOnlyPaths = [ stateDirectory ];
+          # Upstream places only viewer runtime caches beneath query/. Keep
+          # descriptor caches, graph JSON and covers immutable to this user.
+          ReadWritePaths = [ queryDirectory ];
+          # /nix/store remains readable, including the packaged CPU worker's
+          # model link farm and its resolved checkpoint/tokenizer targets.
           RestrictAddressFamilies = [ "AF_INET" ];
           IPAddressDeny = "any";
           IPAddressAllow = "localhost";
-          MemoryDenyWriteExecute = true;
+          # Torch/oneDNN needs executable inference primitives (upstream MDWE
+          # smoke). This exception is confined to the viewer and its CPU child.
+          MemoryDenyWriteExecute = false;
+          MemoryHigh = "2500M";
+          MemoryMax = "3G";
           UMask = "0077";
         };
       };
@@ -194,6 +257,31 @@ in
         text = launchers.viewer;
       };
       fixturePython = pkgs.python3.withPackages (packages: [ packages.pillow ]);
+      fixtureProxy = textProxy {
+        canonical = "albums.example.test";
+        rootLocation = {
+          proxyPass = "http://127.0.0.1:@BACKEND_PORT@";
+          extraConfig = "allow 127.0.0.1;\ndeny all;\n";
+        };
+      };
+      fixtureProxyConfig = pkgs.writeText "album-graph-proxy-fixture.conf" ''
+        pid @ROOT@/nginx.pid;
+        error_log stderr;
+        events {}
+        http {
+          access_log off;
+          client_body_temp_path @ROOT@/body;
+          proxy_temp_path @ROOT@/proxy;
+          ${fixtureProxy.httpConfig}
+          server {
+            listen 127.0.0.1:@PROXY_PORT@;
+            location = /api/embed-text {
+              proxy_pass ${fixtureProxy.location.proxyPass};
+              ${fixtureProxy.location.extraConfig}
+            }
+          }
+        }
+      '';
     in
     {
       checks.beets-album-graph-host =
@@ -207,7 +295,9 @@ in
             export PYTHONDONTWRITEBYTECODE=1
             python3 ${./tests/albums_test.py} \
               ${lib.getExe fixtureExport} ${lib.getExe fixtureViewer} \
-              ${inputs.beets-plugins}/plugins/embed/beets_embed/covers.py
+              ${inputs.beets-plugins}/plugins/embed/beets_embed/covers.py \
+              ${lib.getExe pkgs.nginx} ${fixtureProxyConfig} \
+              ${inputs.beets-plugins}/plugins/embed/viewer/server.py
             touch "$out"
           '';
     };
