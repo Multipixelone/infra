@@ -7007,6 +7007,7 @@ in
             source_labels = ["__journal_priority_keyword"]
             target_label  = "level"
           }
+          ${config.infra.games.observability.journalRelabel or ""}
         }
 
         loki.source.journal "system" {
@@ -7016,6 +7017,7 @@ in
         }
 
         loki.process "redact" {
+          ${config.infra.games.observability.journalStages or ""}
           stage.replace {
             expression = ${builtins.toJSON "(?i)(?:bearer\\x20+)([A-Za-z0-9._~+/-]+=*)"}
             replace    = "[REDACTED]"
