@@ -37,6 +37,23 @@ let
           ${pkgs.coreutils}/bin/sleep 1
         done
       '';
+      # plex.tv registration runs once at startup and is never retried, so a
+      # start during a resolver restart (e.g. blocky during a deploy) leaves the
+      # player invisible to Plex clients. Wait briefly for DNS, but still start
+      # without it so the player works when the internet is down.
+      dnsReady = pkgs.writeShellScript "caldera-headless-wait-for-dns" ''
+        set -eu
+
+        deadline=$(${pkgs.coreutils}/bin/date +%s)
+        deadline=$((deadline + 30))
+        while ! ${pkgs.getent}/bin/getent hosts plex.tv >/dev/null 2>&1; do
+          if [ "$(${pkgs.coreutils}/bin/date +%s)" -ge "$deadline" ]; then
+            echo "Caldera DNS readiness timed out: starting without plex.tv registration." >&2
+            exit 0
+          fi
+          ${pkgs.coreutils}/bin/sleep 1
+        done
+      '';
 
       control = pkgs.writeShellApplication {
         name = "caldera-headless-control";
@@ -181,7 +198,10 @@ let
             "XDG_CONFIG_HOME=${configDir}"
             "XDG_CACHE_HOME=${stateDir}/.cache"
           ];
-          ExecStartPre = audioReady;
+          ExecStartPre = [
+            audioReady
+            dnsReady
+          ];
           ExecStart = "${pkgs.util-linux}/bin/flock --exclusive ${stateDir}/.operation.lock ${lib.getExe caldera-headless} --config ${configDir}";
           Restart = "on-failure";
           RestartSec = "5s";
