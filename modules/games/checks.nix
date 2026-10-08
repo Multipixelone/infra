@@ -63,6 +63,8 @@
           stop = cfg.systemd.services.${name}.serviceConfig.ExecStop or [ ];
           memoryMax = cfg.systemd.services.${name}.serviceConfig.MemoryMax;
           slice = cfg.systemd.services.${name}.serviceConfig.Slice;
+          renderedUnitLength = builtins.stringLength cfg.systemd.units."${name}.service".text;
+          startTimeout = cfg.systemd.services.${name}.serviceConfig.TimeoutStartSec or null;
           stopTimeout = cfg.systemd.services.${name}.serviceConfig.TimeoutStopSec or null;
         });
         polkit = cfg.security.polkit.extraConfig;
@@ -152,10 +154,13 @@
                   assert all(server["backup"]["enabled"] == expected for server in servers.values())
                   assert all(unit["enable"] == expected for unit in fixture["units"].values())
                   assert all(unit["slice"] == "games.slice" for unit in fixture["units"].values())
+                  assert all(unit["renderedUnitLength"] > 0 for unit in fixture["units"].values())
                   assert fixture["units"]["minecraft-server-survival"]["memoryMax"] == "6G"
                   assert fixture["units"]["minecraft-server-survival"]["stopTimeout"] == 180
                   assert fixture["units"]["minecraft-server-velocity"]["memoryMax"] == "1G"
                   assert fixture["units"]["podman-games-terraria"]["memoryMax"] == "4G"
+                  assert fixture["units"]["podman-games-terraria"]["startTimeout"] == "40min"
+                  assert fixture["units"]["podman-games-terraria"]["stopTimeout"] == 180
                   allowlists = [set(json.loads(value)) for value in re.findall(r'(\[[^\n]*\])\.indexOf\(unit\)', fixture["polkit"])]
                   assert allowlists[0] == units
                   assert allowlists[1] == ({"restic-backups-games-survival.service", "restic-backups-games-terraria.service"} if expected else set())

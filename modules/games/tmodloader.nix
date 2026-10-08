@@ -177,8 +177,8 @@
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = s.memoryMax;
-              TimeoutStartSec = "40min";
-              TimeoutStopSec = 180;
+              TimeoutStartSec = lib.mkForce "40min";
+              TimeoutStopSec = lib.mkForce 180;
               ExecStartPre = lib.mkBefore [
                 "${lib.getExe cfg.packages.prechange} ${id}"
                 "${lib.getExe cfg.packages.prepare} ${id}"
