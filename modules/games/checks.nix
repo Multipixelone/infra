@@ -188,7 +188,7 @@
               assert all(timer["RandomizedDelaySec"] == "2m" for timer in data["backupTimers"].values())
               assert set(data["ddns"]["domains"]) == {"wg.finnrut.is", "mc.finnrut.is", "survival.mc.finnrut.is", "terraria.finnrut.is"}
               assert not data["ddns"]["proxied"] and data["ddns"]["ipv4"] and not data["ddns"]["ipv6"]
-              assert not data["gamesPublished"] and not data["productionFixtureSecrets"]
+              assert data["gamesPublished"] and not data["productionFixtureSecrets"]
               assert data["rconMode"] == "0440" and data["rconGroup"] == "games-dashboard"
               assert "games-dashboard" not in data["privateSecretGroups"]
               assert {server["id"] for server in data["discovery"]["servers"]} == {"creative", "survival", "terraria"}
