@@ -5,6 +5,74 @@ operator is Finn. Do not add server creation, package installation, configuratio
 editors, or secret editors to the dashboard. New Nix declarations appear through
 the manifest automatically.
 
+## Dev loop
+
+The plain skeleton lives in `pkgs/games-dashboard/`: Python/FastAPI in `backend/`
+and Vite/Svelte/TypeScript in `frontend/`. From the infra worktree root:
+
+```console
+nix develop .#games-dashboard
+npm --prefix pkgs/games-dashboard/frontend ci
+just games-dashboard-dev
+```
+
+Open `http://127.0.0.1:5173`. The recipe runs Uvicorn with source reload and Vite
+with HMR directly against the checkout; Ctrl-C stops both. Install npm dependencies
+once, and repeat `npm ci` when the committed lockfile changes. Python, Node, and
+npm come from the locked flake; frontend packages are pinned in `package-lock.json`.
+Do not install Python dependencies globally or create a separate environment.
+
+Both listeners bind only `127.0.0.1`. `PORT` sets the Vite port (default `5173`,
+allowed range `1024`–`65534`); Uvicorn uses `PORT + 1`. Vite fails if its port is
+occupied and proxies `/api` unchanged to Uvicorn, including SSE. For example,
+`PORT=5200 just games-dashboard-dev` exposes only the frontend on port 5200.
+
+`GAMES_DASHBOARD_MOCK=1` is the recipe default. The fixture comes directly from
+the real schema-v1 Nix manifest evaluation used by `games-contract`, with its
+evaluation-only prerequisites and backups enabled. No production secrets are
+read or installed. The page lists server status and streams fake console lines.
+Mock start/restart arms Minecraft's sleeping listener or starts Terraria; stop
+stops the selected server. Backup records a fake completion and preserves the
+server state. Backend reload/restart resets all in-memory mock state.
+
+The API is `GET /api/servers` (manifest metadata with a `status` on each server),
+`GET /api/servers/{id}/events` (SSE `log` events containing `id`, `timestamp`, and
+`line`), and `POST /api/servers/{id}/{start,stop,restart,backup}` (returns `id`,
+`action`, and `status`). Shared-service metadata is retained, but the skeleton
+does not control Velocity or submit console commands. The UI intentionally has
+no controls or dashboard design yet.
+
+Later, on a host with the installed game helpers and manifest, use:
+
+```console
+GAMES_DASHBOARD_MOCK=0 just games-dashboard-dev
+```
+
+Real mode reads only `/etc/games/manifest.json` and invokes the existing helpers
+and manifest-listed systemd units with fixed argv. Missing/invalid manifests
+fail startup; it never falls back to mock data. Run the backend with the existing
+`games-dashboard` user's helper and polkit permissions for real actions; the
+recipe grants no privileges and uses no sudo for service controls. Ordinary
+developer users may be refused. Real actions can affect live servers and backups;
+the real-mode adapter tests substitute a runner and never execute host controls.
+Keep this unauthenticated skeleton on loopback. Authentication and publication
+remain attended follow-up work.
+
+For a quick check inside the shell:
+
+```console
+pytest -c pkgs/games-dashboard/backend/pyproject.toml pkgs/games-dashboard/backend/tests
+npm --prefix pkgs/games-dashboard/frontend run check
+npm --prefix pkgs/games-dashboard/frontend run build
+python pkgs/games-dashboard/backend/tests/smoke.py
+```
+
+The smoke runs the actual dev recipe, checks the API and multiple SSE events
+through Vite, then checks listener cleanup after Ctrl-C. It requires free ports
+and installed npm dependencies. Follow the repository's `agent-run-long`
+workflow for agent-run validation. Backend parity tests validate the generated
+Nix manifest with strict nested models and require an exact JSON round-trip.
+
 ## Backend inventory and adding servers
 
 `gameServers.servers` is the flake-level registry in `modules/games/registry.nix`.
@@ -52,17 +120,17 @@ Read `/etc/games/manifest.json`; it is Nix-generated, root-owned, and contains
 no secret values. Schema version 1 has `host`, `sharedServices` (Velocity), and a
 `servers` array. Each server contains:
 
-| Field | Meaning |
-| --- | --- |
-| `id`, `game`, `displayName` | Stable identity, adapter name, UI label |
-| `public` | Array of `hostname`, `port`, `protocol`, and `edition` endpoints |
-| `unit`, `container` | Exact systemd unit; container name or null |
-| `dataDir`, `worldPaths` | Persistent data and backup paths; informational |
-| `wakeOnJoin` | Whether start arms an idle wake listener |
-| `available` | Required encrypted service secrets exist in the locked input |
-| `console` | Method, command argv, and local RCON details when applicable |
-| `backup` | Enabled flag, exact backup unit, and command argv |
-| `statusCommand`, `logsCommand` | Fixed helper argv |
+| Field                          | Meaning                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `id`, `game`, `displayName`    | Stable identity, adapter name, UI label                          |
+| `public`                       | Array of `hostname`, `port`, `protocol`, and `edition` endpoints |
+| `unit`, `container`            | Exact systemd unit; container name or null                       |
+| `dataDir`, `worldPaths`        | Persistent data and backup paths; informational                  |
+| `wakeOnJoin`                   | Whether start arms an idle wake listener                         |
+| `available`                    | Required encrypted service secrets exist in the locked input     |
+| `console`                      | Method, command argv, and local RCON details when applicable     |
+| `backup`                       | Enabled flag, exact backup unit, and command argv                |
+| `statusCommand`, `logsCommand` | Fixed helper argv                                                |
 
 `available` describes configured prerequisites, not runtime health. Likewise,
 `backup.enabled` means enabled in Nix with a declared password; NAS availability
@@ -196,13 +264,13 @@ enroll the destination before changing the target. Commit only encrypted files
 there, then update this repo's `secrets` input lock. Decrypted files live beneath
 `/run/agenix/games` and never enter the Nix store.
 
-| Run `agenix -e` with this path | Contents | Runtime access |
-| --- | --- | --- |
-| `games/minecraft/velocity-forwarding.age` | Random forwarding secret | Minecraft, 0400 |
-| `games/minecraft/floodgate-key.age` | Exact Floodgate-generated `key.pem` | Minecraft, 0400 |
-| `games/minecraft/survival-rcon.age` | Random RCON password | Minecraft/dashboard group, 0440 |
-| `games/terraria/terraria-password.age` | Server password | Root, 0400 |
-| `games/restic-password.age` | Separate restic repository password | Root, 0400 |
+| Run `agenix -e` with this path            | Contents                            | Runtime access                  |
+| ----------------------------------------- | ----------------------------------- | ------------------------------- |
+| `games/minecraft/velocity-forwarding.age` | Random forwarding secret            | Minecraft, 0400                 |
+| `games/minecraft/floodgate-key.age`       | Exact Floodgate-generated `key.pem` | Minecraft, 0400                 |
+| `games/minecraft/survival-rcon.age`       | Random RCON password                | Minecraft/dashboard group, 0440 |
+| `games/terraria/terraria-password.age`    | Server password                     | Root, 0400                      |
+| `games/restic-password.age`               | Separate restic repository password | Root, 0400                      |
 
 Password and forwarding payloads must be raw, single-line, 16–256 URL-safe
 characters (`A–Z`, `a–z`, digits, `_`, `-`), not `NAME=value` environment files.
@@ -243,8 +311,8 @@ Java uses its default 25565 port. Loopback-only survival ports are 25566 (lazymc
 claims 25565 if manually started, conflicting with Velocity. Don't start both;
 the dashboard must not offer ATM10 as a managed server.
 
-For the dashboard, a Nix-packaged Python/FastAPI service with HTMX and SSE fits
-the small, single-user control surface. Bind it to a loopback port, run it as
+For the dashboard, build on the Python/FastAPI and Svelte/TypeScript skeleton
+with SSE. Package the eventual service separately, bind it to a loopback port, run it as
 `games-dashboard`, and implement `/healthz` before publishing it. Required UI
 features are status, players online, live console, start/stop, and back up now;
 server discovery comes exclusively from the manifest.

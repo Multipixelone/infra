@@ -57,6 +57,7 @@ Task execution is managed via `just`.
 | Command | Description |
 |---|---|
 | `just rebuild` | Local system rebuild (uses `nh os switch`). |
+| `just games-dashboard-dev` | See Justfile recipe. |
 | `just deploy` | Rebuild and push closures to the Attic binary cache. |
 | `just colmena-apply <host>` | Deploy one host via Colmena. Host names are tags, so any node name works. |
 | `just colmena-apply-servers` | Deploy every always-on server (`@server`) in one run. |
@@ -103,7 +104,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (68)</summary>
+<summary>Packages exposed by this flake (89)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -118,6 +119,27 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`dawarich-home-assistant`](https://github.com/Multipixelone/infra/blob/main/modules/iot/dawarich.nix) — Dawarich integration for Home Assistant · `nix run github:Multipixelone/infra#dawarich-home-assistant`
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
 - [`forgejo-check-status`](https://github.com/Multipixelone/infra/blob/main/modules/ci/status.nix) — Report each flake check as its own Forgejo commit status from one nix-fast-build run · `nix run github:Multipixelone/infra#forgejo-check-status`
+- `games-backup` · `nix run github:Multipixelone/infra#games-backup`
+- `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
+- `games-backup-run` · `nix run github:Multipixelone/infra#games-backup-run`
+- `games-console` · `nix run github:Multipixelone/infra#games-console`
+- `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
+- `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`
+- [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
+- `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
+- `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`
+- `games-lazymc` — Remote wake-up daemon for minecraft servers · `nix run github:Multipixelone/infra#games-lazymc`
+- `games-logs` · `nix run github:Multipixelone/infra#games-logs`
+- `games-paper-result` · `nix run github:Multipixelone/infra#games-paper-result`
+- `games-paper-stop` · `nix run github:Multipixelone/infra#games-paper-stop`
+- `games-paper-survival` — A high performance spigot fork · `nix run github:Multipixelone/infra#games-paper-survival`
+- `games-prechange` · `nix run github:Multipixelone/infra#games-prechange`
+- `games-prepare` · `nix run github:Multipixelone/infra#games-prepare`
+- `games-prune` · `nix run github:Multipixelone/infra#games-prune`
+- `games-status` · `nix run github:Multipixelone/infra#games-status`
+- `games-survival-lazy` · `nix run github:Multipixelone/infra#games-survival-lazy`
+- `games-tmodloader-runtime` · `nix run github:Multipixelone/infra#games-tmodloader-runtime`
+- `games-velocity` — A modern, next-generation Minecraft server proxy · `nix run github:Multipixelone/infra#games-velocity`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
 - [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`

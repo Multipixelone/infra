@@ -135,6 +135,11 @@ result-*
 /.slim/deepwork/
 /.slim/worktrees.json
 /.slim/worktrees/
+/pkgs/games-dashboard/**/.pytest_cache/
+/pkgs/games-dashboard/**/.venv/
+/pkgs/games-dashboard/**/__pycache__/
+/pkgs/games-dashboard/**/dist/
+/pkgs/games-dashboard/**/node_modules/
 /result
 /result.*
 /retroarch-save-bundles/

@@ -7,6 +7,10 @@
 rebuild:
   genswitch
 
+[doc("Start the loopback games dashboard with backend reload and Vite HMR.")]
+games-dashboard-dev:
+  nix run .#games-dashboard-dev
+
 deploy:
   genswitch
   attic push system /run/current-system -j 2
