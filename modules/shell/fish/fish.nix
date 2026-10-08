@@ -31,7 +31,7 @@
         fzf-config = ''
           set -x FZF_DEFAULT_OPTS "--preview='bat {} --color=always'"
           set -x SKIM_DEFAULT_COMMAND "rg --files || fd || find ."
-          set -gx __done_notification_command "zellij pipe \"zjstatus::notify::\$title \$message\""
+          set -gx __done_notification_command "__done_notify_zellij \"\$title \$message\""
           set -gx __done_allow_nongraphical 1
           set -g __done_exclude '^lazygit' '^hx'
         '';
@@ -177,6 +177,11 @@
               end
           '';
           functions = {
+            __done_notify_zellij = ''
+              set -q ZELLIJ; or return 0
+              ${getExe' pkgs.coreutils "timeout"} --kill-after=1s 5s ${getExe pkgs.zellij} pipe "zjstatus::notify::$argv[1]" </dev/null >/dev/null 2>&1 &
+              disown $last_pid
+            '';
             __onefetch_on_pwd_change = {
               # body = "__onefetch_on_pwd_change --on-variable PWD";
               onVariable = "PWD";
