@@ -18,7 +18,7 @@ let
         + ''
           export TZDIR=${pkgs.tzdata}/share/zoneinfo
         ''
-        + builtins.readFile ./scripts/deadman.sh;
+        + (import ../../lib/alerting-deadman.nix);
     };
 in
 {
@@ -69,7 +69,7 @@ in
             ];
           }
           ''
-            python3 ${./fixtures}/check-deadman.py ${./scripts/deadman.sh} ${pkgs.writeText "alert-format.sh" (import ../../lib/alert-format.nix)}
+            python3 ${./fixtures}/check-deadman.py ${pkgs.writeText "deadman.sh" (import ../../lib/alerting-deadman.nix)} ${pkgs.writeText "alert-format.sh" (import ../../lib/alert-format.nix)}
             touch "$out"
           '';
     };
