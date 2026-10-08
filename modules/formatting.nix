@@ -26,6 +26,7 @@
         settings = {
           on-unmatched = "fatal";
           global.excludes = [
+            ".ignore"
             "*.jpg"
             "*.png"
             "Justfile"
