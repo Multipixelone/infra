@@ -258,9 +258,13 @@ workflow in `docs/service-publication-runbook.md`; regenerate its outputs, run i
 checks, and perform the separately attended rollout. Do not create a public
 Tunnel route or DDNS record for this application.
 
-Private publication currently trusts configured LAN **and VPN** client networks.
-Choose Finn-only application authentication (for example a passkey session) and
-CSRF protection; LAN reachability alone is not identity. Restrict WebSocket/SSE
+Private publication currently trusts configured LAN **and VPN** client networks;
+`public=false` alone does not meet this dashboard's LAN-only requirement. Before
+publishing it, add a declarative application-specific client-network restriction
+to the registry/proxy configuration, permit only the intended NYC LAN CIDRs,
+and check that VPN and public clients are denied. Keep other applications' access
+unchanged. Choose Finn-only application authentication (for example a passkey
+session) and CSRF protection; LAN reachability alone is not identity. Restrict WebSocket/SSE
 origins, bound command output and request sizes, avoid credentials in responses,
 and require a session for every control action. The backend grants no access to
 restic credentials, Floodgate keys, forwarding secrets, arbitrary journals or
@@ -274,8 +278,8 @@ the container runtime socket.
   whitelist rejection, forced-host routing, and sleep/wake behavior. Test a
   second hostname when adding another server.
 - Confirm Fortigate forwards and LAN hairpin behavior for the public game names.
-- Select the dashboard's authentication and backend port. Decide whether VPN
-  clients should retain private-route access or require stricter LAN-only policy.
+- Select the dashboard's authentication and backend port, and implement its
+  application-specific LAN-only restriction before publication.
 - Choose future Terraria mods and its player-list presentation. No mods are
   currently enabled, and size/difficulty apply only when creating a new world.
 - Size memory after real play: Paper gets a 6G cap with 4G maximum heap, Velocity
