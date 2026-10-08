@@ -286,6 +286,9 @@ class RuntimeTest(unittest.TestCase):
             run.assert_not_called()
 
     def test_paper_stop_finds_jvm_spawned_by_non_leader_thread(self):
+        marker = self.directory / "paper-exit.json"
+        marker.write_text("true\n")
+        self.item["childExitFile"] = str(marker)
         leader, worker = self.directory / "leader", self.directory / "worker"
         leader.write_text("")
         worker.write_text("123456789 ")
@@ -303,6 +306,64 @@ class RuntimeTest(unittest.TestCase):
         self.assertEqual(
             [call.args[1] for call in rcon.call_args_list], ["save-all flush", "stop"]
         )
+
+    def test_sleeping_paper_after_forced_idle_kill_cannot_create_save_proof(self):
+        marker = self.directory / "paper-exit.json"
+        self.item["childExitFile"] = str(marker)
+        marker.write_text("false\n")
+        with (
+            patch.object(runtime, "process_children", return_value=[]),
+            patch.object(runtime.time, "monotonic", side_effect=[0, 4]),
+            self.assertRaises(RuntimeError),
+        ):
+            runtime.paper_stop(self.cfg, "survival", "100")
+        self.assertFalse(
+            json.loads(runtime.stop_result_path(self.cfg, "survival").read_text())[
+                "graceful"
+            ]
+        )
+
+    def test_shutdown_waits_for_tokio_to_publish_exit_after_reaping(self):
+        with (
+            patch.object(runtime, "paper_exit_clean", side_effect=[False, True]),
+            patch.object(runtime.time, "sleep") as sleep,
+        ):
+            runtime.wait_for_paper_exit(self.item)
+        sleep.assert_called_once_with(0.05)
+
+    def test_clean_sleeping_paper_preserves_verified_proof(self):
+        marker = self.directory / "paper-exit.json"
+        self.item["childExitFile"] = str(marker)
+        marker.write_text("true\n")
+        with patch.object(runtime, "process_children", return_value=[]):
+            runtime.paper_stop(self.cfg, "survival", "100")
+        runtime.paper_result(self.cfg, "survival")
+        self.assertTrue(
+            json.loads(runtime.stop_result_path(self.cfg, "survival").read_text())[
+                "graceful"
+            ]
+        )
+
+    def test_post_stop_new_child_or_failed_exit_invalidates_old_proof(self):
+        marker = self.directory / "paper-exit.json"
+        self.item["childExitFile"] = str(marker)
+        marker.write_text("false\n")
+        runtime.paper_result(self.cfg, "survival")
+        self.assertFalse(
+            json.loads(runtime.stop_result_path(self.cfg, "survival").read_text())[
+                "graceful"
+            ]
+        )
+
+    def test_child_exit_flag_must_be_plain_boolean_regular_file(self):
+        marker = self.directory / "paper-exit.json"
+        self.item["childExitFile"] = str(marker)
+        for value in ('{"graceful":true}', '"true"', "true" * 100, "invalid"):
+            marker.write_text(value)
+            self.assertFalse(runtime.paper_exit_clean(self.item))
+        marker.unlink()
+        os.mkfifo(marker)
+        self.assertFalse(runtime.paper_exit_clean(self.item))
 
     def test_console_cannot_inject_extra_arguments_or_newlines(self):
         path = self.directory / "inventory.json"

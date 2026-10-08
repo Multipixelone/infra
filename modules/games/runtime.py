@@ -47,7 +47,14 @@ def atomic_json(path, value):
     temporary = Path(filename)
     with os.fdopen(fd, "w") as stream:
         stream.write(json.dumps(value) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
     temporary.replace(path)
+    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def reject_symlinks(path):
@@ -203,7 +210,19 @@ def status(cfg, identifier):
 def prepare(cfg, identifier):
     root()
     item = server(cfg, identifier, proxy=True)
+    previously_saved = False
     if identifier in cfg["servers"]:
+        previous = stop_result_path(cfg, identifier)
+        previously_saved = previous.exists() and json.loads(previous.read_text()).get(
+            "graceful", False
+        )
+        if item.get("childExitFile") and not previously_saved:
+            for world in item["worldPaths"]:
+                reject_symlinks(world)
+            previously_saved = not any(
+                Path(world).exists() and any(Path(world).iterdir())
+                for world in item["worldPaths"]
+            )
         atomic_json(stop_result_path(cfg, identifier), {"graceful": False})
     identity = pwd.getpwnam(item["owner"])
     runtime = Path(cfg["runDir"]) / identifier
@@ -215,6 +234,8 @@ def prepare(cfg, identifier):
         os.setgroups([])
         os.setgid(identity.pw_gid)
         os.setuid(identity.pw_uid)
+    if item.get("childExitFile"):
+        atomic_json(item["childExitFile"], previously_saved)
     for destination, template in item.get("configTemplates", {}).items():
         path = Path(destination)
         if identity.pw_uid == 0:
@@ -271,6 +292,7 @@ def paper_stop(cfg, identifier, pid):
     atomic_json(result, {"graceful": False})
     children = process_children(pid)
     if not children:
+        wait_for_paper_exit(item)
         atomic_json(result, {"graceful": True})
         return
     if listening(item["console"]["port"]):
@@ -287,7 +309,40 @@ def paper_stop(cfg, identifier, pid):
         if time.monotonic() >= deadline:
             raise TimeoutError("Paper did not exit gracefully; do not snapshot")
         time.sleep(0.2)
+    wait_for_paper_exit(item)
     atomic_json(result, {"graceful": True})
+
+
+def paper_exit_clean(item):
+    try:
+        fd = os.open(item["childExitFile"], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            value = os.fstat(stream.fileno())
+            if not stat.S_ISREG(value.st_mode) or value.st_size > 128:
+                return False
+            return json.loads(stream.read(128)) is True
+    except (OSError, ValueError):
+        return False
+
+
+def wait_for_paper_exit(item):
+    # waitpid reaps Java before the Tokio task publishes its exit flag. Keep
+    # lazymc alive briefly so systemd cannot interrupt that atomic publication.
+    deadline = time.monotonic() + 3
+    while not paper_exit_clean(item):
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Paper has no clean child exit; snapshot refused")
+        time.sleep(0.05)
+
+
+def paper_result(cfg, identifier):
+    root()
+    item = server(cfg, identifier)
+    result = stop_result_path(cfg, identifier)
+    confirmed = result.exists() and json.loads(result.read_text()).get(
+        "graceful", False
+    )
+    atomic_json(result, {"graceful": confirmed and paper_exit_clean(item)})
 
 
 def validate_repository(cfg):
@@ -652,6 +707,7 @@ def main(argv):
             "recover",
             "container-stop",
             "container-result",
+            "paper-result",
         )
         and len(args) == 1
     ):
@@ -662,6 +718,7 @@ def main(argv):
             "recover": recover,
             "container-stop": container_stop,
             "container-result": container_result,
+            "paper-result": paper_result,
         }
         if action == "backup-run":
 

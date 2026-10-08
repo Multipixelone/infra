@@ -42,6 +42,7 @@
         prepare = helper "games-prepare" "prepare";
         prechange = helper "games-prechange" "prechange";
         paper-stop = helper "games-paper-stop" "paper-stop";
+        paper-result = helper "games-paper-result" "paper-result";
         container-stop = helper "games-container-stop" "container-stop";
         container-result = helper "games-container-result" "container-result";
         backup-run = helper "games-backup-run" "backup-run";

@@ -1,4 +1,4 @@
-"""Exercise real lazymc cold/warm byte forwarding with a protocol fixture."""
+"""Exercise real lazymc byte forwarding and child-exit proofs."""
 
 import hashlib
 import hmac
@@ -90,7 +90,8 @@ def backend(port, directory):
     listener.settimeout(0.2)
     stopped = threading.Event()
     players = set()
-    signal.signal(signal.SIGTERM, lambda *_: stopped.set())
+    ignore_sigterm = (directory / "ignore-sigterm").exists()
+    signal.signal(signal.SIGTERM, lambda *_: None if ignore_sigterm else stopped.set())
     signal.signal(signal.SIGINT, lambda *_: stopped.set())
 
     def client(connection):
@@ -201,12 +202,15 @@ enabled = false
 rewrite_server_properties = false
 ''')
         (directory / "server.properties").write_text("online-mode=false\n")
+        exit_marker = directory / "paper-exit.json"
+        exit_marker.write_text("true\n")
         output = (directory / "lazymc.log").open("w+")
         process = subprocess.Popen(
             [lazymc, "--config", str(configuration)],
             stdout=output,
             stderr=output,
             start_new_session=True,
+            env={**os.environ, "GAMES_PAPER_EXIT_FILE": str(exit_marker)},
         )
         try:
 
@@ -228,6 +232,9 @@ rewrite_server_properties = false
             assert not (directory / "started").exists(), (
                 "status polling woke the backend"
             )
+            assert json.loads(exit_marker.read_text()) is True, (
+                "sleeping status polling changed the prior clean-exit proof"
+            )
 
             def join():
                 connection = socket.create_connection(("127.0.0.1", public), timeout=2)
@@ -244,6 +251,10 @@ rewrite_server_properties = false
 
             # First join takes the cold hold path; second takes direct warm proxy.
             cold = join()
+            assert json.loads(exit_marker.read_text()) is False, (
+                "spawn did not clear the prior clean-exit proof"
+            )
+            assert exit_marker.stat().st_mode & 0o777 == 0o600
             warm = join()
             cold.close()
             warm.close()
@@ -267,14 +278,34 @@ rewrite_server_properties = false
                 lambda: (status() or {}).get("description") == "fixture sleeping",
                 "lazymc did not return to its sleeping state",
             )
+            assert json.loads(exit_marker.read_text()) is True, (
+                "graceful idle exit did not record a clean-exit proof"
+            )
             (directory / "started").unlink()
+            (directory / "saved").unlink()
+            # The next child ignores the graceful stop signal. lazymc eventually
+            # kills it and sleeps; that sleeping state must retain a false proof.
+            (directory / "ignore-sigterm").touch()
             revived = join()
             assert (directory / "started").exists(), (
                 "join did not wake the sleeping backend again"
             )
+            assert json.loads(exit_marker.read_text()) is False, (
+                "re-wake did not clear the previous clean-exit proof"
+            )
             revived.close()
+            wait_for(
+                lambda: (status() or {}).get("description") == "fixture sleeping",
+                "forced idle stop did not return to its sleeping state",
+            )
+            assert process.poll() is None and not (directory / "saved").exists(), (
+                "forced idle stop unexpectedly saved or stopped the listener"
+            )
+            assert json.loads(exit_marker.read_text()) is False, (
+                "forced idle SIGKILL incorrectly recorded a clean-exit proof"
+            )
             print(
-                "Real lazymc cold/warm joins preserve UUID, Floodgate metadata, and modern forwarding; idle sleep and re-wake passed"
+                "Real lazymc cold/warm forwarding, clean idle proof, re-wake reset, and forced-idle failure proof passed"
             )
         except BaseException:
             output.flush()

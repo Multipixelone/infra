@@ -171,6 +171,13 @@ downgrades are changes too; a Nix rollback does not undo a world migration.
 Version metadata and persistent `<id>-stop.json` save proofs live under root-only
 `/srv/games/.state`. Starting a game clears its proof; its stop hook records a
 successful save. Proofs survive reboot and cannot be written by the game user.
+Paper uses nixpkgs lazymc 0.2.11 with a small patch that atomically records its
+child's kernel exit result before returning to sleeping. Every wake invalidates
+the previous result; a forced kill leaves it false. The root stop/post-stop hooks
+also verify this result, so a sleeping listener cannot conceal a failed idle
+shutdown. Normal idle RCON stops exit successfully; Java's normal signal exit
+codes 130/143 retain upstream's graceful-shutdown interpretation. This local
+patch changes no forwarding packets or wake logic.
 World roots with symlinked ancestors are rejected. Backups include all
 Paper dimensions and Terraria's `.wld`, `.twld`, and sidecar backups. Preserve
 the private secrets separately; world snapshots do not replace agenix recovery.
@@ -284,4 +291,5 @@ the exact link evaluation, new `games-contract`, `games-runtime`, and
 service-publication checks. The runtime check includes an actual restic
 snapshot/quarantine restore. The lazymc check exercises raw UUID and Floodgate
 metadata preservation, modern forwarding request/response packets, cold/warm
-joins, empty-server sleep, and another wake against real lazymc 0.2.11.
+joins, empty-server sleep, another wake, and forced-stop rejection against real
+lazymc 0.2.11.

@@ -63,6 +63,7 @@
           stop = cfg.systemd.services.${name}.serviceConfig.ExecStop or [ ];
           memoryMax = cfg.systemd.services.${name}.serviceConfig.MemoryMax;
           slice = cfg.systemd.services.${name}.serviceConfig.Slice;
+          stopTimeout = cfg.systemd.services.${name}.serviceConfig.TimeoutStopSec or null;
         });
         polkit = cfg.security.polkit.extraConfig;
         dashboardUser = {
@@ -111,7 +112,7 @@
       checks = {
         games-lazymc = pkgs.runCommand "games-lazymc-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
           export PYTHONDONTWRITEBYTECODE=1
-          python3 ${./tests/lazymc_test.py} ${lib.getExe pkgs.lazymc}
+          python3 ${./tests/lazymc_test.py} ${lib.getExe host.config.infra.games.artifacts.games-lazymc}
           touch "$out"
         '';
         games-runtime =
@@ -152,6 +153,7 @@
                   assert all(unit["enable"] == expected for unit in fixture["units"].values())
                   assert all(unit["slice"] == "games.slice" for unit in fixture["units"].values())
                   assert fixture["units"]["minecraft-server-survival"]["memoryMax"] == "6G"
+                  assert fixture["units"]["minecraft-server-survival"]["stopTimeout"] == 180
                   assert fixture["units"]["minecraft-server-velocity"]["memoryMax"] == "1G"
                   assert fixture["units"]["podman-games-terraria"]["memoryMax"] == "4G"
                   allowlists = [set(json.loads(value)) for value in re.findall(r'(\[[^\n]*\])\.indexOf\(unit\)', fixture["polkit"])]

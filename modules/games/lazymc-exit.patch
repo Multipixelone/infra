@@ -1,0 +1,65 @@
+--- a/src/server.rs
++++ b/src/server.rs
+@@ -462,0 +463,41 @@
++/// Record the kernel-derived child result for an optional game backup guard.
++/// Readers see a complete JSON boolean; neither creation nor replacement follows
++/// a pre-existing destination symlink.
++fn record_server_exit(clean: bool) -> std::io::Result<()> {
++    use std::fs::{self, OpenOptions};
++    use std::io::Write;
++    use std::path::PathBuf;
++    use std::time::{SystemTime, UNIX_EPOCH};
++
++    let path = match std::env::var_os("GAMES_PAPER_EXIT_FILE") {
++        Some(path) => PathBuf::from(path),
++        None => return Ok(()),
++    };
++    let nonce = SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .unwrap_or_default()
++        .as_nanos();
++    let temporary = path.with_file_name(format!(
++        ".lazymc-exit-{}-{}",
++        std::process::id(),
++        nonce
++    ));
++    let result = (|| -> std::io::Result<()> {
++        let mut options = OpenOptions::new();
++        options.write(true).create_new(true);
++        #[cfg(unix)]
++        {
++            use std::os::unix::fs::OpenOptionsExt;
++            options.mode(0o600);
++        }
++        let mut file = options.open(&temporary)?;
++        file.write_all(if clean { b"true\n" } else { b"false\n" })?;
++        file.sync_all()?;
++        fs::rename(&temporary, &path)
++    })();
++    if result.is_err() {
++        let _ = fs::remove_file(&temporary);
++    }
++    result
++}
++
+@@ -478,0 +520,3 @@
++    // Invalidate the prior proof before any child can write world data.
++    record_server_exit(false)?;
++
+@@ -494,0 +539,13 @@
++    // Publish the actual exit result before clearing the PID/sleeping state.
++    let status = child.wait().await;
++    let clean = status.as_ref().map_or(false, |status| {
++        status.success()
++            || status
++                .code()
++                .map_or(false, |code| ALLOWED_EXIT_CODES.contains(&code))
++    });
++    if let Err(error) = record_server_exit(clean) {
++        // The pre-spawn false marker remains authoritative if publication fails.
++        error!(target: "lazymc", "Failed to record server exit proof: {}", error);
++    }
++
+@@ -496 +553 @@
+-    let crashed = match child.wait().await {
++    let crashed = match status {

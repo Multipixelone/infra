@@ -16,6 +16,9 @@
         "games/minecraft/floodgate-key"
       ];
       dataRoot = "/srv/games/minecraft";
+      lazymc = pkgs.lazymc.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./lazymc-exit.patch ];
+      });
       forwardingPath = secretPath "games/minecraft/velocity-forwarding";
       floodgatePath = secretPath "games/minecraft/floodgate-key";
       geyser = pkgs.fetchurl {
@@ -121,7 +124,7 @@
         id:
         pkgs.writeShellApplication {
           name = "paper-${id}-lazy";
-          text = "exec ${lib.getExe pkgs.lazymc} --config ${lib.escapeShellArg "${dataRoot}/${id}/lazymc.toml"}";
+          text = "exec ${lib.getExe lazymc} --config ${lib.escapeShellArg "${dataRoot}/${id}/lazymc.toml"}";
         };
       proxyConfig = (pkgs.formats.toml { }).generate "velocity.toml" {
         config-version = "2.7";
@@ -167,6 +170,7 @@
             games-velocity = velocity;
             games-geyser = geyser;
             games-floodgate = floodgate;
+            games-lazymc = lazymc;
           }
           // lib.listToAttrs (
             lib.concatLists (
@@ -274,6 +278,7 @@
             publicUDPPorts = [ ];
             wakeOnJoin = true;
             serverPort = s.minecraft.serverPort;
+            childExitFile = "/run/games/${id}/paper-exit.json";
             secretNames = proxySecrets ++ [ "games/minecraft/${id}-rcon" ];
             available = ready (proxySecrets ++ [ "games/minecraft/${id}-rcon" ]);
             console = {
@@ -353,17 +358,19 @@
           id: s:
           lib.nameValuePair "minecraft-server-${id}" {
             enable = cfg.runtime.${id}.available;
+            environment.GAMES_PAPER_EXIT_FILE = cfg.runtime.${id}.childExitFile;
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = s.memoryMax;
               TimeoutStartSec = "40min";
-              TimeoutStopSec = 180;
+              TimeoutStopSec = lib.mkForce 180;
               ExecStart = lib.mkForce (lib.getExe (lazyPackage id));
               ExecStartPre = lib.mkMerge [
                 (lib.mkBefore [ "+${lib.getExe cfg.packages.prechange} ${id}" ])
                 (lib.mkAfter [ "+${lib.getExe cfg.packages.prepare} ${id}" ])
               ];
               ExecStop = lib.mkForce "+${lib.getExe cfg.packages.paper-stop} ${id} $MAINPID";
+              ExecStopPost = [ "+${lib.getExe cfg.packages.paper-result} ${id}" ];
             };
           }
         ) servers;
