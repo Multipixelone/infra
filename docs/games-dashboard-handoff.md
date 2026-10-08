@@ -7,7 +7,7 @@ the manifest automatically.
 
 ## Dev loop
 
-The plain skeleton lives in `pkgs/games-dashboard/`: Python/FastAPI in `backend/`
+The dashboard lives in `pkgs/games-dashboard/`: Python/FastAPI in `backend/`
 and Vite/Svelte/TypeScript in `frontend/`. From the infra worktree root:
 
 ```console
@@ -41,9 +41,8 @@ server state. Backend reload/restart resets all in-memory mock state.
 The API is `GET /api/servers` (manifest metadata with a `status` on each server),
 `GET /api/servers/{id}/events` (SSE `log` events containing `id`, `timestamp`, and
 `line`), and `POST /api/servers/{id}/{start,stop,restart,backup}` (returns `id`,
-`action`, and `status`). Shared-service metadata is retained, but the skeleton
-does not control Velocity or submit console commands. The UI intentionally has
-no controls or dashboard design yet.
+`action`, and `status`). Shared-service metadata is retained, but the dashboard
+does not control Velocity or submit console commands.
 
 Later, on a host with the installed game helpers and manifest, use:
 
@@ -58,7 +57,7 @@ fail startup; it never falls back to mock data. Run the backend with the existin
 recipe grants no privileges and uses no sudo for service controls. Ordinary
 developer users may be refused. Real actions can affect live servers and backups;
 the real-mode adapter tests substitute a runner and never execute host controls.
-Keep this unauthenticated skeleton on loopback. Authentication and publication
+Keep this unauthenticated dashboard on loopback. Authentication and publication
 remain attended follow-up work.
 
 For a quick check inside the shell:
@@ -75,6 +74,53 @@ through Vite, then checks listener cleanup after Ctrl-C. It requires free ports
 and installed npm dependencies. Follow the repository's `agent-run-long`
 workflow for agent-run validation. Backend parity tests validate the generated
 Nix manifest with strict nested models and require an exact JSON round-trip.
+
+## Dashboard UI
+
+The initial UI is implemented in the existing Svelte frontend. It uses the
+paper/ink colors and local serif/monospace font families from
+`modules/link/homepage-theme.css`; light/dark preference is saved locally.
+`src/dashboard.css` owns the dashboard styles, `src/dashboard.ts` validates
+schema-v1 responses and supplies status labels, and `src/Icon.svelte` supplies
+SVG icons, including the server selector's chevron.
+
+This is a personal admin tool. Keep labels terse and operational; do not add
+taglines, introductory copy, decorative footers, or explanations of obvious
+controls. The compact header leads directly into a responsive server selector,
+the selected server's controls, and logs. Preserve useful state/error information
+and warnings about disruptive actions.
+
+Implemented behavior:
+
+- Manifest-only server discovery with status polling every five seconds after
+  each request completes. Invalid or unsupported schemas and inventory errors
+  disable controls until polling recovers.
+- Server state, player count, wake-on-join and backup configuration, copyable
+  connection addresses, and read-only service/data-path details. Unknown player
+  counts remain unknown. Shared-service availability and backup configuration
+  are not presented as runtime health or backup history.
+- Start/stop/restart and manual backup actions. Stop, restart, and backup require
+  confirmation describing player disconnection and relevant recovery behavior.
+  Controls remain locked per server while its action runs, including when
+  another server is selected. Late polls cannot overwrite an action result.
+- SSE console output with filtering, pause/resume, local clearing, and optional
+  follow scrolling. The UI retains 500 lines, bounds individual displayed lines,
+  reconnects automatically, and closes the previous stream on server selection.
+  Clearing or pausing affects only the local display, not host logs.
+
+If an action loses its connection before a response arrives, its outcome is
+unknown and that server remains locked in the current page. Check host logs for
+completion before reloading. The API still needs operation-status tracking to
+recover this state without operator intervention. Reloading also loses in-page
+locks for ongoing actions; backend serialization remains authoritative.
+
+The UI was checked in Chrome in light/dark themes and at a 390px viewport,
+including server selection, details, console filtering and pause/resume,
+confirmation dialogs, and mock start/stop/backup actions. Svelte checking and
+the frontend production build pass. These checks do not validate live game
+operations or deployment. Console command submission, Velocity controls,
+backup history, authentication/CSRF, service packaging, and publication remain
+follow-up work.
 
 ## Backend inventory and adding servers
 
@@ -314,8 +360,8 @@ Java uses its default 25565 port. Loopback-only survival ports are 25566 (lazymc
 claims 25565 if manually started, conflicting with Velocity. Don't start both;
 the dashboard must not offer ATM10 as a managed server.
 
-For the dashboard, build on the Python/FastAPI and Svelte/TypeScript skeleton
-with SSE. Package the eventual service separately, bind it to a loopback port, run it as
+The dashboard uses Python/FastAPI and Svelte/TypeScript with SSE. The initial UI
+is implemented; package the eventual service separately, bind it to a loopback port, run it as
 `games-dashboard`, and implement `/healthz` before publishing it. Required UI
 features are status, players online, live console, start/stop, and back up now;
 server discovery comes exclusively from the manifest.
@@ -357,7 +403,7 @@ the container runtime socket.
   plus plugins 1G/512M heap, and tModLoader 4G. All belong to `games.slice` with
   CPUWeight 200, above the existing batch budget; backfill limits are untouched.
 
-Implementation does not deploy, activate, push, or modify real worlds. Automated
+Development and fixture checks do not deploy, activate, or modify real worlds. Automated
 fixture checks do not replace an authenticated client play test.
 
 To repeat local validation, use the repository's `agent-run-long` workflow for

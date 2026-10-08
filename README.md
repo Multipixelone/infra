@@ -57,6 +57,8 @@ Task execution is managed via `just`.
 | Command | Description |
 |---|---|
 | `just rebuild` | Local system rebuild (uses `nh os switch`). |
+| `just games-dashboard-shell` | See Justfile recipe. |
+| `just games-dashboard-npm` | See Justfile recipe. |
 | `just games-dashboard-dev` | See Justfile recipe. |
 | `just deploy` | Rebuild and push closures to the Attic binary cache. |
 | `just colmena-apply <host>` | Deploy one host via Colmena. Host names are tags, so any node name works. |
