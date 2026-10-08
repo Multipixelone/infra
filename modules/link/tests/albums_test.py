@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
 
@@ -365,16 +366,42 @@ class AlbumGraphProxyTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.queries = []
+        self.query_started = threading.Event()
+        self.query_finished = threading.Event()
+        self.query_release = threading.Event()
+        self.query_release.set()
+        self.assets = self.root / "assets"
+        self.assets.mkdir()
+        (self.assets / "index.html").write_text("fixture viewer")
+        (self.assets / "app.js").write_text("fixture script")
+        (self.assets / "private.json").write_text("must not be served")
+        self.data = self.root / "albums.json"
+        self.data.write_text(
+            json.dumps({"albums": [{"summed_plays": 17, "mean_plays": 8.5}]})
+        )
+        self.covers = self.root / "covers"
+        self.covers.mkdir()
+        self.cover = "cover-" + "a" * 64 + ".jpg"
+        Image.new("RGB", (8, 8), "red").save(self.covers / self.cover)
 
         class Queries:
             def query(inner, phrase):
                 self.queries.append(phrase)
+                self.query_started.set()
+                if not self.query_release.wait(timeout=5):
+                    raise RuntimeError("fixture query was not released")
+                self.query_finished.set()
                 return {"model_id": "text:fixture", "vector": [1.0] + [0.0] * 511}
 
             def close(inner):
                 pass
 
-        handler = partial(self.module.Handler, directory=str(self.root))
+        handler = partial(
+            self.module.Handler,
+            directory=str(self.assets),
+            data=self.data,
+            covers=self.covers,
+        )
         self.backend = self.module.Server(
             ("127.0.0.1", 0), handler, text_query=Queries()
         )
@@ -405,6 +432,7 @@ class AlbumGraphProxyTest(unittest.TestCase):
             stderr=self.nginx_log,
         )
         self.addCleanup(self.stop_proxy)
+        self.addCleanup(self.query_release.set)
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
             if self.proxy.poll() is not None:
@@ -427,37 +455,72 @@ class AlbumGraphProxyTest(unittest.TestCase):
             self.proxy.terminate()
             self.proxy.wait(timeout=5)
 
-    def request(self, *, origin=None, fetch_site="same-origin", body=None):
+    def request(
+        self,
+        *,
+        origin=None,
+        fetch_site="same-origin",
+        body=None,
+        cf_client=None,
+        source="127.0.0.1",
+        host="albums.finnrut.is",
+        method="POST",
+        path="/api/embed-text",
+    ):
         headers = {
-            "Host": "albums.example.test",
+            "Host": host,
             "Content-Type": "application/json",
             "Sec-Fetch-Site": fetch_site,
         }
         if origin is not None:
             headers["Origin"] = origin
-        if body is None:
+        if cf_client is not None:
+            headers["CF-Connecting-IP"] = cf_client
+        if body is None and method == "POST":
             body = json.dumps({"q": "rainy night jazz piano"})
-        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.port, timeout=5, source_address=(source, 0)
+        )
         try:
-            connection.request("POST", "/api/embed-text", body=body, headers=headers)
+            connection.request(method, path, body=body, headers=headers)
             response = connection.getresponse()
             return response.status, dict(response.getheaders()), response.read()
         finally:
             connection.close()
 
     def test_same_origin_post_reaches_upstream_and_is_not_cached(self):
-        status, headers, body = self.request(origin="https://albums.example.test")
+        status, headers, body = self.request(origin="https://albums.finnrut.is")
         self.assertEqual(status, 200, body)
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(self.queries, ["rainy night jazz piano"])
         self.assertEqual(json.loads(body)["model_id"], "text:fixture")
+
+    def test_internal_origin_post_reaches_upstream(self):
+        status, _, body = self.request(origin="https://albums.nyc.finnrut.is")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.queries, ["rainy night jazz piano"])
+
+    def test_internal_name_redirects_to_public_name_with_query_string(self):
+        status, headers, _ = self.request(
+            method="GET", host="albums.nyc.finnrut.is", path="/?data=data.json"
+        )
+        self.assertEqual(status, 308)
+        self.assertEqual(
+            headers["Location"], "https://albums.finnrut.is/?data=data.json"
+        )
 
     def test_absent_origin_remains_absent_and_query_works(self):
         status, _, body = self.request()
         self.assertEqual(status, 200, body)
 
     def test_wrong_origin_is_rejected_before_embedding(self):
-        for origin in ["https://evil.example", "null", "http://albums.example.test"]:
+        for origin in [
+            "https://evil.example",
+            "null",
+            "http://albums.finnrut.is",
+            "http://albums.nyc.finnrut.is",
+            "https://albums.finnrut.is.evil.example",
+        ]:
             with self.subTest(origin=origin):
                 status, _, _ = self.request(origin=origin)
                 self.assertEqual(status, 403)
@@ -465,7 +528,7 @@ class AlbumGraphProxyTest(unittest.TestCase):
 
     def test_cross_site_fetch_metadata_is_preserved_and_rejected(self):
         status, _, _ = self.request(
-            origin="https://albums.example.test", fetch_site="cross-site"
+            origin="https://albums.finnrut.is", fetch_site="cross-site"
         )
         self.assertEqual(status, 403)
         self.assertEqual(self.queries, [])
@@ -474,6 +537,133 @@ class AlbumGraphProxyTest(unittest.TestCase):
         status, _, _ = self.request(body="x" * 4097)
         self.assertEqual(status, 413)
         self.assertEqual(self.queries, [])
+
+    def exhaust_rate(self, **kwargs):
+        # The fast synthetic backend isolates nginx from the encoder's own
+        # two-starts-per-second limit. No model or real library is involved.
+        for _ in range(11):
+            status, _, body = self.request(**kwargs)
+            self.assertEqual(status, 200, body)
+        status, _, _ = self.request(**kwargs)
+        self.assertEqual(status, 429)
+        self.assertEqual(len(self.queries), 11)
+
+    def test_rate_limit_uses_client_ip_from_each_trusted_connector(self):
+        self.exhaust_rate(cf_client="198.51.100.10")
+        status, _, _ = self.request(cf_client="198.51.100.10", source="127.0.0.4")
+        self.assertEqual(status, 429)
+        status, _, body = self.request(cf_client="2001:db8::20", source="127.0.0.4")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(len(self.queries), 12)
+
+    def test_untrusted_peer_cannot_rotate_header_to_evade_rate_limit(self):
+        for index in range(12):
+            status, _, body = self.request(
+                cf_client=f"198.51.100.{index + 1}", source="127.0.0.2"
+            )
+            self.assertEqual(status, 200 if index < 11 else 429, body)
+        self.assertEqual(len(self.queries), 11)
+
+    def test_missing_client_header_falls_back_to_peer_address(self):
+        self.exhaust_rate()
+        status, _, _ = self.request(cf_client="")
+        self.assertEqual(status, 429)
+        status, _, body = self.request(source="127.0.0.2")
+        self.assertEqual(status, 200, body)
+
+    def test_client_header_does_not_replace_generated_acl_peer_address(self):
+        status, _, _ = self.request(cf_client="127.0.0.1", source="127.0.0.3")
+        self.assertEqual(status, 403)
+        self.assertEqual(self.queries, [])
+
+    def assert_assets_available(self, **kwargs):
+        for path in ["/index.html", "/app.js", "/data.json", f"/covers/{self.cover}"]:
+            with self.subTest(path=path):
+                status, _, body = self.request(method="GET", path=path, **kwargs)
+                self.assertEqual(status, 200, body)
+                if path == "/data.json":
+                    self.assertEqual(
+                        json.loads(body)["albums"][0],
+                        {"summed_plays": 17, "mean_plays": 8.5},
+                    )
+        status, _, _ = self.request(method="GET", path="/private.json", **kwargs)
+        self.assertEqual(status, 404)
+
+    def test_assets_and_play_counts_are_available_after_text_rate_limit(self):
+        self.exhaust_rate(cf_client="198.51.100.10")
+        self.assert_assets_available(cf_client="198.51.100.10")
+        self.assertEqual(len(self.queries), 11)
+
+    def test_global_concurrency_limit_matches_one_worker_and_releases_slot(self):
+        self.query_release.clear()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            active = executor.submit(self.request, cf_client="198.51.100.10")
+            try:
+                self.assertTrue(self.query_started.wait(timeout=3))
+                status, _, _ = self.request(
+                    cf_client="198.51.100.20", source="127.0.0.4"
+                )
+                self.assertEqual(status, 429)
+                self.assert_assets_available(cf_client="198.51.100.20")
+                self.assertEqual(len(self.queries), 1)
+            finally:
+                self.query_release.set()
+            self.assertEqual(active.result(timeout=3)[0], 200)
+        status, _, body = self.request(cf_client="198.51.100.30")
+        self.assertEqual(status, 200, body)
+
+    def test_disconnect_keeps_inference_slot_until_upstream_finishes(self):
+        self.query_release.clear()
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        self.addCleanup(connection.close)
+        connection.request(
+            "POST",
+            "/api/embed-text",
+            body=json.dumps({"q": "rainy night jazz piano"}),
+            headers={
+                "Host": "albums.finnrut.is",
+                "Content-Type": "application/json",
+                "CF-Connecting-IP": "198.51.100.10",
+            },
+        )
+        try:
+            self.assertTrue(self.query_started.wait(timeout=3))
+            connection.sock.shutdown(socket.SHUT_RDWR)
+            connection.close()
+            # Give nginx time to observe the disconnect, then prove a fresh IP
+            # still cannot start inference. Bounds avoid a timing-only pass.
+            for index in range(3):
+                time.sleep(0.05)
+                status, _, _ = self.request(cf_client=f"198.51.100.{20 + index}")
+                self.assertEqual(status, 429)
+            self.assertEqual(len(self.queries), 1)
+        finally:
+            self.query_release.set()
+        self.assertTrue(self.query_finished.wait(timeout=3))
+        deadline = time.monotonic() + 3
+        attempt = 0
+        while time.monotonic() < deadline:
+            status, _, body = self.request(cf_client=f"2001:db8::{attempt + 1}")
+            if status == 200:
+                return
+            self.assertEqual(status, 429, body)
+            attempt += 1
+            time.sleep(0.01)
+        self.fail("nginx did not release the completed inference slot")
+
+    def test_viewer_busy_429_is_preserved_without_loading_model(self):
+        query = self.module.TextQuery("fixture-worker", self.root / "encoder")
+        self.backend.text_query = query
+        query.gate.acquire()
+        try:
+            status, headers, body = self.request()
+            self.assertEqual(status, 429)
+            self.assertIn("Text encoder is busy", json.loads(body)["error"])
+            self.assertEqual(headers["Retry-After"], "1")
+            self.assertEqual(headers["Cache-Control"], "no-store")
+            self.assertIsNone(query.child)
+        finally:
+            query.gate.release()
 
 
 if __name__ == "__main__":

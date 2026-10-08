@@ -594,19 +594,59 @@ let
         && !hasIotFirewallAccept 3000 "192.168.6.50/32"
       )
       "IoT remote-backend firewall rules must allow Home Assistant's proxy and direct clients without leaking them to other ports";
-    assert lib.assertMsg (
-      inventory.applications.albums.canonical == "albums.nyc.finnrut.is"
-      && !inventory.applications.albums.public
-      && inventory.routes."albums/root".proxy.host == "link"
-      && inventory.routes."albums/root".backendAddress == "127.0.0.1"
-      && inventory.blockyRecords."albums.nyc.finnrut.is" == registry.hosts.link.addresses.lan
-      && lib.elem "albums.nyc.finnrut.is" inventory.nginxByHost.link.certificateNames
-      &&
-        builtins.length (lib.filter (probe: probe.routeKey == "albums/root") inventory.internalProbes) == 2
-      && !(builtins.hasAttr "albums" inventory.cloudflare.dnsRecords)
-      && lib.all (application: application.key != "albums") inventory.cloudflare.tunnel.applications
-      && !(hasAccessApplicationFor "albums" inventory)
-    ) "albums must stay private with Link loopback proxying, internal DNS, TLS, and probes";
+    assert lib.assertMsg
+      (
+        let
+          albums = inventory.applications.albums;
+          route = inventory.routes."albums/root";
+          tunnel = lib.findFirst (
+            application: application.key == "albums"
+          ) null inventory.cloudflare.tunnel.applications;
+          names = [
+            "albums.finnrut.is"
+            "albums.nyc.finnrut.is"
+          ];
+        in
+        albums.canonical == "albums.finnrut.is"
+        && albums.alias == "albums.nyc.finnrut.is"
+        && albums.public
+        && route.public
+        && route.proxy.host == "link"
+        && route.backend.host == "link"
+        && route.backendAddress == "127.0.0.1"
+        && route.backend.port == 8765
+        && route.access.bypassAccess
+        && route.access.policy == null
+        && lib.all (name: inventory.blockyRecords.${name} == registry.hosts.link.addresses.lan) names
+        && lib.all (name: lib.elem name inventory.nginxByHost.link.certificateNames) names
+        && lib.any (
+          vhost:
+          vhost.name == albums.alias && vhost.kind == "redirect" && vhost.redirectTo == albums.canonical
+        ) inventory.nginxByHost.link.vhosts
+        &&
+          builtins.length (lib.filter (probe: probe.routeKey == "albums/root") inventory.internalProbes) == 2
+        && lib.any (
+          probe: probe.key == "albums/root" && probe.hostname == albums.canonical && probe.access.bypassAccess
+        ) inventory.externalProbes
+        && inventory.cloudflare.dnsRecords.albums.hostname == albums.canonical
+        && inventory.cloudflare.dnsRecords.albums.accessDependency == null
+        && tunnel != null
+        && tunnel.hostname == albums.canonical
+        && tunnel.accessDependency == null
+        && builtins.length tunnel.ingress == 1
+        && lib.all (
+          ingress:
+          ingress.key == "albums/root"
+          && ingress.pathPrefix == "/"
+          && ingress.service == "https://${registry.hosts.link.addresses.lan}:443"
+          && ingress.originServerName == albums.canonical
+          && ingress.httpHostHeader == albums.canonical
+          && !ingress.noTlsVerify
+          && ingress.accessDependency == null
+        ) tunnel.ingress
+        && !(hasAccessApplicationFor "albums" inventory)
+      )
+      "albums must be public without Access, with verified tunnel TLS, an internal redirect, and Link loopback proxying on port 8765";
     inventory;
 in
 {
@@ -660,7 +700,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["copyparty", "forgejo", "homeassistant", "map", "romm", "saves", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "homeassistant", "map", "romm", "saves", "seerr"]) and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and

@@ -11,7 +11,18 @@ let
   coversDirectory = "${stateDirectory}/covers";
   cacheDirectory = "${stateDirectory}/cache";
   queryDirectory = "${cacheDirectory}/query";
-  canonical = config.flake.servicePublicationInventory.applications.albums.canonical;
+  application = config.flake.servicePublicationInventory.applications.albums;
+  inherit (application) canonical;
+  connectorAddresses = map (
+    host: config.servicePublication.hosts.${host}.addresses.lan
+  ) config.servicePublication.sites.${application.site}.connectorHosts;
+  textQueryLimits = {
+    rate = "30r/m";
+    burst = 10;
+    # The pinned viewer has one CPU worker and rejects concurrent queries with
+    # 429. Match that gate rather than admitting work it cannot process.
+    concurrent = 1;
+  };
   publicationEnabled = config.servicePublication.rollout.enableLocalCutover;
   launchers = import ../../lib/album-graph-launchers.nix;
   snapshot =
@@ -22,14 +33,35 @@ let
   # Shared with the HTTP fixture so it exercises the actual Origin and proxy
   # rules. Reuse the generated root ACL rather than adding an unguarded route.
   textProxy =
-    { canonical, rootLocation }:
+    {
+      canonical,
+      alias,
+      connectorAddresses,
+      rootLocation,
+    }:
     {
       httpConfig = ''
         map $http_origin $album_graph_query_origin {
           default invalid;
           "" "";
-          "https://${canonical}" "http://127.0.0.1:8765";
+          ${lib.concatMapStrings (hostname: ''
+            "https://${hostname}" "http://127.0.0.1:8765";
+          '') ([ canonical ] ++ lib.optional (alias != null) alias)}
         }
+        # As in saves-webdav, recover the client in a separate variable: realip
+        # would replace the peer address used by the generated nginx ACL. Only
+        # the declared tunnel connectors may supply CF-Connecting-IP; direct
+        # LAN clients remain keyed by their peer address even if they forge it.
+        map $remote_addr $album_graph_cf_client {
+          default "";
+          ${lib.concatMapStrings (address: "${address} $http_cf_connecting_ip;\n") connectorAddresses}
+        }
+        map $album_graph_cf_client $album_graph_query_client {
+          default $album_graph_cf_client;
+          "" $remote_addr;
+        }
+        limit_req_zone $album_graph_query_client zone=album_graph_query_rate:10m rate=${textQueryLimits.rate};
+        limit_conn_zone $server_name zone=album_graph_query_connections:1m;
       '';
       location = {
         inherit (rootLocation) proxyPass;
@@ -44,7 +76,14 @@ let
               return 403;
             }
             client_max_body_size 4k;
+            limit_req zone=album_graph_query_rate burst=${toString textQueryLimits.burst} nodelay;
+            limit_req_status 429;
+            limit_conn album_graph_query_connections ${toString textQueryLimits.concurrent};
+            limit_conn_status 429;
             proxy_read_timeout 130s;
+            # Inference continues inside the viewer after a client disconnects.
+            # Keep its slot occupied until the upstream completes or times out.
+            proxy_ignore_client_abort on;
             proxy_cache off;
             proxy_set_header Host 127.0.0.1:8765;
             proxy_set_header Origin $album_graph_query_origin;
@@ -56,11 +95,16 @@ in
 {
   servicePublication.applications.albums = {
     site = "nyc";
-    public = false;
+    public = true;
+    publicHostname = "albums.finnrut.is";
+    access = {
+      bypassAccess = true;
+      bypassJustification = "Finn approved unauthenticated public access to the album similarity graph, including play counts";
+    };
     homepage = {
       name = "Albums";
       group = "Media";
-      description = "Private album similarity graph";
+      description = "Album similarity graph";
       icon = "mdi-graph";
     };
     nginx.extraConfig = ''
@@ -92,7 +136,8 @@ in
       rawBeets = withSystem pkgs.stdenv.hostPlatform.system (args: args.config.packages.beets-plugins);
       viewerPackage = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-album-graph;
       proxy = textProxy {
-        inherit canonical;
+        inherit canonical connectorAddresses;
+        inherit (application) alias;
         rootLocation = config.services.nginx.virtualHosts.${canonical}.locations."/";
       };
       viewer = pkgs.writeShellApplication {
@@ -168,7 +213,7 @@ in
       };
 
       systemd.services.beets-album-graph = {
-        description = "Private album similarity graph viewer";
+        description = "Album similarity graph viewer";
         wantedBy = [ "multi-user.target" ];
         after = [ "systemd-tmpfiles-setup.service" ];
         serviceConfig = hardening // {
@@ -229,7 +274,7 @@ in
             # Stored artwork paths resolve relative to /volume1/Media/Music.
             home.programs.beets.settings.directory
             "-${store}"
-            "-${builtins.dirOf store}"
+            "-${dirOf store}"
           ];
           ReadWritePaths = [
             # Covers are maintained in place, outside the temporary JSON staging.
@@ -271,15 +316,27 @@ in
         text = launchers.viewer;
       };
       fixturePython = pkgs.python3.withPackages (packages: [ packages.pillow ]);
+      fixtureAcl = ''
+        allow 127.0.0.1;
+        allow 127.0.0.2;
+        allow 127.0.0.4;
+        deny all;
+      '';
       fixtureProxy = textProxy {
-        canonical = "albums.example.test";
+        inherit canonical;
+        inherit (application) alias;
+        connectorAddresses = [
+          "127.0.0.1"
+          "127.0.0.4"
+        ];
         rootLocation = {
           proxyPass = "http://127.0.0.1:@BACKEND_PORT@";
-          extraConfig = "allow 127.0.0.1;\ndeny all;\n";
+          extraConfig = fixtureAcl;
         };
       };
       fixtureProxyConfig = pkgs.writeText "album-graph-proxy-fixture.conf" ''
         pid @ROOT@/nginx.pid;
+        worker_processes 2;
         error_log stderr;
         events {}
         http {
@@ -289,9 +346,22 @@ in
           ${fixtureProxy.httpConfig}
           server {
             listen 127.0.0.1:@PROXY_PORT@;
+            server_name ${canonical};
+            location / {
+              proxy_pass ${fixtureProxy.location.proxyPass};
+              ${fixtureAcl}
+            }
             location = /api/embed-text {
               proxy_pass ${fixtureProxy.location.proxyPass};
               ${fixtureProxy.location.extraConfig}
+            }
+          }
+          server {
+            listen 127.0.0.1:@PROXY_PORT@;
+            server_name ${application.alias};
+            ${fixtureAcl}
+            location / {
+              return 308 https://${canonical}$request_uri;
             }
           }
         }
