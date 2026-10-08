@@ -313,8 +313,8 @@
               package = velocity;
               jvmOpts = "-Xms128M -Xmx512M";
               stopCommand = "end";
+              files."velocity.toml" = proxyConfig;
               symlinks = {
-                "velocity.toml" = proxyConfig;
                 "plugins/geyser.jar" = geyser;
                 "plugins/floodgate.jar" = floodgate;
               };
