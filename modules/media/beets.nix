@@ -509,7 +509,6 @@ in
           };
         })
       ];
-      programs.beets.xtractorBackfillPackage = beets-xtractor-backfill;
       home.activation.beetsXtractorState = lib.mkIf xtractor-enabled (
         hmArgs.lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           run ${lib.getExe xtractor-state}
@@ -687,6 +686,7 @@ in
           ${lib.getExe beets-interactive} import "$path"
         '';
         beets = {
+          xtractorBackfillPackage = beets-xtractor-backfill;
           enable = true;
           package = beets-interactive;
           mpdIntegration.enableUpdate = true;
