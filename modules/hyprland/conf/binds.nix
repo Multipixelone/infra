@@ -83,13 +83,6 @@
                   bind "${mod} + SUPER + ${key}" (
                     mkLuaInline "hl.dsp.window.resize({ x = ${toString x}, y = ${toString y}, relative = true })"
                   );
-                # borrowed (read: stolen) from fufexan <3 (https://github.com/fufexan/dotfiles/blob/5d5631f475d892e1521c45356805bc9a2d40d6d1/system/programs/hyprland/binds.nix#L18)
-                toggle =
-                  program:
-                  let
-                    prog = builtins.substring 0 14 program;
-                  in
-                  "pkill ${prog} || uwsm app -- ${program}";
                 runOnce = program: "pgrep ${program} || uwsm app -- ${program}";
                 yt-mpv = pkgs.writeShellApplication {
                   name = "yt";
@@ -146,8 +139,9 @@
                 (bind "Print" (exec "${lib.getExe grimblast} --notify --cursor copysave output"))
                 (bind "ALT + Print" (exec (lib.getExe screenshot-area)))
                 (bind "SHIFT + Print" (exec (lib.getExe screenshot-area-ocr)))
-                # (bind "${mod} + SPACE" (exec "${toggle "rofi"} -show combi"))
-                (bind "${mod} + SPACE" (exec (toggle "anyrun")))
+                # (bind "${mod} + SPACE" (exec "pkill rofi || uwsm app -- rofi -show combi"))
+                # `anyrun close` fails when the launcher isn't open, so this toggles via the daemon
+                (bind "${mod} + SPACE" (exec "anyrun close || anyrun"))
                 (bind "${mod} + ESCAPE" (exec (lib.getExe pkgs.wlogout)))
                 (bind "${mod} + V" (mkLuaInline ''hl.dsp.window.float({ action = "toggle" })''))
                 (bind "SUPER + F" (mkLuaInline "hl.dsp.window.fullscreen()"))

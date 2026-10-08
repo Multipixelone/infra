@@ -1,12 +1,13 @@
 { inputs, lib, ... }:
 {
   flake-file.inputs = {
-    anyrun.url = "github:fufexan/anyrun/launch-prefix";
+    anyrun.url = "github:anyrun-org/anyrun";
 
+    # upstream n3oney/anyrun-nixos-options is unmaintained and built against
+    # the pre-provider plugin ABI; this fork tracks anyrun-interface 25.12
     anyrun-nixos-options = {
-      url = "github:n3oney/anyrun-nixos-options";
+      url = "github:catboylei/anyrun-nixos-options";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
     };
   };
   caches = [
@@ -47,9 +48,8 @@
 
         };
         programs.anyrun = {
-          # TEMP: fix this. it's so busted but I'm too lazy to figure out why its busted
           enable = true;
-          package = inputs.anyrun.packages.x86_64-linux.default;
+          package = inputs.anyrun.packages.${pkgs.stdenv.hostPlatform.system}.default;
           config = {
             width = {
               fraction = 0.3;
@@ -60,7 +60,7 @@
             hideIcons = false;
             hidePluginInfo = true;
             plugins = with inputs.anyrun.packages.${pkgs.stdenv.hostPlatform.system}; [
-              uwsm_app
+              applications
               shell
               # symbols
               # dictionary
@@ -121,10 +121,15 @@
             }
           '';
           extraConfigFiles = {
-            "uwsm_app.ron".text = ''
+            "applications.ron".text = ''
               Config(
                 desktop_actions: false,
                 max_entries: 5,
+                preprocess_exec_script: Some("${pkgs.writeShellScript "anyrun-uwsm-app" ''
+                  # args: <term|no-term> <exec...>
+                  shift
+                  echo "uwsm app -- $*"
+                ''}"),
               )
             '';
             "dictionary.ron".text = ''
@@ -158,7 +163,7 @@
                 Config(
                   options: ${options},
                   min_score: 2,
-                  max_entries: Some(5),
+                  max_entries: 5,
                 )
               '';
           };
