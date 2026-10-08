@@ -2,6 +2,7 @@
   config,
   inputs,
   lib,
+  withSystem,
   ...
 }:
 let
@@ -13,6 +14,11 @@ let
   canonical = config.flake.servicePublicationInventory.applications.albums.canonical;
   publicationEnabled = config.servicePublication.rollout.enableLocalCutover;
   launchers = import ../../lib/album-graph-launchers.nix;
+  snapshot =
+    pkgs:
+    pkgs.writers.writePython3Bin "beets-album-graph-snapshot" { flakeIgnore = [ "E501" ]; } (
+      builtins.readFile ../../lib/album-graph-snapshot.py
+    );
   # Shared with the HTTP fixture so it exercises the actual Origin and proxy
   # rules. Reuse the generated root ACL rather than adding an unguarded route.
   textProxy =
@@ -83,6 +89,7 @@ in
       home = config.home-manager.users.${owner};
       beetsDirectory = "${home.xdg.configHome}/beets";
       store = home.programs.beets.settings.embed.store;
+      rawBeets = withSystem pkgs.stdenv.hostPlatform.system (args: args.config.packages.beets-plugins);
       viewerPackage = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-album-graph;
       proxy = textProxy {
         inherit canonical;
@@ -107,8 +114,10 @@ in
           export BEETS_GRAPH_COVERS=${lib.escapeShellArg coversDirectory}
           export BEETS_GRAPH_CACHE=${lib.escapeShellArg cacheDirectory}
           export BEETS_GRAPH_STORE=${lib.escapeShellArg store}
+          export BEETS_GRAPH_LIBRARY=${lib.escapeShellArg home.programs.beets.settings.library}
+          export BEETS_GRAPH_SNAPSHOT=${lib.escapeShellArg (lib.getExe (snapshot pkgs))}
           export BEETS_GRAPH_CONFIG=${lib.escapeShellArg "${beetsDirectory}/config.yaml"}
-          export BEETS_GRAPH_LAUNCHER=${lib.escapeShellArg (lib.getExe home.programs.beets.package)}
+          export BEETS_GRAPH_LAUNCHER=${lib.escapeShellArg (lib.getExe rawBeets)}
           ${launchers.export}
         '';
       };
@@ -216,20 +225,25 @@ in
           ProtectHome = "read-only";
           ReadOnlyPaths = [
             beetsDirectory
+            home.programs.beets.settings.library
             # Stored artwork paths resolve relative to /volume1/Media/Music.
             home.programs.beets.settings.directory
             "-${store}"
+            "-${builtins.dirOf store}"
           ];
           ReadWritePaths = [
             # Covers are maintained in place, outside the temporary JSON staging.
             stateDirectory
-            "-${beetsDirectory}/.import.lock"
           ];
           PrivateNetwork = true;
           RestrictAddressFamilies = [ "AF_UNIX" ];
           Nice = 10;
-          CPUWeight = 10;
-          IOSchedulingClass = "idle";
+          Slice = "system.slice";
+          CPUWeight = 50;
+          CPUQuota = "200%";
+          IOWeight = 50;
+          IOSchedulingClass = "best-effort";
+          IOSchedulingPriority = 7;
           UMask = "0027";
         };
       };
@@ -297,7 +311,9 @@ in
               ${lib.getExe fixtureExport} ${lib.getExe fixtureViewer} \
               ${inputs.beets-plugins}/plugins/embed/beets_embed/covers.py \
               ${lib.getExe pkgs.nginx} ${fixtureProxyConfig} \
-              ${inputs.beets-plugins}/plugins/embed/viewer/server.py
+              ${inputs.beets-plugins}/plugins/embed/viewer/server.py \
+              ${lib.getExe (snapshot pkgs)}
+            python3 ${./tests/albums_snapshot_test.py} ${../../lib/album-graph-snapshot.py}
             touch "$out"
           '';
     };

@@ -365,6 +365,45 @@ os.execv({shutil.which("timeout")!r}, ['timeout', *args])
         with self.hold_lock():
             pass
 
+    def test_interactive_import_waits_for_writer_lock(self):
+        imported = self.root / "imported"
+        fake_beet = self.executable(
+            "import-beet",
+            f"from pathlib import Path\nPath({str(imported)!r}).touch()\n",
+        )
+        body = shell_body("beets-interactive")
+        for old, new in {
+            '${lib.escapeShellArg hmArgs.config.age.secrets."beets-harmony".path}': shlex.quote(
+                str(self.root / "no-secret")
+            ),
+            "${lib.escapeShellArg beets-lock}": shlex.quote(
+                str(self.beets / ".import.lock")
+            ),
+            "${lib.getExe beets-plugins}": shlex.quote(str(fake_beet)),
+        }.items():
+            body = body.replace(old, new)
+        launcher = self.shell("interactive", body)
+        # This wrapper waits indefinitely; use the real flock, not the
+        # accelerated timeout fixture used by the backfill launcher tests.
+        environment = self.env | {"PATH": str(Path(shutil.which("flock")).parent)}
+        with self.hold_lock():
+            child = subprocess.Popen([str(launcher), "import"], env=environment)
+            try:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    child.wait(timeout=0.15)
+                self.assertFalse(imported.exists())
+            except BaseException:
+                child.kill()
+                child.wait()
+                raise
+        try:
+            self.assertEqual(child.wait(timeout=3), 0)
+            self.assertTrue(imported.exists())
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait()
+
     def test_failed_analysis_cleans_output_and_releases_lock(self):
         result = self.run_launcher(ANALYSIS_EXIT="9")
         self.assertEqual(result.returncode, 9, result.stderr)

@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,7 @@ COVERS_MODULE = Path(sys.argv.pop(1))
 NGINX = Path(sys.argv.pop(1))
 PROXY_CONFIG = Path(sys.argv.pop(1))
 SERVER_MODULE = Path(sys.argv.pop(1))
+SNAPSHOT = Path(sys.argv.pop(1))
 
 
 class AlbumGraphHostTest(unittest.TestCase):
@@ -41,40 +43,48 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.art = self.root / "art.png"
         Image.new("RGB", (48, 32), "red").save(self.art)
         self.store = self.root / "vectors.sqlite3"
-        self.store.write_bytes(b"synthetic store")
+        with sqlite3.connect(self.store) as database:
+            database.execute("CREATE TABLE fixture(value)")
+            database.execute("INSERT INTO fixture VALUES (1)")
         self.library = self.root / "library.db"
-        self.library.write_bytes(b"synthetic library")
+        with sqlite3.connect(self.library) as database:
+            database.execute("CREATE TABLE fixture(value)")
+            database.execute("INSERT INTO fixture VALUES (2)")
         self.config = self.root / "config.yaml"
         self.config.write_text("synthetic config\n")
         self.output = self.state / "albums.json"
         self.launcher = self.root / "beet"
         self.launcher.write_text(
             f"#!{sys.executable}\n"
-            "import fcntl, importlib.util, json, os, sys\n"
+            "import importlib.util, json, os, sqlite3, sys\n"
             "from pathlib import Path\n"
             "sys.dont_write_bytecode = True\n"
             "spec = importlib.util.spec_from_file_location('covers', os.environ['TEST_COVERS_MODULE'])\n"
             "covers = importlib.util.module_from_spec(spec)\n"
             "spec.loader.exec_module(covers)\n"
             "Path(os.environ['TEST_WAITING']).touch()\n"
-            "with open(os.environ['TEST_LOCK'], 'w') as lock:\n"
-            "    fcntl.flock(lock, fcntl.LOCK_EX)\n"
-            "    Path(os.environ['TEST_ARGS']).write_text(json.dumps(sys.argv[1:]))\n"
-            "    out = Path(sys.argv[sys.argv.index('-o') + 1])\n"
-            "    cache_dir = sys.argv[sys.argv.index('--covers-dir') + 1]\n"
-            "    cache = covers.CoverCache(cache_dir, [Path(os.environ['TEST_ART'])], [out])\n"
-            "    name = cache.cover(Path(os.environ['TEST_ART']))\n"
-            "    large = cache.cover(Path(os.environ['TEST_ART']), large=True)\n"
-            "    phrase_cache = Path(sys.argv[sys.argv.index('--cache-dir') + 1]) / 'phrases-fixture.npz'\n"
-            "    if not phrase_cache.exists():\n"
-            "        phrase_cache.write_bytes(b'synthetic phrase cache')\n"
-            "    exported = {'schema_version': 3, 'albums': [{'cover': name, 'cover_large': large}]}\n"
-            "    out.write_text('partial' if os.environ.get('TEST_FAIL') else json.dumps(exported))\n"
-            "    out.chmod(0o600)\n"
-            "    if os.environ.get('TEST_FAIL'):\n"
-            "        cache.abort()\n"
-            "        sys.exit(42)\n"
-            "    cache.finish()\n"
+            "for flag, value in [('-l', 2), ('--store', 1)]:\n"
+            "    path = Path(sys.argv[sys.argv.index(flag) + 1])\n"
+            "    assert path.parent.parent == Path(os.environ['BEETS_GRAPH_STATE'])\n"
+            "    with sqlite3.connect(path) as database:\n"
+            "        assert database.execute('SELECT value FROM fixture').fetchone()[0] == value\n"
+            "        database.execute('UPDATE fixture SET value=99')\n"
+            "Path(os.environ['TEST_ARGS']).write_text(json.dumps(sys.argv[1:]))\n"
+            "out = Path(sys.argv[sys.argv.index('-o') + 1])\n"
+            "cache_dir = sys.argv[sys.argv.index('--covers-dir') + 1]\n"
+            "cache = covers.CoverCache(cache_dir, [Path(os.environ['TEST_ART'])], [out])\n"
+            "name = cache.cover(Path(os.environ['TEST_ART']))\n"
+            "large = cache.cover(Path(os.environ['TEST_ART']), large=True)\n"
+            "phrase_cache = Path(sys.argv[sys.argv.index('--cache-dir') + 1]) / 'phrases-fixture.npz'\n"
+            "if not phrase_cache.exists():\n"
+            "    phrase_cache.write_bytes(b'synthetic phrase cache')\n"
+            "exported = {'schema_version': 3, 'albums': [{'cover': name, 'cover_large': large}]}\n"
+            "out.write_text('partial' if os.environ.get('TEST_FAIL') else json.dumps(exported))\n"
+            "out.chmod(0o600)\n"
+            "if os.environ.get('TEST_FAIL'):\n"
+            "    cache.abort()\n"
+            "    sys.exit(42)\n"
+            "cache.finish()\n"
         )
         self.launcher.chmod(0o755)
         self.env = os.environ | {
@@ -82,6 +92,8 @@ class AlbumGraphHostTest(unittest.TestCase):
             "BEETS_GRAPH_COVERS": str(self.covers),
             "BEETS_GRAPH_CACHE": str(self.cache),
             "BEETS_GRAPH_STORE": str(self.store),
+            "BEETS_GRAPH_LIBRARY": str(self.library),
+            "BEETS_GRAPH_SNAPSHOT": str(SNAPSHOT),
             "BEETS_GRAPH_CONFIG": str(self.config),
             "BEETS_GRAPH_LAUNCHER": str(self.launcher),
             "TEST_LOCK": str(self.root / ".import.lock"),
@@ -121,7 +133,7 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.assertEqual(self.run_export().returncode, 0)
         self.assertEqual(self.output.read_text(), "previous")
 
-    def test_success_uses_locked_launcher_and_prepares_reader_permissions(self):
+    def test_success_uses_private_snapshots_and_prepares_reader_permissions(self):
         self.output.write_text("previous")
         previous_inode = self.output.stat().st_ino
         inputs = {
@@ -136,11 +148,13 @@ class AlbumGraphHostTest(unittest.TestCase):
             [
                 "-c",
                 str(self.config),
+                "-l",
+                arguments[3],
                 "-p",
                 "embed",
                 "embed-graph-export",
                 "--store",
-                str(self.store),
+                arguments[8],
                 "--model",
                 "style",
                 "--covers-dir",
@@ -150,6 +164,8 @@ class AlbumGraphHostTest(unittest.TestCase):
                 "-o",
             ],
         )
+        self.assertEqual(Path(arguments[3]).name, "library.db")
+        self.assertEqual(Path(arguments[8]).name, "embeddings.sqlite3")
         self.assertEqual(Path(arguments[-1]).parent.parent, self.state)
         exported = json.loads(self.output.read_text())
         self.assertEqual(exported["schema_version"], 3)
@@ -254,37 +270,37 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.assertTrue(current.is_file())
         self.assertEqual(unrelated.read_text(), "unrelated")
 
-    def test_export_waits_for_launcher_import_lock(self):
-        self.output.write_text("previous")
+    def test_export_completes_while_backfill_holds_import_lock(self):
         with open(self.env["TEST_LOCK"], "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            child = subprocess.Popen(
+            result = subprocess.run(
                 self.command(),
                 env=self.env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
+                timeout=5,
+                check=False,
             )
-            try:
-                deadline = time.monotonic() + 5
-                while (
-                    not (self.root / "waiting").exists() and time.monotonic() < deadline
-                ):
-                    time.sleep(0.01)
-                self.assertTrue((self.root / "waiting").exists())
-                self.assertIsNone(child.poll())
-                self.assertEqual(self.output.read_text(), "previous")
-                self.assertFalse((self.root / "args.json").exists())
-                fcntl.flock(lock, fcntl.LOCK_UN)
-                _, stderr = child.communicate(timeout=5)
-                self.assertEqual(child.returncode, 0, stderr)
-                self.assertEqual(
-                    json.loads(self.output.read_text())["schema_version"], 3
-                )
-            finally:
-                if child.poll() is None:
-                    child.kill()
-                    child.communicate()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(self.output.read_text())["schema_version"], 3)
+            # The exporter never released or replaced the backfill's lock.
+            with (
+                open(self.env["TEST_LOCK"]) as contender,
+                self.assertRaises(BlockingIOError),
+            ):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_snapshot_failure_keeps_previous_export_and_cleans_staging(self):
+        self.output.write_text("previous")
+        self.library.write_bytes(b"not a database")
+        result = self.run_export()
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("snapshot failed", result.stderr)
+        self.assertEqual(self.output.read_text(), "previous")
+        self.assertFalse((self.root / "args.json").exists())
+        self.assertEqual(
+            set(self.state.iterdir()), {self.output, self.covers, self.cache}
+        )
 
     def viewer_arguments(self):
         viewer = self.root / "viewer"

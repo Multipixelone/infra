@@ -5,12 +5,13 @@
       exit 0
     fi
 
-    # The existing beet launcher owns the import lock. Do not invoke the raw
-    # beets package or take that lock a second time here.
+    # Snapshot both inputs without the import lock, then run only the embed
+    # plugin against private copies. Real imports retain their locked launcher.
     staging=$(mktemp -d "$BEETS_GRAPH_STATE/.export-XXXXXXXX")
     trap 'rm -rf -- "$staging"' EXIT
-    "$BEETS_GRAPH_LAUNCHER" -c "$BEETS_GRAPH_CONFIG" -p embed \
-      embed-graph-export --store "$BEETS_GRAPH_STORE" --model style \
+    "$BEETS_GRAPH_SNAPSHOT" "$BEETS_GRAPH_LIBRARY" "$BEETS_GRAPH_STORE" "$staging"
+    "$BEETS_GRAPH_LAUNCHER" -c "$BEETS_GRAPH_CONFIG" -l "$staging/library.db" -p embed \
+      embed-graph-export --store "$staging/embeddings.sqlite3" --model style \
       --covers-dir "$BEETS_GRAPH_COVERS" --cache-dir "$BEETS_GRAPH_CACHE" \
       -o "$staging/albums.json"
 

@@ -21,9 +21,10 @@ def unit(case, name):
     parser.read_string(case["units"][name])
     # systemd accumulates repeated path declarations; ConfigParser otherwise
     # keeps only the last one, hiding sandbox paths from these assertions.
-    paths = re.findall(r"^ReadWritePaths=(.*)$", case["units"][name], re.MULTILINE)
-    if paths:
-        parser["Service"]["ReadWritePaths"] = " ".join(paths)
+    for setting in ("ReadWritePaths", "ReadOnlyPaths"):
+        paths = re.findall(rf"^{setting}=(.*)$", case["units"][name], re.MULTILINE)
+        if paths:
+            parser["Service"][setting] = " ".join(paths)
     return parser
 
 
@@ -40,6 +41,30 @@ def environment(case, unit_name):
 
 
 class NightlyUnitsTest(unittest.TestCase):
+    def test_export_has_bounded_resources_and_readonly_live_inputs(self):
+        for name, case in CASES.items():
+            with self.subTest(case=name):
+                service = unit(case, "beets-album-graph-export.service")["Service"]
+                self.assertEqual(service["Slice"], "system.slice")
+                self.assertEqual(service["Nice"], "10")
+                self.assertEqual(service["CPUWeight"], "50")
+                self.assertEqual(service["CPUQuota"], "200%")
+                self.assertEqual(service["IOWeight"], "50")
+                self.assertEqual(service["IOSchedulingClass"], "best-effort")
+                self.assertEqual(service["IOSchedulingPriority"], "7")
+                self.assertEqual(service["TimeoutStartSec"], "30m")
+                readonly = shlex.split(service["ReadOnlyPaths"])
+                self.assertIn("/home/tunnel/.config/beets/library.db", readonly)
+                self.assertIn(
+                    "-/home/tunnel/.local/share/beets/embeddings.sqlite3", readonly
+                )
+                self.assertIn("/home/tunnel/.config/beets", readonly)
+                self.assertIn("-/home/tunnel/.local/share/beets", readonly)
+                self.assertEqual(
+                    shlex.split(service["ReadWritePaths"]),
+                    ["/var/lib/beets-album-graph"],
+                )
+
     def test_embed_scratch_and_persistent_caches(self):
         for name, case in CASES.items():
             with self.subTest(case=name):

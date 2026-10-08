@@ -18,6 +18,7 @@
             "batch-beets.slice"
             "beets-nightly.target"
             "beets-nightly-now.target"
+            "beets-album-graph-export.service"
           ]
           ++ lib.concatMap (
             job:
