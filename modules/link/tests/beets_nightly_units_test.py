@@ -98,13 +98,14 @@ class NightlyUnitsTest(unittest.TestCase):
         for name, case in CASES.items():
             with self.subTest(case=name):
                 self.assertEqual(case["beetsSlices"], ["batch-beets"])
-                self.assertEqual(case["workers"], 12)
-                self.assertEqual(case["threads"], 4)
-                quotas = (700, 300) if name == "quotaOverrides" else (800, 400)
+                self.assertEqual(case["workers"], 14)
+                self.assertEqual(case["threads"], 10)
+                quotas = (700, 300) if name == "quotaOverrides" else (1400, 1000)
                 shared = case["slices"]["batch-beets"]
                 self.assertEqual(shared["CPUQuota"], f"{sum(quotas)}%")
                 self.assertEqual(shared["CPUWeight"], 10)
                 self.assertEqual(shared["IOWeight"], 10)
+                self.assertNotIn("AllowedCPUs", shared)
                 if name == "memoryHigh":
                     self.assertEqual(shared["MemoryHigh"], "8G")
                 else:
@@ -128,6 +129,8 @@ class NightlyUnitsTest(unittest.TestCase):
                     self.assertEqual(service["Slice"], "batch-beets.slice")
                     self.assertEqual(service["CPUQuota"], f"{quota}%")
                     self.assertEqual(service["CPUWeight"], "10")
+                    self.assertNotIn("AllowedCPUs", service)
+                    self.assertNotIn("CPUAffinity", service)
                     self.assertEqual(service["User"], "tunnel")
                     self.assertEqual(service["KillMode"], "control-group")
                     self.assertEqual(service["TimeoutStopSec"], "60s")

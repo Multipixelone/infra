@@ -125,9 +125,9 @@ in
             PrivateTmp = true;
             RuntimeDirectory = runtimeDirectory;
             RuntimeDirectoryMode = "0700";
-            # Pinned embed overlaps one preparation with one inference, even
-            # with four inference threads and batch-size 8. Conservatively keep
-            # all three mono f32 rates for two 30-minute tracks:
+            # Pinned embed overlaps one preparation with one inference at
+            # batch-size 8; more inference threads do not add prepared tracks.
+            # Conservatively keep all three mono f32 rates for two 30-minute tracks:
             # 2 * 1800 * (48000 + 16000 + 24000) * 4 = 1.18 GiB.
             # 2 GiB leaves 69% headroom for manifests and preparation overhead.
             # noswap keeps scratch from becoming SSD writes under RAM pressure;
@@ -185,7 +185,8 @@ in
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
-            default = lib.min 16 (lib.max 1 (builtins.div config.link.cpu.threads 8));
+            # Ten inference threads on link's 32-thread CPU after burn-in.
+            default = lib.min 16 (lib.max 1 (builtins.div (config.link.cpu.threads * 5) 16));
             description = "Native ONNX/Torch inference threads; preparation uses one worker and FFmpeg one decode thread.";
           };
           cpuQuotaPercent = lib.mkOption {
@@ -197,12 +198,12 @@ in
         xtractorBackfill = {
           workers = lib.mkOption {
             type = lib.types.ints.positive;
-            default = lib.max 1 (builtins.div (config.link.cpu.threads * 3) 8);
+            default = lib.max 1 (builtins.div (config.link.cpu.threads * 7) 16);
             description = "Nightly xt -t concurrency: maximum simultaneous Essentia subprocesses. Zero/automatic CPU detection is disallowed.";
           };
           cpuQuotaPercent = lib.mkOption {
             type = lib.types.ints.positive;
-            default = 100 * lib.max 1 (builtins.div config.link.cpu.threads 4);
+            default = 100 * lib.max 1 (builtins.div (config.link.cpu.threads * 7) 16);
             description = "Aggregate systemd CPU quota for the nightly xtractor worker tree; independent of its worker count.";
           };
         };

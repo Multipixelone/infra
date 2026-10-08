@@ -78,8 +78,8 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(json.loads(self.args.read_text())[2], "40s")
 
     def test_replacement_cpu_thread_budget(self):
-        self.assertEqual(self.run_launcher(BEETS_EMBED_THREADS="4").returncode, 0)
-        self.assertEqual(json.loads(self.args.read_text())[-2:], ["--threads", "4"])
+        self.assertEqual(self.run_launcher(BEETS_EMBED_THREADS="10").returncode, 0)
+        self.assertEqual(json.loads(self.args.read_text())[-2:], ["--threads", "10"])
 
     def test_outside_window_skips_all_work(self):
         for now in ("999", "29740", "40000"):

@@ -55,7 +55,7 @@ if counting:
     sys.stderr.write(os.environ.get('COUNT_MESSAGE',
         'xtractor: Number of items to be processed: ' + os.environ['ITEM_COUNT']) + '\n')
     sys.exit(0)
-assert args[-3:] == ['xt', '-t', '12']
+assert args[-3:] == ['xt', '-t', '14']
 assert os.environ['OMP_NUM_THREADS'] == '1'
 assert os.environ['OPENBLAS_NUM_THREADS'] == '1'
 output = Path(cfg['xtractor']['output_path'])
@@ -154,7 +154,7 @@ os.execv({shutil.which("timeout")!r}, ['timeout', *args])
             ),
             "${lib.escapeShellArg xtractor-output}": shlex.quote(str(self.output)),
             "${backfill-count-config}": shlex.quote(str(count_config)),
-            "${toString backfill-workers}": "12",
+            "${toString backfill-workers}": "14",
         }.items():
             worker = worker.replace(old, new)
         self.worker = self.shell("worker", worker)
