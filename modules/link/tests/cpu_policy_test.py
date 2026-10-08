@@ -1,17 +1,23 @@
 """Exercise CPU policies against fake sysfs/topologies, never the live host."""
 
+import runpy
 import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-LIB = Path(__file__).resolve().parents[3] / "lib"
-CI_SOURCE = Path(sys.argv.pop(1)) if len(sys.argv) > 1 else LIB / "link-ci-cpus.nix"
-EPP_SOURCE = (
-    Path(sys.argv.pop(1)) if len(sys.argv) > 1 else LIB / "link-cpu-idle-policy.nix"
-)
+
+def source_argument(default_name):
+    if len(sys.argv) > 1:
+        return Path(sys.argv.pop(1))
+    return Path(__file__).resolve().parents[3] / "lib" / default_name
+
+
+CI_SOURCE = source_argument("link-ci-cpus.nix")
+EPP_SOURCE = source_argument("link-cpu-idle-policy.nix")
 
 
 def body(path):
@@ -26,6 +32,20 @@ def run(script):
         timeout=5,
         check=False,
     )
+
+
+class SourceArgumentTest(unittest.TestCase):
+    def test_explicit_sources_do_not_require_repository_ancestry(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            shallow_path = Path(directory) / "cpu_policy_test.py"
+            shallow_path.write_text(Path(__file__).read_text())
+            with patch.object(
+                sys, "argv", [str(shallow_path), str(CI_SOURCE), str(EPP_SOURCE)]
+            ):
+                namespace = runpy.run_path(str(shallow_path))
+                self.assertEqual(namespace["CI_SOURCE"], CI_SOURCE)
+                self.assertEqual(namespace["EPP_SOURCE"], EPP_SOURCE)
+                self.assertEqual(sys.argv, [str(shallow_path)])
 
 
 class TopologyTest(unittest.TestCase):
