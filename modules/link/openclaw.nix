@@ -249,9 +249,12 @@ in
             WorkingDirectory = openclawStateDir;
             Restart = "always";
             RestartSec = "5s";
+            TimeoutStartSec = "30s";
+            TimeoutStopSec = "330s";
+            KillMode = "mixed";
             Environment = [
               "HOME=/home/tunnel"
-              "PATH=/home/tunnel/.local/bin:/home/tunnel/.nix-profile/bin:${openclawPrefix}/bin:/home/tunnel/bin:${gatewayPath}"
+              "PATH=/home/tunnel/.local/bin:/home/tunnel/.nix-profile/bin:${openclawPrefix}/bin:/home/tunnel/bin:/run/current-system/sw/bin:${gatewayPath}"
               "NPM_CONFIG_PREFIX=${openclawPrefix}"
               "OPENCLAW_STATE_DIR=${openclawStateDir}"
             ];
