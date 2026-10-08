@@ -651,15 +651,32 @@ def main(argv):
             "--no-pager",
             "-n",
             "200",
-            "-u",
-            item["unit"],
         ]
+        units = [item["unit"]]
         if item.get("backup"):
-            command += ["-u", "restic-backups-games-" + args[0] + ".service"]
+            units.append("restic-backups-games-" + args[0] + ".service")
         if item.get("container"):
             # Podman emits container stdout with CONTAINER_NAME metadata,
             # possibly from its libpod scope rather than the launcher unit.
-            command += ["+", "CONTAINER_NAME=" + item["container"]]
+            # -u is an option, not a positional match: following it with +
+            # alone makes journalctl reject the entire expression. Expand the
+            # fixed units into explicit OR groups, retaining manager/coredump
+            # records as well as the service's own messages.
+            matches = []
+            for unit in units:
+                for group in (
+                    ["_SYSTEMD_UNIT=" + unit],
+                    ["_PID=1", "UNIT=" + unit],
+                    ["_UID=0", "OBJECT_SYSTEMD_UNIT=" + unit],
+                    ["_UID=0", "COREDUMP_UNIT=" + unit],
+                ):
+                    if matches:
+                        matches.append("+")
+                    matches.extend(group)
+            command += matches + ["+", "CONTAINER_NAME=" + item["container"]]
+        else:
+            for unit in units:
+                command += ["-u", unit]
         if len(args) == 2:
             command.append("--follow")
         os.execv(command[0], command)

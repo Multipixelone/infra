@@ -94,6 +94,40 @@ class RuntimeTest(unittest.TestCase):
             runtime.main(["--inventory", str(path), "prune"])
             prune.assert_called_once_with(self.cfg)
 
+    def test_container_logs_use_valid_fixed_match_groups(self):
+        self.item["container"] = "games-survival"
+        self.cfg["commands"] = {"journalctl": "/fixture/journalctl"}
+        path = self.directory / "inventory.json"
+        path.write_text(json.dumps(self.cfg))
+        with patch.object(runtime.os, "execv") as execute:
+            runtime.main(["--inventory", str(path), "logs", "survival", "--follow"])
+        executable, argv = execute.call_args.args
+        self.assertEqual(executable, "/fixture/journalctl")
+        self.assertEqual(argv[-1], "--follow")
+        # Every OR has real positional terms on both sides; -u options alone
+        # cannot precede +. Matches stay confined to this registered game and
+        # its fixed backup unit/container, including root manager records.
+        terms = argv[4:-1]
+        groups = [[]]
+        for term in terms:
+            if term == "+":
+                self.assertTrue(groups[-1])
+                groups.append([])
+            else:
+                self.assertIn("=", term)
+                groups[-1].append(term)
+        self.assertTrue(groups[-1])
+        self.assertEqual(groups[-1], ["CONTAINER_NAME=games-survival"])
+        for group in groups[:-1]:
+            identity = next(term for term in group if "UNIT=" in term)
+            self.assertIn(
+                identity.split("=", 1)[1],
+                {
+                    "minecraft-server-survival.service",
+                    "restic-backups-games-survival.service",
+                },
+            )
+
     def test_first_empty_world_and_unchanged_version_do_not_need_backup(self):
         with patch.object(runtime, "snapshot") as snapshot:
             runtime.prechange(self.cfg, "survival")
