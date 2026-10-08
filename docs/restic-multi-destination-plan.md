@@ -113,11 +113,11 @@ not NAS-first replication. A slow or unavailable NAS must not gate offsite
 backups. The user agreed to proceed to this document; this is a recommendation
 to resume from, not finalized implementation approval.
 
-| Source host | Onsite repository (alexandria) | Offsite repository (OneDrive) |
-| --- | --- | --- |
-| link | `Backups/link` | `Backups/link` (existing) |
-| zelda | `Backups/zelda` | `Backups/zelda` (existing) |
-| Other opted-in NixOS hosts | `Backups/hosts` | `Backups/hosts` (**assumption to confirm**) |
+| Source host                | Onsite repository (alexandria) | Offsite repository (OneDrive)               |
+| -------------------------- | ------------------------------ | ------------------------------------------- |
+| link                       | `Backups/link`                 | `Backups/link` (existing)                   |
+| zelda                      | `Backups/zelda`                | `Backups/zelda` (existing)                  |
+| Other opted-in NixOS hosts | `Backups/hosts`                | `Backups/hosts` (**assumption to confirm**) |
 
 This proposes **six physical repositories**, not three repositories with raw
 file mirrors. The third OneDrive repository was not explicitly approved by the
@@ -189,18 +189,18 @@ permanently impossible option. See the official references below.
 
 - [ ] Re-read repo instructions and this plan; confirm the open decisions with the user.
 - [ ] Re-inventory current jobs, contributions and exclusions; verify existing
-  OneDrive snapshot freshness before changing coverage.
+      OneDrive snapshot freshness before changing coverage.
 - [ ] Inspect NAS capacity/redundancy and measure representative performance.
 - [ ] Finalize transport, repository paths, shared-repo security boundary,
-  maintenance ownership and recoverable credentials.
+      maintenance ownership and recoverable credentials.
 - [ ] Implement reusable NixOS declarations outside the `pc`-only scope, with no
-  generic job for an empty folder list and no accidental jobs on installer media.
+      generic job for an empty folder list and no accidental jobs on installer media.
 - [ ] Generate independent destination jobs, preserving existing OneDrive repos,
-  preparation hooks, exclusions, RetroArch guards/tags and mutable rclone state.
+      preparation hooks, exclusions, RetroArch guards/tags and mutable rclone state.
 - [ ] Add fail-closed NAS access, bounded laptop behavior, scheduling/locking,
-  independent maintenance and per-destination freshness/failure monitoring.
+      independent maintenance and per-destination freshness/failure monitoring.
 - [ ] Validate with the plan below, then roll out incrementally and document
-  recovery commands and evidence. Do not enable game-server backups implicitly.
+      recovery commands and evidence. Do not enable game-server backups implicitly.
 
 ## Future validation plan (not run for this document)
 

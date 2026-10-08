@@ -54,7 +54,7 @@
           builtins.toJSON {
             services = lib.genAttrs [ "enabled" "missing" "empty" "disabled" "stopped" "discovered" ] (
               name:
-              ({
+              {
                 inherit
                   enabled
                   missing
@@ -63,7 +63,8 @@
                   stopped
                   discovered
                   ;
-              }).${name}.services.homepage-dashboard.services
+              }
+              .${name}.services.homepage-dashboard.services
             );
             adapter = enabled.systemd.services.games-homepage-status.serviceConfig;
             adapterMissing = missing.systemd.services ? games-homepage-status;

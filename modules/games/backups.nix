@@ -1,7 +1,7 @@
 { lib, ... }:
 {
   flake.modules.nixos.games-backups =
-    { config, pkgs, ... }:
+    { config, ... }:
     let
       cfg = config.infra.games;
       secret = "games/restic-password";

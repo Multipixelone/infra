@@ -18,8 +18,8 @@
       rgb = config.link.ledfxOpenrgb;
       settings = pkgs.writeText "link-ledfx-openrgb.json" (
         builtins.toJSON {
-          devices = rgb.devices;
-          virtuals = rgb.virtuals;
+          inherit (rgb) devices;
+          inherit (rgb) virtuals;
           cooler = {
             device = "x570-aorus-elite-wifi";
             virtual = "top-front-fan";
@@ -27,7 +27,7 @@
               "D_LED1 Bottom"
               "D_LED1"
             ];
-            ledCount = cfg.ledCount;
+            inherit (cfg) ledCount;
           };
           port = config.services.hardware.openrgb.server.port;
         }

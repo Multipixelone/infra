@@ -123,7 +123,7 @@
             );
             replacements."@PASSWORD@" = secretPath id;
           };
-          mods = lib.mapAttrs (_: path: toString path) s.terraria.mods;
+          mods = lib.mapAttrs (_: toString) s.terraria.mods;
           modConfigs = s.terraria.modConfigs;
         }) servers;
         virtualisation.oci-containers.containers = lib.mapAttrs' (

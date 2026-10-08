@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   configurations.nixos.link.module =
     { config, pkgs, ... }:
     {

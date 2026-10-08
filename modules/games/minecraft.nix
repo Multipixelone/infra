@@ -247,7 +247,7 @@
               memoryMax
               backup
               ;
-            id = id;
+            inherit id;
             owner = "minecraft";
             unit = "minecraft-server-${id}.service";
             container = null;

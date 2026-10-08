@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ lib, ... }:
 let
   patterns = builtins.fromJSON (builtins.readFile ./log-patterns.json);
 in

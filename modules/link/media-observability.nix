@@ -80,7 +80,7 @@ let
     severity = "critical";
     service = "plex";
     backend_host = config.hosts.${plexRoute.backend.host}.hostName;
-    site = plexRoute.site;
+    inherit (plexRoute) site;
     probe_exporter = config.observability.hubHost;
   };
 
@@ -1797,7 +1797,7 @@ in
                   endpoint = plexEndpoint;
                   access_path = "direct";
                   service = "plex";
-                  backend_host = plexAlertLabels.backend_host;
+                  inherit (plexAlertLabels) backend_host;
                   path = plexRoute.health.path;
                 };
               }

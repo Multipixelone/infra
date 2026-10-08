@@ -12,7 +12,7 @@
       inventory = pkgs.writeText "games-runtime.json" (
         builtins.toJSON {
           servers = cfg.runtime;
-          proxy = cfg.proxy;
+          inherit (cfg) proxy;
           backup = {
             enabled = backupEnabled;
             repository = cfg.backup.repository;
@@ -147,7 +147,7 @@
         }
       ];
     };
-  perSystem = { ... }: {
+  perSystem = _: {
     packages =
       lib.mapAttrs' (
         _: package: lib.nameValuePair package.name package

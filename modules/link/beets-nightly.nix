@@ -8,7 +8,7 @@ in
     let
       home = config.home-manager.users.${owner};
       cfg = config.services.beets.nightly;
-      beetsDirectory = builtins.dirOf home.programs.beets.settings.library;
+      beetsDirectory = dirOf home.programs.beets.settings.library;
       modeLock = import ../../lib/beets-backfill-mode-lock.nix { inherit pkgs; };
       lockDirectory = "/run/beets-backfill-locks";
       workers = [

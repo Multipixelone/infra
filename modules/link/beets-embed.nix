@@ -43,7 +43,7 @@ in
       cfg = config.services.beets.embedBackfill;
       home = config.home-manager.users.${owner};
       store = home.programs.beets.settings.embed.store;
-      storeDirectory = builtins.dirOf store;
+      storeDirectory = dirOf store;
       modeLock = import ../../lib/beets-backfill-mode-lock.nix { inherit pkgs; };
       lockDirectory = "/run/beets-backfill-locks";
       cacheDirectory = "/var/cache/beets-embed";
@@ -148,7 +148,7 @@ in
             ProtectHome = "read-only";
             ReadOnlyPaths = [
               home.programs.beets.settings.directory
-              (builtins.dirOf home.programs.beets.settings.library)
+              (dirOf home.programs.beets.settings.library)
             ];
             ReadWritePaths = [
               storeDirectory

@@ -50,11 +50,11 @@ cooler's mapping, LCD/lighting settings and UI references. The stale Facter
 USB interfaces are removed too; generic liquidctl support and Smart Device 2
 remain. No live configuration is edited by building this change.
 
-| Profile | Temperature °C → duty % |
-| --- | --- |
+| Profile           | Temperature °C → duty %                |
+| ----------------- | -------------------------------------- |
 | CPU cooler / Tctl | 30–50 → 30; 60 → 50; 70 → 75; 80 → 100 |
-| Case / Tctl | 30–50 → 30; 60 → 45; 70 → 70; 80 → 100 |
-| Case / GPU edge | 30–45 → 30; 55 → 45; 65 → 70; 80 → 100 |
+| Case / Tctl       | 30–50 → 30; 60 → 45; 70 → 70; 80 → 100 |
+| Case / GPU edge   | 30–45 → 30; 55 → 45; 65 → 70; 80 → 100 |
 
 Case fans use the **maximum duty** from the CPU and GPU graphs, rather than
 averaging temperatures. The Standard function delays only decreases (5 s,
