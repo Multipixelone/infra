@@ -312,11 +312,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1791397831,
-        "narHash": "sha256-ajDzLUwImPKlxDWrXUXziz5nWJxHE23bBGV2XW0LGog=",
+        "lastModified": 1791431777,
+        "narHash": "sha256-AxWAGKTUN32T/t1D52qhFmd2rbS4tprjaFhZNz50gZY=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "b515adf93a269a1d9fc6c5b38a77813b493e01cd",
+        "rev": "222a78cd4a9d6e2f2afee7b054cf2f89592fc8d8",
         "type": "github"
       },
       "original": {
@@ -4446,11 +4446,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1789861080,
-        "narHash": "sha256-NjbU3KDwMQSDMTnOXtDjacgIexrpxjs9jrk+Nzg0k9I=",
+        "lastModified": 1791466253,
+        "narHash": "sha256-dlTWygxP0b4GjlEGxcj8JkV+7lv/tXmSfLFSwJpqrA8=",
         "ref": "refs/heads/main",
-        "rev": "6df84132a8642a6234b0b1f4e6ded9e2ee407e34",
-        "revCount": 152,
+        "rev": "3fb8f6960727619c277a447fb8045c47d922d3ab",
+        "revCount": 153,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },
