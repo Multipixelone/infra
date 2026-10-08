@@ -1,4 +1,14 @@
-{ inputs, ... }:
+{
+  inputs,
+  config,
+  lib,
+  ...
+}:
+let
+  gameDomains = lib.concatMap (server: server.hostnames) (
+    lib.attrValues (lib.filterAttrs (_: server: server.enable) config.gameServers.servers)
+  );
+in
 {
   configurations.nixos.link.module =
     { config, ... }:
@@ -18,10 +28,13 @@
       services.cloudflare-dyndns = {
         enable = true;
         apiTokenFile = config.age.secrets."cloudflare-ddns".path;
-        domains = [
-          "wg.finnrut.is"
-          "mc.finnrut.is"
-        ];
+        domains = lib.unique (
+          [
+            "wg.finnrut.is"
+            "mc.finnrut.is"
+          ]
+          ++ gameDomains
+        );
         # Load-bearing. The Cloudflare proxy only carries HTTP over TCP, so an
         # orange-clouded record silently blackholes WireGuard on UDP 443.
         proxied = false;
