@@ -1,4 +1,5 @@
 import fcntl
+import logging
 import os
 import signal
 import subprocess
@@ -12,6 +13,8 @@ from unittest.mock import patch
 
 from openclaw_music.errors import BackendTransient, BackendUncertain
 from openclaw_music.importer import DirectBeetsImportAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class ImportProcessTests(unittest.TestCase):
@@ -59,6 +62,7 @@ class ImportProcessTests(unittest.TestCase):
                     acquired.set()
                     self.adapter._run_unlocked(["beet", "import"], mutation=True)
             except BaseException as exc:
+                logger.exception("Background import failed")
                 errors.append(exc)
 
         with open(self.adapter.lock_path, "w") as backfill:
@@ -91,19 +95,21 @@ class ImportProcessTests(unittest.TestCase):
 
         def stop_while_locked(pgid, sig):
             # Cleanup runs inside the same critical section as the import.
-            with open(self.adapter.lock_path) as contender:
-                with self.assertRaises(BlockingIOError):
-                    fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with (
+                open(self.adapter.lock_path) as contender,
+                self.assertRaises(BlockingIOError),
+            ):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
             signals.append(sig)
             killpg(pgid, sig)
 
-        with patch("openclaw_music.importer.IMPORT_TIMEOUT", 1):
-            with patch("openclaw_music.importer.os.killpg", stop_while_locked):
-                with self.adapter._locked():
-                    with self.assertRaisesRegex(BackendUncertain, "timed out"):
-                        self.adapter._run_unlocked(
-                            [sys.executable, "-c", program], mutation=True
-                        )
+        with (
+            patch("openclaw_music.importer.IMPORT_TIMEOUT", 1),
+            patch("openclaw_music.importer.os.killpg", stop_while_locked),
+            self.adapter._locked(),
+            self.assertRaisesRegex(BackendUncertain, "timed out"),
+        ):
+            self.adapter._run_unlocked([sys.executable, "-c", program], mutation=True)
         self.assertEqual(signals, [signal.SIGKILL])
         self.assertTrue(child_pid_file.exists())
         child_pid = int(child_pid_file.read_text())
@@ -126,20 +132,24 @@ class ImportProcessTests(unittest.TestCase):
             fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def test_list_timeout_is_retryable(self):
-        with patch("openclaw_music.importer.LIST_TIMEOUT", 0.05):
-            with self.assertRaisesRegex(BackendTransient, "list timed out"):
-                self.adapter._run_unlocked(
-                    [sys.executable, "-c", "import time; time.sleep(60)"]
-                )
+        with (
+            patch("openclaw_music.importer.LIST_TIMEOUT", 0.05),
+            self.assertRaisesRegex(BackendTransient, "list timed out"),
+        ):
+            self.adapter._run_unlocked(
+                [sys.executable, "-c", "import time; time.sleep(60)"]
+            )
 
     def test_cancellation_stops_group_and_reaps_beet(self):
         process = unittest.mock.Mock()
         process.pid = 12345
         process.communicate.side_effect = KeyboardInterrupt
-        with patch("openclaw_music.importer.subprocess.Popen", return_value=process):
-            with patch("openclaw_music.importer.os.killpg") as killpg:
-                with self.assertRaises(KeyboardInterrupt):
-                    self.adapter._run_process(["beet", "import"], 1800)
+        with (
+            patch("openclaw_music.importer.subprocess.Popen", return_value=process),
+            patch("openclaw_music.importer.os.killpg") as killpg,
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            self.adapter._run_process(["beet", "import"], 1800)
         killpg.assert_called_once_with(12345, signal.SIGKILL)
         process.wait.assert_called_once_with()
         process.stdout.close.assert_called_once_with()
