@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-SOURCE, SETTINGS_FILE, CONFIG_FIXTURE, SDK_FIXTURE = sys.argv[1:5]
+SOURCE, SETTINGS_FILE, CONFIG_FIXTURE, SDK_FIXTURE, LEGACY_BOARD_FIXTURE = sys.argv[1:6]
 spec = importlib.util.spec_from_file_location("link_argb_config", SOURCE)
 argb = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = argb
@@ -153,7 +153,7 @@ class RgbTests(unittest.TestCase):
                 )
         self.assertEqual(self.sleeps, [])
         self.assertTrue(all(k["protocol_version"] == 3 for k in self.kwargs))
-        self.assertEqual(self.clients[0].resizes, [(3, "D_LED1", 6)])
+        self.assertEqual(self.clients[0].resizes, [(3, "D_LED1", 9)])
 
     def test_absent_optional_collision_parks_and_reappearance_resolves(self):
         _, result = self.configure()
@@ -246,7 +246,7 @@ class RgbTests(unittest.TestCase):
         records.append(twin)
         _, result = self.configure(records)
         self.assertEqual(self.device(result, BOARD)["openrgb_id"], 5)
-        self.assertEqual(self.clients[0].resizes, [(5, "D_LED1", 6)])
+        self.assertEqual(self.clients[0].resizes, [(5, "D_LED1", 9)])
 
     def test_ambiguous_name_never_guesses_or_delays(self):
         self.settings["devices"][RAM]["match"]["location"] = None
@@ -281,8 +281,8 @@ class RgbTests(unittest.TestCase):
         records.append(twin)
         _, result = self.configure(records)
         self.assertEqual(self.device(result, BOARD)["openrgb_id"], 5)
-        self.assertEqual(self.device(result, BOARD)["pixel_count"], 10)
-        self.assertEqual(self.clients[0].resizes, [(5, "D_LED1", 6)])
+        self.assertEqual(self.device(result, BOARD)["pixel_count"], 13)
+        self.assertEqual(self.clients[0].resizes, [(5, "D_LED1", 9)])
         self.assertTrue(any("duplicate physical identity" in log for log in self.logs))
 
     def test_optional_only_sdk_failure_does_not_retry(self):
@@ -317,11 +317,11 @@ class RgbTests(unittest.TestCase):
         _, result = self.configure()
         self.assertEqual(
             self.virtual(result, "top-front-fan")["segments"],
-            [[SMART, 10, 17, True], [BOARD, 0, 5, False]],
+            [[SMART, 10, 17, True], [BOARD, 0, 8, False]],
         )
         self.assertEqual(
             self.virtual(result, BOARD)["segments"],
-            [[BOARD, i, i, False] for i in range(6, 10)],
+            [[BOARD, i, i, False] for i in range(9, 13)],
         )
         before, after = (
             argb.JsonDocument(self.original),
@@ -419,7 +419,7 @@ class RgbTests(unittest.TestCase):
         _, result = self.configure()
         self.assertEqual(
             self.virtual(result, "top-front-fan")["segments"],
-            [[SMART, 10, 17, True], [BOARD, 0, 5, False]],
+            [[SMART, 10, 17, True], [BOARD, 0, 8, False]],
         )
         self.assertEqual(
             self.virtual(result, "top-front-fan")["effect"], target["effect"]
@@ -451,6 +451,98 @@ class RgbTests(unittest.TestCase):
         self.configure(self.clients[-1].records)
         self.assertEqual(self.path.read_bytes(), first)
 
+    def test_six_pixel_migration_activates_only_declared_cooler_virtuals(self):
+        for alias in ("D_LED1", "D_LED1 Bottom"):
+            with self.subTest(alias=alias):
+                records = copy.deepcopy(DEVICES)
+                records[5] = json.loads(Path(LEGACY_BOARD_FIXTURE).read_text())
+                records[5]["zones"][0]["name"] = alias
+                document = json.loads(self.original)
+                self.device(document, BOARD)["pixel_count"] = 10
+                target = self.virtual(document, "top-front-fan")
+                target["segments"] = [[SMART, 10, 17, True], [BOARD, 0, 5, False]]
+                target["active"] = False
+                self.virtual(document, BOARD)["segments"] = [
+                    [BOARD, i, i, False] for i in range(6, 10)
+                ]
+                self.virtual(document, BOARD)["active"] = False
+                self.virtual(document, "back-fan")["active"] = False
+                # An undeclared virtual using the same cooler pixels is user state.
+                document["virtuals"].append(
+                    {
+                        "id": "user-cooler",
+                        "active": False,
+                        "segments": [[BOARD, 0, 5, False]],
+                    }
+                )
+                raw = (json.dumps(document, indent=4) + "\n").encode()
+                self.path.write_bytes(raw)
+                changed, result = self.configure(records)
+                self.assertTrue(changed)
+                self.assertEqual(self.clients[-1].resizes, [(5, alias, 9)])
+                self.assertEqual(self.device(result, BOARD)["pixel_count"], 13)
+                self.assertEqual(
+                    self.virtual(result, "top-front-fan")["segments"],
+                    [[SMART, 10, 17, True], [BOARD, 0, 8, False]],
+                )
+                self.assertEqual(
+                    self.virtual(result, BOARD)["segments"],
+                    [[BOARD, i, i, False] for i in range(9, 13)],
+                )
+                self.assertTrue(self.virtual(result, "top-front-fan")["active"])
+                self.assertFalse(self.virtual(result, BOARD)["active"])
+                self.assertFalse(self.virtual(result, "back-fan")["active"])
+                self.assertEqual(
+                    self.virtual(result, "user-cooler"),
+                    self.virtual(document, "user-cooler"),
+                )
+                self.assertEqual(
+                    self.virtual(result, "top-front-fan")["effect"], target["effect"]
+                )
+                before, after = (
+                    argb.JsonDocument(raw),
+                    argb.JsonDocument(self.path.read_bytes()),
+                )
+                # Activation changes only its scalar span, retaining effect bytes.
+                index = next(
+                    i
+                    for i, v in enumerate(document["virtuals"])
+                    if v["id"] == "top-front-fan"
+                )
+                path = ("virtuals", index, "effect")
+                a, b = before.spans[path], after.spans[path]
+                self.assertEqual(before.text[a[0] : a[1]], after.text[b[0] : b[1]])
+                first = self.path.read_bytes()
+                backups = sorted(self.path.parent.glob("*.pre-link-nix.*"))
+                changed, _ = self.configure(self.clients[-1].records)
+                self.assertFalse(changed)
+                self.assertEqual(self.clients[-1].resizes, [])
+                self.assertEqual(self.path.read_bytes(), first)
+                self.assertEqual(
+                    sorted(self.path.parent.glob("*.pre-link-nix.*")), backups
+                )
+
+    def test_activation_requires_valid_segments_and_boolean_false(self):
+        for active in (False, True, None, 0, "false"):
+            with self.subTest(active=active):
+                document = json.loads(self.original)
+                self.virtual(document, "top-front-fan")["active"] = active
+                self.path.write_text(json.dumps(document))
+                _, result = self.configure()
+                expected = True if active is False else active
+                actual = self.virtual(result, "top-front-fan")["active"]
+                self.assertEqual(actual, expected)
+                self.assertIs(type(actual), type(expected))
+        document = json.loads(self.original)
+        self.virtual(document, "top-front-fan")["active"] = False
+        self.path.write_text(json.dumps(document))
+        records = [d for d in DEVICES if d["name"] != "NZXT Smart Device V2"]
+        _, result = self.configure(records)
+        self.assertEqual(
+            self.virtual(result, "top-front-fan"),
+            self.virtual(document, "top-front-fan"),
+        )
+
     def test_interrupted_replace_retries_canonical_layout(self):
         with (
             patch.object(argb.os, "replace", side_effect=OSError("interrupted")),
@@ -462,9 +554,9 @@ class RgbTests(unittest.TestCase):
         _, result = self.configure(self.clients[0].records)
         self.assertEqual(
             self.virtual(result, BOARD)["segments"],
-            [[BOARD, i, i, False] for i in range(6, 10)],
+            [[BOARD, i, i, False] for i in range(9, 13)],
         )
-        self.assertEqual(self.device(result, BOARD)["pixel_count"], 10)
+        self.assertEqual(self.device(result, BOARD)["pixel_count"], 13)
 
     def test_missing_cooler_virtual_prevents_resize(self):
         document = json.loads(self.original)

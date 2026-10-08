@@ -11,8 +11,8 @@ from pathlib import Path
 
 import tomlkit
 
-COOLING_COMMAND, DAEMON, COOLING_SOURCE, FAKEROOT = sys.argv[1:5]
-del sys.argv[1:5]
+COOLING_COMMAND, DAEMON, COOLING_SOURCE, FAKEROOT, RGB_SETTINGS = sys.argv[1:6]
+del sys.argv[1:6]
 
 
 def load(name, path):
@@ -137,6 +137,12 @@ class ConfigTests(unittest.TestCase):
         }
         (self.directory / "config-ui.json").write_text(json.dumps(ui))
         return old
+
+    def test_cooler_argb_defaults_match_parallel_fans(self):
+        settings = json.loads(Path(RGB_SETTINGS).read_text())
+        self.assertEqual(settings["cooler"]["ledCount"], 9)
+        board = settings["cooler"]["device"]
+        self.assertEqual(settings["devices"][board]["pixelCount"], 13)
 
     def test_fresh_profiles_are_accepted_by_real_daemon(self):
         document = self.run_cooling()

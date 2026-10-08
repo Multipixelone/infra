@@ -1,0 +1,40 @@
+{
+  "id": 5,
+  "name": "X570 AORUS ELITE WIFI",
+  "vendor": "Gigabyte",
+  "serial": "0x82970100",
+  "location": "HID: /dev/hidraw0",
+  "pixelCount": 10,
+  "zones": [
+    {
+      "name": "D_LED1",
+      "start": 0,
+      "count": 6
+    },
+    {
+      "name": "D_LED2",
+      "start": 6,
+      "count": 0
+    },
+    {
+      "name": "I/O Cover",
+      "start": 6,
+      "count": 1
+    },
+    {
+      "name": "LED_CPU",
+      "start": 7,
+      "count": 1
+    },
+    {
+      "name": "PCI-E Accent",
+      "start": 8,
+      "count": 1
+    },
+    {
+      "name": "LED_C1/LED_C2",
+      "start": 9,
+      "count": 1
+    }
+  ]
+}

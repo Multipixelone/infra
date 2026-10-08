@@ -22,7 +22,8 @@ in
               ${../../lib/link-argb-config.py} \
               ${host.config.link.ledfxOpenrgb.settingsFile} \
               ${./tests/fixtures/ledfx-config.json} \
-              ${./tests/fixtures/openrgb-devices.json}
+              ${./tests/fixtures/openrgb-devices.json} \
+              ${./tests/fixtures/openrgb-board-six-pixel.json}
             touch "$out"
           '';
       checks.link-cooling-config =
@@ -43,7 +44,8 @@ in
               ${lib.getExe host.config.link.cooling.package} \
               ${lib.getExe host.pkgs.coolercontrol.coolercontrold} \
               ${../../lib/link-cooling-config.py} \
-              ${lib.getExe pkgs.fakeroot}
+              ${lib.getExe pkgs.fakeroot} \
+              ${host.config.link.ledfxOpenrgb.settingsFile}
             touch "$out"
           '';
     };

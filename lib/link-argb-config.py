@@ -512,6 +512,25 @@ def configure(config_path, settings, sdk=bounded_sdk):
             level("%s: %s; segments untouched", identity, error)
             continue
         changes[("virtuals", index, "segments")] = values
+        cooler = settings["cooler"]
+        if entry.get("active") is False and any(
+            value[0] == cooler["device"] for value in values
+        ):
+            try:
+                zone = named_zone(resolved[cooler["device"]], cooler["zoneNames"])
+            except (KeyError, ValueError) as error:
+                LOG.error("%s: %s; activation untouched", identity, error)
+                continue
+            cooler_end = zone["start"] + zone["count"] - 1
+            if any(
+                device == cooler["device"]
+                and start <= cooler_end
+                and end >= zone["start"]
+                for device, start, end, _ in values
+            ):
+                # Only the declared cooler segment owns activation. Missing
+                # active fields already allow LedFx to restore the saved effect.
+                changes[("virtuals", index, "active")] = True
     payload = document.render(changes)
     changed = atomic_write(path, original, payload)
     LOG.info("LedFx mappings %s", "updated" if changed else "already reconciled")

@@ -88,9 +88,12 @@ fails, and recover from the private backups with the daemon stopped.
 ## Cooler ARGB
 
 The user confirmed the cooler is connected to **D_LED1 bottom**, with shared
-data through a splitter. Use **six logical LEDs**, mirrored across both fans;
-two parallel six-LED fans are not a twelve-pixel serial chain. Adjust
-`link.coolerArgb.ledCount` if the fan variant or wiring changes.
+data through a splitter. Use **nine logical LEDs**, mirrored across both fans;
+two parallel nine-LED fans mirror nine addresses rather than forming an
+eighteen-pixel serial chain. Adjust
+`link.coolerArgb.ledCount` if the fan variant or wiring changes. The earlier
+six-pixel setting left the last LEDs orange on both TL-C12C fans; community
+measurement reports nine LEDs per fan.
 
 Live USB sysfs identifies the motherboard controller as `048d:8297`
 (`ITE Device(8595)`); today's OpenRGB server log registers
@@ -106,7 +109,11 @@ plugin-list request timed out during read-only inspection. It resizes only the
 motherboard's `D_LED1 Bottom` / `D_LED1` zone, then uses refreshed zone offsets to
 attach the cooler to `top-front-fan`. The cooler follows that virtual's existing
 effect. The four onboard motherboard LEDs retain their order in their own
-virtual. LedFx selects Direct mode during activation.
+virtual. An existing six-pixel zone migrates to nine on the next LedFx start:
+the cooler occupies pixels 0–8 and the four onboard LEDs move from 6–9 to 9–12.
+The motherboard device therefore has thirteen pixels. Repeated starts with
+this layout require no resize or config write. LedFx selects Direct mode
+during activation.
 
 ### Device identities and inspection
 
@@ -177,11 +184,17 @@ link.ledfxOpenrgb.virtuals.top-front-fan = [
 ```
 
 The helper owns **only** declared OpenRGB devices' `config.openrgb_id` and
-`config.pixel_count`, and declared virtuals' `segments`. UI edits to these
-fields reset at the next LedFx start. Names, ports/IPs, effects, colors,
-presets, scenes, playlists, startup selections, virtual settings, integrations,
-and every other field retain their exact bytes. The helper does not create
-missing devices/virtuals or choose a default scene/effect.
+`config.pixel_count`, and declared virtuals' `segments`. For a declared virtual
+whose successfully resolved segments overlap D_LED1, it also changes an existing
+boolean `active: false` to `true`; this fixes the observed inactive
+`top-front-fan` without altering unrelated virtuals. Missing activation fields
+already let LedFx restore the saved effect and are left untouched. Invalid
+activation fields and virtuals with unresolved segments are left untouched.
+UI edits to these owned fields reset at the next LedFx start. Names, ports/IPs,
+effects, colors, presets, scenes, playlists, startup selections, virtual settings,
+integrations, and every other field retain their exact bytes, including global
+pause state. The helper does not create missing devices/virtuals or choose a
+default scene/effect.
 
 Optional unplugged devices log at info level and do not consume detection
 retries. If their stale index collides with a resolved controller, only their
@@ -210,6 +223,6 @@ or deploy it. Effects require the graphical-session LedFx service to run.
 
 For a visual count check after later activation, connect the OpenRGB GUI to the
 existing SDK server → `X570 AORUS ELITE WIFI` → `D_LED1 Bottom` / `D_LED1` →
-Resize → 6 LEDs. Check that all six addresses illuminate both fans. Keep the
+Resize → 9 LEDs. Check that all nine addresses illuminate both fans. Keep the
 matching count in Nix; a manual resize is restored at the next LedFx startup.
 If only one fan responds, inspect its ARGB cable before changing counts.

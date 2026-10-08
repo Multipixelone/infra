@@ -164,8 +164,8 @@
         };
         ledCount = lib.mkOption {
           type = lib.types.ints.between 1 512;
-          default = 6;
-          description = "Logical D_LED1 LEDs: splitter-connected cooler fans mirror six pixels.";
+          default = 9;
+          description = "Logical D_LED1 LEDs: splitter-connected cooler fans mirror nine pixels.";
         };
       };
       options.link.ledfxOpenrgb = {
