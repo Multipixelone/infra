@@ -162,7 +162,75 @@ def wait_for(predicate, message, timeout=35):
     raise AssertionError(message)
 
 
-def exercise(lazymc):
+def ping_status(port, host="survival.mc.finnrut.is"):
+    with socket.create_connection(("127.0.0.1", port), timeout=1) as connection:
+        initial = b"\0" + varint(777) + string(host) + struct.pack(">H", port) + b"\x01"
+        connection.sendall(frame(initial) + frame(b"\0"))
+        response = packet(connection)
+        offset = 1
+        while response[offset] & 128:
+            offset += 1
+        result = json.loads(response[offset + 1 :])
+        ping = b"\x01" + struct.pack(">q", 123456789)
+        connection.sendall(frame(ping))
+        assert packet(connection) == ping, "status ping was not echoed"
+        return result
+
+
+def velocity_status(velocity, directory, backend_port):
+    """Default proxy pings, including forced hosts, never login to lazymc."""
+    directory = directory / "velocity"
+    directory.mkdir()
+    port = unused_port()
+    (directory / "forwarding.secret").write_text("fixture-forwarding-secret")
+    (directory / "velocity.toml").write_text(f"""
+config-version = "2.7"
+bind = "127.0.0.1:{port}"
+motd = "fixture proxy"
+online-mode = false
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+[servers]
+survival = "127.0.0.1:{backend_port}"
+try = ["survival"]
+[forced-hosts]
+"survival.mc.finnrut.is" = ["survival"]
+""")
+    with (directory / "velocity.log").open("w+") as output:
+        process = subprocess.Popen(
+            [velocity, "-Xms64M", "-Xmx256M"],
+            cwd=directory,
+            stdout=output,
+            stderr=output,
+            start_new_session=True,
+        )
+        try:
+
+            def ready():
+                try:
+                    return ping_status(port)
+                except (OSError, EOFError):
+                    assert process.poll() is None, (
+                        "Velocity exited before opening its listener"
+                    )
+                    return False
+
+            wait_for(ready, "Velocity did not open its status listener")
+            for host in ("127.0.0.1", "survival.mc.finnrut.is"):
+                for _ in range(3):
+                    response = ping_status(port, host)
+                    assert "Velocity" in response["version"]["name"]
+                    assert "fixture proxy" in json.dumps(response["description"])
+        except BaseException:
+            output.flush()
+            print((directory / "velocity.log").read_text(), file=sys.stderr)
+            raise
+        finally:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=10)
+
+
+def exercise(lazymc, velocity):
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
         public, internal = unused_port(), unused_port()
@@ -229,8 +297,11 @@ rewrite_server_properties = false
                     return False
 
             wait_for(status, "lazymc did not open its sleeping listener")
+            for _ in range(5):
+                assert ping_status(public)["description"] == "fixture sleeping"
+            velocity_status(velocity, directory, public)
             assert not (directory / "started").exists(), (
-                "status polling woke the backend"
+                "direct or Velocity status polling woke the backend"
             )
             assert json.loads(exit_marker.read_text()) is True, (
                 "sleeping status polling changed the prior clean-exit proof"
@@ -305,7 +376,7 @@ rewrite_server_properties = false
                 "forced idle SIGKILL incorrectly recorded a clean-exit proof"
             )
             print(
-                "Real lazymc cold/warm forwarding, clean idle proof, re-wake reset, and forced-idle failure proof passed"
+                "Velocity forced-host and direct lazymc status pings never wake Paper; cold/warm forwarding, clean idle proof, re-wake reset, and forced-idle failure proof passed"
             )
         except BaseException:
             output.flush()
@@ -325,4 +396,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "--backend":
         backend(int(sys.argv[2]), sys.argv[3])
     else:
-        exercise(sys.argv[1])
+        exercise(sys.argv[1], sys.argv[2])

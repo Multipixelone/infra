@@ -114,7 +114,7 @@
       checks = {
         games-lazymc = pkgs.runCommand "games-lazymc-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
           export PYTHONDONTWRITEBYTECODE=1
-          python3 ${./tests/lazymc_test.py} ${lib.getExe host.config.infra.games.artifacts.games-lazymc}
+          python3 ${./tests/lazymc_test.py} ${lib.getExe host.config.infra.games.artifacts.games-lazymc} ${lib.getExe host.config.infra.games.artifacts.games-velocity}
           touch "$out"
         '';
         games-runtime =
