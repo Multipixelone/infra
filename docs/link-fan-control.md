@@ -36,3 +36,51 @@ and `/sys/class/hwmon/*/name` to record the actual chip IDs/revisions and expose
 fan/PWM channels. A successful module build proves ABI compatibility, not
 correct physical fan control. Firmware and Linux may still contend for the
 controller despite relaxed ACPI resource enforcement.
+
+## Curves and calibration
+
+CoolerControl 5.0.1 stores profiles/functions in writable
+`/etc/coolercontrol/config.toml`, not a UI-only database. Its NixOS module has
+only an enable option. A read-only store symlink is not supported: the daemon
+checks writeability and saves its device list, profiles and UI changes.
+`link-cooling-config` reconciles the Nix-owned profiles before each daemon
+startup, retaining other configuration. Existing files get private
+`.pre-link-nix` backups on their first change. The helper removes the departed
+cooler's mapping, LCD/lighting settings and UI references. The stale Facter
+USB interfaces are removed too; generic liquidctl support and Smart Device 2
+remain. No live configuration is edited by building this change.
+
+| Profile | Temperature °C → duty % |
+| --- | --- |
+| CPU cooler / Tctl | 30–50 → 30; 60 → 50; 70 → 75; 80 → 100 |
+| Case / Tctl | 30–50 → 30; 60 → 45; 70 → 70; 80 → 100 |
+| Case / GPU edge | 30–45 → 30; 55 → 45; 65 → 70; 80 → 100 |
+
+Case fans use the **maximum duty** from the CPU and GPU graphs, rather than
+averaging temperatures. The Standard function delays only decreases (5 s,
+2 °C deviance), allowing fast increases. Its duty minimum/maximum fields are
+step sizes; the graphs supply the 30% non-stopping floor. Adjust
+`link.cooling.{cpuCurve,caseCpuCurve,caseGpuCurve}` in Nix after calibration;
+UI edits to these named `(Nix)` profiles are replaced at the next daemon start.
+The Tctl and GPU edge source UIDs match the inspected configuration and can be
+updated with `link.cooling.{cpuSource,gpuSource}` after hardware replacements.
+GPU fan assignments, curves and functions are preserved; only its obsolete
+"AIO Radiator" profile label is renamed.
+
+After activation, open CoolerControl → Controls → each identified fan channel
+→ Device Channel Settings → RPM Calibration, then select and apply
+`CPU cooler (Nix)` to CPU_FAN and
+`Case CPU/GPU max (Nix)` to connected front/rear Smart Device and SYS_FAN channels.
+The observed Smart Device fan1/fan2 radiator assignments migrate to the case
+profile; other channels need this one-time assignment. Identify channels from
+wiring/readings before calibrating; the CPU splitter cannot report both fans.
+Raise curve floors above the measured reliable start/run duty. Calibration
+changes speeds and belongs to later commissioning, not this build task.
+
+Keep BIOS cooling enabled until correct control and startup behavior are
+verified. Missing assignments do not install a fallback curve; a failed daemon,
+missing temperature source, or firmware override can leave a manual fan at its
+last speed. No independent hardware failsafe is claimed. The reconciler rejects
+malformed or symlinked files before writing and fails startup rather than
+silently resetting configuration. Inspect `journalctl -u coolercontrold` if it
+fails, and recover from the private backups with the daemon stopped.
