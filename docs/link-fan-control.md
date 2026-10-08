@@ -84,3 +84,42 @@ last speed. No independent hardware failsafe is claimed. The reconciler rejects
 malformed or symlinked files before writing and fails startup rather than
 silently resetting configuration. Inspect `journalctl -u coolercontrold` if it
 fails, and recover from the private backups with the daemon stopped.
+
+## Cooler ARGB
+
+The user confirmed the cooler is connected to **D_LED1 bottom**, with shared
+data through a splitter. Use **six logical LEDs**, mirrored across both fans;
+two parallel six-LED fans are not a twelve-pixel serial chain. Adjust
+`link.coolerArgb.ledCount` if the fan variant or wiring changes.
+
+Live USB sysfs identifies the motherboard controller as `048d:8297`
+(`ITE Device(8595)`); today's OpenRGB server log registers
+`X570 AORUS ELITE WIFI`. The board's D_LED headers are zones of this USB
+controller, not independent USB fan devices. Existing OpenRGB udev rules cover
+8297 with `uaccess`; no additional broad permissions are needed. Smart Device 2
+is still USB `1e71:2006`; the removed Kraken's `1e71:3008` is absent.
+
+LedFx already uses the OpenRGB SDK at localhost:6742. Before its user service
+starts, `link-argb-config` locates the motherboard and `D_LED1 Bottom` by name,
+resizes only that zone, resolves the current controller index, and adds its
+pixels to the existing `top-front-fan` virtual. The cooler follows that
+virtual's existing effect; changing the effect also changes the cooler. Other
+motherboard segments are remapped around the new strip and overlapping writes
+to the strip are removed. No other device's index, effect, color or fan control
+is configured. LedFx selects Direct mode during device activation.
+
+The helper keeps writable `~/.ledfx/config.json` and a checkpoint in
+`~/.ledfx/link-argb-layout.json` so offsets survive server restarts and interrupted
+configuration updates. Initial originals are backed up privately. A missing or
+ambiguous device/zone, malformed configuration, or missing existing front-fan
+virtual fails LedFx startup with a journal error instead of guessing a mapping.
+Check `journalctl --user -u ledfx` if that happens. The helper does not launch a
+second OpenRGB scanner or write fan controls. Hardware effects require the
+existing LedFx graphical-session service to be running.
+
+For a visual count check after later activation, connect the OpenRGB GUI to the
+existing SDK server → `X570 AORUS ELITE WIFI` → `D_LED1 Bottom` → Resize → 6 LEDs.
+Check that all six addresses illuminate both fans. Keep the matching count in
+Nix; a manual resize is restored by the helper at the next LedFx startup. Do not
+run a separate standalone detector against a controller already owned by the
+server. If only one fan responds, inspect its ARGB cable before changing counts.
