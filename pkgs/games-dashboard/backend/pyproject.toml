@@ -1,9 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "games-dashboard"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["fastapi", "uvicorn", "pydantic", "watchfiles"]
+dependencies = ["fastapi", "uvicorn", "pydantic"]
+
+[project.scripts]
+games-dashboard = "games_dashboard.cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+games_dashboard = ["static/**/*", "static/*"]

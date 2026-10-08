@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (89)</summary>
+<summary>Packages exposed by this flake (90)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -127,6 +127,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
 - `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`
+- [`games-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-package.nix) — Private game server dashboard with packaged frontend · `nix run github:Multipixelone/infra#games-dashboard`
 - [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
 - `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
 - `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from .adapters import (
     HelperFailure,
@@ -66,13 +67,30 @@ async def sse_events(adapter, identifier):
         await events.aclose()
 
 
-def create_app(adapter=None):
+def create_app(adapter=None, static_directory=None):
     @asynccontextmanager
     async def lifespan(app):
         app.state.adapter = adapter if adapter is not None else configured_adapter()
         yield
 
-    app = FastAPI(title="Games dashboard dev skeleton", lifespan=lifespan)
+    app = FastAPI(title="Games dashboard", lifespan=lifespan)
+    origin = os.environ.get("GAMES_DASHBOARD_ORIGIN")
+
+    @app.middleware("http")
+    async def require_same_origin(request, call_next):
+        if origin and request.url.path.startswith("/api/"):
+            supplied = request.headers.get("origin")
+            if (supplied is not None and supplied != origin) or (
+                request.method == "POST" and supplied != origin
+            ):
+                return JSONResponse(
+                    {"detail": "invalid request origin"}, status_code=403
+                )
+        return await call_next(request)
+
+    @app.get("/healthz")
+    async def health():
+        return {"status": "ok"}
 
     for exception, code in (
         (UnknownServer, 404),
@@ -120,6 +138,16 @@ def create_app(adapter=None):
             action_route(action),
             methods=["POST"],
             name=action,
+        )
+
+    # Keep API misses JSON 404s, never static HTML, even in production.
+    @app.api_route("/api/{path:path}", methods=["GET", "POST", "HEAD", "OPTIONS"])
+    async def unknown_api(path: str):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+
+    if static_directory is not None:
+        app.mount(
+            "/", StaticFiles(directory=static_directory, html=True), name="frontend"
         )
 
     return app
