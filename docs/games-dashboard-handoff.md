@@ -58,9 +58,8 @@ fail startup; it never falls back to mock data. Run the backend with the existin
 recipe grants no privileges and uses no sudo for service controls. Ordinary
 developer users may be refused. Real actions can affect live servers and backups;
 the real-mode adapter tests substitute a runner and never execute host controls.
-Keep the unauthenticated development launcher on loopback. The packaged service
-uses the authenticated private publication described below; the dev launcher
-does not inherit nginx authentication.
+Keep the development launcher on loopback. The packaged service uses the
+registry's private LAN/VPN publication described below, with no login required.
 
 For a quick check inside the shell:
 
@@ -122,7 +121,7 @@ confirmation dialogs, and mock start/stop/backup actions. Svelte checking and
 the frontend production build pass. These checks do not validate live game
 operations or deployment. Console command submission, Velocity controls,
 backup history and operation-status tracking remain follow-up work. The packaged
-service adds private publication, Basic auth and production Origin checks;
+service adds private publication and production Origin checks;
 these do not change the development UI or grant new game permissions.
 
 ## Backend inventory and adding servers
@@ -323,7 +322,6 @@ there, then update this repo's `secrets` input lock. Decrypted files live beneat
 | `games/minecraft/survival-rcon.age`       | Random RCON password                | Minecraft/dashboard group, 0440 |
 | `games/terraria/terraria-password.age`    | Server password                     | Root, 0400                      |
 | `games/restic-password.age`               | Separate restic repository password | Root, 0400                      |
-| `games/dashboard-htpasswd.age`            | One bcrypt htpasswd entry for Finn  | Root/nginx, 0440                |
 
 Password and forwarding payloads must be raw, single-line, 16–256 URL-safe
 characters (`A–Z`, `a–z`, digits, `_`, `-`), not `NAME=value` environment files.
@@ -331,8 +329,6 @@ characters (`A–Z`, `a–z`, digits, `_`, `-`), not `NAME=value` environment fi
 original contents; it is a different format. Generate that key with Floodgate in
 a temporary, isolated Velocity instance bound only to loopback, then encrypt it.
 Do not generate or replace that authentication key automatically on each boot.
-The dashboard htpasswd is also a different format: one complete `finn:$2y$...`
-line, not a raw password or environment assignment.
 
 For each future Paper server `<id>`, create
 `games/minecraft/<id>-rcon.age`; for another Terraria server, create
@@ -416,21 +412,19 @@ certificate provide HTTPS. There is no public DNS, DDNS or Tunnel route for it.
 **Private: LAN and VPN.** Finn approved using the registry's normal private-app
 policy: `192.168.3.0/24`, `192.168.5.0/24`, `192.168.6.0/24`, and VPN
 `10.100.0.0/24`. The routed `.7` and `.8` LANs are not accepted. nginx checks the
-client source address and denies other ranges, including public clients even
-with valid credentials. This replaces the earlier LAN-only requirement; there
+client source address and denies other ranges, including public clients. There
 is no application-specific VPN deny or new shared access-policy hook.
 
-Open `https://games.nyc.finnrut.is` from an accepted LAN or VPN client, using
-internal DNS, and sign in as `finn` with the dashboard password. nginx Basic auth
-protects the UI, all API methods, controls and SSE. Only exact `/healthz` skips
-authentication while retaining the same private ACL; it returns HTTP 200 with
-`{"status":"ok"}` after valid startup and reveals no manifest or server status.
+Open `https://games.nyc.finnrut.is` from an accepted LAN or VPN client using
+internal DNS. No login or Basic auth is required, matching the registry's other
+private publications. The UI, API, controls, SSE and `/healthz` all use the same
+private ACL. `/healthz` returns HTTP 200 with `{"status":"ok"}` after valid startup
+and reveals no manifest or server status.
 The health contract expects 200 within three seconds. nginx disables buffering,
 caching and gzip for this application, limits request bodies to 4 KiB, and allows
 45 minutes between upstream reads for long backups. The backend requires the
 exact production Origin on control POSTs and rejects foreign API/SSE Origins;
-no cross-origin CORS permissions are granted. Basic-auth credentials are checked
-by nginx and are not used by game helpers.
+no cross-origin CORS permissions are granted.
 
 `systemd.services.games-dashboard` uses the existing dashboard identity and only
 the existing status/log/backup helpers and polkit controls. Its filesystem is
@@ -448,40 +442,20 @@ dashboard API; the existing console helpers retain their own permissions.
 The backend grants no access to restic credentials, Floodgate keys, forwarding
 secrets, arbitrary journals or the container runtime socket.
 
-### Credential setup and activation
+### Enablement and activation
 
-The auth safeguard is nginx Basic auth, matching the repository's htpasswd
-pattern. Create the encrypted file yourself in the separate `nix-secrets` repo:
-
-1. In this infra worktree, generate an interactive bcrypt entry; do not pass a
-   password on the command line:
-
-   ```console
-   nix shell --inputs-from . nixpkgs#apacheHttpd --command htpasswd -nBC 12 finn
-   ```
-
-2. In `~/Documents/Git/nix-secrets`, include link's host identity and Finn's
-   recovery identity in the recipients for `games/dashboard-htpasswd.age`, then
-   run `agenix -e games/dashboard-htpasswd.age -i ~/.ssh/agenix`. Paste the single
-   htpasswd line into the editor. Commit only the encrypted file there.
-3. In infra, update the locked input with `nix flake update secrets`, regenerate
-   outputs and commit the lock change. agenix installs the file as
-   `/run/agenix/games/dashboard-htpasswd`, owned by `root:nginx`, mode `0440`.
-
-Missing encrypted credentials disable the dashboard unit at evaluation time;
-the runtime secret is also a systemd start condition. nginx never falls back to
-unauthenticated access. Until credentials exist and the separately authorized
-rollout runs, the registered URL is not a live deployment and its health probe
-cannot succeed. No activation or push is part of the packaging change. Use the
-normal publication workflow in `docs/service-publication-runbook.md` for that
-rollout; do not deploy a publication host through an unrelated generic rebuild.
+The dashboard unit is enabled unconditionally and starts without a dashboard
+secret. Game servers still require their own secrets; missing game secrets do
+not disable the dashboard. No activation or push is part of this change. Use the
+normal publication workflow in `docs/service-publication-runbook.md` for a
+separately authorized rollout; do not deploy a publication host through an
+unrelated generic rebuild.
 
 ### Iterating on the UI
 
 `just games-dashboard-dev` remains the source/HMR development loop, with mock
-mode by default. It serves the checkout and does not require production
-credentials or affect game servers. Edit the frontend there for Finn's attended
-design session. The deployed service uses immutable assets from
+mode by default. It serves the checkout without affecting game servers. Edit the
+frontend there for Finn's attended design session. The deployed service uses immutable assets from
 `nix build .#games-dashboard`; checkout edits do not change it until rebuilt and
 activated through the publication workflow. Never run Vite in production.
 
@@ -493,9 +467,9 @@ activated through the publication workflow. Never run Vite in production.
   whitelist rejection, forced-host routing, and sleep/wake behavior. Test a
   second hostname when adding another server.
 - Confirm Fortigate forwards and LAN hairpin behavior for the public game names.
-- Create the dashboard htpasswd and perform the separately authorized
-  publication rollout. Verify authenticated LAN/VPN access, public denial,
-  exact unauthenticated private health, and streamed logs before live controls.
+- Perform the separately authorized publication rollout. Verify LAN/VPN access
+  without a login, public denial, private health, and streamed logs before live
+  controls.
 - Choose future Terraria mods and its player-list presentation. No mods are
   currently enabled, and size/difficulty apply only when creating a new world.
 - Size memory after real play: Paper gets a 6G cap with 4G maximum heap, Velocity
@@ -515,7 +489,7 @@ joins, empty-server sleep, another wake, and forced-stop rejection against real
 lazymc 0.2.11.
 
 Dashboard publication checks are `games-dashboard-backend`,
-`games-dashboard-publication` (actual nginx auth/ACL/origin/SSE fixture), and
+`games-dashboard-publication` (actual nginx private ACL/origin/SSE fixture), and
 `games-dashboard-service` (NixOS fixture exercising actual sudo-backed logs and
 polkit controls inside the production sandbox). Build the `games-dashboard`
 package explicitly. A separate local packaged smoke can run in the dev shell:

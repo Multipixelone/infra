@@ -5,14 +5,7 @@ let
   canonical = "games.nyc.finnrut.is";
   vhost = host.config.services.nginx.virtualHosts.${canonical};
   root = vhost.locations."/";
-  health = vhost.locations."= /healthz";
   inventory = infra.flake.servicePublicationInventory;
-  present =
-    (host.extendModules {
-      modules = [
-        { infra.games.secretFiles."games/dashboard-htpasswd" = lib.mkForce ./tests/fixture.age; }
-      ];
-    }).config;
   missing =
     (host.extendModules {
       modules = [ { infra.games.secretFiles = lib.mkForce { }; } ];
@@ -43,17 +36,11 @@ in
           real_ip_header X-Test-Client-IP;
           server {
             listen 127.0.0.1:@PROXY_PORT@;
-            ${lib.replaceStrings [ "/run/agenix/games/dashboard-htpasswd" ] [ "@ROOT@/htpasswd" ]
-              vhost.extraConfig
-            }
+            ${vhost.extraConfig}
             location / {
               proxy_pass ${lib.replaceStrings [ ":8780" ] [ ":@BACKEND_PORT@" ] root.proxyPass};
               proxy_http_version 1.1;
               ${root.extraConfig}
-            }
-            location = /healthz {
-              proxy_pass ${lib.replaceStrings [ ":8780" ] [ ":@BACKEND_PORT@" ] health.proxyPass};
-              ${health.extraConfig}
             }
           }
         }
@@ -74,16 +61,22 @@ in
           && !(inventory.cloudflare.accessApplications ? games)
           && lib.all (application: application.key != "games") inventory.cloudflare.tunnel.applications
         ) "games dashboard must remain private with link loopback backend, DNS and TLS";
-        assert lib.assertMsg (
-          !missing.systemd.services.games-dashboard.enable
-          && !(missing.age.secrets ? "games/dashboard-htpasswd")
-          && present.systemd.services.games-dashboard.enable
-          && present.age.secrets."games/dashboard-htpasswd".mode == "0440"
-          && present.age.secrets."games/dashboard-htpasswd".group == "nginx"
-          &&
-            present.systemd.services.games-dashboard.unitConfig.ConditionPathExists
-            == "/run/agenix/games/dashboard-htpasswd"
-        ) "games dashboard must fail closed until its encrypted and runtime credentials exist";
+        assert lib.assertMsg
+          (
+            host.config.systemd.services.games-dashboard.enable
+            && missing.systemd.services.games-dashboard.enable
+            && lib.all (name: !(lib.hasPrefix "games/dashboard-" name)) (lib.attrNames missing.age.secrets)
+            && !(missing.systemd.services.games-dashboard.unitConfig ? ConditionPathExists)
+            &&
+              root.extraConfig
+              == infra.flake.nixosConfigurations.impa.config.services.nginx.virtualHosts."snapweb.nyc.finnrut.is".locations."/".extraConfig
+            && vhost.basicAuth == { }
+            && vhost.basicAuthFile == null
+            && lib.all (text: !(lib.hasInfix "auth_basic" text)) (
+              [ vhost.extraConfig ] ++ map (location: location.extraConfig) (lib.attrValues vhost.locations)
+            )
+          )
+          "games dashboard must be enabled without secrets and use the standard private ACL without basic auth";
         pkgs.runCommand "games-dashboard-publication-check"
           {
             nativeBuildInputs = [ pkgs.python3 ];
@@ -92,8 +85,7 @@ in
           ''
             python3 ${../../pkgs/games-dashboard/backend/tests/packaged_smoke.py} \
               --executable ${lib.getExe self'.packages.games-dashboard} \
-              --nginx ${lib.getExe pkgs.nginx} --proxy-config ${proxyConfig} \
-              --htpasswd ${pkgs.apacheHttpd}/bin/htpasswd
+              --nginx ${lib.getExe pkgs.nginx} --proxy-config ${proxyConfig}
             touch "$out"
           '';
     };

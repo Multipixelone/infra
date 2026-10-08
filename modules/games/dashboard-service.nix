@@ -8,20 +8,12 @@ let
   serviceModule =
     { config, pkgs, ... }:
     let
-      secret = "games/dashboard-htpasswd";
       cfg = config.infra.games;
-      secretAvailable = cfg.secretFiles ? ${secret} && builtins.pathExists cfg.secretFiles.${secret};
       package = withSystem pkgs.stdenv.hostPlatform.system (args: args.config.packages.games-dashboard);
     in
     {
-      age.secrets.${secret} = lib.mkIf secretAvailable {
-        file = cfg.secretFiles.${secret};
-        owner = "root";
-        group = "nginx";
-        mode = "0440";
-      };
       systemd.services.games-dashboard = {
-        enable = secretAvailable;
+        enable = true;
         description = "Private game server dashboard";
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" ];
@@ -36,7 +28,6 @@ let
           GAMES_DASHBOARD_ORIGIN = "https://games.nyc.finnrut.is";
           PYTHONDONTWRITEBYTECODE = "1";
         };
-        unitConfig.ConditionPathExists = "/run/agenix/${secret}";
         serviceConfig = {
           User = "games-dashboard";
           Group = "games-dashboard";

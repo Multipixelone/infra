@@ -1,7 +1,6 @@
 """Bounded packaged-app smoke, optionally through the evaluated nginx config."""
 
 import argparse
-import base64
 import http.client
 import json
 import os
@@ -66,7 +65,6 @@ def main():
     parser.add_argument("--executable", required=True)
     parser.add_argument("--nginx")
     parser.add_argument("--proxy-config")
-    parser.add_argument("--htpasswd")
     args = parser.parse_args()
     # All fixtures and child output stay in the tool's permitted temp area.
     os.makedirs("/tmp/opencode", exist_ok=True)
@@ -128,17 +126,6 @@ def main():
 
                 if args.proxy_config:
                     proxy_port = free_port()
-                    subprocess.run(
-                        [
-                            args.htpasswd,
-                            "-cBb",
-                            str(root / "htpasswd"),
-                            "finn",
-                            "fixture-password",
-                        ],
-                        check=True,
-                        capture_output=True,
-                    )
                     text = Path(args.proxy_config).read_text()
                     for key, value in {
                         "ROOT": str(root),
@@ -163,10 +150,6 @@ def main():
                         start_new_session=True,
                     )
                     lan = {"X-Test-Client-IP": "192.168.6.42"}
-                    auth = {
-                        "Authorization": "Basic "
-                        + base64.b64encode(b"finn:fixture-password").decode()
-                    }
                     while True:
                         assert proxy.poll() is None, "nginx fixture exited"
                         try:
@@ -184,25 +167,17 @@ def main():
                     ):
                         client = {"X-Test-Client-IP": address}
                         assert request(proxy_port, "/healthz", client)[0] == 200
-                        for path in (
-                            "/",
-                            "/api/servers",
-                            f"/api/servers/{identifier}/events",
-                            "/healthz/",
-                            "/docs",
-                        ):
-                            assert request(proxy_port, path, client)[0] == 401
-                        assert (
-                            request(proxy_port, "/api/servers", client | auth)[0] == 200
-                        )
+                        for path in ("/", "/api/servers", "/docs", *assets):
+                            assert request(proxy_port, path, client)[0] == 200
+                        events(proxy_port, identifier, client)
                         assert (
                             request(
                                 proxy_port,
                                 f"/api/servers/{identifier}/stop",
-                                client,
+                                client | {"Origin": "https://games.nyc.finnrut.is"},
                                 "POST",
                             )[0]
-                            == 401
+                            == 200
                         )
                     for address in (
                         "203.0.113.42",
@@ -210,22 +185,14 @@ def main():
                         "192.168.7.42",
                         "192.168.8.42",
                     ):
-                        client = {"X-Test-Client-IP": address} | auth
+                        client = {"X-Test-Client-IP": address}
                         for path in ("/", "/healthz", "/api/servers"):
                             assert request(proxy_port, path, client)[0] == 403
                     assert (
                         request(
                             proxy_port,
-                            "/",
-                            lan | {"Authorization": "Basic ZmlubjpiYWQ="},
-                        )[0]
-                        == 401
-                    )
-                    assert (
-                        request(
-                            proxy_port,
                             f"/api/servers/{identifier}/stop",
-                            lan | auth,
+                            lan,
                             "POST",
                         )[0]
                         == 403
@@ -234,7 +201,7 @@ def main():
                         request(
                             proxy_port,
                             f"/api/servers/{identifier}/stop",
-                            lan | auth | {"Origin": "https://evil.example"},
+                            lan | {"Origin": "https://evil.example"},
                             "POST",
                         )[0]
                         == 403
@@ -243,14 +210,14 @@ def main():
                         request(
                             proxy_port,
                             f"/api/servers/{identifier}/stop",
-                            lan | auth | {"Origin": "https://games.nyc.finnrut.is"},
+                            lan | {"Origin": "https://games.nyc.finnrut.is"},
                             "POST",
                         )[0]
                         == 200
                     )
-                    events(proxy_port, identifier, lan | auth)
+                    events(proxy_port, identifier, lan)
                     print(
-                        "PASS generated nginx: LAN/VPN auth, public denial, exact health exception, origins and unbuffered SSE",
+                        "PASS generated nginx: LAN/VPN access without credentials, public denial, origins and unbuffered SSE",
                         flush=True,
                     )
             except BaseException:

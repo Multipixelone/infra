@@ -116,7 +116,6 @@ let
   );
   hosts = lib.unique (map (s: s.targetHost) (lib.attrValues cfg.servers));
   secrets = {
-    "games/dashboard-htpasswd" = "${inputs.secrets}/games/dashboard-htpasswd.age";
     "games/minecraft/velocity-forwarding" = "${inputs.secrets}/games/minecraft/velocity-forwarding.age";
     "games/minecraft/floodgate-key" = "${inputs.secrets}/games/minecraft/floodgate-key.age";
     "games/restic-password" = "${inputs.secrets}/games/restic-password.age";

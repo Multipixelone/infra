@@ -14,21 +14,19 @@ in
             infra.flake.modules.nixos.games-dashboard
             infra.flake.modules.nixos.games-dashboard-service
           ];
-          # Fixture credentials are materialised by the driver. This small age
-          # stub avoids decrypting the existing evaluation-only fixture.age.
+          # games-base declares age.secrets; this fixture needs no decryption.
           options.age.secrets = lib.mkOption {
             type = lib.types.attrs;
             default = { };
           };
           config = {
             networking.hostName = "link";
-            users.groups.nginx = { };
             security.polkit.enable = true;
             security.sudo.enable = true;
             security.sudo-rs.enable = false;
             environment.systemPackages = [ pkgs.curl ];
             infra.games = {
-              secretFiles."games/dashboard-htpasswd" = ./tests/fixture.age;
+              secretFiles = { };
               runtime.fixture = {
                 game = "terraria-tmodloader";
                 displayName = "Fixture";
@@ -64,11 +62,6 @@ in
 
           machine.start()
           machine.wait_for_unit("multi-user.target")
-          machine.succeed("systemctl start games-dashboard.service")
-          machine.fail("systemctl is-active games-dashboard.service")
-          machine.succeed("install -d -m 0750 /run/agenix/games")
-          machine.succeed("touch /run/agenix/games/dashboard-htpasswd")
-          machine.succeed("systemctl start games-dashboard.service")
           machine.wait_for_unit("games-dashboard.service")
           machine.wait_for_open_port(8780)
           assert json.loads(machine.succeed("curl --fail -s http://127.0.0.1:8780/healthz")) == {"status": "ok"}
