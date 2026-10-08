@@ -112,7 +112,7 @@
         };
         # wayland.windowManager.hyprland.settings.exec-once = [(dynamic + "/bin/dynamic &")];
         programs.waybar = {
-          enable = true;
+          enable = false;
           systemd = {
             enable = true;
             targets = [ "graphical-session.target" ];
