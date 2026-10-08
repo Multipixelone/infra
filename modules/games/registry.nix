@@ -59,6 +59,10 @@ let
             type = types.str;
             default = "-Xms1G -Xmx4G";
           };
+          maxPlayers = mkOption {
+            type = types.ints.positive;
+            default = 20;
+          };
           whitelist = mkOption {
             type = types.attrsOf uuidType;
             default = { };
@@ -194,9 +198,11 @@ in
           config.flake.modules.nixos.games-base
           config.flake.modules.nixos.games-backups
           config.flake.modules.nixos.games-dashboard
+          config.flake.modules.nixos.games-observability
         ]
         ++ lib.attrValues cfg.adapters;
         infra.games = {
+          registeredServers = lib.filterAttrs (_: s: s.targetHost == host) cfg.servers;
           servers = lib.filterAttrs (_: s: s.enable && s.targetHost == host) cfg.servers;
           inherit (cfg) secretFiles backup;
           defaultServer = cfg.minecraft.defaultServer;

@@ -1,0 +1,62 @@
+{
+  "running": [
+    {
+      "id": "survival",
+      "state": "running",
+      "unitState": "active",
+      "ready": true,
+      "playersOnline": null,
+      "available": true
+    }
+  ],
+  "sleeping": [
+    {
+      "id": "survival",
+      "state": "sleeping",
+      "unitState": "active",
+      "ready": false,
+      "playersOnline": 0,
+      "available": true
+    }
+  ],
+  "stopped": [
+    {
+      "id": "survival",
+      "state": "stopped",
+      "unitState": "inactive",
+      "ready": false,
+      "playersOnline": null,
+      "available": true
+    }
+  ],
+  "missing-secret": [
+    {
+      "id": "survival",
+      "state": "stopped",
+      "unitState": "inactive",
+      "ready": false,
+      "playersOnline": null,
+      "available": false
+    }
+  ],
+  "disabled": [
+    {
+      "id": "survival",
+      "state": "stopped",
+      "unitState": "inactive",
+      "ready": false,
+      "playersOnline": null,
+      "available": false
+    }
+  ],
+  "terraria": [
+    {
+      "id": "terraria",
+      "state": "running",
+      "unitState": "active",
+      "ready": true,
+      "playersOnline": null,
+      "available": true
+    }
+  ]
+}

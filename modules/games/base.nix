@@ -21,6 +21,12 @@
           type = lib.types.attrs;
           default = { };
         };
+        registeredServers = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          internal = true;
+          description = "Host registry including deliberately disabled servers.";
+        };
         secretFiles = lib.mkOption {
           type = lib.types.attrsOf lib.types.path;
           default = { };
@@ -73,6 +79,7 @@
           games.sliceConfig = {
             CPUAccounting = true;
             MemoryAccounting = true;
+            IOAccounting = true;
             CPUWeight = 200;
             IOWeight = 100;
           };

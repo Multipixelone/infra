@@ -178,18 +178,28 @@ def process_children(pid):
     return sorted(children)
 
 
-def status(cfg, identifier):
+def passive_listening(port):
+    """Inspect the host socket table without connecting to any game listener."""
+    for name in ("tcp", "tcp6"):
+        for line in Path("/proc/net/" + name).read_text().splitlines()[1:]:
+            fields = line.split()
+            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
+                return True
+    return False
+
+
+def status(cfg, identifier, query=True):
     item = server(cfg, identifier)
     state = unit_state(cfg, item)
     active = state.get("ActiveState") in ("active", "activating", "reloading")
-    ready = active and listening(item["serverPort"])
+    ready = active and (listening if query else passive_listening)(item["serverPort"])
     value = "running" if active else "stopped"
     if active and item["wakeOnJoin"] and not ready:
         pid = state.get("MainPID", "0")
         if not process_children(pid):
             value = "sleeping"
     players = 0 if value == "sleeping" else None
-    if ready and item["console"]["method"] == "rcon":
+    if query and ready and item["console"]["method"] == "rcon":
         try:
             response = rcon(item, "list")
             match = re.search(r"There are (\d+) of a max", response)
@@ -385,6 +395,7 @@ def snapshot(cfg, identifier):
         "-p",
         cfg["backup"]["passwordFile"],
         "backup",
+        "--json",
         "--retry-lock",
         "30s",
         "--tag",
@@ -392,7 +403,24 @@ def snapshot(cfg, identifier):
         *paths,
         timeout=1700,
     )
-    print(output, end="", flush=True)
+    summaries = [
+        json.loads(line) for line in output.splitlines() if line.startswith("{")
+    ]
+    summary = next(
+        (
+            value
+            for value in reversed(summaries)
+            if value.get("message_type") == "summary"
+        ),
+        None,
+    )
+    if summary is None:
+        raise RuntimeError("restic returned no backup summary")
+    metrics_path = Path(cfg["stateDir"]) / (identifier + "-backup.json")
+    previous = json.loads(metrics_path.read_text()) if metrics_path.exists() else {}
+    previous.update(lastSuccess=time.time(), lastSize=summary["total_bytes_processed"])
+    atomic_json(metrics_path, previous)
+    print("World snapshot completed", flush=True)
 
 
 def prechange(cfg, identifier):
@@ -521,7 +549,7 @@ def recover(cfg, identifier):
     path.unlink()
 
 
-def backup_run(cfg, identifier):
+def backup_run_inner(cfg, identifier):
     root()
     item = server(cfg, identifier)
     validate_repository(cfg)
@@ -547,6 +575,23 @@ def backup_run(cfg, identifier):
     finally:
         # Release the lock before starting: ExecStartPre takes the same lock.
         recover(cfg, identifier)
+
+
+def backup_run(cfg, identifier):
+    root()
+    server(cfg, identifier)
+    started = time.monotonic()
+    success = False
+    try:
+        backup_run_inner(cfg, identifier)
+        success = True
+    finally:
+        path = Path(cfg["stateDir"]) / (identifier + "-backup.json")
+        previous = json.loads(path.read_text()) if path.exists() else {}
+        previous["failed"] = not success
+        if success:
+            previous["lastDuration"] = time.monotonic() - started
+        atomic_json(path, previous)
 
 
 def prune(cfg):
@@ -634,11 +679,16 @@ def main(argv):
     cfg = json.loads(Path(argv[1]).read_text())
     action, args = argv[2], argv[3:]
     if action == "status":
+        query = "--no-query" not in args
+        args = [arg for arg in args if arg != "--no-query"]
         if len(args) > 1:
-            raise ValueError("usage: games-status [server]")
+            raise ValueError("usage: games-status [--no-query] [server]")
         print(
             json.dumps(
-                [status(cfg, identifier) for identifier in (args or cfg["servers"])]
+                [
+                    status(cfg, identifier, query=query)
+                    for identifier in (args or cfg["servers"])
+                ]
             )
         )
     elif action == "logs":

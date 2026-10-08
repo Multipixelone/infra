@@ -89,7 +89,7 @@ class RuntimeTest(unittest.TestCase):
             runtime, "status", return_value={"state": "sleeping"}
         ) as status:
             runtime.main(["--inventory", str(path), "status"])
-            status.assert_called_once_with(self.cfg, "survival")
+            status.assert_called_once_with(self.cfg, "survival", query=True)
         with patch.object(runtime, "prune") as prune:
             runtime.main(["--inventory", str(path), "prune"])
             prune.assert_called_once_with(self.cfg)
@@ -318,6 +318,92 @@ class RuntimeTest(unittest.TestCase):
             self.assertEqual(result["state"], "sleeping")
             self.assertEqual(result["playersOnline"], 0)
             run.assert_not_called()
+
+    def test_no_query_status_never_connects_or_reads_rcon(self):
+        with (
+            patch.object(
+                runtime,
+                "unit_state",
+                return_value={"ActiveState": "active", "MainPID": "0"},
+            ),
+            patch.object(runtime, "passive_listening", return_value=False),
+            patch.object(runtime, "process_children", return_value=[]),
+            patch.object(runtime.socket, "create_connection") as connection,
+            patch.object(runtime, "rcon") as rcon,
+        ):
+            result = runtime.status(self.cfg, "survival", query=False)
+        self.assertEqual(result["state"], "sleeping")
+        connection.assert_not_called()
+        rcon.assert_not_called()
+
+    def test_passive_socket_table_and_no_query_dispatch(self):
+        socket_table = "header\n0: 0100007F:63DF 00000000:0000 0A\n"
+        with patch.object(Path, "read_text", return_value=socket_table):
+            self.assertTrue(runtime.passive_listening(25567))
+            self.assertFalse(runtime.passive_listening(25566))
+        path = self.directory / "inventory.json"
+        path.write_text(json.dumps(self.cfg))
+        with patch.object(runtime, "status", return_value={}) as status:
+            runtime.main(["--inventory", str(path), "status", "--no-query", "survival"])
+        status.assert_called_once_with(self.cfg, "survival", query=False)
+
+    def test_backup_metadata_records_validation_failure(self):
+        with (
+            patch.object(
+                runtime,
+                "validate_repository",
+                side_effect=RuntimeError("not configured"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            runtime.backup_run(self.cfg, "survival")
+        metadata = json.loads(
+            (Path(self.cfg["stateDir"]) / "survival-backup.json").read_text()
+        )
+        self.assertTrue(metadata["failed"])
+
+    def test_backup_metadata_records_recovery_failure_without_erasing_snapshot(self):
+        path = Path(self.cfg["stateDir"]) / "survival-backup.json"
+        runtime.atomic_json(path, {"lastSuccess": 100, "lastSize": 123})
+        with (
+            patch.object(
+                runtime, "backup_run_inner", side_effect=RuntimeError("recovery failed")
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            runtime.backup_run(self.cfg, "survival")
+        metadata = json.loads(path.read_text())
+        self.assertEqual(metadata["lastSuccess"], 100)
+        self.assertEqual(metadata["lastSize"], 123)
+        self.assertTrue(metadata["failed"])
+
+    def test_successful_backup_clears_failure_and_records_duration(self):
+        with (
+            patch.object(runtime, "backup_run_inner"),
+            patch.object(runtime.time, "monotonic", side_effect=[100, 112]),
+        ):
+            runtime.backup_run(self.cfg, "survival")
+        metadata = json.loads(
+            (Path(self.cfg["stateDir"]) / "survival-backup.json").read_text()
+        )
+        self.assertFalse(metadata["failed"])
+        self.assertEqual(metadata["lastDuration"], 12)
+
+    def test_snapshot_exports_restic_summary_without_logging_raw_output(self):
+        output = '{"message_type":"status","current_files":["private-path"]}\n{"message_type":"summary","total_bytes_processed":1234}\n'
+        with (
+            patch.object(runtime, "validate_repository"),
+            patch.object(runtime, "run", return_value=output) as run,
+            patch.object(runtime.time, "time", return_value=321),
+            patch("builtins.print") as print_output,
+        ):
+            runtime.snapshot(self.cfg, "survival")
+        self.assertIn("--json", run.call_args.args)
+        print_output.assert_called_once_with("World snapshot completed", flush=True)
+        metadata = json.loads(
+            (Path(self.cfg["stateDir"]) / "survival-backup.json").read_text()
+        )
+        self.assertEqual(metadata, {"lastSuccess": 321, "lastSize": 1234})
 
     def test_paper_stop_finds_jvm_spawned_by_non_leader_thread(self):
         marker = self.directory / "paper-exit.json"

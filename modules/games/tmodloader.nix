@@ -177,6 +177,9 @@
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = s.memoryMax;
+              CPUAccounting = true;
+              MemoryAccounting = true;
+              IOAccounting = true;
               TimeoutStartSec = lib.mkForce "40min";
               TimeoutStopSec = lib.mkForce 180;
               ExecStartPre = lib.mkBefore [

@@ -1,0 +1,18 @@
+{
+  "minecraft-paper": {
+    "join": "(?:^|\\]: )(?P<player>[A-Za-z0-9_.]+) joined the game$",
+    "leave": "(?:^|\\]: )(?P<player>[A-Za-z0-9_.]+) left the game$",
+    "chat": "(?:^|\\]: )<[A-Za-z0-9_.]+> .*$",
+    "wake": "^[^<>]*lazymc::monitor[^<>]*Server is now online$",
+    "sleep": "^[^<>]*lazymc::monitor[^<>]*Server is now sleeping$"
+  },
+  "minecraft-velocity": {
+    "join": "\\[connected player\\] (?P<player>[A-Za-z0-9_.]+) \\([^\\r\\n]*\\) has connected$",
+    "leave": "\\[connected player\\] (?P<player>[A-Za-z0-9_.]+) \\([^\\r\\n]*\\) has disconnected$"
+  },
+  "terraria-tmodloader": {
+    "join": "^(?:\\[[^\\]\\r\\n]+\\]:?\\s*)*(?P<player>[^<>\\r\\n]+) has joined\\.$",
+    "leave": "^(?:\\[[^\\]\\r\\n]+\\]:?\\s*)*(?P<player>[^<>\\r\\n]+) has left\\.$",
+    "chat": "^(?:\\[[^\\]\\r\\n]+\\]:?\\s*)*<[^<>\\r\\n]+> .*$"
+  }
+}

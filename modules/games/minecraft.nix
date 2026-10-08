@@ -114,6 +114,7 @@
                 gamemode=survival
                 difficulty=normal
                 level-name=world
+                max-players=${toString s.minecraft.maxPlayers}
                 motd=${s.displayName}
               ''
             );
@@ -131,6 +132,7 @@
         bind = "0.0.0.0:25565";
         motd = "Finn's Minecraft servers";
         show-max-players = 20;
+        ping-passthrough = "DISABLED";
         online-mode = true;
         force-key-authentication = true;
         player-info-forwarding-mode = "modern";
@@ -350,6 +352,9 @@
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = "1G";
+              CPUAccounting = true;
+              MemoryAccounting = true;
+              IOAccounting = true;
               ExecStartPre = lib.mkAfter [ "+${lib.getExe cfg.packages.prepare} velocity" ];
             };
           };
@@ -362,6 +367,9 @@
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = s.memoryMax;
+              CPUAccounting = true;
+              MemoryAccounting = true;
+              IOAccounting = true;
               TimeoutStartSec = "40min";
               TimeoutStopSec = lib.mkForce 180;
               ExecStart = lib.mkForce (lib.getExe (lazyPackage id));
