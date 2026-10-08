@@ -25,7 +25,7 @@
           workspace = "5 silent";
         }
         {
-          match.class = "^(obsidian)$";
+          match.class = "^(obsidian|md\\.obsidian\\.Obsidian)$";
           workspace = "4 silent";
         }
         {
