@@ -37,6 +37,13 @@ in
           pkgs.nodejs_24
         ];
         text = ''
+          frontend="$PWD/pkgs/games-dashboard/frontend"
+          if [[ ! -d "$frontend/node_modules" ||
+                ! -f "$frontend/node_modules/.package-lock.json" ||
+                "$frontend/package-lock.json" -nt "$frontend/node_modules/.package-lock.json" ]]; then
+            echo "Installing games dashboard frontend dependencies..."
+            npm --prefix "$frontend" ci
+          fi
           export GAMES_DASHBOARD_MOCK_MANIFEST=${fixture}
           exec ${python}/bin/python "$PWD/pkgs/games-dashboard/backend/dev.py"
         '';

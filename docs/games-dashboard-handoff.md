@@ -11,15 +11,18 @@ The plain skeleton lives in `pkgs/games-dashboard/`: Python/FastAPI in `backend/
 and Vite/Svelte/TypeScript in `frontend/`. From the infra worktree root:
 
 ```console
-nix develop .#games-dashboard
-npm --prefix pkgs/games-dashboard/frontend ci
 just games-dashboard-dev
 ```
 
 Open `http://127.0.0.1:5173`. The recipe runs Uvicorn with source reload and Vite
-with HMR directly against the checkout; Ctrl-C stops both. Install npm dependencies
-once, and repeat `npm ci` when the committed lockfile changes. Python, Node, and
-npm come from the locked flake; frontend packages are pinned in `package-lock.json`.
+with HMR directly against the checkout; Ctrl-C stops both. The launcher installs
+frontend dependencies automatically when `node_modules` or its installed lockfile
+is missing, or the committed lockfile is newer than the installed lockfile.
+Repeated starts skip installation while dependencies are current. Use
+`just games-dashboard-shell` to enter the development shell and
+`just games-dashboard-npm` to explicitly reinstall frontend dependencies.
+Python, Node, and npm come from the locked flake; frontend packages are pinned in
+`package-lock.json`.
 Do not install Python dependencies globally or create a separate environment.
 
 Both listeners bind only `127.0.0.1`. `PORT` sets the Vite port (default `5173`,

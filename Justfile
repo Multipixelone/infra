@@ -7,6 +7,14 @@
 rebuild:
   genswitch
 
+[doc("Enter the games dashboard development shell.")]
+games-dashboard-shell:
+  nix develop .#games-dashboard
+
+[doc("Install the games dashboard frontend dependencies in the development shell.")]
+games-dashboard-npm:
+  nix develop .#games-dashboard -c npm --prefix pkgs/games-dashboard/frontend ci
+
 [doc("Start the loopback games dashboard with backend reload and Vite HMR.")]
 games-dashboard-dev:
   nix run .#games-dashboard-dev
