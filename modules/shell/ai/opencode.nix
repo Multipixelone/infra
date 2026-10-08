@@ -27,7 +27,7 @@
         aiConfig = config.flake.aiConfig;
         # OpenCode fetches this npm plugin; update this version and its schema
         # together here, not with the installer (which writes HM-managed files).
-        omoVersion = "3.0.1";
+        omoVersion = "3.0.3";
 
         upstreamOpencode = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
         # opencode's root package.json requires bun@1.3.14, but nixpkgs ships
