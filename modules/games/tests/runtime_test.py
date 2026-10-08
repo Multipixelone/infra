@@ -61,6 +61,72 @@ class RuntimeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runtime.server(self.cfg, identifier)
 
+    def prepare_secret(self, value, game="terraria-tmodloader", token="@PASSWORD@"):
+        source = self.directory / "template"
+        source.write_text(f"password={token}\n")
+        secret = self.directory / "secret"
+        secret.write_text(value)
+        destination = self.directory / "rendered" / "serverconfig.txt"
+        item = self.item if game != "velocity" else {}
+        item.update(
+            owner="root",
+            configTemplates={
+                str(destination): {
+                    "source": str(source),
+                    "replacements": {token: str(secret)},
+                }
+            },
+        )
+        if game == "velocity":
+            self.cfg["proxy"] = item
+            identifier = "velocity"
+        else:
+            item["game"] = game
+            identifier = "survival"
+        with (
+            patch.object(runtime.pwd, "getpwnam") as identity,
+            patch.object(runtime.os, "chown"),
+        ):
+            identity.return_value.pw_uid = 0
+            identity.return_value.pw_gid = 0
+            runtime.prepare(self.cfg, identifier)
+        return destination.read_text()
+
+    def test_terraria_join_password_accepts_short_phrase_and_boundaries(self):
+        for value in ("abcdefgh", "friendtime", "a" * 256, "ABcd_012-", "friendtime\n"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.prepare_secret(value), f"password={value.strip()}\n"
+                )
+
+    def test_terraria_join_password_rejects_empty_short_and_malformed_values(self):
+        for value in (
+            "",
+            "\n",
+            "abcdefg",
+            "a" * 257,
+            "friend time",
+            "friend\ntime",
+            "friendtime!",
+        ):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "8–256"):
+                self.prepare_secret(value)
+
+    def test_other_secret_replacements_keep_sixteen_character_minimum(self):
+        for game, token in (
+            ("minecraft-paper", "@RCON@"),
+            ("minecraft-paper", "@PASSWORD@"),
+            ("velocity", "@FORWARDING@"),
+            ("terraria-tmodloader", "@OTHER@"),
+        ):
+            with self.subTest(game=game, token=token):
+                with self.assertRaisesRegex(ValueError, "16–256"):
+                    self.prepare_secret("friendtime", game, token)
+                self.assertEqual(
+                    self.prepare_secret("a" * 16, game, token),
+                    f"password={'a' * 16}\n",
+                )
+
     def test_root_configuration_rejects_container_planted_directory_symlink(self):
         escape = self.directory / "outside"
         escape.mkdir()

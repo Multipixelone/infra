@@ -258,9 +258,16 @@ def prepare(cfg, identifier):
             text = Path(template["source"]).read_text()
             for token, secret in template.get("replacements", {}).items():
                 value = Path(secret).read_text().strip()
-                if not re.fullmatch(r"[A-Za-z0-9_-]{16,256}", value):
+                # Friends type the shared Terraria join phrase by hand.
+                minimum = (
+                    8
+                    if item.get("game") == "terraria-tmodloader"
+                    and token == "@PASSWORD@"
+                    else 16
+                )
+                if not re.fullmatch(rf"[A-Za-z0-9_-]{{{minimum},256}}", value):
                     raise ValueError(
-                        "passwords and forwarding secrets must be 16–256 URL-safe characters"
+                        f"passwords and forwarding secrets must be {minimum}–256 URL-safe characters"
                     )
                 text = text.replace(token, value)
             if path.name == "lazymc.toml" and (runtime / "wake-once").exists():

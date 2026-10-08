@@ -86,6 +86,11 @@
         baselineBatch = without.systemd.slices.batch-beets.sliceConfig;
         gamesSlice = enabled.systemd.slices.games.sliceConfig;
         containerOptions = enabled.virtualisation.oci-containers.containers.games-terraria.extraOptions;
+        terrariaPassword = {
+          inherit (enabled.infra.games.runtime.terraria) game;
+          replacements =
+            enabled.infra.games.runtime.terraria.configTemplates."/run/games/terraria/serverconfig.txt".replacements;
+        };
         backupTimers = lib.genAttrs [ "survival" "terraria" ] (
           id: enabled.services.restic.backups."games-${id}".timerConfig
         );
@@ -191,6 +196,7 @@
               assert data["gamesPublished"] and not data["productionFixtureSecrets"]
               assert data["rconMode"] == "0440" and data["rconGroup"] == "games-dashboard"
               assert "games-dashboard" not in data["privateSecretGroups"]
+              assert data["terrariaPassword"] == {"game": "terraria-tmodloader", "replacements": {"@PASSWORD@": "/run/agenix/games/terraria/terraria-password"}}
               assert {server["id"] for server in data["discovery"]["servers"]} == {"creative", "survival", "terraria"}
               print("Game manifest, secret gates, controls, hooks, resources, DNS, and firewall contract passed")
               PY
