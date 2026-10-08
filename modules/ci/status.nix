@@ -7,7 +7,7 @@ let
 in
 {
   perSystem =
-    { pkgs, ... }:
+    { config, pkgs, ... }:
     {
       # The bridge between one nix-fast-build and 85 individual green lights.
       #
@@ -130,24 +130,49 @@ in
               # decides to skip it (workers.py enqueues the result, then
               # continues), so a cached check is never left pending: it greens
               # on its EVAL row and simply never gets a BUILD row. An EVAL row
-              # that is successful and uncached falls through to `empty` and
-              # stays pending until its BUILD row arrives.
-              jq --unbuffered -r '
+              # that is successful and uncached stays pending until its BUILD
+              # row arrives. nix-fast-build deduplicates builds by drvPath:
+              # EVAL exposes that identity, but BUILD only names one attribute.
+              # Keep the outcome by derivation so every alias is resolved,
+              # including aliases evaluated after the build has finished.
+              jq --unbuffered -nr '
                 def unq: if startswith("\"") and endswith("\"") then .[1:-1] else . end;
                 def msg: (.error // "") | gsub("[\t\r\n]+"; " ");
-                if .type == "EVAL" and (.success | not) then
-                  [(.attr | unq), "fail", "Evaluation failed: \(msg)"]
-                elif .type == "EVAL" and .cacheStatus == "cached" then
-                  [(.attr | unq), "ok", "Substituted from cache"]
-                elif .type == "EVAL" and .cacheStatus == "local" then
-                  [(.attr | unq), "ok", "Already in store"]
-                elif .type == "BUILD" then
-                  [ (.attr | unq),
-                    (if .success then "ok" else "fail" end),
-                    (if .success then "Built in \(.duration | floor)s" else msg end) ]
-                else
-                  empty
-                end
+                foreach inputs as $row (
+                  {derivations: {}, aliases: {}, builds: {}, events: []};
+                  .events = []
+                  | ($row.attr | unq) as $attr
+                  | if $row.type == "EVAL" then
+                      if ($row.success | not) then
+                        .events = [[$attr, "fail", "Evaluation failed: \($row | msg)"]]
+                      elif $row.skipped then
+                        .events = [[$attr, "ok", "Skipped: \($row | msg)"]]
+                      else
+                        (if ($row.drvPath | type) == "string" and ($row.drvPath | length) > 0 then
+                           .derivations[$attr] = $row.drvPath
+                           | .aliases[$row.drvPath] = ((.aliases[$row.drvPath] // []) + [$attr] | unique)
+                         else . end)
+                        | if $row.cacheStatus == "cached" then
+                            .events = [[$attr, "ok", "Substituted from cache"]]
+                          elif $row.cacheStatus == "local" then
+                            .events = [[$attr, "ok", "Already in store"]]
+                          elif .derivations[$attr] != null and .builds[.derivations[$attr]] != null then
+                            .events = [[$attr] + .builds[.derivations[$attr]]]
+                          else . end
+                      end
+                    elif $row.type == "BUILD" then
+                      [ (if $row.success then "ok" else "fail" end),
+                        (if $row.success then "Built in \($row.duration | floor)s" else ($row | msg) end) ] as $outcome
+                      | if .derivations[$attr] != null then
+                          .derivations[$attr] as $drv
+                          | .builds[$drv] = $outcome
+                          | .events = (.aliases[$drv] | map([.] + $outcome))
+                        else
+                          .events = [[$attr] + $outcome]
+                        end
+                    else . end;
+                  .events[]
+                )
                 | @tsv' \
               | while IFS=$'\t' read -r attr verdict desc; do
                   if [ "$verdict" = ok ]; then
@@ -219,5 +244,16 @@ in
           esac
         '';
       };
+
+      checks.forgejo-check-status =
+        pkgs.runCommand "forgejo-check-status-check"
+          {
+            nativeBuildInputs = [ pkgs.python3 ];
+          }
+          ''
+            export PYTHONDONTWRITEBYTECODE=1
+            python3 ${./tests/status_test.py} ${lib.getExe config.packages.forgejo-check-status} ${lib.getExe pkgs.bash}
+            touch "$out"
+          '';
     };
 }
