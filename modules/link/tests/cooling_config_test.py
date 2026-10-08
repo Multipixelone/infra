@@ -1,6 +1,5 @@
 """Exercise configuration migrations with private files and a fake SDK."""
 
-import copy
 import importlib.util
 import json
 import os
@@ -9,13 +8,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
 import tomlkit
 
-COOLING_COMMAND, DAEMON, COOLING_SOURCE, ARGB_SOURCE, FAKEROOT = sys.argv[1:6]
-del sys.argv[1:6]
+COOLING_COMMAND, DAEMON, COOLING_SOURCE, FAKEROOT = sys.argv[1:5]
+del sys.argv[1:5]
 
 
 def load(name, path):
@@ -27,16 +24,7 @@ def load(name, path):
 
 
 cooling = load("link_cooling_config", COOLING_SOURCE)
-argb = load("link_argb_config", ARGB_SOURCE)
 GPU = "13d8f4a5be256999d60cb90f5cb7c6418a3f5a70946d2761c2049de37081d0d1"
-SETTINGS = {
-    "controller": "X570 AORUS ELITE WIFI",
-    "zone": "D_LED1 Bottom",
-    "led_count": 6,
-    "ledfx_device": "x570-aorus-elite-wifi",
-    "virtual": "top-front-fan",
-    "port": 6742,
-}
 
 
 class ConfigTests(unittest.TestCase):
@@ -239,179 +227,6 @@ class ConfigTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(target.read_bytes(), original)
-
-
-class FakeClient:
-    def __init__(self, board_index=4, sized=False):
-        self.devices = [SimpleNamespace(name="unrelated", id=0)]
-        self.board = SimpleNamespace(name=SETTINGS["controller"], id=board_index)
-        self.devices.append(self.board)
-        self.closed = False
-        self.resizes = []
-        self.layout(6 if sized else 0)
-
-    def layout(self, count):
-        def leds(indices):
-            return [SimpleNamespace(id=i) for i in indices]
-
-        self.board.zones = [
-            SimpleNamespace(
-                name="D_LED1 Bottom", leds=leds(range(count)), resize=self.resize
-            ),
-            SimpleNamespace(name="D_LED2 Top", leds=[]),
-            # Model SDK 0.3.6's cached IDs when an unchanged-length zone moves.
-            SimpleNamespace(name="Motherboard", leds=leds(range(4))),
-        ]
-        self.board.leds = leds(range(count + 4))
-        self.board.data = SimpleNamespace(
-            zones=[
-                SimpleNamespace(
-                    name="D_LED1 Bottom", start_idx=0, leds=leds(range(count))
-                ),
-                SimpleNamespace(name="D_LED2 Top", start_idx=count, leds=[]),
-                SimpleNamespace(
-                    name="Motherboard", start_idx=count, leds=leds(range(4))
-                ),
-            ]
-        )
-
-    def resize(self, count):
-        self.resizes.append(count)
-        self.layout(count)
-
-    def update(self):
-        pass
-
-    def disconnect(self):
-        self.closed = True
-
-
-class ArgbTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(
-            prefix="link-argb-test-", dir="/tmp/opencode"
-        )
-        self.addCleanup(self.temp.cleanup)
-        self.path = Path(self.temp.name) / "config.json"
-        self.original = {
-            "devices": [
-                {
-                    "id": SETTINGS["ledfx_device"],
-                    "type": "openrgb",
-                    "config": {"openrgb_id": 7, "pixel_count": 4},
-                },
-                {
-                    "id": "other",
-                    "config": {"auth_token": "fixture-only", "pixel_count": 8},
-                },
-            ],
-            "virtuals": [
-                {
-                    "id": SETTINGS["virtual"],
-                    "effect": {"type": "blade_power_plus", "config": {"fixture": True}},
-                    "segments": [["smart", 10, 17, True]],
-                },
-                {"id": "board", "segments": [[SETTINGS["ledfx_device"], 0, 3, False]]},
-                {"id": "unrelated", "segments": [["other", 0, 7, False]]},
-            ],
-        }
-        self.path.write_text(json.dumps(self.original))
-
-    def configure(self, client):
-        argb.configure(self.path, SETTINGS, client_factory=lambda **_: client)
-        self.assertTrue(client.closed)
-        return json.loads(self.path.read_text())
-
-    def test_identity_lookup_resize_offsets_and_effect_preservation(self):
-        client = FakeClient(board_index=9)
-        result = self.configure(client)
-        self.assertEqual(client.resizes, [6])
-        self.assertEqual(result["devices"][0]["config"]["openrgb_id"], 9)
-        self.assertEqual(result["devices"][0]["config"]["pixel_count"], 10)
-        self.assertEqual(
-            result["virtuals"][1]["segments"], [[SETTINGS["ledfx_device"], 6, 9, False]]
-        )
-        self.assertEqual(
-            result["virtuals"][0]["segments"][-1],
-            [SETTINGS["ledfx_device"], 0, 5, False],
-        )
-        self.assertEqual(
-            result["virtuals"][0]["effect"], self.original["virtuals"][0]["effect"]
-        )
-        self.assertEqual(result["devices"][1], self.original["devices"][1])
-        self.assertEqual(result["virtuals"][2], self.original["virtuals"][2])
-
-    def test_restart_uses_saved_layout_and_does_not_duplicate_cooler(self):
-        first = self.configure(FakeClient())
-        self.assertEqual(self.configure(FakeClient()), first)
-        self.assertEqual(self.configure(FakeClient(sized=True)), first)
-
-    def test_interrupted_config_replacement_recovers_offsets(self):
-        original = self.path.read_bytes()
-        write = argb.atomic_write
-
-        def fail_config(path, content):
-            if path == self.path:
-                raise OSError("simulated interruption before LedFx replacement")
-            write(path, content)
-
-        with (
-            patch.object(argb, "atomic_write", side_effect=fail_config),
-            self.assertRaises(OSError),
-        ):
-            self.configure(FakeClient())
-        self.assertEqual(self.path.read_bytes(), original)
-        result = self.configure(FakeClient(sized=True))
-        self.assertEqual(
-            result["virtuals"][1]["segments"], [[SETTINGS["ledfx_device"], 6, 9, False]]
-        )
-
-    def test_other_virtual_cannot_compete_for_cooler_pixels(self):
-        self.configure(FakeClient())
-        document = json.loads(self.path.read_text())
-        document["virtuals"][1]["segments"] = [[SETTINGS["ledfx_device"], 0, 9, False]]
-        self.path.write_text(json.dumps(document))
-        result = self.configure(FakeClient(sized=True))
-        self.assertEqual(
-            result["virtuals"][1]["segments"], [[SETTINGS["ledfx_device"], 6, 9, False]]
-        )
-
-    def test_missing_or_ambiguous_controller_preserves_files(self):
-        original = self.path.read_bytes()
-        for devices in (
-            [],
-            [
-                SimpleNamespace(name=SETTINGS["controller"]),
-                SimpleNamespace(name=SETTINGS["controller"]),
-            ],
-        ):
-            client = FakeClient()
-            client.devices = devices
-            with self.assertRaises(ValueError):
-                self.configure(client)
-            self.assertEqual(self.path.read_bytes(), original)
-            self.assertEqual(client.resizes, [])
-            self.assertTrue(client.closed)
-
-    def test_missing_virtual_causes_no_hardware_operation(self):
-        document = copy.deepcopy(self.original)
-        document["virtuals"] = []
-        self.path.write_text(json.dumps(document))
-        with self.assertRaises(ValueError):
-            argb.configure(
-                self.path,
-                SETTINGS,
-                client_factory=lambda **_: self.fail("SDK must not be opened"),
-            )
-
-    def test_direction_is_preserved_when_resizing_splits_a_segment(self):
-        result = argb.remap_segments(
-            [["board", 0, 5, True]],
-            "board",
-            {"D_LED1": [0, 1], "Motherboard": [2, 3, 4, 5]},
-            {"D_LED1": list(range(6)), "Motherboard": [6, 7, 8, 9]},
-        )
-        self.assertEqual(result, [["board", 6, 9, True], ["board", 0, 1, True]])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,137 @@
+[
+  {
+    "id": 0,
+    "name": "Corsair Vengeance RGB Pro DDR4",
+    "vendor": "Corsair",
+    "serial": "",
+    "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-10), address 0x58",
+    "pixelCount": 10,
+    "zones": [
+      {
+        "name": "Corsair DRAM",
+        "start": 0,
+        "count": 10
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "name": "Corsair Vengeance RGB Pro DDR4",
+    "vendor": "Corsair",
+    "serial": "",
+    "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-10), address 0x59",
+    "pixelCount": 10,
+    "zones": [
+      {
+        "name": "Corsair DRAM",
+        "start": 0,
+        "count": 10
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Corsair Vengeance RGB Pro DDR4",
+    "vendor": "Corsair",
+    "serial": "",
+    "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-10), address 0x5A",
+    "pixelCount": 10,
+    "zones": [
+      {
+        "name": "Corsair DRAM",
+        "start": 0,
+        "count": 10
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Corsair Vengeance RGB Pro DDR4",
+    "vendor": "Corsair",
+    "serial": "",
+    "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-10), address 0x5B",
+    "pixelCount": 10,
+    "zones": [
+      {
+        "name": "Corsair DRAM",
+        "start": 0,
+        "count": 10
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "ASUS TUF Radeon RX 7800 XT Gaming OC",
+    "vendor": "ASUS",
+    "serial": "",
+    "location": "I2C: AMDGPU DM i2c OEM bus (/dev/i2c-6), address 0x67",
+    "pixelCount": 4,
+    "zones": [
+      {
+        "name": "Unknown",
+        "start": 0,
+        "count": 4
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "X570 AORUS ELITE WIFI",
+    "vendor": "Gigabyte",
+    "serial": "0x82970100",
+    "location": "HID: /dev/hidraw0",
+    "pixelCount": 4,
+    "zones": [
+      {
+        "name": "D_LED1",
+        "start": 0,
+        "count": 0
+      },
+      {
+        "name": "D_LED2",
+        "start": 0,
+        "count": 0
+      },
+      {
+        "name": "I/O Cover",
+        "start": 0,
+        "count": 1
+      },
+      {
+        "name": "LED_CPU",
+        "start": 1,
+        "count": 1
+      },
+      {
+        "name": "PCI-E Accent",
+        "start": 2,
+        "count": 1
+      },
+      {
+        "name": "LED_C1/LED_C2",
+        "start": 3,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "NZXT Smart Device V2",
+    "vendor": "NZXT",
+    "serial": "00000000001A",
+    "location": "HID: /dev/hidraw1",
+    "pixelCount": 34,
+    "zones": [
+      {
+        "name": "Hue 2 Channel 1",
+        "start": 0,
+        "count": 10
+      },
+      {
+        "name": "Hue 2 Channel 2",
+        "start": 10,
+        "count": 24
+      }
+    ]
+  }
+]

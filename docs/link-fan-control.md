@@ -99,27 +99,117 @@ controller, not independent USB fan devices. Existing OpenRGB udev rules cover
 8297 with `uaccess`; no additional broad permissions are needed. Smart Device 2
 is still USB `1e71:2006`; the removed Kraken's `1e71:3008` is absent.
 
-LedFx already uses the OpenRGB SDK at localhost:6742. Before its user service
-starts, `link-argb-config` locates the motherboard and `D_LED1 Bottom` by name,
-resizes only that zone, resolves the current controller index, and adds its
-pixels to the existing `top-front-fan` virtual. The cooler follows that
-virtual's existing effect; changing the effect also changes the cooler. Other
-motherboard segments are remapped around the new strip and overlapping writes
-to the strip are removed. No other device's index, effect, color or fan control
-is configured. LedFx selects Direct mode during device activation.
+LedFx uses the OpenRGB SDK at localhost:6742. Before its user service starts,
+`link-argb-config` reconciles device identities and virtual segments declared in
+`modules/hardware/rgb.nix`. It uses SDK protocol 3, matching LedFx; protocol 4's
+plugin-list request timed out during read-only inspection. It resizes only the
+motherboard's `D_LED1 Bottom` / `D_LED1` zone, then uses refreshed zone offsets to
+attach the cooler to `top-front-fan`. The cooler follows that virtual's existing
+effect. The four onboard motherboard LEDs retain their order in their own
+virtual. LedFx selects Direct mode during activation.
 
-The helper keeps writable `~/.ledfx/config.json` and a checkpoint in
-`~/.ledfx/link-argb-layout.json` so offsets survive server restarts and interrupted
-configuration updates. Initial originals are backed up privately. A missing or
-ambiguous device/zone, malformed configuration, or missing existing front-fan
-virtual fails LedFx startup with a journal error instead of guessing a mapping.
-Check `journalctl --user -u ledfx` if that happens. The helper does not launch a
-second OpenRGB scanner or write fan controls. Hardware effects require the
-existing LedFx graphical-session service to be running.
+### Device identities and inspection
+
+Read-only SDK inspection on 2026-10-08 found seven controllers. The four Corsair
+sticks have no serial; their stable identity is the PIIX4 port 0 bus description
+at `0b00` plus addresses `0x58`, `0x59`, `0x5a`, and `0x5b`, respectively.
+`/dev/i2c-N` enumeration is excluded from matching. The GPU is ASUS TUF Radeon
+RX 7800 XT Gaming OC on AMDGPU DM i2c OEM bus at `0x67`. The motherboard has
+serial `0x82970100`; NZXT Smart Device V2 has serial `00000000001A`. HID paths
+are not pinned because `/dev/hidrawN` can change between boots. MK750, the Razer
+bungee, and G502 were unplugged and remain optional declarations using their
+existing names and expected counts of 127, 8, and 2.
+
+The server's SDK list contains seven devices, with the motherboard at index 5
+and NZXT at 6. The old G502/Razer indices pointed at these controllers. A CLI
+list showed two identical blocks, but the server log recorded one detection
+pass and the direct SDK confirmed seven controllers. No duplicate detection
+was found in the server unit, and its existing configuration/udev rules remain.
+For read-only inspection, use a protocol-3 Python SDK client, or
+`openrgb --client 127.0.0.1:6742 --nodetect --noautoconnect --list-detailed`
+when that CLI combination works. Never launch another local hardware detector.
+
+### Editing declarations
+
+Add a device in the LedFx UI first, then declare its **existing LedFx id** in
+`link.ledfxOpenrgb.devices`. Use its exact SDK name and expected LED count, with
+serial or stable I2C location where names collide. An exact `zoneSignature`
+(name-to-count attribute set) is also available as an identity discriminator.
+All supplied match fields must agree; unresolved or genuinely ambiguous devices
+are left untouched, with a journal message. Exact duplicate SDK entries with
+the same physical identity and zone layout select the lowest index and warn.
+Multiple LedFx declarations cannot claim the same physical controller.
+
+For example, a replacement RAM stick declaration looks like:
+
+```nix
+link.ledfxOpenrgb.devices.corsair-vengeance-pro-rgb = {
+  match = {
+    name = "Corsair Vengeance RGB Pro DDR4";
+    vendor = "Corsair";
+    location = {
+      bus = "SMBus PIIX4 adapter port 0 at 0b00";
+      address = "0x58";
+    };
+  };
+  pixelCount = 10;
+};
+```
+
+Declare each existing virtual's ordered segments in
+`link.ledfxOpenrgb.virtuals`. Fixed ranges are inclusive; `reverse` defaults to
+false. A `zoneNames` segment includes the entire uniquely matched zone and
+tracks offsets after resizing. Use either a fixed range or a zone selector:
+
+```nix
+link.ledfxOpenrgb.virtuals.top-front-fan = [
+  {
+    device = "nzxt-smart-device-v2";
+    start = 10;
+    end = 17;
+    reverse = true;
+  }
+  {
+    device = "x570-aorus-elite-wifi";
+    zoneNames = [ "D_LED1 Bottom" "D_LED1" ];
+  }
+];
+```
+
+The helper owns **only** declared OpenRGB devices' `config.openrgb_id` and
+`config.pixel_count`, and declared virtuals' `segments`. UI edits to these
+fields reset at the next LedFx start. Names, ports/IPs, effects, colors,
+presets, scenes, playlists, startup selections, virtual settings, integrations,
+and every other field retain their exact bytes. The helper does not create
+missing devices/virtuals or choose a default scene/effect.
+
+Optional unplugged devices log at info level and do not consume detection
+retries. If their stale index collides with a resolved controller, only their
+`openrgb_id` is parked at one past the highest SDK index. LedFx accepts this
+nonnegative index and treats the absent controller as offline. Reconnection
+resolves the real index normally. Required-device detection/connection retries
+are bounded to five attempts, two seconds apart, with a 90-second overall SDK
+work deadline. Unresolved devices do not stop reconciliation of other devices;
+a virtual referencing one keeps its entire previous segment array.
+
+### Files and recovery
+
+`~/.ledfx/config.json` stays writable. Only changed JSON value spans are
+replaced, preserving key order and unrelated formatting; an unchanged result
+has no write or backup. Before each changed replacement, the exact prior bytes
+are saved privately as `config.json.pre-link-nix.<sha256>`. A same-directory
+temporary file is fsynced and atomically renamed. Symlinked/malformed JSON and
+concurrent edits are rejected. Earlier `link-argb-layout.json` checkpoints are
+no longer needed because layouts come from Nix and fresh zone data; existing
+checkpoint files are left alone.
+
+Inspect `journalctl --user -u ledfx` for unresolved identities, count mismatches,
+or SDK failures. Restore a private backup only with LedFx stopped. Building
+this configuration does not edit live files, resize live LEDs, restart services,
+or deploy it. Effects require the graphical-session LedFx service to run.
 
 For a visual count check after later activation, connect the OpenRGB GUI to the
-existing SDK server → `X570 AORUS ELITE WIFI` → `D_LED1 Bottom` → Resize → 6 LEDs.
-Check that all six addresses illuminate both fans. Keep the matching count in
-Nix; a manual resize is restored by the helper at the next LedFx startup. Do not
-run a separate standalone detector against a controller already owned by the
-server. If only one fan responds, inspect its ARGB cable before changing counts.
+existing SDK server → `X570 AORUS ELITE WIFI` → `D_LED1 Bottom` / `D_LED1` →
+Resize → 6 LEDs. Check that all six addresses illuminate both fans. Keep the
+matching count in Nix; a manual resize is restored at the next LedFx startup.
+If only one fan responds, inspect its ARGB cable before changing counts.

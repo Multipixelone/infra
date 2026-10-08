@@ -10,6 +10,21 @@ in
         link-cooling-config = host.config.link.cooling.package;
         link-argb-config = host.config.link.coolerArgb.package;
       };
+      checks.link-rgb-config =
+        pkgs.runCommand "link-rgb-config-check"
+          {
+            nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.openrgb-python ])) ];
+          }
+          ''
+            export PYTHONDONTWRITEBYTECODE=1
+            mkdir -p /tmp/opencode
+            python3 ${./tests/rgb_config_test.py} \
+              ${../../lib/link-argb-config.py} \
+              ${host.config.link.ledfxOpenrgb.settingsFile} \
+              ${./tests/fixtures/ledfx-config.json} \
+              ${./tests/fixtures/openrgb-devices.json}
+            touch "$out"
+          '';
       checks.link-cooling-config =
         pkgs.runCommand "link-cooling-config-check"
           {
@@ -28,7 +43,6 @@ in
               ${lib.getExe host.config.link.cooling.package} \
               ${lib.getExe host.pkgs.coolercontrol.coolercontrold} \
               ${../../lib/link-cooling-config.py} \
-              ${../../lib/link-argb-config.py} \
               ${lib.getExe pkgs.fakeroot}
             touch "$out"
           '';
