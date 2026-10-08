@@ -54,7 +54,7 @@
             id: _:
             lib.nameValuePair "restic-backups-games-${id}" {
               unitConfig.RequiresMountsFor = [ "/media/alexandria" ];
-              onFailure = [ "notify-telegram@%n.service" ];
+              # GameBackupUnhealthy owns per-world notifications and freshness.
               serviceConfig = {
                 Slice = "games-backup.slice";
                 ExecStart = lib.mkForce [ "${lib.getExe cfg.packages.backup-run} ${id}" ];

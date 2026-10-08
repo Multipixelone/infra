@@ -6885,7 +6885,7 @@ in
               }
               {
                 alert = "SystemdUnitFailed";
-                expr = ''(node_systemd_unit_state{${requiredNodeJobSelector},state="failed"} == 1) unless on (instance, name) ALERTS{alertname="OptedInUnitFailed",alertstate="firing"}'';
+                expr = ''(node_systemd_unit_state{${requiredNodeJobSelector},state="failed"} == 1) unless on (instance, name) ALERTS{alertname="OptedInUnitFailed",alertstate="firing"} unless on(instance,name) label_replace(games_server_enabled{job="link-node",instance="link"}, "name", "$1", "unit", "(.+)") unless on(instance,name) label_replace(games_backup_configured{job="link-node",instance="link"}, "name", "$1", "unit", "(.+)")'';
                 for = "5m";
                 labels.severity = "warning";
                 annotations.summary = "Systemd unit {{ $labels.name }} is failed on {{ $labels.instance }}";

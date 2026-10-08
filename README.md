@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (90)</summary>
+<summary>Packages exposed by this flake (94)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -131,8 +131,10 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
 - `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
 - `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`
+- [`games-grafana-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/grafana.nix) · `nix run github:Multipixelone/infra#games-grafana-dashboard`
 - `games-lazymc` — Remote wake-up daemon for minecraft servers · `nix run github:Multipixelone/infra#games-lazymc`
 - `games-logs` · `nix run github:Multipixelone/infra#games-logs`
+- `games-metrics` · `nix run github:Multipixelone/infra#games-metrics`
 - `games-paper-result` · `nix run github:Multipixelone/infra#games-paper-result`
 - `games-paper-stop` · `nix run github:Multipixelone/infra#games-paper-stop`
 - `games-paper-survival` — A high performance spigot fork · `nix run github:Multipixelone/infra#games-paper-survival`
@@ -153,6 +155,8 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`ipod-sync`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync`
 - [`ipod-sync-inner`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync-inner`
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
+- [`link-argb-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-argb-config`
+- [`link-cooling-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-cooling-config`
 - [`listen`](https://github.com/Multipixelone/infra/blob/main/modules/link/listen.nix) · `nix run github:Multipixelone/infra#listen`
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`

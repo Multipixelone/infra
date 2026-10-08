@@ -68,6 +68,22 @@ let
     inhibit_rules = [
       {
         source_matchers = [
+          ''alertname=~"GameServerFailed|VelocityDown"''
+          (nonempty "host")
+          (nonempty "server_id")
+        ];
+        target_matchers = [
+          ''alertname="GameServerMemoryPressure"''
+          (nonempty "host")
+          (nonempty "server_id")
+        ];
+        equal = [
+          "host"
+          "server_id"
+        ];
+      }
+      {
+        source_matchers = [
           ''alertname=~"PlexBackendDown|PublishedRouteDown"''
           (nonempty "endpoint")
         ];
