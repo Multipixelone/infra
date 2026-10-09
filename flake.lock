@@ -3405,6 +3405,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-zotero": {
+      "locked": {
+        "lastModified": 1787814960,
+        "narHash": "sha256-PYZq1qzCJXC2zGI0mH07vrZBsw6DRBAOX0jN1pPtqOQ=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "c27cdad491a991b11ed731760aa2ef8db0cb0410",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "c27cdad491a991b11ed731760aa2ef8db0cb0410",
+        "type": "github"
+      }
+    },
     "nixpkgs_10": {
       "locked": {
         "lastModified": 1789921291,
@@ -4329,6 +4345,7 @@
         "nixpkgs": "nixpkgs_26",
         "nixpkgs-mine": "nixpkgs-mine",
         "nixpkgs-stable": "nixpkgs-stable",
+        "nixpkgs-zotero": "nixpkgs-zotero",
         "noctalia": "noctalia",
         "nur": "nur",
         "opencode": "opencode",
