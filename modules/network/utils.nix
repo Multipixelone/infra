@@ -17,7 +17,8 @@
           with pkgs;
           [
             ethtool
-            wifite2
+            # FIXME: just buckets of build errors w/ this one.
+            # wifite2
           ]
         );
     };
