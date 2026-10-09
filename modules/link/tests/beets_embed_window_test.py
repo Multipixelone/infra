@@ -81,6 +81,35 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(self.run_launcher(BEETS_EMBED_THREADS="10").returncode, 0)
         self.assertEqual(json.loads(self.args.read_text())[-2:], ["--threads", "10"])
 
+    def test_delayed_start_and_retries_share_elapsed_budget(self):
+        for now, expected in ((1300, 6840), (1600, 6540), (1900, 6240)):
+            with self.subTest(now=now):
+                result = self.run_launcher(
+                    CLOCK_NOW=str(now), BEETS_EMBED_BUDGET_SECONDS="7200"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(self.args.read_text())[2], f"{expected}s")
+
+    def test_exhausted_budget_skips_inside_window(self):
+        for now in ("8140", "8141", "9000"):
+            with self.subTest(now=now):
+                result = self.run_launcher(
+                    CLOCK_NOW=now, BEETS_EMBED_BUDGET_SECONDS="7200"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("budget exhausted", result.stdout)
+                self.assertFalse(self.args.exists())
+
+    def test_runner_exit_status_survives_timeout_and_launcher(self):
+        # Use real GNU timeout: systemd must see the runner's EX_TEMPFAIL.
+        (self.bin / "timeout").unlink()
+        self.tool("runner", "import os,sys\nsys.exit(int(os.environ['RUNNER_EXIT']))\n")
+        for status in (0, 1, 2, 75, 124, 143):
+            with self.subTest(status=status):
+                self.assertEqual(
+                    self.run_launcher(RUNNER_EXIT=str(status)).returncode, status
+                )
+
     def test_outside_window_skips_all_work(self):
         for now in ("999", "29740", "40000"):
             result = self.run_launcher(CLOCK_NOW=now)
@@ -110,12 +139,20 @@ class WindowTest(unittest.TestCase):
                     env=os.environ | {"TZ": "America/New_York"},
                     text=True,
                 ).strip()
-                for clock in ("01:00:00", "08:59:00")
+                for clock in ("00:00:00", "08:59:00")
             ]
-            self.run_launcher(
-                CLOCK_NOW=epochs[0], CLOCK_START=epochs[0], CLOCK_STOP=epochs[1]
-            )
-            self.assertEqual(json.loads(self.args.read_text())[2], f"{expected}s")
+            start = int(epochs[0]) + 3600
+            for delay in (0, 300, 600, 3600):
+                with self.subTest(day=day, delay=delay):
+                    result = self.run_launcher(
+                        CLOCK_NOW=str(start + delay),
+                        CLOCK_START=str(start),
+                        CLOCK_STOP=epochs[1],
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        json.loads(self.args.read_text())[2], f"{expected - delay}s"
+                    )
 
 
 if __name__ == "__main__":

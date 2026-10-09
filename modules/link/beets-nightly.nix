@@ -18,14 +18,16 @@ in
       targetName = mode: if mode == "now" then "beets-nightly-now.target" else "beets-nightly.target";
       target = mode: {
         description =
-          if mode == "now" then "Run both Beets backfills now" else "Run both nightly Beets backfills";
+          if mode == "now" then "Run both Beets backfills now" else "Group nightly Beets backfills";
         wants =
           if mode == "now" then
             map (name: lib.removeSuffix ".service" name + "-now.service") workers
           else
-            workers;
+            [ ];
+        # Nightly timers admit workers independently so xtractor cannot pull
+        # embed in before its staggered start, including during an embed retry.
         # Workers require the target while running. Once both finish it can
-        # become inactive, so the next start can pull in both again.
+        # become inactive; the manual target can then pull in both again.
         unitConfig.StopWhenUnneeded = true;
       };
       xtractorService = mode: {

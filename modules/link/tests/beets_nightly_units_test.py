@@ -171,8 +171,8 @@ class NightlyUnitsTest(unittest.TestCase):
                 target = unit(case, "beets-nightly.target")["Unit"]
                 self.assertEqual(target["StopWhenUnneeded"], "true")
                 self.assertEqual(
-                    set(target["Wants"].split()),
-                    {job + ".service" for job in expected},
+                    target.get("Wants", "").split(),
+                    [],
                 )
                 for job in expected:
                     dependencies = unit(case, job + ".service")["Unit"]
@@ -218,6 +218,8 @@ class NightlyUnitsTest(unittest.TestCase):
                         "RuntimeDirectory",
                         "TemporaryFileSystem",
                         "ReadWritePaths",
+                        "RestartForceExitStatus",
+                        "RestartSec",
                     }
                     self.assertEqual(
                         {k: v for k, v in nightly.items() if k not in varying},
@@ -261,12 +263,34 @@ class NightlyUnitsTest(unittest.TestCase):
                         manual_env["TMPDIR"] = "/run/beets-embed-tmp"
                     self.assertEqual(manual_env, environment(case, job + ".service"))
 
-    def test_start_and_cutoff_timers_are_unchanged(self):
+    def test_only_nightly_embed_retries_tempfail_with_bounded_attempts(self):
+        for name, case in CASES.items():
+            for job in case["jobs"]:
+                for suffix in (".service", "-now.service"):
+                    with self.subTest(case=name, job=job, suffix=suffix):
+                        parsed = unit(case, job + suffix)
+                        service = parsed["Service"]
+                        self.assertEqual(service["Restart"], "no")
+                        self.assertNotIn("75", service["SuccessExitStatus"].split())
+                        if job == "beets-embed-backfill" and suffix == ".service":
+                            self.assertEqual(service["RestartForceExitStatus"], "75")
+                            self.assertEqual(service["RestartSec"], "5m")
+                            self.assertEqual(
+                                parsed["Unit"]["StartLimitIntervalSec"], "12h"
+                            )
+                            self.assertEqual(parsed["Unit"]["StartLimitBurst"], "4")
+                        else:
+                            self.assertNotIn("RestartForceExitStatus", service)
+
+    def test_staggered_start_and_unchanged_cutoff_timers(self):
         for name, case in CASES.items():
             with self.subTest(case=name):
                 for job in case["jobs"]:
                     for suffix, clock in (
-                        (".timer", "01:00:00"),
+                        (
+                            ".timer",
+                            "01:05:00" if job == "beets-embed-backfill" else "01:00:00",
+                        ),
                         ("-stop.timer", "08:58:59"),
                     ):
                         timer = unit(case, job + suffix)

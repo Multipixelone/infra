@@ -19,8 +19,15 @@
       # Epochs handle DST; the calendar stop also handles suspend, during which
       # GNU timeout's relative clock pauses.
       wall_remaining=$((stop - now))
+      # All nightly attempts share the elapsed ceiling anchored at the first
+      # 01:00. Delayed starts and retries must not renew it on the DST fold.
+      remaining=$((start + budget - now))
       if (( wall_remaining < remaining )); then
         remaining=$wall_remaining
+      fi
+      if (( remaining <= 0 )); then
+        echo "Nightly embed backfill budget exhausted; skipping"
+        exit 0
       fi
       ;;
     now) ;;

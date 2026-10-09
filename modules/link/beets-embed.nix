@@ -84,6 +84,10 @@ in
           after = [ "systemd-tmpfiles-setup.service" ];
           requires = [ target ];
           partOf = [ target ];
+          unitConfig = lib.optionalAttrs (mode == "nightly") {
+            StartLimitIntervalSec = "12h";
+            StartLimitBurst = 4;
+          };
           environment = {
             HOME = home.home.homeDirectory;
             TMPDIR = scratchDirectory;
@@ -119,6 +123,10 @@ in
               "143"
             ];
             Restart = "no";
+            # Only EX_TEMPFAIL retries; other failures remain visible. An
+            # explicit cutoff/target stop cancels even a pending restart.
+            RestartForceExitStatus = lib.mkIf (mode == "nightly") [ "75" ];
+            RestartSec = lib.mkIf (mode == "nightly") "5m";
             UMask = "0077";
             NoNewPrivileges = true;
             CapabilityBoundingSet = "";
@@ -181,7 +189,7 @@ in
           budgetHours = lib.mkOption {
             type = lib.types.ints.between 1 8;
             default = 8;
-            description = "Maximum elapsed budget for nightly and manual runs, including shutdown; nightly runs also finish before 09:00 America/New_York.";
+            description = "Maximum elapsed budget including shutdown; nightly attempts share a budget anchored at the first 01:00 and finish before 09:00 America/New_York. Manual runs receive a fresh budget.";
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
@@ -220,7 +228,7 @@ in
           description = "Schedule the concurrent nightly embedding backfill";
           wantedBy = [ "timers.target" ];
           timerConfig = {
-            OnCalendar = "*-*-* 01:00:00 America/New_York";
+            OnCalendar = "*-*-* 01:05:00 America/New_York";
             Persistent = false;
             RandomizedDelaySec = 0;
             AccuracySec = "1s";
