@@ -51,8 +51,9 @@
           metric_relabel_configs = [
             {
               source_labels = [ "__name__" ];
-              # Passive games-metrics remains authoritative for players/state/process usage.
-              regex = "mc_(tps.*|tick_duration_seconds|tick_samples|world_entities.*|world_tile_entities.*|world_chunks.*|jvm_.*)";
+              # Exact families keep entity-by-type cardinality out of Prometheus.
+              # Passive games-metrics remains authoritative for lifecycle state.
+              regex = "mc_(tickscope_info|tps|tick_duration_seconds|tick_samples|players_(online|max)|uptime_seconds|world_(entities|tile_entities|chunks)|jvm_(memory_(used|committed|max|init)_bytes|threads_(current|daemon|peak|started_total)|classes_loaded|gc_(collections|seconds)_total)|(?:process|system)_cpu_load_ratio|events_total|collection_(duration_seconds|enabled|last_success_timestamp_seconds|failures_total))";
               action = "keep";
             }
           ];

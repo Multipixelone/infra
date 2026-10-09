@@ -10,6 +10,230 @@ let
       options = values;
     }
   ];
+  tickSelector = ''job="minecraft-paper",instance="link",server=~"$server"'';
+  tickAwake = ''and on(instance,server_id) (up{job="minecraft-paper",instance="link",server_id=~"$server"} == 1)'';
+  tickQuery = metric: "${metric}{${tickSelector}} ${tickAwake}";
+  tickRate = metric: "rate(${metric}{${tickSelector}}[$__rate_interval]) ${tickAwake}";
+  tickStat =
+    args:
+    viz.panel (
+      lib.recursiveUpdate {
+        type = "stat";
+        w = 4;
+        h = 5;
+        unit = viz.units.none;
+        noValue = "Asleep / no data";
+        options.graphMode = "none";
+        description = "Current successful scrape only. Asleep / no data can also mean unavailable telemetry.";
+      } args
+    );
+  tickSeries =
+    args:
+    viz.panel (
+      lib.recursiveUpdate {
+        interval = "60s";
+        description = "TickScope is unavailable while Paper sleeps under lazymc. Gaps also indicate unavailable telemetry.";
+      } args
+    );
+  tickTarget = expr: legend: { inherit expr legend; };
+  tickInstant = expr: legend: (tickTarget expr legend) // { instant = true; };
+  tickRows = [
+    [ (viz.row "Survival server performance (TickScope)") ]
+    [
+      (tickStat {
+        title = "TPS (current)";
+        targets = [ (tickInstant ''mc_tps{${tickSelector},window="1m"} ${tickAwake}'' "{{server}}") ];
+        decimals = 2;
+        thresholds = [
+          { color = "red"; }
+          {
+            color = "yellow";
+            value = 18;
+          }
+          {
+            color = "green";
+            value = 19.5;
+          }
+        ];
+      })
+      (tickStat {
+        title = "MSPT (current)";
+        unit = viz.units.milliseconds;
+        targets = [
+          (tickInstant ''1000 * mc_tick_duration_seconds{${tickSelector},statistic="avg"} ${tickAwake}'' "{{server}}")
+        ];
+        decimals = 2;
+        thresholds = [
+          { color = "green"; }
+          {
+            color = "yellow";
+            value = 40;
+          }
+          {
+            color = "red";
+            value = 50;
+          }
+        ];
+      })
+      (tickStat {
+        title = "Players online / max";
+        decimals = 0;
+        targets = [
+          (tickInstant (tickQuery "mc_players_online") "{{server}} online")
+          (tickInstant (tickQuery "mc_players_max") "{{server}} max")
+        ];
+        options.textMode = "value_and_name";
+      })
+      (tickStat {
+        title = "JVM uptime";
+        unit = viz.units.duration;
+        targets = [ (tickInstant (tickQuery "mc_uptime_seconds") "{{server}}") ];
+      })
+      (tickStat {
+        title = "TickScope version";
+        targets = [ (tickInstant (tickQuery "mc_tickscope_info") "{{server}} TickScope {{version}}") ];
+        options.textMode = "name";
+      })
+      (tickStat {
+        title = "Paper version";
+        targets = [ (tickInstant (tickQuery "mc_tickscope_info") "{{server}} {{paper}}") ];
+        options.textMode = "name";
+      })
+    ]
+    [
+      (tickSeries {
+        title = "TPS and MSPT";
+        unit = viz.units.none;
+        targets = [
+          (tickTarget ''mc_tps{${tickSelector},window="1m"} ${tickAwake}'' "{{server}} TPS")
+          (tickTarget ''1000 * mc_tick_duration_seconds{${tickSelector},statistic="avg"} ${tickAwake}'' "{{server}} MSPT")
+        ];
+        overrides = [
+          (viz.overrideByRegexp ".* MSPT" [
+            {
+              id = "unit";
+              value = viz.units.milliseconds;
+            }
+            {
+              id = "custom.axisPlacement";
+              value = "right";
+            }
+          ])
+        ];
+      })
+      (tickSeries {
+        title = "JVM heap";
+        unit = viz.units.bytes;
+        targets =
+          map
+            (
+              kind:
+              tickTarget ''mc_jvm_memory_${kind}_bytes{${tickSelector},area="heap"} ${tickAwake}'' "{{server}} ${kind}"
+            )
+            [
+              "used"
+              "committed"
+              "max"
+            ];
+      })
+    ]
+    [
+      (tickSeries {
+        title = "GC time rate";
+        unit = viz.units.seconds;
+        targets = [ (tickTarget (tickRate "mc_jvm_gc_seconds_total") "{{server}} {{gc}}") ];
+        description = "Seconds spent collecting per second, by GC collector. Gaps while Paper sleeps.";
+      })
+      (tickSeries {
+        title = "GC collection rate";
+        unit = viz.units.ops;
+        targets = [ (tickTarget (tickRate "mc_jvm_gc_collections_total") "{{server}} {{gc}}") ];
+      })
+    ]
+    [
+      (tickSeries {
+        title = "JVM process and system CPU";
+        unit = viz.units.percentunit;
+        targets = map (scope: tickTarget (tickQuery "mc_${scope}_cpu_load_ratio") "{{server}} ${scope}") [
+          "process"
+          "system"
+        ];
+      })
+      (tickSeries {
+        title = "TickScope players online";
+        unit = viz.units.none;
+        decimals = 0;
+        targets = [ (tickTarget (tickQuery "mc_players_online") "{{server}}") ];
+      })
+    ]
+    [
+      (tickSeries {
+        title = "Loaded chunks by world";
+        unit = viz.units.short;
+        targets = [ (tickTarget (tickQuery "mc_world_chunks") "{{server}} {{world}}") ];
+      })
+      (tickSeries {
+        title = "Entities and tile entities by world";
+        unit = viz.units.short;
+        targets = map (kind: tickTarget (tickQuery "mc_world_${kind}") "{{server}} {{world}} ${kind}") [
+          "entities"
+          "tile_entities"
+        ];
+      })
+    ]
+    [
+      (tickSeries {
+        title = "TickScope event rates";
+        unit = viz.units.ops;
+        targets = [
+          (tickTarget ''rate(mc_events_total{${tickSelector},event=~"login|chat|death"}[$__rate_interval]) ${tickAwake}'' "{{server}} {{event}}")
+        ];
+        description = "Login, chat and death events per second. Joins/leaves are already shown by passive telemetry above. Gaps while Paper sleeps.";
+      })
+      (tickSeries {
+        title = "Collection failure rate";
+        unit = viz.units.ops;
+        targets = [ (tickTarget (tickRate "mc_collection_failures_total") "{{server}} {{stage}}") ];
+      })
+    ]
+    [
+      (tickSeries {
+        title = "Collection last success age";
+        unit = viz.units.duration;
+        targets = [
+          (tickTarget "(time() - mc_collection_last_success_timestamp_seconds{${tickSelector}}) and on(instance,server_id,stage) (mc_collection_last_success_timestamp_seconds{${tickSelector}} > 0) and on(instance,server_id,stage) (mc_collection_enabled{${tickSelector}} == 1) ${tickAwake}" "{{server}} {{stage}}")
+        ];
+      })
+      (tickSeries {
+        title = "Collection duration";
+        unit = viz.units.milliseconds;
+        targets = [ (tickTarget "1000 * ${tickQuery "mc_collection_duration_seconds"}" "{{server}} main") ];
+      })
+    ]
+    [
+      (viz.panel {
+        title = "Collection first success";
+        type = "stat";
+        w = 24;
+        h = 5;
+        unit = viz.units.none;
+        noValue = "Asleep / no data";
+        options = {
+          graphMode = "none";
+          textMode = "value_and_name";
+        };
+        targets = [
+          (tickInstant "(mc_collection_last_success_timestamp_seconds{${tickSelector}} > bool 0) and on(instance,server_id,stage) (mc_collection_enabled{${tickSelector}} == 1) ${tickAwake}" "{{server}} {{stage}}")
+        ];
+        mappings = viz.boolMapping {
+          falseText = "Never succeeded";
+          trueText = "Succeeded";
+          falseColor = "yellow";
+          nullText = "Asleep / no data";
+        };
+      })
+    ]
+  ];
   stateExpression = ''
     sum without(state) (
       games_server_state{${selector},state="running"} * 2
@@ -408,7 +632,7 @@ let
           type = "text";
           options = {
             mode = "markdown";
-            content = "TPS/MSPT, chunks, entities and JVM heap: **Unavailable** (no metrics plugin installed). RAM panels show cgroup memory.\n\nVelocity readiness and connected players appear above. Java/Bedrock split: **Unavailable**.";
+            content = "TPS/MSPT, chunks, entities and JVM heap appear in **Survival server performance (TickScope)** below. RAM panels above show cgroup memory.\n\nVelocity readiness and connected players appear above. Java/Bedrock split: **Unavailable**.";
           };
         })
       ]
@@ -439,7 +663,8 @@ let
           description = "State and resource panels leave gaps after three minutes without an updated collection.";
         })
       ]
-    ];
+    ]
+    ++ tickRows;
   };
 in
 {

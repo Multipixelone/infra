@@ -82,6 +82,13 @@
           exporterFlags = cfg.services.prometheus.exporters.node.extraFlags;
           backupOnFailure = enabled.systemd.services.restic-backups-games-survival.onFailure;
           proxyConfig = toString enabled.services.minecraft-servers.servers.velocity.files."velocity.toml";
+          grafana = config.flake.grafanaDashboards."game-servers.json";
+          tickscopeScrapes = lib.filter (
+            job: job.job_name == "minecraft-paper"
+          ) cfg.services.prometheus.scrapeConfigs;
+          discoveredTickscopeScrapes = lib.filter (
+            job: job.job_name == "minecraft-paper"
+          ) discovered.services.prometheus.scrapeConfigs;
         }
       );
     in
@@ -123,9 +130,17 @@
               touch "$out"
             '';
         games-observability-contract =
-          pkgs.runCommand "games-observability-contract-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+          pkgs.runCommand "games-observability-contract-check"
+            {
+              nativeBuildInputs = [
+                pkgs.python3
+                pkgs.prometheus.cli
+              ];
+            }
             ''
               python3 ${./tests/observability_contract.py} ${contract}
+              python3 ${./tests/tickscope_dashboard.py} ${contract} "$TMPDIR/tickscope-tests.json"
+              promtool test rules "$TMPDIR/tickscope-tests.json"
               touch "$out"
             '';
       };
