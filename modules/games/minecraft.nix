@@ -276,14 +276,15 @@
                 protocol = "udp";
                 edition = "bedrock";
               }
-            ]) s.hostnames;
+            ]) s.hostnames ++ [{ hostname = lib.head s.hostnames; port = s.minecraft.voicechatPort; protocol = "udp"; edition = "voice chat"; }];
             internalPorts = [
               s.minecraft.proxyPort
               s.minecraft.serverPort
               s.minecraft.rconPort
+              s.minecraft.metricsPort
             ];
             publicTCPPorts = [ ];
-            publicUDPPorts = [ ];
+            publicUDPPorts = [ s.minecraft.voicechatPort ];
             wakeOnJoin = true;
             serverPort = s.minecraft.serverPort;
             childExitFile = "/run/games/${id}/paper-exit.json";
