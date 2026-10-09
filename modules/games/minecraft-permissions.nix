@@ -230,7 +230,7 @@
           '';
         };
         services.minecraft-servers.servers = lib.mkIf ready (
-          lib.mapAttrs (id: _: {
+          lib.mapAttrs (_id: _: {
             symlinks."plugins/LuckPerms/libs" = cache;
           }) servers
           // {
@@ -249,8 +249,15 @@
           })
           // {
             luckperms-provision = {
-              after = [ "postgresql.service" ];
-              requires = [ "postgresql.service" ];
+              # Setup creates the role, database, and ownership before provisioning alters the role.
+              after = [
+                "postgresql.service"
+                "postgresql-setup.service"
+              ];
+              requires = [
+                "postgresql.service"
+                "postgresql-setup.service"
+              ];
               serviceConfig = {
                 Type = "oneshot";
                 RemainAfterExit = true;

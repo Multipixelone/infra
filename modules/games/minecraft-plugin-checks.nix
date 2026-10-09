@@ -125,10 +125,15 @@ let
       "group"
       "mode"
     ] permissions.age.secrets."games/minecraft/luckperms-db-password";
-    provision = lib.getAttrs [
-      "User"
-      "LoadCredential"
-    ] permissions.systemd.services.luckperms-provision.serviceConfig;
+    provision =
+      lib.getAttrs [
+        "User"
+        "LoadCredential"
+      ] permissions.systemd.services.luckperms-provision.serviceConfig
+      // lib.getAttrs [
+        "after"
+        "requires"
+      ] permissions.systemd.services.luckperms-provision;
     backendTemplates = lib.filterAttrs (
       path: _: lib.hasInfix "/plugins/LuckPerms/" path
     ) permissions.infra.games.minecraftPlugins.backends.survival.templates;
