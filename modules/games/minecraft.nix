@@ -16,6 +16,8 @@
         "games/minecraft/floodgate-key"
       ];
       dataRoot = "/srv/games/minecraft";
+      additions = cfg.minecraftPlugins;
+      backend = id: additions.backends.${id};
       lazymc = pkgs.lazymc.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [ ./lazymc-exit.patch ];
       });
@@ -130,7 +132,7 @@
       proxyConfig = (pkgs.formats.toml { }).generate "velocity.toml" {
         config-version = "2.7";
         bind = "0.0.0.0:25565";
-        motd = "Finn's Minecraft servers";
+        motd = "<gradient:#ff9e42:#ffb366><bold>Finn's Survival</bold></gradient>\n<gradient:#9e9486:#e8e2d8>A quiet place to build & explore</gradient>";
         show-max-players = 20;
         ping-passthrough = "DISABLED";
         online-mode = true;
@@ -168,6 +170,7 @@
           }
         ];
         infra.games = {
+          minecraftPlugins.backends = lib.genAttrs (lib.attrNames servers) (_: { });
           artifacts = {
             games-velocity = velocity;
             games-geyser = geyser;
@@ -188,13 +191,13 @@
             unit = "minecraft-server-velocity.service";
             dataDir = "${dataRoot}/velocity";
             available = ready proxySecrets;
-            secretNames = proxySecrets;
+            secretNames = proxySecrets ++ additions.proxy.secretNames;
             owner = "minecraft";
             console = {
               method = "stdin";
               path = "/run/minecraft/velocity.stdin";
             };
-            configTemplates = {
+            configTemplates = additions.proxy.templates // {
               "${dataRoot}/velocity/plugins/floodgate/key.pem" = {
                 secret = floodgatePath;
               };
@@ -257,7 +260,9 @@
               "world"
               "world_nether"
               "world_the_end"
-            ];
+            ] ++ (backend id).statePaths;
+            pluginInventory = (backend id).inventory;
+            mapUrl = "https://map.finnrut.is";
             public = lib.concatMap (hostname: [
               {
                 inherit hostname;
@@ -282,7 +287,7 @@
             wakeOnJoin = true;
             serverPort = s.minecraft.serverPort;
             childExitFile = "/run/games/${id}/paper-exit.json";
-            secretNames = proxySecrets ++ [ "games/minecraft/${id}-rcon" ];
+            secretNames = proxySecrets ++ [ "games/minecraft/${id}-rcon" ] ++ (backend id).secretNames;
             available = ready (proxySecrets ++ [ "games/minecraft/${id}-rcon" ]);
             console = {
               method = "rcon";
@@ -293,10 +298,11 @@
             fingerprint = builtins.hashString "sha256" (
               builtins.toJSON {
                 package = toString (paper s);
-                inherit (s.minecraft) plugins;
+                plugins = s.minecraft.plugins // (backend id).jars;
+                templates = templatesFor id s // (backend id).templates;
               }
             );
-            configTemplates = templatesFor id s;
+            configTemplates = templatesFor id s // (backend id).templates;
           }) servers;
         };
         services.minecraft-servers = {
@@ -315,7 +321,7 @@
               jvmOpts = "-Xms128M -Xmx512M";
               stopCommand = "end";
               files."velocity.toml" = proxyConfig;
-              symlinks = {
+              symlinks = lib.mapAttrs' (name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact) additions.proxy.jars // {
                 "plugins/geyser.jar" = geyser;
                 "plugins/floodgate.jar" = floodgate;
               };
@@ -344,7 +350,7 @@
             };
             symlinks = lib.mapAttrs' (
               name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact
-            ) s.minecraft.plugins;
+            ) (s.minecraft.plugins // (backend id).jars);
           }) servers;
         };
         systemd.services = {
