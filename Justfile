@@ -28,22 +28,22 @@ deploy:
 # filterless recipe: a fleet-wide deploy has to be typed out by hand.
 [doc("Deploy one host.")]
 colmena-apply host:
-  colmena apply --on {{host}}
+  colmena apply --evaluator streaming --on {{host}}
 
 # Every always-on server, in one go.
 colmena-apply-servers:
-  colmena apply --on @server
+  colmena apply --evaluator streaming --on @server
 
 colmena-apply-tag tag:
-  colmena apply --on @{{tag}}
+  colmena apply --evaluator streaming --on @{{tag}}
 
 # Evaluate + build one host's closure locally without touching it.
 colmena-build host:
-  colmena build --on {{host}}
+  colmena build --evaluator streaming --on {{host}}
 
 # Say what would start/stop/restart on the target; changes nothing.
 colmena-dry host:
-  colmena apply dry-activate --on {{host}}
+  colmena apply dry-activate --evaluator streaming --on {{host}}
 
 # Only works while the target's *current* closure is still in the local store —
 # nvd reads both sides locally, so a host last built on another machine (or
@@ -53,7 +53,7 @@ colmena-dry host:
 colmena-diff host:
   #!/usr/bin/env bash
   set -euo pipefail
-  colmena build --on {{host}} --keep-result
+  colmena build --evaluator streaming --on {{host}} --keep-result
   # command substitution, NOT process substitution — nvd needs a real store path
   nvd diff "$(ssh colmena.{{host}} readlink -f /run/current-system)" ./.gcroots/node-{{host}}
 

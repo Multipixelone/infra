@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (106)</summary>
+<summary>Packages exposed by this flake (108)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -121,6 +121,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`dawarich-home-assistant`](https://github.com/Multipixelone/infra/blob/main/modules/iot/dawarich.nix) — Dawarich integration for Home Assistant · `nix run github:Multipixelone/infra#dawarich-home-assistant`
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
 - [`forgejo-check-status`](https://github.com/Multipixelone/infra/blob/main/modules/ci/status.nix) — Report each flake check as its own Forgejo commit status from one nix-fast-build run · `nix run github:Multipixelone/infra#forgejo-check-status`
+- `games-acknowledge-unclean` · `nix run github:Multipixelone/infra#games-acknowledge-unclean`
 - `games-backup` · `nix run github:Multipixelone/infra#games-backup`
 - `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
 - `games-backup-run` · `nix run github:Multipixelone/infra#games-backup-run`
@@ -149,6 +150,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-prechange` · `nix run github:Multipixelone/infra#games-prechange`
 - `games-prepare` · `nix run github:Multipixelone/infra#games-prepare`
 - `games-prune` · `nix run github:Multipixelone/infra#games-prune`
+- `games-shared-status` · `nix run github:Multipixelone/infra#games-shared-status`
 - `games-skinsrestorer` · `nix run github:Multipixelone/infra#games-skinsrestorer`
 - `games-status` · `nix run github:Multipixelone/infra#games-status`
 - `games-survival-lazy` · `nix run github:Multipixelone/infra#games-survival-lazy`

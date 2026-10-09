@@ -8,6 +8,7 @@
     {
       environment.systemPackages = [
         inputs.colmena.packages.${pkgs.stdenv.hostPlatform.system}.colmena
+        pkgs.nix-eval-jobs
       ];
     };
 }
