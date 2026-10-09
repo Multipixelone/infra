@@ -461,6 +461,19 @@
                     </div>{/each}
                 </div>
               </div>{/if}
+            {#if selected.mapUrl}
+              <p><a href={selected.mapUrl} target="_blank" rel="noopener noreferrer">Open world map</a> · Available while Survival sleeps</p>
+            {/if}
+            {#if selected.plugins?.length}
+              <div class="addresses">
+                <span class="eyebrow address-label">Plugins</span>
+                <div>
+                  {#each [...selected.plugins, ...(manifest?.sharedServices.find((service) => service.id === "velocity")?.plugins ?? [])] as plugin}
+                    <div class="address-row"><span>{plugin.name}</span><code>{plugin.version}</code><span>{plugin.installed ? "Enabled" : "Awaiting setup"}</span></div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
             <div class="action-bar">
               <div class="lifecycle-actions">
                 {#if selected.status.state === "stopped"}<button

@@ -75,6 +75,7 @@
         sharedServices = lib.optional (cfg.proxy != { }) {
           id = "velocity";
           inherit (cfg.proxy) unit available;
+          plugins = cfg.proxy.pluginInventory or [ ];
           logsCommand = [
             "games-logs"
             "velocity"
@@ -93,6 +94,8 @@
             available
             ;
           inherit id;
+          plugins = s.pluginInventory or [ ];
+          mapUrl = s.mapUrl or null;
           console = s.console // {
             command = [
               "games-console"

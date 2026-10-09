@@ -165,6 +165,18 @@
         nixpkgs.overlays = [ inputs.nix-minecraft.overlays.default ];
         assertions = [
           {
+            assertion = lib.all (
+              id:
+              lib.intersectLists (lib.attrNames servers.${id}.minecraft.plugins) (lib.attrNames (backend id).jars)
+              == [ ]
+            ) (lib.attrNames servers);
+            message = "custom Minecraft plugins must not replace managed plugin names";
+          }
+          {
+            assertion = lib.all (s: s.minecraft.version == "26.3") (lib.attrValues servers);
+            message = "managed Minecraft plugins and BlueMap assets are verified for 26.3; recheck pins before changing Paper versions";
+          }
+          {
             assertion = builtins.hasAttr cfg.defaultServer servers;
             message = "Minecraft default server must be on the Velocity host; move the Minecraft fleet together.";
           }
@@ -193,6 +205,7 @@
             available = ready proxySecrets;
             secretNames = proxySecrets ++ additions.proxy.secretNames;
             owner = "minecraft";
+            pluginInventory = additions.proxy.inventory;
             console = {
               method = "stdin";
               path = "/run/minecraft/velocity.stdin";
@@ -256,27 +269,38 @@
             unit = "minecraft-server-${id}.service";
             container = null;
             dataDir = "${dataRoot}/${id}";
-            worldPaths = map (name: "${dataRoot}/${id}/${name}") [
-              "world"
-              "world_nether"
-              "world_the_end"
-            ] ++ (backend id).statePaths;
+            worldPaths =
+              map (name: "${dataRoot}/${id}/${name}") [
+                "world"
+                "world_nether"
+                "world_the_end"
+              ]
+              ++ (backend id).statePaths;
             pluginInventory = (backend id).inventory;
             mapUrl = "https://map.finnrut.is";
-            public = lib.concatMap (hostname: [
-              {
-                inherit hostname;
-                port = 25565;
-                protocol = "tcp";
-                edition = "java";
-              }
-              {
-                inherit hostname;
-                port = 19132;
-                protocol = "udp";
-                edition = "bedrock";
-              }
-            ]) s.hostnames ++ [{ hostname = lib.head s.hostnames; port = s.minecraft.voicechatPort; protocol = "udp"; edition = "voice chat"; }];
+            public =
+              lib.concatMap (hostname: [
+                {
+                  inherit hostname;
+                  port = 25565;
+                  protocol = "tcp";
+                  edition = "java";
+                }
+                {
+                  inherit hostname;
+                  port = 19132;
+                  protocol = "udp";
+                  edition = "bedrock";
+                }
+              ]) s.hostnames
+              ++ [
+                {
+                  hostname = lib.head s.hostnames;
+                  port = s.minecraft.voicechatPort;
+                  protocol = "udp";
+                  edition = "voice chat";
+                }
+              ];
             internalPorts = [
               s.minecraft.proxyPort
               s.minecraft.serverPort
@@ -322,10 +346,14 @@
               jvmOpts = "-Xms128M -Xmx512M";
               stopCommand = "end";
               files."velocity.toml" = proxyConfig;
-              symlinks = lib.mapAttrs' (name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact) additions.proxy.jars // {
-                "plugins/geyser.jar" = geyser;
-                "plugins/floodgate.jar" = floodgate;
-              };
+              symlinks =
+                lib.mapAttrs' (
+                  name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact
+                ) additions.proxy.jars
+                // {
+                  "plugins/geyser.jar" = geyser;
+                  "plugins/floodgate.jar" = floodgate;
+                };
             };
           }
           // lib.mapAttrs (id: s: {
@@ -349,9 +377,9 @@
               );
               "spigot.yml".value.settings.bungeecord = false;
             };
-            symlinks = lib.mapAttrs' (
-              name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact
-            ) (s.minecraft.plugins // (backend id).jars);
+            symlinks = lib.mapAttrs' (name: artifact: lib.nameValuePair "plugins/${name}.jar" artifact) (
+              s.minecraft.plugins // (backend id).jars
+            );
           }) servers;
         };
         systemd.services = {

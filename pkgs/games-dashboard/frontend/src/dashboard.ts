@@ -16,7 +16,11 @@ export type Endpoint = {
   edition: string | null;
 };
 
+export type Plugin = { name: string; version: string; installed: boolean };
+
 export type Server = {
+  plugins?: Plugin[];
+  mapUrl?: string | null;
   id: string;
   game: string;
   displayName: string;
@@ -41,6 +45,7 @@ export type SharedService = {
   available: boolean;
   logsCommand: string[];
   status: SharedStatus;
+  plugins?: Plugin[];
 };
 
 export type Manifest = {
@@ -254,7 +259,20 @@ function parseServer(value: unknown): Server {
       command: strings(backup.command, "backup.command"),
     },
     status: parseStatus(server.status, id),
+    plugins: parsePlugins(server.plugins),
+    mapUrl: nullableString(server.mapUrl ?? null, "server.mapUrl"),
   };
+}
+
+function parsePlugins(data: unknown): Plugin[] {
+  return array(data ?? [], "plugins").map((value) => {
+    const plugin = record(value, "plugin");
+    return {
+      name: string(plugin.name, "plugin.name"),
+      version: string(plugin.version, "plugin.version"),
+      installed: boolean(plugin.installed, "plugin.installed"),
+    };
+  });
 }
 
 export function parseManifest(data: unknown): Manifest {
@@ -280,6 +298,7 @@ export function parseManifest(data: unknown): Manifest {
           status: parseStatus(service.status, id, true),
           unit: string(service.unit, "shared service.unit"),
           available: boolean(service.available, "shared service.available"),
+          plugins: parsePlugins(service.plugins),
           logsCommand: strings(
             service.logsCommand,
             "shared service.logsCommand",

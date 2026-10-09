@@ -36,6 +36,12 @@ class Backup(StrictModel):
     command: list[str]
 
 
+class Plugin(StrictModel):
+    name: str
+    version: str
+    installed: bool
+
+
 class Server(StrictModel):
     id: str
     game: str
@@ -51,6 +57,8 @@ class Server(StrictModel):
     backup: Backup
     statusCommand: list[str]
     logsCommand: list[str]
+    plugins: list[Plugin] = Field(default_factory=list)
+    mapUrl: str | None = None
 
     @model_validator(mode="after")
     def fixed_commands(self):
@@ -74,6 +82,7 @@ class SharedService(StrictModel):
     unit: str
     available: bool
     logsCommand: list[str]
+    plugins: list[Plugin] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def fixed_commands(self):

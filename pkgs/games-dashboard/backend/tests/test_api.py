@@ -75,6 +75,20 @@ def test_mock_list_and_state_transitions(manifest):
             assert client.get("/api/servers").json() == before
 
 
+def test_plugin_inventory_and_static_map_survive_sleep(manifest):
+    with TestClient(create_app(MockAdapter(manifest))) as client:
+        client.post("/api/servers/survival/start")
+        data = client.get("/api/servers").json()
+    survival = next(server for server in data["servers"] if server["id"] == "survival")
+    assert survival["status"]["state"] == "sleeping"
+    assert survival["mapUrl"] == "https://map.finnrut.is"
+    plugins = {plugin["name"]: plugin for plugin in survival["plugins"]}
+    assert plugins["BlueMap"] == {"name": "BlueMap", "version": "5.28", "installed": True}
+    assert not plugins["DiscordSRV"]["installed"]
+    velocity = next(service for service in data["sharedServices"] if service["id"] == "velocity")
+    assert any(plugin["name"] == "MiniMOTD" and plugin["installed"] for plugin in velocity["plugins"])
+
+
 def test_mock_backup_preserves_stopped_state(manifest):
     with TestClient(create_app(MockAdapter(manifest))) as client:
         response = client.post("/api/servers/terraria/backup")
