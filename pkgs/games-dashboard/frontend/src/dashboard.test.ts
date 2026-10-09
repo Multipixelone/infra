@@ -73,6 +73,24 @@ test("shared manifest requires a matching, valid runtime status", () => {
   }
 });
 
+test("proxy plugin inventory survives shared runtime status parsing", () => {
+  const plugins = [
+    { name: "MiniMOTD", version: "2.2.5", installed: true },
+    { name: "LuckPerms", version: "5.5.71", installed: false },
+  ];
+  for (const state of ["running", "stopped", "failed"]) {
+    const proxy = { ...service({ state }), plugins };
+    const parsed = parseManifest({
+      schemaVersion: 1,
+      host: "link",
+      servers: [],
+      sharedServices: [proxy],
+    }).sharedServices[0];
+    assert.deepEqual(parsed.plugins, plugins);
+    assert.deepEqual(parsed.status, proxy.status);
+  }
+});
+
 test("server status still rejects the shared failed state", () => {
   assert.throws(() =>
     parseStatus(service({ state: "failed" }).status, "velocity"),

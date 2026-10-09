@@ -171,10 +171,14 @@
                   assert manifest["schemaVersion"] == 1 and manifest["host"] == "link"
                   servers = {server["id"]: server for server in manifest["servers"]}
                   assert set(servers) == {"survival", "terraria"}
-                  assert manifest["sharedServices"] == [{
+                  assert [{key: value for key, value in service.items() if key != "plugins"}
+                          for service in manifest["sharedServices"]] == [{
                       "id": "velocity", "unit": "minecraft-server-velocity.service",
                       "available": name == "enabled", "logsCommand": ["games-logs", "velocity"],
                   }]
+                  plugins = {plugin["name"]: plugin for plugin in manifest["sharedServices"][0]["plugins"]}
+                  assert plugins["MiniMOTD"] == {"name": "MiniMOTD", "version": "2.2.5", "installed": True}
+                  assert not plugins["LuckPerms"]["installed"]
                   assert servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
                   assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 24454, 7777}
                   assert all(server["console"]["command"] == ["games-console", server["id"]] for server in servers.values())
