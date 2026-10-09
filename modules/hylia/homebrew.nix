@@ -78,8 +78,6 @@ in
         "google-gemini"
         # AI agent orchestration (from the traycerai/traycer tap)
         "traycerai/traycer/traycer-desktop"
-        # theo app
-        "t3-app"
         # codex
         "chatgpt"
 
