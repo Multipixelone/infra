@@ -9,19 +9,13 @@
 # over the REST API and replace whatever the daemon holds.
 #
 # Unlike link, both override flags are ON. link's daemon carries 26 folders of
-# hand-built state that predate nix and must survive; hylia's has never run, so
-# there is nothing to preserve and no reason to let UI-added folders accumulate
+# hand-built state that predate nix and must survive; hylia's folders are all
+# declared here, so there is no reason to let UI-added folders accumulate
 # outside this file. If that stops being true, turn them off deliberately and
 # say why, exactly as modules/link/syncthing.nix does.
 #
-# link's device ID is known and always has been, so this side is complete
-# before any pairing happens: the first activation generates hylia's identity
-# and offers the connection to link. Finishing the pairing is one edit on the
-# other side -- read the ID off hylia with `syncthing --device-id`, set
-# saveSync.syncthing.devices.hylia.id in modules/link/syncthing.nix and add
-# "hylia" to that file's `receivers`. Until then link offers these folders to
-# nobody and this daemon sits idle, which is the intended half-built state and
-# not a failure.
+# Device identities live in saveSync.syncthing.devices. The RomM Library mesh
+# and Prism's link/zelda peers use that registry, never a second copy of an ID.
 { config, lib, ... }:
 let
   user = config.flake.meta.owner.username;
@@ -42,6 +36,13 @@ let
   meshNames = lib.subtractLists [ "hylia" ] ([ "link" ] ++ syncthing.receivers);
   meshDevices = lib.filterAttrs (name: _: builtins.elem name meshNames) syncthing.devices;
   peerNames = builtins.attrNames meshDevices;
+  prismPeers = [
+    "link"
+    "zelda"
+  ];
+  declaredDevices = lib.filterAttrs (
+    name: _: builtins.elem name (meshNames ++ prismPeers)
+  ) syncthing.devices;
 in
 {
   configurations.darwin.hylia.module = {
@@ -91,7 +92,7 @@ in
           overrideFolders = true;
 
           settings = {
-            devices = lib.mapAttrs (_: device: { inherit (device) id name; }) meshDevices;
+            devices = lib.mapAttrs (_: device: { inherit (device) id name; }) declaredDevices;
 
             # receiveonly, mirroring link's sendonly. The Library is
             # authoritative and lives on link; deleting a ROM here to reclaim
@@ -103,6 +104,33 @@ in
             # The folder IDs are the permanent identity and MUST match link's
             # byte-for-byte -- the labels are cosmetic.
             folders = {
+              "multimc" = {
+                id = "multimc";
+                label = "Prism Launcher";
+                path = "~/Library/Application Support/PrismLauncher/instances/";
+                type = "sendreceive";
+                devices = prismPeers;
+                # Receiver-local .stignore via Syncthing's API. Leave Linux
+                # ignores alone; runtime data must be regenerated on the Mac.
+                # Unrooted patterns match at any depth, including .minecraft
+                # and minecraft game directories. Never ignore instance.cfg:
+                # Prism requires it to discover an instance at all.
+                ignorePatterns = [
+                  "(?i)natives"
+                  "(?i)logs"
+                  "(?i)*.log"
+                  "(?i)*.log.gz"
+                  "(?i)crash-reports"
+                  "(?i)assets"
+                ];
+              };
+              "multimc-icons" = {
+                id = "multimc-icons";
+                label = "Prism Launcher Icons";
+                path = "~/Library/Application Support/PrismLauncher/icons/";
+                type = "sendreceive";
+                devices = prismPeers;
+              };
               "romm-library-roms" = {
                 id = "romm-library-roms";
                 label = "RomM Library ROMs";

@@ -139,6 +139,7 @@ let
     ];
     "transcoded-music" = [ "zelda" ];
     "multimc" = [
+      "hylia"
       "Macbook Pro"
       "alexandria"
       "eggs"
@@ -150,6 +151,7 @@ let
       "zelda"
     ];
     "multimc-icons" = [
+      "hylia"
       "alexandria"
       "fedora"
       "link-win"

@@ -1,11 +1,11 @@
 {
   lib,
-  # config,
+  config,
   ...
 }:
-# let
-#   inherit (config.flake.modules.nixos) gaming;
-# in
+let
+  hyliaDevice = config.saveSync.syncthing.devices.hylia;
+in
 {
   nixpkgs.config.allowUnfreePackages = [
     "nvidia-x11"
@@ -120,6 +120,7 @@
         overrideFolders = true;
         settings = {
           devices = {
+            "hylia" = { inherit (hyliaDevice) id name; };
             "link" = {
               id = "XOMPLRL-64GMF4T-P4SQ4XN-GCG26C2-3BKWACO-4DSWVCW-BU755ZU-KOJUDQ2";
             };
@@ -146,6 +147,7 @@
             "multimc" = {
               path = "/home/tunnel/.local/share/PrismLauncher/instances/";
               devices = [
+                "hylia"
                 "link"
                 "alexandria"
                 "deck"
@@ -155,6 +157,7 @@
             "multimc-icons" = {
               path = "/home/tunnel/.local/share/PrismLauncher/icons/";
               devices = [
+                "hylia"
                 "link"
                 "alexandria"
                 "deck"
