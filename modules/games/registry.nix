@@ -118,6 +118,8 @@ let
   secrets = {
     "games/minecraft/velocity-forwarding" = "${inputs.secrets}/games/minecraft/velocity-forwarding.age";
     "games/minecraft/floodgate-key" = "${inputs.secrets}/games/minecraft/floodgate-key.age";
+    "games/minecraft/luckperms-db-password" = "${inputs.secrets}/games/minecraft/luckperms-db-password.age";
+    "games/minecraft/discordsrv-token" = "${inputs.secrets}/games/minecraft/discordsrv-token.age";
     "games/restic-password" = "${inputs.secrets}/games/restic-password.age";
   }
   // lib.listToAttrs (

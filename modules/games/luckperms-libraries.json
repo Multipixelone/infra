@@ -1,0 +1,201 @@
+[
+  {
+    "name": "asm-9.8.jar",
+    "sha256": "876eab6a83daecad5ca67eb9fcabb063c97b5aeb8cf1fca7a989ecde17522051",
+    "relocations": [],
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.8/asm-9.8.jar"
+  },
+  {
+    "name": "asm-commons-9.8.jar",
+    "sha256": "3301a1c1cb4c59fcc5292648dac1d7c5aed4c0f067dfbe88873b8cdfe77404f4",
+    "relocations": [],
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.8/asm-commons-9.8.jar"
+  },
+  {
+    "name": "jar-relocator-1.7.jar",
+    "sha256": "6f7d1184e17a90788797e3b9b2e34b87ff9e02bd623851052d78709071c3bb82",
+    "relocations": [],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/jar-relocator/1.7/jar-relocator-1.7.jar"
+  },
+  {
+    "name": "adventure-4.21.1.jar",
+    "sha256": "910265674814c5d4d1464b244f8dea8b2da4a6df6ceb9e0bbc1d27aa808fe981",
+    "relocations": [
+      [
+        "adventure",
+        "net.kyori.adventure"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/adventure-api/4.21.1/adventure-api-4.21.1.jar"
+  },
+  {
+    "name": "adventure-platform-4.21.1.jar",
+    "sha256": "2a4f089043156bd21305f0b7ca872971742267d0b037d5717968ca503f08d27d",
+    "relocations": [
+      [
+        "adventure",
+        "net.kyori.adventure"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/adventure-platform-api/4.21.1/adventure-platform-api-4.21.1.jar"
+  },
+  {
+    "name": "adventure-platform-bukkit-4.21.1.jar",
+    "sha256": "35f7f00677d3fcc73a569b264dc6973ef724bfd4f8bcf243f3769db740bcbdaa",
+    "relocations": [
+      [
+        "adventure",
+        "net.kyori.adventure"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/adventure-platform-bukkit/4.21.1/adventure-platform-bukkit-4.21.1.jar"
+  },
+  {
+    "name": "event-3.0.0.jar",
+    "sha256": "ca3bdd4dd03292d97788511014b1c2dea630c2deff0db09ded973c4384a521a8",
+    "relocations": [
+      [
+        "eventbus",
+        "net.kyori.event"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/net/kyori/event-api/3.0.0/event-api-3.0.0.jar"
+  },
+  {
+    "name": "caffeine-3.2.0.jar",
+    "sha256": "ec411dfdf0c03f25218648ce89861630b71680e5858a9a7278ebac8e55cab3d7",
+    "relocations": [
+      [
+        "caffeine",
+        "com.github.benmanes.caffeine"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/com/github/ben-manes/caffeine/caffeine/3.2.0/caffeine-3.2.0.jar"
+  },
+  {
+    "name": "okio-1.17.6.jar",
+    "sha256": "8e88b055523cc80613dfb844d598740e10ada62f4bd98304cdd140c5854cc3b6",
+    "relocations": [
+      [
+        "okio",
+        "okio"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio/1.17.6/okio-1.17.6.jar"
+  },
+  {
+    "name": "okhttp-3.14.9.jar",
+    "sha256": "2570fab55515cbf881d7a4ceef49fc515490bc027057e666776a2832465aeca0",
+    "relocations": [
+      [
+        "okhttp3",
+        "okhttp3"
+      ],
+      [
+        "okio",
+        "okio"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/3.14.9/okhttp-3.14.9.jar"
+  },
+  {
+    "name": "bytebuddy-1.15.11.jar",
+    "sha256": "fa08998aae1e7bdae83bde0712c50e8444d71c0e0c196bb2247ade8d4ad0eb90",
+    "relocations": [
+      [
+        "bytebuddy",
+        "net.bytebuddy"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/net/bytebuddy/byte-buddy/1.15.11/byte-buddy-1.15.11.jar"
+  },
+  {
+    "name": "commodore-2.2.jar",
+    "sha256": "86667703f49ff0bbeb4fde5bb93945370744059dfa5fd2acf1228e4b56fb7f6f",
+    "relocations": [
+      [
+        "commodore",
+        "me.lucko.commodore"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/commodore/2.2/commodore-2.2.jar"
+  },
+  {
+    "name": "commodore-file-1.0.jar",
+    "sha256": "57dfbe772a7d45bcc3e032ced91f6ea45f19f2fe5259ab325fca1ca98440328c",
+    "relocations": [
+      [
+        "commodore",
+        "me.lucko.commodore"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/commodore-file/1.0/commodore-file-1.0.jar"
+  },
+  {
+    "name": "postgresql-driver-42.7.6.jar",
+    "sha256": "f2a1cc0352dd5e5c6f65dbadff27bee00c32e432c6ad030d07447f8a5983c42a",
+    "relocations": [
+      [
+        "postgresql",
+        "org.postgresql"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.6/postgresql-42.7.6.jar"
+  },
+  {
+    "name": "hikari-6.3.0.jar",
+    "sha256": "07c6344059af30a135144209c7c8bd666b8823124422ec859864d209d4ab7ca1",
+    "relocations": [
+      [
+        "hikari",
+        "com.zaxxer.hikari"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/com/zaxxer/HikariCP/6.3.0/HikariCP-6.3.0.jar"
+  },
+  {
+    "name": "slf4j-simple-1.7.36.jar",
+    "sha256": "2f39bed943d624dfa8f4102d0571283a10870b6aa36f197a8a506f147010c10f",
+    "relocations": [],
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-simple/1.7.36/slf4j-simple-1.7.36.jar"
+  },
+  {
+    "name": "slf4j-api-1.7.36.jar",
+    "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0",
+    "relocations": [],
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar"
+  },
+  {
+    "name": "configurate-core-3.7.3.jar",
+    "sha256": "d3a47758356207ce16b529074ee755f1348fc45d5e4320b27da6fc2fb3efa363",
+    "relocations": [
+      [
+        "configurate",
+        "ninja.leaping.configurate"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/org/spongepowered/configurate-core/3.7.3/configurate-core-3.7.3.jar"
+  },
+  {
+    "name": "configurate-yaml-3.7.3.jar",
+    "sha256": "6b4e2f4642e18a022a886fe0755bcaedcd58881409ee4d6afe404db12f4e543b",
+    "relocations": [
+      [
+        "configurate",
+        "ninja.leaping.configurate"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/org/spongepowered/configurate-yaml/3.7.3/configurate-yaml-3.7.3.jar"
+  },
+  {
+    "name": "snakeyaml-1.33.jar",
+    "sha256": "11ff459788f0a2d781f56a4a86d7e69202cebacd0273d5269c4ae9f02f3fd8f0",
+    "relocations": [
+      [
+        "yaml",
+        "org.yaml.snakeyaml"
+      ]
+    ],
+    "url": "https://repo.maven.apache.org/maven2/org/yaml/snakeyaml/1.33/snakeyaml-1.33.jar"
+  }
+]
