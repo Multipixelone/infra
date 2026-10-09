@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 import zipfile
 
+import yaml
+
 cases = json.loads(pathlib.Path(sys.argv[1]).read_text())
 for case in cases:
     assert case["installed"] == case["expected"]
@@ -31,6 +33,42 @@ cache = pathlib.Path(sys.argv[4])
 assert (cache / "postgresql-driver-42.7.6.jar").exists()
 with zipfile.ZipFile(cache / "postgresql-driver-42.7.6-remapped.jar") as jar:
     assert "me/lucko/luckperms/lib/postgresql/Driver.class" in jar.namelist()
+
+permissions = json.loads(pathlib.Path(sys.argv[5]).read_text())
+assert permissions["proxyInstalled"] and permissions["backendInstalled"]
+assert not permissions["baseAvailable"]
+assert "luckperms" in permissions["databases"]
+assert permissions["role"]["ensureDBOwnership"]
+assert permissions["role"]["ensureClauses"]["login"]
+assert "host luckperms luckperms 127.0.0.1/32 scram-sha-256" in permissions["authentication"]
+assert "host luckperms luckperms ::1/128 scram-sha-256" in permissions["authentication"]
+assert permissions["secret"] == {"owner": "minecraft", "group": "minecraft", "mode": "0400"}
+assert permissions["provision"] == {
+    "User": "postgres",
+    "LoadCredential": ["password:/run/agenix/games/minecraft/luckperms-db-password"],
+}
+for field, directory, server in (
+    ("backendTemplates", "/srv/games/minecraft/survival/plugins/LuckPerms", "survival"),
+    ("proxyTemplates", "/srv/games/minecraft/velocity/plugins/luckperms", "velocity"),
+):
+    template = permissions[field][f"{directory}/config.yml"]
+    assert template["replacements"] == {
+        "@LUCKPERMS_PASSWORD@": "/run/agenix/games/minecraft/luckperms-db-password"
+    }
+    configuration = yaml.safe_load(pathlib.Path(template["source"]).read_text())
+    assert configuration["server"] == server
+    assert configuration["storage-method"] == "postgresql"
+    assert configuration["messaging-service"] == "pluginmsg"
+    assert not configuration["auto-install-translations"]
+    assert configuration["data"]["address"] == "127.0.0.1:5432"
+    assert configuration["data"]["database"] == "luckperms"
+    assert configuration["data"]["username"] == "luckperms"
+    assert configuration["data"]["password"] == "@LUCKPERMS_PASSWORD@"
+    bootstrap = json.loads(pathlib.Path(permissions[field][f"{directory}/bootstrap.json"]["source"]).read_text())
+    assert "default" in bootstrap["groups"]
+    assert {"key": "group.default", "value": True} in bootstrap["groups"]["admin"]["nodes"]
+    assert {"key": "*", "value": True} in bootstrap["groups"]["admin"]["nodes"]
+    assert bootstrap["users"] == {}
 
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)

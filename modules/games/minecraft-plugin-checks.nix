@@ -85,6 +85,32 @@ let
       ];
   cfg = host.config;
   vhost = cfg.services.nginx.virtualHosts.minecraft-map-origin;
+  permissions = evaluate {
+    "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+  } "" "" true;
+  permissionsFixture = {
+    proxyInstalled = permissions.infra.games.minecraftPlugins.proxy.jars ? luckperms;
+    backendInstalled = permissions.infra.games.minecraftPlugins.backends.survival.jars ? luckperms;
+    baseAvailable = permissions.infra.games.runtime.survival.available;
+    databases = permissions.services.postgresql.ensureDatabases;
+    role = lib.findFirst (
+      user: user.name == "luckperms"
+    ) null permissions.services.postgresql.ensureUsers;
+    authentication = permissions.services.postgresql.authentication;
+    secret = lib.getAttrs [
+      "owner"
+      "group"
+      "mode"
+    ] permissions.age.secrets."games/minecraft/luckperms-db-password";
+    provision = lib.getAttrs [
+      "User"
+      "LoadCredential"
+    ] permissions.systemd.services.luckperms-provision.serviceConfig;
+    backendTemplates = lib.filterAttrs (
+      path: _: lib.hasInfix "/plugins/LuckPerms/" path
+    ) permissions.infra.games.minecraftPlugins.backends.survival.templates;
+    proxyTemplates = permissions.infra.games.minecraftPlugins.proxy.templates;
+  };
 in
 {
   perSystem = { pkgs, ... }: {
@@ -92,7 +118,7 @@ in
       pkgs.runCommand "games-minecraft-plugins-check"
         {
           nativeBuildInputs = [
-            pkgs.python3
+            (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
             pkgs.nginx
           ];
         }
@@ -116,7 +142,8 @@ in
               }
             ''} \
             ${cfg.infra.games.artifacts.games-bluemap-offline} \
-            ${cfg.infra.games.artifacts.games-luckperms-libraries}
+            ${cfg.infra.games.artifacts.games-luckperms-libraries} \
+            ${pkgs.writeText "minecraft-permissions-fixture.json" (builtins.toJSON permissionsFixture)}
           touch "$out"
         '';
   };
