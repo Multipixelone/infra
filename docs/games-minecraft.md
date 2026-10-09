@@ -23,9 +23,25 @@ plugin JAR is fetched or updated at runtime. Configurations use Nix formats.
 MiniMOTD compatibility is a source/API assessment, not a claim of a live 4.2
 integration test. Its dependencies target the older API, but the calls used
 remain present in build 30. Velocity's native MOTD contains the same text as a
-fallback if the plugin must be removed. The gradients use the dashboard's
-orange `#ff9e42` / `#ffb366` and muted `#9e9486` / `#e8e2d8` palette. There is no
-server icon override because no existing Minecraft icon was found.
+fallback if the plugin must be removed. Both use `Finn's Survival` on line 1
+and `mc.finnrut.is · survival · 26.3` on line 2 (15 and 31 visible characters).
+The bold name uses Mocha mauve `#cba6f7`, pink `#f5c2e7`, and peach `#fab387`;
+the factual second line uses subtext0 `#a6adc8` with a mauve hostname. These
+exact colours come from the Stylix Mocha scheme selected in
+`modules/theme/color-scheme.nix` and the pinned Mocha Foot palette selected in
+`modules/shell/terminal/foot.nix`.
+
+The source headshot favicon from Finn's blog is committed as
+`modules/games/assets/survival-icon-source.png` (180×180). Nix generates the
+server icon with ImageMagick: box-filter downsampling to 24×24, four levels per
+channel, a quality-18 JPEG round-trip with 4:2:0 chroma subsampling, then
+nearest-neighbour enlargement to a 64×64 PNG24. The deliberately crunchy
+result is built rather than committed, with no dependency on the blog checkout.
+Velocity symlinks the same output to MiniMOTD's `icons/survival.png` and its
+native `server-icon.png`; MiniMOTD enables icons and selects `survival`.
+Both the MOTD and icon remain available while Paper sleeps because Velocity
+answers server-list pings. The native icon remains the fallback if MiniMOTD
+is removed.
 
 SkinsRestorer uses file storage and Paper proxy detection `AUTO`; backend API
 calls requiring database storage are disabled. Both installations have the

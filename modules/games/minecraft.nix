@@ -132,7 +132,7 @@
       proxyConfig = (pkgs.formats.toml { }).generate "velocity.toml" {
         config-version = "2.7";
         bind = "0.0.0.0:25565";
-        motd = "<gradient:#ff9e42:#ffb366><bold>Finn's Survival</bold></gradient>\n<gradient:#9e9486:#e8e2d8>A quiet place to build & explore</gradient>";
+        motd = "<gradient:#cba6f7:#f5c2e7:#fab387><bold>Finn's Survival</bold></gradient>\n<#a6adc8><#cba6f7>mc.finnrut.is</#cba6f7> · survival · 26.3</#a6adc8>";
         show-max-players = 20;
         ping-passthrough = "DISABLED";
         online-mode = true;
