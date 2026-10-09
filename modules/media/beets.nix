@@ -864,7 +864,7 @@ in
               cleanup_existing = true;
             };
             lyrics = {
-              auto = true;
+              auto = false;
               synced = true;
             };
             duplicates = {
