@@ -8,12 +8,17 @@ selected.
 
 ## Provenance and updates
 
-The package is Caldera Music Headless **1.0.47** from:
+The package is Caldera Music Headless **1.1.0** from:
 
 ```
 https://releases.caldera.homes/music/headless/latest/caldera-music-linux-x86_64.tar.gz
-sha256-tJfm8X2LTy4fepVFTyNvjfDMijaAXqv9c6zzKryv0JA=
+sha256-R2giaoB3vwHDfK9iL9wvMXsCAYqV1fwLH3hntB/aGJ8=
 ```
+
+The archive's `VERSION` is `1.1.0`, corroborated by the publisher's stable feed
+at <https://releases.caldera.homes/music/headless/latest/latest.json>
+(`version: 1.1.0`, `tag: headless-v1.1.0`). It retains `bin/caldera-music`
+and the bundled FFmpeg `lib/` layout expected by the package.
 
 The publisher's URL is mutable; the Nix fixed-output hash pins the accepted
 contents. Update only by changing the version, URL if a versioned artifact is

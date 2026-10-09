@@ -10,13 +10,13 @@
 }:
 stdenvNoCC.mkDerivation (_finalAttrs: {
   pname = "caldera-headless";
-  version = "1.0.47";
+  version = "1.1.0";
 
   # The publisher currently exposes this release only through its mutable
   # `latest` path. The fixed hash makes a changed upstream payload fail closed.
   src = fetchurl {
     url = "https://releases.caldera.homes/music/headless/latest/caldera-music-linux-x86_64.tar.gz";
-    hash = "sha256-tJfm8X2LTy4fepVFTyNvjfDMijaAXqv9c6zzKryv0JA=";
+    hash = "sha256-R2giaoB3vwHDfK9iL9wvMXsCAYqV1fwLH3hntB/aGJ8=";
   };
 
   # The archive intentionally contains several top-level files and directories.
