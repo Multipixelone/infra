@@ -70,7 +70,6 @@
       home.packages = [
         pkgs.rtk
         pkgs.ast-grep
-        pkgs.semgrep
         pkgs.fastmod
       ];
       programs.fish.shellAbbrs = {
