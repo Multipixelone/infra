@@ -19,6 +19,7 @@ plugin JAR is fetched or updated at runtime. Configurations use Nix formats.
 | Simple Voice Chat  | bukkit-2.6.24 / Paper          | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24)                                                                                                                                                 |
 | TickScope          | 2.0.1 / Paper                  | [Maintained release](https://github.com/gzimbric/TickScope/releases/tag/v2.0.1), [26.3 compatibility](https://hangar.papermc.io/gzimbric/TickScope/versions/2.0.1)                                                                         |
 | DiscordSRV classic | 1.30.5 / Paper                 | [26.3 release](https://modrinth.com/plugin/discordsrv/version/1.30.5)                                                                                                                                                                      |
+| Vault              | 1.7.3 / Paper (rank sync only) | [Pinned release](https://github.com/MilkBowl/Vault/releases/tag/1.7.3); isolated Paper 26.3 build 159 startup and DiscordSRV's LuckPerms provider lookup passed                                                                            |
 | HuskHomes          | 4.11-9ed80cc **alpha** / Paper | [Pinned release metadata](https://api.modrinth.com/v2/version/eXHdkjXf) explicitly lists Paper and 26.3; [source commit](https://github.com/WiIIiam278/HuskHomes/commit/9ed80cc)                                                           |
 | AxGraves           | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
 
@@ -118,15 +119,15 @@ The separate dashboard **Datapacks** list shows the following installed set,
 plus the generated Survival World Policy pack. Installation status describes
 the declaration; it does not assert that Paper is awake or a player's HUD is on.
 
-| Vanilla Tweaks pack | Pinned version | Minecraft / format |
-| --- | --- | --- |
-| Confetti Creepers | 2.2.19 | 26.3 / 121.0 |
-| Player Head Drops | 1.1.18 | 26.3 / 121.0 |
-| Mini Blocks | 1.1.8 | 26.3 / 121.0 |
-| More Mob Heads | 2.20.1 | 26.3 / 121.0 |
-| Custom Nether Portals | 2.3.21 | 26.3 / 121.0 |
-| Double Shulker Shells | 1.3.18 | 26.3 / 121.0 |
-| AFK Display | 1.1.18 | 26.3 / 121.0 |
+| Vanilla Tweaks pack   | Pinned version | Minecraft / format |
+| --------------------- | -------------- | ------------------ |
+| Confetti Creepers     | 2.2.19         | 26.3 / 121.0       |
+| Player Head Drops     | 1.1.18         | 26.3 / 121.0       |
+| Mini Blocks           | 1.1.8          | 26.3 / 121.0       |
+| More Mob Heads        | 2.20.1         | 26.3 / 121.0       |
+| Custom Nether Portals | 2.3.21         | 26.3 / 121.0       |
+| Double Shulker Shells | 1.3.18         | 26.3 / 121.0       |
+| AFK Display           | 1.1.18         | 26.3 / 121.0       |
 
 Coordinates HUD, Silence Mobs, Durability Ping and Armor Statues are no longer
 managed. The next stopped-server reconcile removes their four previously
@@ -523,6 +524,8 @@ options for Finn's existing bot:
 | `channelId`        | `1557960229528797265` | Main bidirectional chat, deaths and advancements |
 | `eventsChannelId`  | `1518484285982769204` | Join, first join and leave messages              |
 | `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands       |
+| `roles.mod`        | `1558172717218533468` | LuckPerms `mod` → Discord Mod (purple)           |
+| `roles.admin`      | `1558173111931904092` | LuckPerms `admin` → Discord Admin (green)        |
 
 The defaults for other servers are empty. Either missing guild/chat ID, missing token or `enable = false`
 means no DiscordSRV JAR is installed; Minecraft itself remains independently
@@ -532,7 +535,8 @@ Use Discord Developer Mode to copy the IDs and ensure the bot is in that guild.
 An empty events ID keeps join/leave messages in chat; an empty console ID
 disables console forwarding without disabling the bridge.
 
-The pinned 1.30.5 JAR's `config/en.yml` and `messages/en.yml` were inspected.
+The pinned 1.30.5 JAR's `config/en.yml`, `messages/en.yml` and
+`synchronization/en.yml` were inspected.
 Routing uses `Channels.global`, `Channels.join` and `Channels.leave`; the message
 templates have no channel selector. Deaths and advancements use distinct
 `deaths`/`awards` routes and fall back to the first channel, `global`, here.
@@ -541,12 +545,75 @@ Server startup/shutdown messages also remain in chat.
 Enable **Message Content** and **Server Members** privileged intents. Grant
 **View Channel**, **Send Messages**, **Read Message History** and **Embed Links**
 in the chat and events channels. Make the events channel read-only to ordinary
-members so it remains a bot event feed. Presence is disabled. Webhooks, chat-channel console commands, topic edits,
-role/nickname/ban synchronization and mandatory account linking are disabled;
-no Administrator or Manage Roles permission is needed. Join/leave, first join,
+members so it remains a bot event feed. Grant the bot **Manage Roles** for rank
+synchronization; its invite permission bit is `268435456` (OR it with the
+existing permission integer when updating an invite). No Administrator
+permission is needed. Presence is disabled. Webhooks, chat-channel console
+commands, topic edits, nickname/ban synchronization and mandatory account
+linking remain disabled. Join/leave, first join,
 death, advancement and bidirectional chat messages are enabled. Test them after
 the first configured wake. Confirm token permissions remain private and neither
 configuration nor logs expose it.
+
+Create Discord roles **Mod (purple)** and **Admin (green)**. Colours are set in
+Discord's role editor, not by DiscordSRV. Put Admin above Mod and the bot's own
+role **above both** in the role list; Manage Roles cannot manage roles at or
+above the bot's role. Enable **Developer Mode**, right-click each role and
+select **Copy Role ID**. Set those IDs in Survival's
+`gameServers.servers.survival.minecraft.discord.roles.mod` and `.roles.admin`
+declaration. These options default to empty on other servers. Only nonempty
+IDs are mapped; with neither set, linking remains available but rank sync is
+inert and Vault is not installed. Missing token/guild/chat IDs or a disabled
+bridge still prevent DiscordSRV and Vault installation.
+
+Players link voluntarily: run **`/discord link` in Minecraft**, then **DM the
+displayed code to the bot** from the Discord account they want to link. Paper
+must be awake for the bot to receive it. `/discord linked` checks the result.
+Names are never used to auto-link accounts. Redeeming a new code cannot
+automatically replace an existing link. Linking executes no console commands
+and grants no separate "Linked" role. Unlinked players may still play and chat;
+they simply do not receive synced roles. Mandatory linking is a separate,
+future change.
+
+Unlinking requires operator permission by default (`discordsrv.unlink`);
+players should ask an operator to unlink their account before changing it.
+
+LuckPerms group membership is authoritative. Both
+`GroupRoleSynchronizationMinecraftIsAuthoritative = true` and
+`GroupRoleSynchronizationOneWay = true` are required for **Minecraft → Discord
+only**. `default` is never mapped. All memberships, including inherited groups,
+count: an admin inherits mod and receives both roles when both IDs are set.
+Sync runs on linking and periodically every five minutes for online players;
+full-guild cycling is disabled. Discord role grants/removals cannot create or
+remove LuckPerms membership and are reconciled to Minecraft membership on the
+next sync. Unlinking removes managed roles without changing Minecraft ranks.
+
+Group sync requires Vault's permission API. Vault **1.7.3** is pinned and
+installed only on configured Paper backends with at least one role mapping;
+its update checking is disabled. Despite its age, an isolated startup on the
+pinned Paper **26.3 build 159** confirmed it enables and LuckPerms **5.5.71**
+registers its Vault hook. VaultUnlocked was not needed. DiscordSRV continues to
+use the existing LuckPerms groups rather than a separate permission store.
+
+DiscordSRV's existing Discord-to-Minecraft message format uses
+`%toprolecolor%`, so the top Discord role's colour also appears in Minecraft
+chat: purple for Mod and green for Admin when these are the highest roles.
+There is no native LuckPerms prefix/tab-list formatter configured; no chat
+formatter plugin is added.
+
+The JDBC account-link backend is explicitly empty, selecting DiscordSRV
+1.30.5's default local `accounts.aof` storage under
+`/srv/games/minecraft/survival/plugins/DiscordSRV`. The whole directory is
+already included in clean-stop backups. Account records remain mutable player
+state and are never replaced by a generated Nix file.
+
+After deployment, test with a linked account: grant/remove `mod` and `admin`
+in LuckPerms and confirm the corresponding Discord roles follow (including
+inherited Mod for Admin). Grant a mapped role directly in Discord to a linked
+default player and confirm LuckPerms stays default; the role should disappear
+on resync. Check that removing a Discord role does not demote Minecraft, that
+unlinked players get no roles, and that `/discord unlink` removes managed roles.
+An operator can run `/discord resync` to avoid waiting for the periodic cycle.
 
 **Lock the console channel's permissions to Finn.** Deny other members View
 Channel and Send Messages, and permit Finn and the bot to access it, including

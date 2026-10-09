@@ -17,9 +17,13 @@ cases = json.loads(pathlib.Path(sys.argv[1]).read_text())
 with zipfile.ZipFile(sys.argv[6]) as jar:
     discord_defaults = yaml.safe_load(jar.read("config/en.yml"))
     message_defaults = yaml.safe_load(jar.read("messages/en.yml"))
+    synchronization_defaults = yaml.safe_load(jar.read("synchronization/en.yml"))
+    linking_defaults = yaml.safe_load(jar.read("linking/en.yml"))
 assert discord_defaults["ConfigVersion"] == "1.30.5"
 for case in cases:
     assert case["installed"] == case["expected"]
+    mappings = {group: role for group, role in case["discord"]["roles"].items() if role}
+    assert case["vaultInstalled"] == (case["expected"] and bool(mappings))
     assert not case[
         "baseAvailable"
     ]  # No mandatory Minecraft credentials in these fixtures.
@@ -47,6 +51,37 @@ for case in cases:
         messages = yaml.safe_load(pathlib.Path(case["messages"]).read_text())
         assert configuration.keys() <= discord_defaults.keys()
         assert messages.keys() <= message_defaults.keys()
+        synchronization = yaml.safe_load(pathlib.Path(case["synchronization"]).read_text())
+        linking = yaml.safe_load(pathlib.Path(case["linking"]).read_text())
+        assert synchronization.keys() <= synchronization_defaults.keys()
+        assert linking.keys() <= linking_defaults.keys()
+        assert synchronization["GroupRoleSynchronizationGroupsAndRolesToSync"] == mappings
+        assert "default" not in mappings
+        assert synchronization["GroupRoleSynchronizationMinecraftIsAuthoritative"] is True
+        assert synchronization["GroupRoleSynchronizationOneWay"] is True
+        assert synchronization["GroupRoleSynchronizationPrimaryGroupOnly"] is False
+        assert synchronization["GroupRoleSynchronizationEnableDenyPermission"] is False
+        assert synchronization["GroupRoleSynchronizationOnLink"] == bool(mappings)
+        assert synchronization["GroupRoleSynchronizationCycleTime"] == 5
+        assert synchronization["GroupRoleSynchronizationCycleCompletely"] is False
+        assert synchronization["NicknameSynchronizationEnabled"] is False
+        assert synchronization["BanSynchronizationDiscordToMinecraft"] is False
+        assert synchronization["BanSynchronizationMinecraftToDiscord"] is False
+        assert linking["Require linked account to play"]["Enabled"] is False
+        assert configuration["DiscordChatChannelRequireLinkedAccount"] is False
+        assert configuration["MinecraftDiscordAccountLinkedUsePM"] is True
+        assert configuration["MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode"] is False
+        assert configuration["MinecraftDiscordAccountLinkedConsoleCommands"] == []
+        assert configuration["MinecraftDiscordAccountUnlinkedConsoleCommands"] == []
+        assert configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"] == ""
+        assert configuration["Experiment_JdbcAccountLinkBackend"] == ""
+        # Existing in-game Discord chat uses the Discord role's configured colour.
+        assert "%toprolecolor%" in message_defaults["DiscordToMinecraftChatMessageFormat"]
+        if mappings:
+            vault_config = yaml.safe_load(pathlib.Path(case["vaultConfiguration"]).read_text())
+            assert vault_config == {"update-check": False}
+        else:
+            assert case["vaultConfiguration"] is None
         channels = {"global": case["discord"]["channelId"]}
         if case["discord"]["eventsChannelId"]:
             channels.update(
@@ -72,6 +107,10 @@ for case in cases:
             assert messages[f"MinecraftPlayer{event}Message"]["Enabled"]
             assert "Channel" not in messages[f"MinecraftPlayer{event}Message"]
     else:
+        assert case["configuration"] is None
+        assert case["synchronization"] is None
+        assert case["linking"] is None
+        assert case["vaultConfiguration"] is None
         assert token_hooks == []
         assert not any(
             path.endswith("plugins/DiscordSRV") for path in case["statePaths"]

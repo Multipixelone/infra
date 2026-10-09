@@ -42,6 +42,9 @@ let
         {
           expected = case.token && case.guild != "" && case.channel != "" && case.enable;
           installed = plugins.jars ? discordsrv;
+          vaultInstalled = plugins.jars ? vault;
+          vaultConfiguration =
+            plugins.templates."/srv/games/minecraft/survival/plugins/Vault/config.yml".source or null;
           tokenCopy = plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/.token" or null;
           preStart = cfg.systemd.services.minecraft-server-survival.serviceConfig.ExecStartPre;
           declaredSecret = cfg.age.secrets."games/minecraft/discordsrv-token".mode or null;
@@ -52,6 +55,11 @@ let
             plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/config.yml".source or null;
           messages =
             plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/messages.yml".source or null;
+          synchronization =
+            plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/synchronization.yml".source
+              or null;
+          linking =
+            plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/linking.yml".source or null;
         }
       )
       [
@@ -90,6 +98,36 @@ let
           guild = "123456789012345678";
           channel = "234567890123456789";
           enable = true;
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.roles = {
+            mod = "";
+            admin = "";
+          };
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.roles = {
+            mod = "345678901234567890";
+            admin = "";
+          };
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.roles = {
+            mod = "";
+            admin = "456789012345678901";
+          };
         }
         {
           token = true;

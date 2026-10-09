@@ -68,6 +68,14 @@ let
             default = 9225;
           };
           discord = {
+            roles = lib.genAttrs [ "mod" "admin" ] (
+              rank:
+              mkOption {
+                type = types.strMatching "([0-9]{17,20})?";
+                default = "";
+                description = "Discord role ID for the LuckPerms ${rank} group; empty disables this mapping.";
+              }
+            );
             enable = mkOption {
               type = types.bool;
               default = true;
@@ -227,6 +235,10 @@ in
             channelId = "1557960229528797265";
             eventsChannelId = "1518484285982769204";
             consoleChannelId = "1557960243101831168";
+            roles = {
+              admin = "1558173111931904092";
+              mod = "1558172717218533468";
+            };
           };
           hostnames = [
             "survival.mc.finnrut.is"

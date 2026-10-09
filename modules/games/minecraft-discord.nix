@@ -13,6 +13,8 @@
         && secretReady
         && s.minecraft.discord.guildId != ""
         && s.minecraft.discord.channelId != "";
+      roles = s: lib.filterAttrs (_: role: role != "") s.minecraft.discord.roles;
+      syncEnabled = s: roles s != { };
       message = content: {
         Enabled = true;
         Content = content;
@@ -36,10 +38,20 @@
               version = "1.30.5";
               installed = ready s;
             }
+            {
+              name = "Vault";
+              version = "1.7.3";
+              installed = ready s && syncEnabled s;
+            }
           ];
         }
         // lib.optionalAttrs (ready s) {
-          jars.discordsrv = cfg.artifacts.games-discordsrv;
+          jars = {
+            discordsrv = cfg.artifacts.games-discordsrv;
+          }
+          // lib.optionalAttrs (syncEnabled s) {
+            vault = cfg.artifacts.games-vault;
+          };
           secretNames = [ secret ];
           statePaths = [ "/srv/games/minecraft/${id}/plugins/DiscordSRV" ];
           templates =
@@ -84,6 +96,14 @@
                   DiscordChatChannelBlockBots = true;
                   DiscordChatChannelBlockWebhooks = true;
                   DiscordCannedResponses = { };
+                  # Code redemption proves account ownership; linking grants no permissions.
+                  MinecraftDiscordAccountLinkedUsePM = true;
+                  MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode = false;
+                  MinecraftDiscordAccountLinkedConsoleCommands = [ ];
+                  MinecraftDiscordAccountUnlinkedConsoleCommands = [ ];
+                  MinecraftDiscordAccountLinkedRoleNameToAddUserTo = "";
+                  # The default file backend keeps accounts.aof in the backed-up plugin directory.
+                  Experiment_JdbcAccountLinkBackend = "";
                   UseModernPaperChatEvent = true;
                   EnablePresenceInformation = false;
                   Experiment_WebhookChatMessageDelivery = false;
@@ -102,14 +122,27 @@
                 };
                 synchronization = {
                   NicknameSynchronizationEnabled = false;
-                  GroupRoleSynchronizationGroupsAndRolesToSync = { };
-                  GroupRoleSynchronizationOnLink = false;
+                  GroupRoleSynchronizationGroupsAndRolesToSync = roles s;
+                  # Both keys are required: authoritative alone still permits reverse sync events.
+                  GroupRoleSynchronizationMinecraftIsAuthoritative = true;
+                  GroupRoleSynchronizationOneWay = true;
+                  GroupRoleSynchronizationPrimaryGroupOnly = false;
+                  GroupRoleSynchronizationEnableDenyPermission = false;
+                  GroupRoleSynchronizationOnLink = syncEnabled s;
+                  # An empty mapping disables sync; 1.30.5 clamps cycle times to >= 1 minute.
+                  GroupRoleSynchronizationCycleTime = 5;
+                  GroupRoleSynchronizationCycleCompletely = false;
                   BanSynchronizationDiscordToMinecraft = false;
                   BanSynchronizationMinecraftToDiscord = false;
                 };
                 linking."Require linked account to play".Enabled = false;
                 voice.Enabled = false;
-              };
+              }
+            // lib.optionalAttrs (syncEnabled s) {
+              "/srv/games/minecraft/${id}/plugins/Vault/config.yml".source = toString (
+                format.generate "vault-${id}-config.yml" { update-check = false; }
+              );
+            };
         }
       ) servers;
       systemd.services = lib.mapAttrs' (

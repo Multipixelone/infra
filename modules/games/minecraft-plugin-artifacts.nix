@@ -51,6 +51,11 @@
         url = "https://cdn.modrinth.com/data/UmLGoGij/versions/ATlquwiT/DiscordSRV-Build-1.30.5.jar";
         sha256 = "ef2fa1f2eb146c7c77412b7190a7dd33f1fc91282683fe45407739554c8aefef";
       };
+      games-vault = pkgs.fetchurl {
+        name = "vault-1.7.3.jar";
+        url = "https://github.com/MilkBowl/Vault/releases/download/1.7.3/Vault.jar";
+        sha256 = "a6b5ed97f43a5cf5bbaf00a7c8cd23c5afc9bd003f849875af8b36e6cf77d01d";
+      };
       games-tickscope = pkgs.fetchurl {
         name = "tickscope-2.0.1.jar";
         url = "https://github.com/gzimbric/TickScope/releases/download/v2.0.1/TickScope-2.0.1.jar";
