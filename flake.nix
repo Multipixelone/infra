@@ -254,6 +254,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-mine.url = "github:Multipixelone/nixpkgs/init-soundshow";
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs-zotero.url = "github:nixos/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410";
     noctalia = {
       url = "github:noctalia-dev/noctalia-shell";
       inputs.nixpkgs.follows = "nixpkgs";
