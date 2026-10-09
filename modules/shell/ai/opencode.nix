@@ -39,7 +39,7 @@
           node_modules =
             if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
               old.node_modules.override {
-                hash = "sha256-D1nVqPY9u0DpGZexj+AhYQ4lnsSfxqjCYgZ17DMA/1Q=";
+                hash = "sha256-G2AHfouEWB9q/yS6E8C3HLHbK8ijymh+s2cK4/ZXydw=";
               }
             else
               old.node_modules;
