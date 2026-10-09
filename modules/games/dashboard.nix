@@ -41,6 +41,7 @@
       packages = {
         prepare = helper "games-prepare" "prepare";
         prechange = helper "games-prechange" "prechange";
+        acknowledge-unclean = helper "games-acknowledge-unclean" "acknowledge-unclean";
         paper-stop = helper "games-paper-stop" "paper-stop";
         paper-result = helper "games-paper-result" "paper-result";
         container-stop = helper "games-container-stop" "container-stop";

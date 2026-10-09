@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 
@@ -75,9 +76,25 @@ def stop_result_path(cfg, identifier):
     return Path(cfg["stateDir"]) / (identifier + "-stop.json")
 
 
-def require_saved(cfg, identifier):
+def stop_proof(cfg, identifier):
     path = stop_result_path(cfg, identifier)
-    if not path.exists() or not json.loads(path.read_text()).get("graceful", False):
+    value = json.loads(path.read_text()) if path.exists() else {"graceful": False}
+    if not isinstance(value, dict) or type(value.get("graceful")) is not bool:
+        raise ValueError("invalid game shutdown proof")
+    return value
+
+
+def record_stop(cfg, identifier, graceful, *, new=False):
+    # A new run/stop must invalidate acknowledgements even if both proofs say false.
+    value = {"generation": uuid.uuid4().hex} if new else stop_proof(cfg, identifier)
+    value["graceful"] = graceful
+    atomic_json(stop_result_path(cfg, identifier), value)
+    if new:
+        consume_acknowledgement(cfg, identifier)
+
+
+def require_saved(cfg, identifier):
+    if not stop_proof(cfg, identifier)["graceful"]:
         raise RuntimeError("no verified clean game shutdown; snapshot refused")
 
 
@@ -233,7 +250,7 @@ def prepare(cfg, identifier):
                 Path(world).exists() and any(Path(world).iterdir())
                 for world in item["worldPaths"]
             )
-        atomic_json(stop_result_path(cfg, identifier), {"graceful": False})
+        record_stop(cfg, identifier, False, new=True)
     identity = pwd.getpwnam(item["owner"])
     runtime = Path(cfg["runDir"]) / identifier
     safe_directory(runtime)
@@ -305,12 +322,11 @@ def prepare(cfg, identifier):
 def paper_stop(cfg, identifier, pid):
     root()
     item = server(cfg, identifier)
-    result = stop_result_path(cfg, identifier)
-    atomic_json(result, {"graceful": False})
+    record_stop(cfg, identifier, False, new=True)
     children = process_children(pid)
     if not children:
         wait_for_paper_exit(item)
-        atomic_json(result, {"graceful": True})
+        record_stop(cfg, identifier, True)
         return
     if listening(item["console"]["port"]):
         response = rcon(item, "save-all flush")
@@ -327,7 +343,7 @@ def paper_stop(cfg, identifier, pid):
             raise TimeoutError("Paper did not exit gracefully; do not snapshot")
         time.sleep(0.2)
     wait_for_paper_exit(item)
-    atomic_json(result, {"graceful": True})
+    record_stop(cfg, identifier, True)
 
 
 def paper_exit_clean(item):
@@ -359,7 +375,7 @@ def paper_result(cfg, identifier):
     confirmed = result.exists() and json.loads(result.read_text()).get(
         "graceful", False
     )
-    atomic_json(result, {"graceful": confirmed and paper_exit_clean(item)})
+    record_stop(cfg, identifier, confirmed and paper_exit_clean(item))
 
 
 def validate_repository(cfg):
@@ -378,7 +394,7 @@ def validate_repository(cfg):
     run(cfg, "restic", "-r", path, "-p", backup["passwordFile"], "snapshots", "--json")
 
 
-def snapshot(cfg, identifier):
+def snapshot(cfg, identifier, *, unclean=False):
     item = server(cfg, identifier)
     if not item["backup"]:
         raise RuntimeError("world backups are disabled for this server")
@@ -394,6 +410,10 @@ def snapshot(cfg, identifier):
     proof = stop_result_path(cfg, identifier)
     if proof.exists():
         paths.append(str(proof))
+    tags = ["--tag", "games:" + identifier]
+    if unclean:
+        paths.append(str(acknowledgement_path(cfg, identifier)))
+        tags += ["--tag", "games:unclean", "--tag", "games:unverified"]
     output = run(
         cfg,
         "restic",
@@ -405,8 +425,7 @@ def snapshot(cfg, identifier):
         "--json",
         "--retry-lock",
         "30s",
-        "--tag",
-        "games:" + identifier,
+        *tags,
         *paths,
         timeout=1700,
     )
@@ -428,6 +447,101 @@ def snapshot(cfg, identifier):
     previous.update(lastSuccess=time.time(), lastSize=summary["total_bytes_processed"])
     atomic_json(metrics_path, previous)
     print("World snapshot completed", flush=True)
+    return summary.get("snapshot_id")
+
+
+def acknowledgement_path(cfg, identifier):
+    return Path(cfg["stateDir"]) / (identifier + "-acknowledge-unclean.json")
+
+
+def consume_acknowledgement(cfg, identifier):
+    path = acknowledgement_path(cfg, identifier)
+    if not path.exists():
+        return
+    path.unlink()
+    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def container_state(cfg, item):
+    try:
+        value = json.loads(
+            run(
+                cfg,
+                "podman",
+                "inspect",
+                "--format",
+                "{{json .State}}",
+                item["container"],
+            )
+        )
+    except subprocess.CalledProcessError:
+        # inspect's 125 also covers runtime/storage errors. Only exists' 1
+        # establishes absence; daemon errors and timeouts must still fail closed.
+        try:
+            run(cfg, "podman", "container", "exists", item["container"])
+        except subprocess.CalledProcessError as error:
+            if error.returncode == 1:
+                return None
+            raise
+        raise
+    if not isinstance(value, dict):
+        raise TypeError("invalid container state")
+    return value
+
+
+def require_stopped(cfg, item, *, prestart=False):
+    state = unit_state(cfg, item)
+    stopped = state.get("ActiveState") in ("inactive", "failed")
+    # ExecStartPre is already activating, but the game has not been launched.
+    preparing = (
+        prestart
+        and state.get("ActiveState") == "activating"
+        and state.get("SubState") == "start-pre"
+        and state.get("MainPID") == "0"
+    )
+    if not (stopped or preparing) or state.get("MainPID", "0") != "0":
+        raise RuntimeError("unclean acknowledgement requires a stopped game server")
+    if item.get("container"):
+        value = container_state(cfg, item)
+        if value is not None and (
+            value.get("Running") is not False
+            or value.get("Status") not in ("exited", "stopped", "created")
+        ):
+            raise RuntimeError("unclean acknowledgement requires a stopped container")
+
+
+def acknowledge_unclean(cfg, identifier):
+    root()
+    item = server(cfg, identifier)
+    with lock(cfg, identifier):
+        require_stopped(cfg, item)
+        proof = stop_proof(cfg, identifier)
+        if proof["graceful"]:
+            raise RuntimeError("game shutdown is already verified clean")
+        if not stop_result_path(cfg, identifier).exists():
+            record_stop(cfg, identifier, False, new=True)
+            proof = stop_proof(cfg, identifier)
+        metadata = Path(cfg["stateDir"]) / (identifier + ".json")
+        previous = json.loads(metadata.read_text()) if metadata.exists() else {}
+        atomic_json(
+            acknowledgement_path(cfg, identifier),
+            {
+                "id": identifier,
+                "token": uuid.uuid4().hex,
+                "acknowledgedAt": time.time(),
+                "previousFingerprint": previous.get("fingerprint"),
+                "newFingerprint": item["fingerprint"],
+                "stopProof": proof,
+            },
+        )
+        print(
+            "Acknowledged unclean shutdown for next pre-change: " + identifier,
+            flush=True,
+        )
 
 
 def prechange(cfg, identifier):
@@ -436,17 +550,76 @@ def prechange(cfg, identifier):
     path = Path(cfg["stateDir"]) / (identifier + ".json")
     with lock(cfg, identifier):
         old = json.loads(path.read_text()) if path.exists() else None
-        if old and old["fingerprint"] == item["fingerprint"]:
+        acknowledgement = acknowledgement_path(cfg, identifier)
+        accepted = (
+            json.loads(acknowledgement.read_text())
+            if acknowledgement.exists()
+            else None
+        )
+        if accepted is not None:
+            if (
+                not isinstance(accepted, dict)
+                or accepted.get("id") != identifier
+                or accepted.get("newFingerprint") != item["fingerprint"]
+                or accepted.get("stopProof") != stop_proof(cfg, identifier)
+                or accepted["stopProof"].get("graceful") is not False
+                or not isinstance(accepted.get("token"), str)
+                or not re.fullmatch(r"[0-9a-f]{32}", accepted["token"])
+            ):
+                raise RuntimeError(
+                    "unclean acknowledgement is stale; acknowledge again"
+                )
+            require_stopped(cfg, item, prestart=True)
+        elif old and old["fingerprint"] == item["fingerprint"]:
             return
         for world in item["worldPaths"]:
             reject_symlinks(world)
         worlds_exist = any(
             Path(p).exists() and any(Path(p).iterdir()) for p in item["worldPaths"]
         )
+        snapshot_taken = False
+        snapshot_id = None
         if worlds_exist:
-            require_saved(cfg, identifier)
-            print("Taking required pre-change snapshot for " + identifier, flush=True)
-            snapshot(cfg, identifier)
+            if not accepted:
+                require_saved(cfg, identifier)
+            if cfg["backup"]["enabled"] and item["backup"]:
+                print(
+                    "Taking required pre-change snapshot for " + identifier, flush=True
+                )
+                if accepted:
+                    snapshot_id = snapshot(cfg, identifier, unclean=True)
+                else:
+                    snapshot_id = snapshot(cfg, identifier)
+                snapshot_taken = True
+            else:
+                qualifier = (
+                    "acknowledged unclean recovery"
+                    if accepted
+                    else "verified clean change"
+                )
+                print(
+                    f"WARNING: {identifier}: {qualifier}; backups disabled; no snapshot was taken",
+                    flush=True,
+                )
+        elif accepted:
+            print(
+                f"WARNING: {identifier}: acknowledged unclean recovery; no world exists; no snapshot was taken",
+                flush=True,
+            )
+        if accepted:
+            # Persist the original evidence before publishing a new fingerprint.
+            # The token makes retrying after an interrupted publication idempotent.
+            atomic_json(
+                Path(cfg["stateDir"])
+                / "unclean"
+                / (identifier + "-" + accepted["token"] + ".json"),
+                dict(
+                    accepted,
+                    appliedAt=time.time(),
+                    snapshotTaken=snapshot_taken,
+                    snapshotId=snapshot_id,
+                ),
+            )
         atomic_json(
             path,
             {
@@ -455,6 +628,8 @@ def prechange(cfg, identifier):
                 "fingerprint": item["fingerprint"],
             },
         )
+        if accepted:
+            consume_acknowledgement(cfg, identifier)
 
 
 def log_tail(path, offset=0):
@@ -469,8 +644,7 @@ def log_tail(path, offset=0):
 def container_stop(cfg, identifier):
     root()
     item = server(cfg, identifier)
-    result = stop_result_path(cfg, identifier)
-    atomic_json(result, {"graceful": False})
+    record_stop(cfg, identifier, False, new=True)
     logfile = Path(item["logDir"]) / "server.log"
     # Direct console exit avoids the entrypoint's SIGTERM/tee exit-code bug.
     # Fresh log evidence and both saved world files are mandatory, too.
@@ -481,9 +655,10 @@ def container_stop(cfg, identifier):
     }
     console_root(cfg, identifier, "exit")
     exit_code = run(cfg, "podman", "wait", item["container"], timeout=150).strip()
-    state = json.loads(
-        run(cfg, "podman", "inspect", "--format", "{{json .State}}", item["container"])
-    )
+    # The adapter disables auto-removal; OCI cleanup runs after verification.
+    state = container_state(cfg, item)
+    if state is None:
+        raise RuntimeError("container disappeared before shutdown verification")
     fresh = log_tail(logfile, offset)
     position = 0
     for marker in (
@@ -503,37 +678,34 @@ def container_stop(cfg, identifier):
             or value.st_mtime_ns <= modified
         ):
             raise RuntimeError("container world save files did not advance")
-    if exit_code != "0" or state.get("ExitCode") != 0 or state.get("OOMKilled", False):
+    if exit_code != "0" or not container_exit_clean(state):
         raise RuntimeError("container did not exit normally after saving")
-    atomic_json(result, {"graceful": True})
+    record_stop(cfg, identifier, True)
+
+
+def container_exit_clean(value):
+    return (
+        value.get("Running") is False
+        and type(value.get("ExitCode")) is int
+        and value["ExitCode"] == 0
+        and value.get("OOMKilled") is False
+    )
 
 
 def container_result(cfg, identifier):
     root()
     item = server(cfg, identifier)
+    proof = {"graceful": False}
     try:
-        value = json.loads(
-            run(
-                cfg,
-                "podman",
-                "inspect",
-                "--format",
-                "{{json .State}}",
-                item["container"],
-            )
-        )
-        result = stop_result_path(cfg, identifier)
-        confirmed = result.exists() and json.loads(result.read_text()).get(
-            "graceful", False
-        )
-        ok = (
-            confirmed
-            and value.get("ExitCode") == 0
-            and not value.get("OOMKilled", False)
-        )
-    except (subprocess.SubprocessError, ValueError):
+        proof = stop_proof(cfg, identifier)
+        confirmed = proof["graceful"]
+        value = container_state(cfg, item)
+        ok = confirmed and (value is None or container_exit_clean(value))
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError):
         ok = False
-    atomic_json(stop_result_path(cfg, identifier), {"graceful": ok})
+    if ok:
+        return  # Preserve the verified evidence, including when OCI already removed it.
+    atomic_json(stop_result_path(cfg, identifier), dict(proof, graceful=False))
 
 
 def recovery_path(cfg, identifier):
@@ -777,6 +949,7 @@ def main(argv):
         in (
             "prepare",
             "prechange",
+            "acknowledge-unclean",
             "backup-run",
             "recover",
             "container-stop",
@@ -788,6 +961,7 @@ def main(argv):
         functions = {
             "prepare": prepare,
             "prechange": prechange,
+            "acknowledge-unclean": acknowledge_unclean,
             "backup-run": backup_run,
             "recover": recover,
             "container-stop": container_stop,
@@ -808,7 +982,13 @@ def main(argv):
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        RuntimeError,
+        subprocess.SubprocessError,
+    ) as error:
         # Never print captured child output: it could contain credentials.
         print(str(error), file=sys.stderr)
         sys.exit(1)

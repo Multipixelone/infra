@@ -61,6 +61,8 @@
           inherit (cfg.systemd.services.${name}) enable;
           preStart = cfg.systemd.services.${name}.serviceConfig.ExecStartPre or [ ];
           stop = cfg.systemd.services.${name}.serviceConfig.ExecStop or [ ];
+          stopPost = cfg.systemd.services.${name}.serviceConfig.ExecStopPost or [ ];
+          startScript = cfg.systemd.services.${name}.script;
           memoryMax = cfg.systemd.services.${name}.serviceConfig.MemoryMax;
           slice = cfg.systemd.services.${name}.serviceConfig.Slice;
           renderedUnitLength = builtins.stringLength cfg.systemd.units."${name}.service".text;
@@ -73,6 +75,13 @@
           group = cfg.users.users.games-dashboard.group;
         };
         gameSecrets = lib.filter (name: builtins.hasAttr name cfg.age.secrets) secretNames;
+        acknowledgement = {
+          executable = lib.getExe cfg.infra.games.packages.acknowledge-unclean;
+          installed = lib.elem cfg.infra.games.packages.acknowledge-unclean cfg.environment.systemPackages;
+          sudoCommands = lib.concatMap (
+            rule: map (command: command.command) rule.commands
+          ) cfg.security.sudo.extraRules;
+        };
         tcp = cfg.networking.firewall.allowedTCPPorts;
         udp = cfg.networking.firewall.allowedUDPPorts;
         batch = cfg.systemd.slices.batch-beets.sliceConfig;
@@ -86,6 +95,8 @@
         baselineBatch = without.systemd.slices.batch-beets.sliceConfig;
         gamesSlice = enabled.systemd.slices.games.sliceConfig;
         containerOptions = enabled.virtualisation.oci-containers.containers.games-terraria.extraOptions;
+        containerAutoRemove =
+          enabled.virtualisation.oci-containers.containers.games-terraria.autoRemoveOnStop;
         terrariaPassword = {
           inherit (enabled.infra.games.runtime.terraria) game;
           replacements =
@@ -185,6 +196,9 @@
                   assert 'verb === "start"' in fixture["polkit"] and 'return polkit.Result.NO' in fixture["polkit"]
                   assert fixture["dashboardUser"] == {"isSystemUser": True, "extraGroups": [], "group": "games-dashboard"}
                   assert fixture["batch"] == data["baselineBatch"]
+                  assert fixture["acknowledgement"]["installed"]
+                  assert fixture["acknowledgement"]["executable"].endswith("/bin/games-acknowledge-unclean")
+                  assert fixture["acknowledgement"]["executable"] not in fixture["acknowledgement"]["sudoCommands"]
               assert data["missing"]["gameSecrets"] == []
               assert len(data["enabled"]["gameSecrets"]) == 5
               pre = data["enabled"]["units"]["minecraft-server-survival"]["preStart"]
@@ -193,6 +207,10 @@
               assert "games-prechange" in pre[0] and "games-prepare" in pre[1] and "pre-start" in pre[2]
               stop = data["enabled"]["units"]["podman-games-terraria"]["stop"]
               assert "games-container-stop" in stop[0] and "stop" in stop[1]
+              post = data["enabled"]["units"]["podman-games-terraria"]["stopPost"]
+              assert "games-container-result" in post[0] and "post-stop" in post[1]
+              assert not data["containerAutoRemove"]
+              assert "--rm" not in data["enabled"]["units"]["podman-games-terraria"]["startScript"]
               assert set(data["missing"]["tcp"]) - set(data["baselineTCP"]) == {7777}  # ATM10 already opens 25565.
               assert set(data["missing"]["udp"]) - set(data["baselineUDP"]) == {19132}
               assert {25565, 7777} <= set(data["missing"]["tcp"])

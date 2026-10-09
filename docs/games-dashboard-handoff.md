@@ -254,7 +254,11 @@ not accepted as a consistent snapshot. Its stop helper sends literal `exit`,
 waits for normal exit, checks fresh ordered save/validation/modded-save log
 messages, and requires both world files' modification times to advance. The
 image's exit code alone is insufficient: its wrapper can report success after
-a runtime crash. Logs are retained at the server's `logs/server.log` beneath
+a runtime crash. Auto-removal is disabled for Terraria: its stopped container
+retains exit and OOM state until the post-stop verification runs, then the OCI
+cleanup hook removes it. Unexpected disappearance during stop verification
+fails closed; disappearance after a verified stop does not erase its proof.
+Logs are retained at the server's `logs/server.log` beneath
 its data directory and through journald.
 
 Nightly jobs run at 00:30 for survival and 00:40 for Terraria, with at most two
@@ -279,17 +283,54 @@ sudo restic -r /media/alexandria/Backups/games \
 ```
 
 The server may create its first empty world before backups are configured.
-Subsequent version/modpack changes require a successful snapshot before new
-files can open that world. Existing worlds without a version baseline also
-require a snapshot and verified clean shutdown. Failed units and absent or
-failed save proofs are refused, including when the server is already stopped.
-After an unclean exit, start the unchanged version and complete a clean stop
-before changing versions. This guard fails closed while backups are disabled. Package
+Subsequent version/modpack changes and existing worlds without a version
+baseline require verified clean shutdown. When backups are enabled for the
+server, they also require a successful snapshot before new files can open that
+world. An uninitialized repository, wrong mount, or snapshot failure blocks the
+change. When backups are disabled globally or for that server, a verified-clean
+change proceeds without a snapshot and logs an explicit warning. Package
 downgrades are changes too; a Nix rollback does not undo a world migration.
+
+An absent or unclean save proof blocks changes even with backups disabled.
+After inspecting the failure and stopping the game, root can deliberately
+authorize the next pre-change using the packaged command on link:
+
+```console
+sudo games-acknowledge-unclean terraria
+```
+
+This command records a one-use acknowledgement; it does not start the service
+or claim the shutdown was clean. With backups enabled, the next pre-change
+takes a snapshot tagged `games:terraria`, `games:unclean`, and
+`games:unverified`, including the acknowledgement and unclean proof. With
+backups disabled, it records a root-owned audit without accessing the NAS,
+publishes the new fingerprint, and warns in the journal that acknowledged
+unclean recovery proceeded without a snapshot. This branch works before the
+NAS repository has been initialized. Root-only audit records under
+`/srv/games/.state/unclean/` retain timestamps, previous/new fingerprints, the
+unclean proof, and whether a snapshot was taken (and its ID when available).
+
+The acknowledgement is bound to the target fingerprint and shutdown evidence.
+A different deployment requires another acknowledgement; a new run or stop
+invalidates the pending acknowledgement. Snapshot or audit-write failure keeps
+the old fingerprint and acknowledgement for retry. Successful pre-change
+consumes it, even if the fingerprint was unchanged. Later changes after another
+unclean stop require another deliberate acknowledgement. Scheduled backups
+continue to require verified-clean shutdown.
+
+For the existing start-limit-hit failure, after installing the fix and running
+the acknowledgement command, the operator can clear the limit and start:
+
+```console
+sudo systemctl reset-failed podman-games-terraria.service
+sudo systemctl start podman-games-terraria.service
+```
 
 Version metadata and persistent `<id>-stop.json` save proofs live under root-only
 `/srv/games/.state`. Starting a game clears its proof; its stop hook records a
-successful save. Proofs survive reboot and cannot be written by the game user.
+successful save. New run/stop generations prevent acknowledgement reuse even
+when consecutive unclean proofs both say `graceful=false`. Proofs survive reboot
+and cannot be written by the game user.
 Paper uses nixpkgs lazymc 0.2.11 with a small patch that atomically records its
 child's kernel exit result before returning to sleeping. Every wake invalidates
 the previous result; a forced kill leaves it false. The root stop/post-stop hooks

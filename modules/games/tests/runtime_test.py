@@ -5,6 +5,7 @@ import json
 import os
 import socket
 import struct
+import subprocess
 import sys
 import tempfile
 import threading
@@ -267,6 +268,365 @@ class RuntimeTest(unittest.TestCase):
         ):
             runtime.prechange(self.cfg, "survival")
         self.assertFalse((Path(self.cfg["stateDir"]) / "survival.json").exists())
+
+    def test_clean_change_without_backups_publishes_fingerprint_without_nas_access(
+        self,
+    ):
+        for global_enabled, server_enabled in (
+            (False, True),
+            (True, False),
+            (False, False),
+        ):
+            with self.subTest(
+                global_enabled=global_enabled, server_enabled=server_enabled
+            ):
+                self.cfg["backup"]["enabled"] = global_enabled
+                self.item["backup"] = server_enabled
+                runtime.prechange(self.cfg, "survival")
+                (self.world / "level.dat").touch()
+                self.item["fingerprint"] += "-new"
+                with (
+                    patch.object(runtime, "snapshot") as snapshot,
+                    patch.object(runtime, "run") as run,
+                    patch("builtins.print") as output,
+                ):
+                    runtime.prechange(self.cfg, "survival")
+                snapshot.assert_not_called()
+                run.assert_not_called()
+                self.assertIn("no snapshot was taken", output.call_args.args[0])
+                self.assertEqual(self.fingerprint(), self.item["fingerprint"])
+
+    def test_disabled_backups_do_not_allow_unacknowledged_unclean_changes(self):
+        self.cfg["backup"]["enabled"] = False
+        runtime.prechange(self.cfg, "survival")
+        (self.world / "level.dat").touch()
+        self.item["fingerprint"] = "new"
+        runtime.record_stop(self.cfg, "survival", False, new=True)
+        with self.assertRaisesRegex(RuntimeError, "no verified clean"):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "old")
+
+    def fingerprint(self):
+        path = Path(self.cfg["stateDir"]) / "survival.json"
+        return json.loads(path.read_text())["fingerprint"]
+
+    def unclean_change(self, *, unchanged=False, baseline=True):
+        if baseline:
+            runtime.prechange(self.cfg, "survival")
+        (self.world / "level.dat").write_text("irreplaceable")
+        if not unchanged:
+            self.item["fingerprint"] = "new"
+        runtime.record_stop(self.cfg, "survival", False, new=True)
+
+    def acknowledge(self):
+        with patch.object(
+            runtime,
+            "unit_state",
+            return_value={"ActiveState": "failed", "MainPID": "0"},
+        ):
+            runtime.acknowledge_unclean(self.cfg, "survival")
+        return json.loads(
+            runtime.acknowledgement_path(self.cfg, "survival").read_text()
+        )
+
+    def audit(self):
+        paths = list((Path(self.cfg["stateDir"]) / "unclean").glob("survival-*.json"))
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(paths[0].stat().st_mode & 0o777, 0o600)
+        self.assertEqual(paths[0].parent.stat().st_mode & 0o777, 0o700)
+        return json.loads(paths[0].read_text())
+
+    def test_disabled_backup_recovery_audits_before_publishing_and_consumes_ack(self):
+        self.unclean_change()
+        self.cfg["backup"]["enabled"] = False
+        accepted = self.acknowledge()
+        original_atomic = runtime.atomic_json
+
+        def persist(path, value):
+            if Path(path).name == "survival.json":
+                self.assertEqual(self.audit()["stopProof"], accepted["stopProof"])
+                self.assertFalse(runtime.stop_proof(self.cfg, "survival")["graceful"])
+            original_atomic(path, value)
+
+        with (
+            patch.object(
+                runtime,
+                "unit_state",
+                return_value={
+                    "ActiveState": "activating",
+                    "SubState": "start-pre",
+                    "MainPID": "0",
+                },
+            ),
+            patch.object(runtime, "snapshot") as snapshot,
+            patch.object(runtime, "run") as run,
+            patch.object(runtime, "atomic_json", side_effect=persist),
+            patch("builtins.print") as output,
+        ):
+            runtime.prechange(self.cfg, "survival")
+        snapshot.assert_not_called()
+        run.assert_not_called()
+        self.assertIn("acknowledged unclean recovery", output.call_args.args[0])
+        self.assertIn("no snapshot was taken", output.call_args.args[0])
+        audit = self.audit()
+        self.assertEqual(audit["previousFingerprint"], "old")
+        self.assertEqual(audit["newFingerprint"], "new")
+        self.assertIsInstance(audit["acknowledgedAt"], float)
+        self.assertGreaterEqual(audit["appliedAt"], audit["acknowledgedAt"])
+        self.assertFalse(audit["snapshotTaken"])
+        self.assertIsNone(audit["snapshotId"])
+        self.assertEqual(self.fingerprint(), "new")
+        self.assertFalse(runtime.acknowledgement_path(self.cfg, "survival").exists())
+        self.assertEqual(
+            runtime.stop_proof(self.cfg, "survival"), accepted["stopProof"]
+        )
+        self.item["fingerprint"] = "newer"
+        with self.assertRaisesRegex(RuntimeError, "no verified clean"):
+            runtime.prechange(self.cfg, "survival")
+
+    def test_server_disabled_backups_also_allow_acknowledged_recovery(self):
+        self.unclean_change()
+        self.item["backup"] = False
+        self.acknowledge()
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(runtime, "snapshot") as snapshot,
+            patch.object(runtime, "validate_repository") as repository,
+        ):
+            runtime.prechange(self.cfg, "survival")
+        snapshot.assert_not_called()
+        repository.assert_not_called()
+        self.assertFalse(self.audit()["snapshotTaken"])
+
+    def test_enabled_recovery_requires_unclean_snapshot_before_publication(self):
+        self.unclean_change()
+        accepted = self.acknowledge()
+
+        def snapshot(cfg, identifier, *, unclean=False):
+            self.assertTrue(unclean)
+            self.assertEqual(self.fingerprint(), "old")
+            self.assertEqual(runtime.stop_proof(cfg, identifier), accepted["stopProof"])
+            self.assertTrue(runtime.acknowledgement_path(cfg, identifier).exists())
+            return "unclean-snapshot-id"
+
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(runtime, "snapshot", side_effect=snapshot) as operation,
+        ):
+            runtime.prechange(self.cfg, "survival")
+        operation.assert_called_once_with(self.cfg, "survival", unclean=True)
+        self.assertTrue(self.audit()["snapshotTaken"])
+        self.assertEqual(self.audit()["snapshotId"], "unclean-snapshot-id")
+        self.assertEqual(self.fingerprint(), "new")
+        self.assertFalse(runtime.acknowledgement_path(self.cfg, "survival").exists())
+
+    def test_acknowledgement_for_unchanged_fingerprint_still_takes_snapshot(self):
+        self.unclean_change(unchanged=True)
+        self.acknowledge()
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(
+                runtime, "snapshot", return_value="unchanged-snapshot"
+            ) as snapshot,
+        ):
+            runtime.prechange(self.cfg, "survival")
+            runtime.prechange(self.cfg, "survival")
+        snapshot.assert_called_once_with(self.cfg, "survival", unclean=True)
+        self.assertFalse(runtime.acknowledgement_path(self.cfg, "survival").exists())
+
+    def test_failed_unclean_snapshot_keeps_acknowledgement_and_old_fingerprint(self):
+        self.unclean_change()
+        accepted = self.acknowledge()
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(runtime, "snapshot", side_effect=RuntimeError("offline")),
+            self.assertRaisesRegex(RuntimeError, "offline"),
+        ):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "old")
+        self.assertEqual(
+            json.loads(runtime.acknowledgement_path(self.cfg, "survival").read_text()),
+            accepted,
+        )
+        self.assertFalse((Path(self.cfg["stateDir"]) / "unclean").exists())
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(runtime, "snapshot", return_value="retry-snapshot"),
+        ):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "new")
+
+    def test_enabled_recovery_with_uninitialized_repo_does_not_fall_back(self):
+        self.unclean_change()
+        self.acknowledge()
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            self.assertRaisesRegex(RuntimeError, "not initialized"),
+        ):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "old")
+        self.assertTrue(runtime.acknowledgement_path(self.cfg, "survival").exists())
+
+    def test_acknowledgement_audit_failure_blocks_publication(self):
+        self.unclean_change()
+        self.cfg["backup"]["enabled"] = False
+        self.acknowledge()
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            patch.object(runtime, "atomic_json", side_effect=OSError("disk full")),
+            self.assertRaises(OSError),
+        ):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "old")
+        self.assertTrue(runtime.acknowledgement_path(self.cfg, "survival").exists())
+
+    def test_recovery_without_baseline_records_null_previous_fingerprint(self):
+        self.unclean_change(baseline=False)
+        self.cfg["backup"]["enabled"] = False
+        self.acknowledge()
+        with patch.object(
+            runtime, "unit_state", return_value={"ActiveState": "inactive"}
+        ):
+            runtime.prechange(self.cfg, "survival")
+        self.assertIsNone(self.audit()["previousFingerprint"])
+
+    def test_acknowledgement_requires_root_and_fixed_identifier(self):
+        with (
+            patch.object(runtime, "root", side_effect=PermissionError("root required")),
+            self.assertRaises(PermissionError),
+        ):
+            runtime.acknowledge_unclean(self.cfg, "survival")
+        for identifier in ("../survival", "velocity", "--all"):
+            with self.assertRaises(ValueError):
+                runtime.acknowledge_unclean(self.cfg, identifier)
+
+    def test_acknowledgement_and_consumption_reject_live_or_stopping_server(self):
+        self.unclean_change()
+        for state in (
+            {"ActiveState": "active", "MainPID": "123"},
+            {"ActiveState": "activating", "SubState": "start", "MainPID": "0"},
+            {"ActiveState": "deactivating", "MainPID": "0"},
+            {"ActiveState": "failed", "MainPID": "123"},
+            {"ActiveState": "activating", "SubState": "start-pre", "MainPID": "0"},
+        ):
+            with (
+                patch.object(runtime, "unit_state", return_value=state),
+                self.assertRaisesRegex(RuntimeError, "stopped game"),
+            ):
+                runtime.acknowledge_unclean(self.cfg, "survival")
+        self.acknowledge()
+        with (
+            patch.object(runtime, "unit_state", return_value={"ActiveState": "active"}),
+            self.assertRaisesRegex(RuntimeError, "stopped game"),
+        ):
+            runtime.prechange(self.cfg, "survival")
+
+    def test_production_legacy_unclean_proof_with_removed_container_can_recover(self):
+        self.unclean_change()
+        self.cfg["backup"]["enabled"] = False
+        self.item["container"] = "games-terraria"
+        runtime.atomic_json(
+            runtime.stop_result_path(self.cfg, "survival"), {"graceful": False}
+        )
+        inventory = self.directory / "inventory.json"
+        inventory.write_text(json.dumps(self.cfg))
+
+        def operation(cfg, tool, *args, **kwargs):
+            if tool == "systemctl":
+                return "ActiveState=failed\nMainPID=0\n"
+            if args[0] == "inspect":
+                raise subprocess.CalledProcessError(125, ["podman", "inspect"])
+            self.assertEqual(args, ("container", "exists", "games-terraria"))
+            raise subprocess.CalledProcessError(1, ["podman", "container", "exists"])
+
+        with patch.object(runtime, "run", side_effect=operation):
+            runtime.main(
+                ["--inventory", str(inventory), "acknowledge-unclean", "survival"]
+            )
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "new")
+        self.assertEqual(self.audit()["stopProof"], {"graceful": False})
+
+    def test_acknowledgement_with_missing_proof_records_unclean_evidence(self):
+        self.unclean_change()
+        runtime.stop_result_path(self.cfg, "survival").unlink()
+        accepted = self.acknowledge()
+        self.assertFalse(accepted["stopProof"]["graceful"])
+        self.assertEqual(
+            accepted["stopProof"], runtime.stop_proof(self.cfg, "survival")
+        )
+
+    def test_clean_shutdown_cannot_be_acknowledged_as_unclean(self):
+        with (
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+            self.assertRaisesRegex(RuntimeError, "already verified clean"),
+        ):
+            runtime.acknowledge_unclean(self.cfg, "survival")
+
+    def test_malformed_acknowledgement_cannot_bypass_unchanged_shortcut(self):
+        self.unclean_change(unchanged=True)
+        for value in ({}, [], {"token": "../../escape"}):
+            runtime.atomic_json(
+                runtime.acknowledgement_path(self.cfg, "survival"), value
+            )
+            with self.assertRaisesRegex(RuntimeError, "stale"):
+                runtime.prechange(self.cfg, "survival")
+
+    def test_acknowledgement_rejects_running_retained_container(self):
+        self.unclean_change()
+        self.item["container"] = "games-terraria"
+        with (
+            patch.object(runtime, "unit_state", return_value={"ActiveState": "failed"}),
+            patch.object(
+                runtime,
+                "container_state",
+                return_value={"Running": True, "Status": "running"},
+            ),
+            self.assertRaisesRegex(RuntimeError, "stopped container"),
+        ):
+            runtime.acknowledge_unclean(self.cfg, "survival")
+
+    def test_stale_acknowledgement_cannot_authorize_different_change_or_proof(self):
+        self.unclean_change()
+        self.acknowledge()
+        self.item["fingerprint"] = "different"
+        with self.assertRaisesRegex(RuntimeError, "stale"):
+            runtime.prechange(self.cfg, "survival")
+        self.item["fingerprint"] = "new"
+        runtime.atomic_json(
+            runtime.stop_result_path(self.cfg, "survival"),
+            {"graceful": False, "generation": "different"},
+        )
+        with self.assertRaisesRegex(RuntimeError, "stale"):
+            runtime.prechange(self.cfg, "survival")
+        self.assertEqual(self.fingerprint(), "old")
+
+    def test_new_run_or_stop_invalidates_pending_acknowledgement(self):
+        self.unclean_change()
+        accepted = self.acknowledge()
+        runtime.record_stop(self.cfg, "survival", False, new=True)
+        self.assertNotEqual(
+            runtime.stop_proof(self.cfg, "survival"), accepted["stopProof"]
+        )
+        self.assertFalse(runtime.acknowledgement_path(self.cfg, "survival").exists())
+        with self.assertRaisesRegex(RuntimeError, "no verified clean"):
+            runtime.prechange(self.cfg, "survival")
 
     def test_wrong_mount_is_rejected_before_restic(self):
         (self.directory / "repo").mkdir()
@@ -609,22 +969,151 @@ class RuntimeTest(unittest.TestCase):
     def test_container_requires_fresh_world_and_modded_saves_then_normal_exit(self):
         result = self.container_fixture()
 
-        def exit_command(*args):
-            with (Path(self.item["logDir"]) / "server.log").open("a") as stream:
-                stream.write(
-                    "Saving world data\nValidating world save\nSaving modded world data\n"
-                )
-            for path in self.item["worldFiles"]:
-                Path(path).write_text("fresh saved world")
-
         with (
-            patch.object(runtime, "console_root", side_effect=exit_command),
+            patch.object(runtime, "console_root", side_effect=self.container_save),
             patch.object(
-                runtime, "run", side_effect=["0\n", '{"ExitCode":0,"OOMKilled":false}']
+                runtime,
+                "run",
+                side_effect=["0\n", '{"Running":false,"ExitCode":0,"OOMKilled":false}'],
             ),
         ):
             runtime.container_stop(self.cfg, "survival")
         self.assertTrue(json.loads(result.read_text())["graceful"])
+
+    def container_save(self, *args):
+        with (Path(self.item["logDir"]) / "server.log").open("a") as stream:
+            stream.write(
+                "Saving world data\nValidating world save\nSaving modded world data\n"
+            )
+        for path in self.item["worldFiles"]:
+            Path(path).write_text("fresh saved world")
+
+    def test_auto_removed_container_before_stop_inspect_fails_closed(self):
+        result = self.container_fixture()
+        with (
+            patch.object(runtime, "console_root", side_effect=self.container_save),
+            patch.object(
+                runtime,
+                "run",
+                side_effect=[
+                    "0\n",
+                    subprocess.CalledProcessError(125, ["podman", "inspect"]),
+                    subprocess.CalledProcessError(1, ["podman", "container", "exists"]),
+                ],
+            ) as operation,
+            self.assertRaisesRegex(RuntimeError, "disappeared"),
+        ):
+            runtime.container_stop(self.cfg, "survival")
+        self.assertEqual(
+            operation.call_args.args[2:], ("container", "exists", "games-terraria")
+        )
+        self.assertFalse(json.loads(result.read_text())["graceful"])
+
+    def test_container_result_after_removal_preserves_only_verified_proof(self):
+        result = self.container_fixture()
+        for verified in (True, False):
+            proof = {"graceful": verified, "generation": "retained-proof"}
+            runtime.atomic_json(result, proof)
+            with patch.object(
+                runtime,
+                "run",
+                side_effect=[
+                    subprocess.CalledProcessError(125, ["podman", "inspect"]),
+                    subprocess.CalledProcessError(1, ["podman", "container", "exists"]),
+                ],
+            ):
+                runtime.container_result(self.cfg, "survival")
+            self.assertEqual(json.loads(result.read_text()), proof)
+
+    def test_verified_retained_stop_survives_result_then_oci_removal(self):
+        result = self.container_fixture()
+        state = '{"Running":false,"ExitCode":0,"OOMKilled":false}'
+        with (
+            patch.object(runtime, "console_root", side_effect=self.container_save),
+            patch.object(runtime, "run", side_effect=["0\n", state, state]),
+        ):
+            runtime.container_stop(self.cfg, "survival")
+            proof = json.loads(result.read_text())
+            runtime.container_result(self.cfg, "survival")
+        self.assertTrue(proof["graceful"])
+        with patch.object(
+            runtime,
+            "run",
+            side_effect=[
+                subprocess.CalledProcessError(125, ["podman", "inspect"]),
+                subprocess.CalledProcessError(1, ["podman", "container", "exists"]),
+            ],
+        ):
+            runtime.container_result(self.cfg, "survival")
+        self.assertEqual(json.loads(result.read_text()), proof)
+
+    def test_container_result_inspection_errors_are_not_treated_as_absence(self):
+        result = self.container_fixture()
+        for responses in (
+            [subprocess.CalledProcessError(125, ["inspect"]), ""],
+            [
+                subprocess.CalledProcessError(125, ["inspect"]),
+                subprocess.CalledProcessError(125, ["exists"]),
+            ],
+            [subprocess.TimeoutExpired(["inspect"], 30)],
+            ["invalid json"],
+            ["[]"],
+        ):
+            with self.subTest(responses=responses):
+                runtime.atomic_json(result, {"graceful": True})
+                with patch.object(runtime, "run", side_effect=responses):
+                    runtime.container_result(self.cfg, "survival")
+                self.assertFalse(json.loads(result.read_text())["graceful"])
+
+    def test_container_stop_rejects_abnormal_or_unknown_exit_even_after_save(self):
+        result = self.container_fixture()
+        for exit_code, state in (
+            ("137\n", {"Running": False, "ExitCode": 0, "OOMKilled": False}),
+            ("0\n", {"Running": False, "ExitCode": 137, "OOMKilled": False}),
+            ("0\n", {"Running": False, "ExitCode": 0, "OOMKilled": True}),
+            ("0\n", {"Running": True, "ExitCode": 0, "OOMKilled": False}),
+            ("0\n", {"ExitCode": 0}),
+        ):
+            with self.subTest(exit_code=exit_code, state=state):
+                with (
+                    patch.object(
+                        runtime, "console_root", side_effect=self.container_save
+                    ),
+                    patch.object(
+                        runtime, "run", side_effect=[exit_code, json.dumps(state)]
+                    ),
+                    self.assertRaisesRegex(RuntimeError, "exit normally"),
+                ):
+                    runtime.container_stop(self.cfg, "survival")
+                self.assertFalse(json.loads(result.read_text())["graceful"])
+
+    def test_container_stop_requires_ordered_markers_and_each_advancing_file(self):
+        self.container_fixture()
+        state = '{"Running":false,"ExitCode":0,"OOMKilled":false}'
+
+        def incomplete_save(*args):
+            self.container_save()
+            Path(self.item["worldFiles"][1]).write_text("")
+
+        with (
+            patch.object(runtime, "console_root", side_effect=incomplete_save),
+            patch.object(runtime, "run", side_effect=["0\n", state]),
+            self.assertRaisesRegex(RuntimeError, "files did not advance"),
+        ):
+            runtime.container_stop(self.cfg, "survival")
+
+        def reversed_markers(*args):
+            with (Path(self.item["logDir"]) / "server.log").open("a") as stream:
+                stream.write(
+                    "Saving modded world data\nValidating world save\nSaving world data\n"
+                )
+
+        with (
+            patch.object(runtime, "console_root", side_effect=reversed_markers),
+            patch.object(runtime, "run", side_effect=["0\n", state]),
+            self.assertRaisesRegex(RuntimeError, "fresh, complete"),
+        ):
+            runtime.container_stop(self.cfg, "survival")
 
     def test_entrypoint_exit_zero_does_not_replace_verified_stop(self):
         result = self.container_fixture()
@@ -638,7 +1127,9 @@ class RuntimeTest(unittest.TestCase):
         result = self.container_fixture()
         runtime.atomic_json(result, {"graceful": True})
         with patch.object(
-            runtime, "run", return_value='{"ExitCode":0,"OOMKilled":true}'
+            runtime,
+            "run",
+            return_value='{"Running":false,"ExitCode":0,"OOMKilled":true}',
         ):
             runtime.container_result(self.cfg, "survival")
         self.assertFalse(json.loads(result.read_text())["graceful"])
@@ -677,6 +1168,81 @@ class RuntimeTest(unittest.TestCase):
         self.assertIn("There are 3", runtime.rcon(self.item, "list"))
         thread.join(timeout=5)
         self.assertFalse(thread.is_alive())
+
+    @unittest.skipUnless(
+        os.environ.get("RESTIC_EXE"), "real restic supplied by Nix check"
+    )
+    def test_real_unclean_snapshot_restores_acknowledgement_proof_and_old_fingerprint(
+        self,
+    ):
+        self.unclean_change()
+        accepted = self.acknowledge()
+        self.cfg["commands"] = {"restic": os.environ["RESTIC_EXE"]}
+        password = self.directory / "restic-password"
+        password.write_text("disposable-check-password")
+        self.cfg["backup"]["passwordFile"] = str(password)
+        runtime.run(
+            self.cfg,
+            "restic",
+            "-r",
+            self.cfg["backup"]["repository"],
+            "-p",
+            password,
+            "init",
+        )
+        with (
+            patch.object(runtime, "validate_repository"),
+            patch.object(
+                runtime, "unit_state", return_value={"ActiveState": "inactive"}
+            ),
+        ):
+            runtime.prechange(self.cfg, "survival")
+        snapshots = json.loads(
+            runtime.run(
+                self.cfg,
+                "restic",
+                "-r",
+                self.cfg["backup"]["repository"],
+                "-p",
+                password,
+                "snapshots",
+                "--json",
+            )
+        )
+        self.assertEqual(
+            set(snapshots[0]["tags"]),
+            {"games:survival", "games:unclean", "games:unverified"},
+        )
+        self.assertIn(
+            self.audit()["snapshotId"], (snapshots[0]["id"], snapshots[0]["short_id"])
+        )
+        restore = self.directory / "restore"
+        runtime.run(
+            self.cfg,
+            "restic",
+            "-r",
+            self.cfg["backup"]["repository"],
+            "-p",
+            password,
+            "restore",
+            "latest",
+            "--target",
+            restore,
+        )
+        metadata = restore / str(Path(self.cfg["stateDir"]) / "survival.json").lstrip(
+            "/"
+        )
+        self.assertEqual(json.loads(metadata.read_text())["fingerprint"], "old")
+        proof = restore / str(runtime.stop_result_path(self.cfg, "survival")).lstrip(
+            "/"
+        )
+        self.assertEqual(json.loads(proof.read_text()), accepted["stopProof"])
+        acknowledgement = restore / str(
+            runtime.acknowledgement_path(self.cfg, "survival")
+        ).lstrip("/")
+        self.assertEqual(json.loads(acknowledgement.read_text()), accepted)
+        self.assertEqual(self.fingerprint(), "new")
+        self.assertFalse(runtime.acknowledgement_path(self.cfg, "survival").exists())
 
     @unittest.skipUnless(
         os.environ.get("RESTIC_EXE"), "real restic supplied by Nix check"

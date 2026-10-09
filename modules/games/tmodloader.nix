@@ -130,6 +130,9 @@
           id: s:
           lib.nameValuePair "games-${id}" {
             autoStart = true;
+            # Retain exit/OOM state until the ordered ExecStopPost verification.
+            # oci-containers removes the container in its subsequent cleanup hook.
+            autoRemoveOnStop = false;
             image = s.terraria.image;
             log-driver = "journald";
             environment = {
@@ -187,7 +190,7 @@
                 "${lib.getExe cfg.packages.prepare} ${id}"
               ];
               ExecStop = lib.mkBefore [ "${lib.getExe cfg.packages.container-stop} ${id}" ];
-              # Keep the exit status before oci-containers removes the container.
+              # Auto-removal is disabled, so this runs before OCI cleanup.
               ExecStopPost = lib.mkBefore [ "${lib.getExe cfg.packages.container-result} ${id}" ];
             };
           }
