@@ -95,8 +95,22 @@ for field, directory, server in (
     assert configuration["data"]["password"] == "@LUCKPERMS_PASSWORD@"
     bootstrap = json.loads(pathlib.Path(permissions[field][f"{directory}/bootstrap.json"]["source"]).read_text())
     assert "default" in bootstrap["groups"]
-    assert {"key": "group.default", "value": True} in bootstrap["groups"]["admin"]["nodes"]
+    assert {"key": "group.default", "value": True} in bootstrap["groups"]["mod"]["nodes"]
+    assert {"key": "group.mod", "value": True} in bootstrap["groups"]["admin"]["nodes"]
+    assert {"key": "group.default", "value": True} not in bootstrap["groups"]["admin"]["nodes"]
     assert {"key": "*", "value": True} in bootstrap["groups"]["admin"]["nodes"]
+    assert bootstrap["tracks"] == {"staff": {"groups": ["default", "mod", "admin"]}}
+    default_nodes = {node["key"] for node in bootstrap["groups"]["default"]["nodes"] if node["value"]}
+    assert {"skinsrestorer.command.set", "voicechat.listen", "voicechat.speak", "voicechat.groups",
+            "huskhomes.max_homes.10", "huskhomes.command.home", "huskhomes.command.sethome",
+            "huskhomes.command.delhome", "huskhomes.command.homelist", "huskhomes.command.edithome.privacy",
+            "huskhomes.command.tpa", "huskhomes.command.tpahere", "huskhomes.command.tpaccept",
+            "huskhomes.command.tpdecline", "axgraves.help", "axgraves.list", "axgraves.allowgraves"} <= default_nodes
+    assert "*" not in default_nodes and "axgraves.admin" not in default_nodes
+    mod_nodes = {node["key"] for node in bootstrap["groups"]["mod"]["nodes"] if node["value"]}
+    assert {"minecraft.command.kick", "velocity.command.kick", "huskhomes.command.tp",
+            "minecraft.command.gamemode", "axgraves.list.other", "axgraves.admin"} <= mod_nodes
+    assert "*" not in mod_nodes
     assert bootstrap["users"] == {
         "3f771d00-3456-4007-8d66-13fe158488fa": {
             "primaryGroup": "admin",

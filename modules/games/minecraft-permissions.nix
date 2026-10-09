@@ -92,10 +92,48 @@
                     "voicechat.listen"
                     "voicechat.speak"
                     "voicechat.groups"
+                    "huskhomes.max_homes.10"
+                    "huskhomes.command.home"
+                    "huskhomes.command.sethome"
+                    "huskhomes.command.delhome"
+                    "huskhomes.command.homelist"
+                    "huskhomes.command.edithome"
+                    "huskhomes.command.edithome.privacy"
+                    "huskhomes.command.phome"
+                    "huskhomes.command.phomelist"
+                    "huskhomes.command.warp"
+                    "huskhomes.command.warplist"
+                    "huskhomes.command.tpa"
+                    "huskhomes.command.tpahere"
+                    "huskhomes.command.tpaccept"
+                    "huskhomes.command.tpdecline"
+                    "huskhomes.command.tpignore"
+                    "axgraves.help"
+                    "axgraves.list"
+                    "axgraves.allowgraves"
+                  ];
+              mod.nodes =
+                map
+                  (key: {
+                    inherit key;
+                    value = true;
+                  })
+                  [
+                    "group.default"
+                    "minecraft.command.kick"
+                    "velocity.command.kick"
+                    "huskhomes.command.tp"
+                    "minecraft.command.gamemode"
+                    "minecraft.command.gamemode.survival"
+                    "minecraft.command.gamemode.spectator"
+                    "minecraft.command.gamemode.creative"
+                    "minecraft.command.gamemode.adventure"
+                    "axgraves.list.other"
+                    "axgraves.admin"
                   ];
               admin.nodes = [
                 {
-                  key = "group.default";
+                  key = "group.mod";
                   value = true;
                 }
                 {
@@ -104,7 +142,11 @@
                 }
               ];
             };
-            tracks = { };
+            tracks.staff.groups = [
+              "default"
+              "mod"
+              "admin"
+            ];
             users = lib.optionalAttrs (cfg.minecraftAdminUuid != null) {
               ${cfg.minecraftAdminUuid} = {
                 primaryGroup = "admin";

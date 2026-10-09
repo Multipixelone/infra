@@ -1,6 +1,16 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-huskhomes = pkgs.fetchurl {
+        name = "huskhomes-paper-4.11-9ed80cc.jar";
+        url = "https://cdn.modrinth.com/data/J6U9o3JG/versions/eXHdkjXf/HuskHomes-Paper-4.11-9ed80cc.jar";
+        sha256 = "86591445fffc24533bc3e76de5df01cdde50011c80d88a45d0eb3fe123d617ab";
+      };
+      games-axgraves = pkgs.fetchurl {
+        name = "axgraves-1.32.1.jar";
+        url = "https://hangarcdn.papermc.io/plugins/Artillex-Studios/AxGraves/versions/1.32.1/PAPER/AxGraves-1.32.1.jar";
+        sha256 = "06358594c2ee3032bdddbe473b7605c23b48631c6b41161f1b0f63db992dfc78";
+      };
       games-skinsrestorer = pkgs.fetchurl {
         name = "skinsrestorer-15.12.6.jar";
         url = "https://github.com/SkinsRestorer/SkinsRestorer/releases/download/15.12.6/SkinsRestorer.jar";

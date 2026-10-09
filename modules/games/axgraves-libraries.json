@@ -1,0 +1,83 @@
+[
+  {
+    "group": "org.ow2.asm",
+    "artifact": "asm",
+    "version": "9.10.1",
+    "classifier": "",
+    "name": "org.ow2.asm.asm-9.10.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+    "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb"
+  },
+  {
+    "group": "org.ow2.asm",
+    "artifact": "asm-commons",
+    "version": "9.10.1",
+    "classifier": "",
+    "name": "org.ow2.asm.asm-commons-9.10.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+    "sha256": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895"
+  },
+  {
+    "group": "org.ow2.asm",
+    "artifact": "asm-tree",
+    "version": "9.10.1",
+    "classifier": "",
+    "name": "org.ow2.asm.asm-tree-9.10.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+    "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b"
+  },
+  {
+    "group": "me.lucko",
+    "artifact": "jar-relocator",
+    "version": "1.7",
+    "classifier": "",
+    "name": "me.lucko.jar-relocator-1.7.jar",
+    "url": "https://repo.maven.apache.org/maven2/me/lucko/jar-relocator/1.7/jar-relocator-1.7.jar",
+    "sha256": "6f7d1184e17a90788797e3b9b2e34b87ff9e02bd623851052d78709071c3bb82"
+  },
+  {
+    "group": "org.apache.commons",
+    "artifact": "commons-math3",
+    "version": "3.6.1",
+    "classifier": "",
+    "name": "org.apache.commons.commons-math3-3.6.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar",
+    "sha256": "1e56d7b058d28b65abd256b8458e3885b674c1d588fa43cd7d1cbb9c7ef2b308"
+  },
+  {
+    "group": "com.github.ben-manes.caffeine",
+    "artifact": "caffeine",
+    "version": "3.2.3",
+    "classifier": "",
+    "name": "com.github.ben-manes.caffeine.caffeine-3.2.3.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/github/ben-manes/caffeine/caffeine/3.2.3/caffeine-3.2.3.jar",
+    "sha256": "ca70c90a5d1ce1511880ce9c93d4ad22108f61111d3daf91eb52762b571bd179"
+  },
+  {
+    "group": "org.jspecify",
+    "artifact": "jspecify",
+    "version": "1.0.0",
+    "classifier": "",
+    "name": "org.jspecify.jspecify-1.0.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+    "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+  },
+  {
+    "group": "com.google.errorprone",
+    "artifact": "error_prone_annotations",
+    "version": "2.43.0",
+    "classifier": "",
+    "name": "com.google.errorprone.error_prone_annotations-2.43.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.43.0/error_prone_annotations-2.43.0.jar",
+    "sha256": "48272e75c16e1f7bdc7bd19529ccacd5ee170404701d7f5a23441bb5847957f5"
+  },
+  {
+    "group": "com.artillexstudios.axapi.nms.v26_3",
+    "artifact": "axapi",
+    "version": "2.2.0-DEV-NEW-VERSION-6",
+    "classifier": "all",
+    "name": "com.artillexstudios.axapi.nms.v26_3.axapi-2.2.0-DEV-NEW-VERSION-6-all.jar",
+    "url": "https://repo.artillex-studios.com/releases/com/artillexstudios/axapi/nms/v26_3/axapi/2.2.0-DEV-NEW-VERSION-6/axapi-2.2.0-DEV-NEW-VERSION-6-all.jar",
+    "sha256": "ab89d7f13f79a80ab661116e407e5ab99e251db1cb10a4131514a0ef9187218f"
+  }
+]

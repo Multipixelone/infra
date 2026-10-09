@@ -85,6 +85,10 @@
               webserver.enabled = false;
               plugin = {
                 live-player-markers = false;
+                # HuskHomes publishes public home/warp marker sets. Keep those
+                # responsive on the static webroot without publishing players.
+                write-markers-interval = 30;
+                write-players-interval = 0;
                 skin-download = false;
                 player-render-limit = 1;
               };

@@ -6,19 +6,34 @@ there is no redirect from that name to Dawarich and no data migration.
 
 ## Installed set and compatibility
 
-Verified on 2026-10-08. Every release JAR uses an exact URL and SHA-256 in
+Verified on 2026-10-09. Every release JAR uses an exact URL and SHA-256 in
 `minecraft-plugin-artifacts.nix`; downloads were hashed before pinning. No
 plugin JAR is fetched or updated at runtime. Configurations use Nix formats.
 
-| Plugin | Version / placement | Evidence |
-| --- | --- | --- |
-| SkinsRestorer | 15.12.6 / Velocity and Paper | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml) |
-| MiniMOTD | 2.2.5 / Velocity | [Release](https://github.com/jpenilla/MiniMOTD/releases/tag/v2.2.5); [source](https://github.com/jpenilla/MiniMOTD/tree/v2.2.5/platform/velocity) ping, command and favicon calls inspected against the pinned Velocity 4.2.0 build 30 API |
-| BlueMap | 5.28 / Paper | [Explicit Paper 26.3 support](https://github.com/BlueMap-Minecraft/BlueMap/releases/tag/v5.28) |
-| LuckPerms | 5.5.71 / Velocity and Paper | [Paper 26.3 release](https://modrinth.com/plugin/luckperms/version/v5.5.71-bukkit), [Velocity release](https://modrinth.com/plugin/luckperms/version/v5.5.71-velocity); Finn explicitly approved Velocity compatibility |
-| Simple Voice Chat | bukkit-2.6.24 / Paper | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24) |
-| TickScope | 2.0.1 / Paper | [Maintained release](https://github.com/gzimbric/TickScope/releases/tag/v2.0.1), [26.3 compatibility](https://hangar.papermc.io/gzimbric/TickScope/versions/2.0.1) |
-| DiscordSRV classic | 1.30.5 / Paper | [26.3 release](https://modrinth.com/plugin/discordsrv/version/1.30.5) |
+| Plugin             | Version / placement            | Evidence                                                                                                                                                                                                                                   |
+| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SkinsRestorer      | 15.12.6 / Velocity and Paper   | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml)                          |
+| MiniMOTD           | 2.2.5 / Velocity               | [Release](https://github.com/jpenilla/MiniMOTD/releases/tag/v2.2.5); [source](https://github.com/jpenilla/MiniMOTD/tree/v2.2.5/platform/velocity) ping, command and favicon calls inspected against the pinned Velocity 4.2.0 build 30 API |
+| BlueMap            | 5.28 / Paper                   | [Explicit Paper 26.3 support](https://github.com/BlueMap-Minecraft/BlueMap/releases/tag/v5.28)                                                                                                                                             |
+| LuckPerms          | 5.5.71 / Velocity and Paper    | [Paper 26.3 release](https://modrinth.com/plugin/luckperms/version/v5.5.71-bukkit), [Velocity release](https://modrinth.com/plugin/luckperms/version/v5.5.71-velocity); Finn explicitly approved Velocity compatibility                    |
+| Simple Voice Chat  | bukkit-2.6.24 / Paper          | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24)                                                                                                                                                 |
+| TickScope          | 2.0.1 / Paper                  | [Maintained release](https://github.com/gzimbric/TickScope/releases/tag/v2.0.1), [26.3 compatibility](https://hangar.papermc.io/gzimbric/TickScope/versions/2.0.1)                                                                         |
+| DiscordSRV classic | 1.30.5 / Paper                 | [26.3 release](https://modrinth.com/plugin/discordsrv/version/1.30.5)                                                                                                                                                                      |
+| HuskHomes          | 4.11-9ed80cc **alpha** / Paper | [Pinned release metadata](https://api.modrinth.com/v2/version/eXHdkjXf) explicitly lists Paper and 26.3; [source commit](https://github.com/WiIIiam278/HuskHomes/commit/9ed80cc)                                                           |
+| AxGraves           | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
+
+HuskHomes' stable 4.11 declares support through 26.2. The pinned September 23
+Paper alpha explicitly declares 26.3, so it is used with Finn's approval of a
+compatible prerelease. Its descriptor has `api-version: 1.20`; the release's
+26.3 metadata is the compatibility evidence. HuskHomes supplies homes and TPA
+together: SimpleHome and SimpleTPA are unnecessary and are not installed.
+
+AxGraves is the preferred lightweight option for this friends server: indefinite,
+owner-protected graves and XP storage need few settings. Alternatives are
+actively maintained too: [GravesX 2026.4.9.2](https://modrinth.com/plugin/gravesx/version/2026.4.9.2)
+declares 26.3, while [AngelChest Free 14.0.0-RC5](https://www.spigotmc.org/resources/angelchest-free.60383/)
+lists 26.3 as a release candidate. Neither provides a clear maintenance advantage
+over AxGraves' recent stable release for this scope.
 
 MiniMOTD compatibility is a source/API assessment, not a claim of a live 4.2
 integration test. Its dependencies target the older API, but the calls used
@@ -110,14 +125,143 @@ LuckPerms' SQL messaging queue supports MySQL/MariaDB, not PostgreSQL: this
 single-proxy arrangement uses `pluginmsg` plus a one-minute database sync.
 Permissions load from the shared database when Paper wakes.
 
-A generated `bootstrap.json` declares `default` (skin and voice commands) and
-`admin` (inherits default with administrator permissions). After the first
-wake, run `lp import bootstrap.json` in the Paper console **once**, then verify
-both platforms see the groups. The repo does not know Finn's verified MC UUID.
-Set `gameServers.minecraft.adminUuid` to that UUID before importing to declare
-his membership; the default is `null`, with no invented account. Do not
-re-import casually after interactive permission changes: it is a bootstrap,
-not an ongoing database reconciliation service.
+A generated `bootstrap.json` declares the `staff` track in order
+`default → mod → admin`. `mod` inherits `default`; `admin` inherits `mod`
+and retains `*`. Finn's verified UUID is declared through
+`gameServers.minecraft.adminUuid`; the bootstrap assigns him to `admin`.
+
+| Group                  | Explicit grants                                                                                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| default                | Existing `skinsrestorer.command.set`, `voicechat.listen`, `voicechat.speak`, `voicechat.groups`                                                                                                            |
+| default: homes         | `huskhomes.max_homes.10`, `huskhomes.command.home`, `.sethome`, `.delhome`, `.homelist`, `.edithome`, `.edithome.privacy` (all abbreviated command nodes use the `huskhomes.command` prefix)               |
+| default: public travel | `huskhomes.command.phome`, `.phomelist`, `.warp`, `.warplist`                                                                                                                                              |
+| default: requests      | `huskhomes.command.tpa`, `.tpahere`, `.tpaccept`, `.tpdecline`, `.tpignore`; `/tpdeny` is an alias of `/tpdecline`, so there is no separate `tpdeny` node                                                  |
+| default: graves        | `axgraves.help`, `axgraves.list`, `axgraves.allowgraves`                                                                                                                                                   |
+| mod                    | `minecraft.command.kick`, `velocity.command.kick`, `huskhomes.command.tp`, `minecraft.command.gamemode` plus `.survival`, `.spectator`, `.creative`, `.adventure`, `axgraves.list.other`, `axgraves.admin` |
+| admin                  | `*`, inherited mod/default grants                                                                                                                                                                          |
+
+Mod can kick, teleport themselves to a player, switch gamemode (including
+creative/adventure as Finn requested), list others' graves and open them to
+recover items. It gets no wildcard, ban, reload, warp creation or teleport-other
+node. `axgraves.admin` is AxGraves' owner-protection bypass; this does not grant
+its separate reload command. Bukkit/Velocity op accounts retain upstream op
+permissions independently of the LuckPerms groups.
+
+For a **new database only**, run `lp import bootstrap.json` in the Paper console
+once after the first wake, then verify both platforms see the groups. Generated
+bootstrap files are not ongoing database reconciliation. Do not re-import an
+already-bootstrapped database: that can replace interactive groups/users.
+
+For Finn's **existing database**, run these individual Paper console commands.
+They add grants and change the admin inheritance without clearing users or
+other group nodes. `mod` and `staff` are new; if they already exist, inspect
+`lp track staff info` and skip creation/append commands that are already applied.
+
+```text
+lp creategroup mod
+lp group mod parent add default
+lp group admin parent add mod
+lp group admin parent remove default
+lp group admin permission set * true
+lp createtrack staff
+lp track staff append default
+lp track staff append mod
+lp track staff append admin
+lp group default permission set huskhomes.max_homes.10 true
+lp group default permission set huskhomes.command.home true
+lp group default permission set huskhomes.command.sethome true
+lp group default permission set huskhomes.command.delhome true
+lp group default permission set huskhomes.command.homelist true
+lp group default permission set huskhomes.command.edithome true
+lp group default permission set huskhomes.command.edithome.privacy true
+lp group default permission set huskhomes.command.phome true
+lp group default permission set huskhomes.command.phomelist true
+lp group default permission set huskhomes.command.warp true
+lp group default permission set huskhomes.command.warplist true
+lp group default permission set huskhomes.command.tpa true
+lp group default permission set huskhomes.command.tpahere true
+lp group default permission set huskhomes.command.tpaccept true
+lp group default permission set huskhomes.command.tpdecline true
+lp group default permission set huskhomes.command.tpignore true
+lp group default permission set axgraves.help true
+lp group default permission set axgraves.list true
+lp group default permission set axgraves.allowgraves true
+lp group mod permission set minecraft.command.kick true
+lp group mod permission set velocity.command.kick true
+lp group mod permission set huskhomes.command.tp true
+lp group mod permission set minecraft.command.gamemode true
+lp group mod permission set minecraft.command.gamemode.survival true
+lp group mod permission set minecraft.command.gamemode.spectator true
+lp group mod permission set minecraft.command.gamemode.creative true
+lp group mod permission set minecraft.command.gamemode.adventure true
+lp group mod permission set axgraves.list.other true
+lp group mod permission set axgraves.admin true
+lp user 3f771d00-3456-4007-8d66-13fe158488fa parent add admin
+lp user 3f771d00-3456-4007-8d66-13fe158488fa primarygroup set admin
+lp track staff info
+lp group default permission info
+lp group mod permission info
+lp group admin parent info
+lp sync
+```
+
+Existing skin/voice grants and user assignments remain in place. Run `lpv sync`
+in the Velocity console to refresh immediately (or wait for database sync).
+Assign a moderator later with `lp user <uuid> parent add mod`.
+
+## Homes, requests and graves
+
+HuskHomes uses local SQLite at
+`/srv/games/minecraft/survival/plugins/HuskHomes/HuskHomesData.db`;
+cross-server messaging, Redis and economy integration are disabled. All friends
+start with 10 homes without manual grants; the config fallback is also 10,
+with permission stacking disabled. `/sethome <name>`, `/homes`, `/home <name>`
+and `/delhome <name>` work across Overworld/Nether/End. Teleports have a
+five-second warmup cancelled by movement/damage; requests expire after 60 seconds.
+Use `/tpa <friend>`, `/tpahere <friend>`, `/tpaccept` and `/tpdeny`.
+
+The BlueMap hook publishes **public** homes and warps as marker sets.
+`/edithome <name> privacy public` publishes a home; `privacy private` hides it.
+The home delimiter is `:` instead of `.` because Floodgate names start with
+`.`: e.g. `/phome .BedrockFriend:base`. Private homes stay private. Publishing
+exposes the name/location on the public map at `map.finnrut.is`; live player
+markers stay disabled. BlueMap writes marker sets every 30 seconds while Paper
+is awake. HuskHomes clears its marker sets when disabled, so home/warp markers
+can disappear during lazymc sleep; they repopulate on wake. The static terrain
+map remains viewable throughout. Admins create warps with `/setwarp <name>`;
+regular friends can list/use them.
+
+HuskHomes' six declared driver/Redis dependencies load unconditionally, even
+with SQLite-only settings. `huskhomes-libraries.json` pins the full closure
+(14 JARs and 28 parent/BOM/dependency POMs). Immutable per-version directories
+preseed Paper's `libraries` Maven cache with repository identity; the real
+HuskHomes loader and pinned Paper 26.3 resolver are checked with zero transfers.
+Update checks are off. Installing the Jedis library does not enable Redis.
+
+AxGraves retains **100% XP** and items in graves with no timed expiry or grave
+count eviction. Empty graves disappear. Only the owner can open or instantly
+loot their grave, with the documented mod/admin recovery bypass for opening.
+`/graves list` lists one's graves. State is `plugins/AxGraves/data.json`, saved
+on shutdown and every 30 seconds; backups include the whole plugin directory.
+The ordinary grave interaction and inventory GUI use the Java Player UUID
+provided by Floodgate; no Java client mod or resource pack is required for
+Bedrock. Both normal and sneak instant-pickup ownership protections are enabled.
+
+AxGraves includes an AxAPI runtime downloader. `axgraves-libraries.json` pins
+its exact `v26_3` adapter (`2.2.0-DEV-NEW-VERSION-6`, `all` classifier), commons-math3,
+Caffeine and dependencies, ASM and jar-relocator. Nix relocates jars and preseeds
+the exact immutable cache and metadata at `plugins/AxAPI/libraries/AxGraves`.
+Missing/changed cache metadata would trigger upstream downloads, so version
+upgrades must refresh pins, relocation rules and offline checks together.
+Update notifications are disabled; neither plugin adds credentials or changes
+the existing mandatory-credential startup gate.
+
+After deployment, verify with a non-op Java friend and a Bedrock friend: set
+10 homes and reject an 11th; travel between dimensions; accept/deny both request
+directions; publish/hide a BlueMap home and test a warp. For graves, die with
+items/XP, deny another friend's access, recover as owner/mod, then cleanly stop
+and wake Paper and recover a still-filled grave. These are operator smoke tests;
+the Nix checks do not claim a live client integration test.
 
 Mutable backend plugin directories are included with world snapshot roots in
 the existing clean-stop backup. JAR/cache symlinks do not replace the pinned
@@ -175,12 +319,12 @@ for binary secrets such as Floodgate's key.
 Survival declares the following `gameServers.servers.survival.minecraft.discord`
 options for Finn's existing bot:
 
-| Option | Discord ID | Purpose |
-| --- | --- | --- |
-| `guildId` | `1518484285466873997` | Guild owning the channels |
-| `channelId` | `1557960229528797265` | Main bidirectional chat, deaths and advancements |
-| `eventsChannelId` | `1518484285982769204` | Join, first join and leave messages |
-| `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands |
+| Option             | Discord ID            | Purpose                                          |
+| ------------------ | --------------------- | ------------------------------------------------ |
+| `guildId`          | `1518484285466873997` | Guild owning the channels                        |
+| `channelId`        | `1557960229528797265` | Main bidirectional chat, deaths and advancements |
+| `eventsChannelId`  | `1518484285982769204` | Join, first join and leave messages              |
+| `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands       |
 
 The defaults for other servers are empty. Either missing guild/chat ID, missing token or `enable = false`
 means no DiscordSRV JAR is installed; Minecraft itself remains independently
@@ -248,14 +392,14 @@ is enabled. Reassess memory and startup time with the actual enabled modules.
 **Block logging:** defer for now; existing backups provide whole-world recovery,
 not per-block inspection or rollback. The comparison as of 2026-10-08:
 
-| Candidate | Release / compatibility | Storage, features and performance considerations |
-| --- | --- | --- |
-| [CoreProtect CE](https://www.spigotmc.org/resources/coreprotect-community-edition.8631/) | 24.1; maintained, published support through 26.2 | SQLite/MySQL; mature inspect/lookup/rollback/restore with queued logging; no PostgreSQL |
-| [CoreProtect paid](https://www.patreon.com/cw/coreprotect/sitemap) | 25.0 supports 26.3; paid artifact unavailable here | Adds DuckDB/ClickHouse; [native memory, thread and driver budgets](https://docs.coreprotect.net/config/) need attention; no PostgreSQL |
-| [Prism](https://github.com/prism/prism/releases/tag/v4.4) | 4.4; maintained, released support through 26.2 | H2/SQLite/PostgreSQL/MySQL/MariaDB; inspect, rollback preview, restore and undo; streamed/batched operations bound work |
-| [Original LogBlock](https://github.com/LogBlock/LogBlock) | No verified 26.3 release | MySQL; inspect/lookup/rollback and queued writes, but adds another database engine here |
-| [Tracel](https://hangar.papermc.io/arnodoelinger/Tracel/versions/1.0.0-preview.1) | 1.0.0-preview.1 lists 26.3; first preview released today | Compact custom storage, inspect, preview/undo and crash-resumable rollback; very little release history |
-| [Spyglass](https://github.com/firestarter/spyglass) | Preview, no verified 26.3 release | SQLite or external databases, extensive audit/rollback; aimed at larger servers and not the default for this small survival server |
+| Candidate                                                                                | Release / compatibility                                  | Storage, features and performance considerations                                                                                       |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [CoreProtect CE](https://www.spigotmc.org/resources/coreprotect-community-edition.8631/) | 24.1; maintained, published support through 26.2         | SQLite/MySQL; mature inspect/lookup/rollback/restore with queued logging; no PostgreSQL                                                |
+| [CoreProtect paid](https://www.patreon.com/cw/coreprotect/sitemap)                       | 25.0 supports 26.3; paid artifact unavailable here       | Adds DuckDB/ClickHouse; [native memory, thread and driver budgets](https://docs.coreprotect.net/config/) need attention; no PostgreSQL |
+| [Prism](https://github.com/prism/prism/releases/tag/v4.4)                                | 4.4; maintained, released support through 26.2           | H2/SQLite/PostgreSQL/MySQL/MariaDB; inspect, rollback preview, restore and undo; streamed/batched operations bound work                |
+| [Original LogBlock](https://github.com/LogBlock/LogBlock)                                | No verified 26.3 release                                 | MySQL; inspect/lookup/rollback and queued writes, but adds another database engine here                                                |
+| [Tracel](https://hangar.papermc.io/arnodoelinger/Tracel/versions/1.0.0-preview.1)        | 1.0.0-preview.1 lists 26.3; first preview released today | Compact custom storage, inspect, preview/undo and crash-resumable rollback; very little release history                                |
+| [Spyglass](https://github.com/firestarter/spyglass)                                      | Preview, no verified 26.3 release                        | SQLite or external databases, extensive audit/rollback; aimed at larger servers and not the default for this small survival server     |
 
 Prism is the preferred future fit once it publishes verified 26.3 support. Its
 PostgreSQL backend can reuse link's existing operations and avoid embedded-file
