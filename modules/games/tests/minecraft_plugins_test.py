@@ -20,8 +20,14 @@ assert discord_defaults["ConfigVersion"] == "1.30.5"
 for case in cases:
     assert case["installed"] == case["expected"]
     assert not case["baseAvailable"]  # No mandatory Minecraft credentials in these fixtures.
+    assert case["tokenCopy"] is None  # Text-only preparation is outside generic raw-byte copying.
+    token_hooks = [entry for entry in case["preStart"] if "minecraft-discord-token-prepare" in entry]
     if case["expected"]:
-        assert case["tokenCopy"] == {"secret": "/run/agenix/games/minecraft/discordsrv-token"}
+        assert len(token_hooks) == 1
+        assert token_hooks[0].startswith("+")
+        assert token_hooks[0].endswith(" /run/agenix/games/minecraft/discordsrv-token /srv/games/minecraft/survival/plugins/DiscordSRV/.token")
+        prepare_index = next(i for i, entry in enumerate(case["preStart"]) if "games-prepare" in entry)
+        assert prepare_index < case["preStart"].index(token_hooks[0])
         assert case["declaredSecret"] == "0400"
         assert any(path.endswith("plugins/DiscordSRV") for path in case["statePaths"])
         configuration = yaml.safe_load(pathlib.Path(case["configuration"]).read_text())
@@ -44,7 +50,7 @@ for case in cases:
             assert messages[f"MinecraftPlayer{event}Message"]["Enabled"]
             assert "Channel" not in messages[f"MinecraftPlayer{event}Message"]
     else:
-        assert case["tokenCopy"] is None
+        assert token_hooks == []
         assert not any(path.endswith("plugins/DiscordSRV") for path in case["statePaths"])
     assert any(path.endswith("plugins/BlueMap") for path in case["statePaths"])
     assert any(path.endswith("plugins/SkinsRestorer") for path in case["statePaths"])

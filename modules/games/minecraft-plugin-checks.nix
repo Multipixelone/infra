@@ -43,6 +43,7 @@ let
           expected = case.token && case.guild != "" && case.channel != "" && case.enable;
           installed = plugins.jars ? discordsrv;
           tokenCopy = plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/.token" or null;
+          preStart = cfg.systemd.services.minecraft-server-survival.serviceConfig.ExecStartPre;
           declaredSecret = cfg.age.secrets."games/minecraft/discordsrv-token".mode or null;
           baseAvailable = runtime.available;
           statePaths = runtime.worldPaths;
@@ -145,6 +146,7 @@ in
           ];
         }
         ''
+          python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
           python3 ${./tests/minecraft_plugins_test.py} \
             ${pkgs.writeText "minecraft-plugin-fixtures.json" (builtins.toJSON fixtures)} \
             ${pkgs.writeText "minecraft-static-nginx.conf" ''

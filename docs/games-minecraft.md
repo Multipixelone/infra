@@ -147,9 +147,14 @@ not queued and do not wake Paper. This is the accepted tradeoff.
 Finn already has a bot. Configure its token separately as
 `games/minecraft/discordsrv-token.age` in the secrets repository, with the
 appropriate link recipients/rule, then refresh the pinned secrets input when
-ready. Do not paste it into this repo. The decrypted credential is copied into
-DiscordSRV's supported private `.token` file; periods in Discord tokens bypass
-the unrelated password-placeholder validator safely.
+ready. Do not paste it into this repo. The Minecraft module's Python preparation
+hook runs after `games-prepare`, copies the credential to DiscordSRV's supported
+private `.token` file, and strips surrounding whitespace, including trailing
+newlines. It drops to the Minecraft account before writing plugin paths and
+atomically creates the file with mode `0600`; an empty token fails preparation
+without logging its value. The original agenix file is untouched. Internal
+characters and periods are preserved. Generic raw-byte copying remains unchanged
+for binary secrets such as Floodgate's key.
 
 Survival declares the following `gameServers.servers.survival.minecraft.discord`
 options for Finn's existing bot:

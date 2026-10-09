@@ -20,6 +20,11 @@
         Webhook.Enable = false;
       };
       format = pkgs.formats.yaml { };
+      tokenPrepare = pkgs.writeScript "minecraft-discord-token-prepare" ''
+        #!${pkgs.python3}/bin/python3
+        import runpy
+        runpy.run_path("${./minecraft-discord-token.py}", run_name="__main__")
+      '';
     in
     lib.mkIf (servers != { }) {
       infra.games.minecraftPlugins.backends = lib.mapAttrs (
@@ -37,11 +42,7 @@
           jars.discordsrv = cfg.artifacts.games-discordsrv;
           secretNames = [ secret ];
           statePaths = [ "/srv/games/minecraft/${id}/plugins/DiscordSRV" ];
-          templates = {
-            # Tokens contain periods, unlike games-prepare's password placeholders.
-            "/srv/games/minecraft/${id}/plugins/DiscordSRV/.token".secret = "/run/agenix/${secret}";
-          }
-          //
+          templates =
             lib.mapAttrs'
               (
                 name: value:
@@ -109,6 +110,17 @@
                 linking."Require linked account to play".Enabled = false;
                 voice.Enabled = false;
               };
+        }
+      ) servers;
+      systemd.services = lib.mapAttrs' (
+        id: s:
+        lib.nameValuePair "minecraft-server-${id}" {
+          serviceConfig.ExecStartPre = lib.mkIf (ready s) (
+            # games-prepare has mkAfter priority 1500; trim after its private configs.
+            lib.mkOrder 1600 [
+              "+${tokenPrepare} /run/agenix/${secret} /srv/games/minecraft/${id}/plugins/DiscordSRV/.token"
+            ]
+          );
         }
       ) servers;
     };
