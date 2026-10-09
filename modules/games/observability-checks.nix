@@ -60,6 +60,8 @@
                       proxyPort = 25576;
                       serverPort = 25577;
                       rconPort = 25585;
+                      voicechatPort = 24455;
+                      metricsPort = 9226;
                     };
                   };
                 }

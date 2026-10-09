@@ -19,7 +19,9 @@ def games(groups):
 def contract(data):
     services = data["services"]
     ready = games(services["enabled"])
-    assert list(ready) == ["Survival", "Terraria", "Games dashboard"]
+    assert list(ready) == ["Survival Map", "Survival", "Terraria", "Games dashboard"]
+    assert ready["Survival Map"]["href"] == "https://map.finnrut.is"
+    assert ready["Survival Map"]["siteMonitor"] == "http://127.0.0.1:8766/index.html"
     assert ready["Survival"]["widget"] == {
         "type": "minecraft",
         "url": "udp://127.0.0.1:25566",
@@ -32,11 +34,12 @@ def contract(data):
     assert ready["Terraria"]["widget"]["url"].endswith("/servers/terraria")
     assert ready["Games dashboard"]["href"] == "https://games.nyc.finnrut.is"
     for scenario in ("missing", "empty"):
-        assert list(games(services[scenario])) == ["Games dashboard"]
+        assert list(games(services[scenario])) == ["Survival Map", "Games dashboard"]
+        assert games(services[scenario])["Survival Map"] == ready["Survival Map"]
     for scenario in ("disabled", "stopped"):
-        assert list(games(services[scenario])) == ["Terraria", "Games dashboard"]
+        assert list(games(services[scenario])) == ["Survival Map", "Terraria", "Games dashboard"]
     discovered = games(services["discovered"])
-    assert list(discovered) == ["Creative", "Survival", "Terraria", "Games dashboard"]
+    assert list(discovered) == ["Survival Map", "Creative", "Survival", "Terraria", "Games dashboard"]
     assert discovered["Creative"]["widget"]["url"] == "udp://127.0.0.1:25576"
     original = [group for group in services["empty"] if "Games" not in group]
     assert original and original == [

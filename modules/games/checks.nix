@@ -47,6 +47,8 @@
                       proxyPort = 25576;
                       serverPort = 25577;
                       rconPort = 25585;
+                      voicechatPort = 24455;
+                      metricsPort = 9226;
                     };
                   };
                 }
@@ -174,7 +176,7 @@
                       "available": name == "enabled", "logsCommand": ["games-logs", "velocity"],
                   }]
                   assert servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
-                  assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 7777}
+                  assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 24454, 7777}
                   assert all(server["console"]["command"] == ["games-console", server["id"]] for server in servers.values())
                   expected = name == "enabled"
                   assert all(server["available"] == expected for server in servers.values())
@@ -212,7 +214,7 @@
               assert not data["containerAutoRemove"]
               assert "--rm" not in data["enabled"]["units"]["podman-games-terraria"]["startScript"]
               assert set(data["missing"]["tcp"]) - set(data["baselineTCP"]) == {7777}  # ATM10 already opens 25565.
-              assert set(data["missing"]["udp"]) - set(data["baselineUDP"]) == {19132}
+              assert set(data["missing"]["udp"]) - set(data["baselineUDP"]) == {19132, 24454}
               assert {25565, 7777} <= set(data["missing"]["tcp"])
               assert not ({25566, 25567, 25575} & (set(data["missing"]["tcp"]) | set(data["missing"]["udp"])))
               assert {"--network=host", "--cgroup-parent=games.slice", "--memory=4g", "--memory-swap=4g"} <= set(data["containerOptions"])
