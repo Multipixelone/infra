@@ -116,6 +116,7 @@
                 gamemode=survival
                 difficulty=normal
                 level-name=world
+                spawn-protection=0
                 max-players=${toString s.minecraft.maxPlayers}
                 motd=${s.displayName}
               ''
@@ -277,6 +278,7 @@
               ]
               ++ (backend id).statePaths;
             pluginInventory = (backend id).inventory;
+            datapackInventory = cfg.minecraftDatapacks.backends.${id}.inventory;
             mapUrl = "https://map.finnrut.is";
             public =
               lib.concatMap (hostname: [
@@ -324,6 +326,7 @@
               builtins.toJSON {
                 package = toString (paper s);
                 plugins = s.minecraft.plugins // (backend id).jars;
+                datapacks = cfg.minecraftDatapacks.backends.${id}.packs;
                 templates = templatesFor id s // (backend id).templates;
               }
             );

@@ -135,6 +135,7 @@ result-*
 /.slim/deepwork/
 /.slim/worktrees.json
 /.slim/worktrees/
+/modules/games/datapacks/*.zip
 /pkgs/games-dashboard/**/.pytest_cache/
 /pkgs/games-dashboard/**/.venv/
 /pkgs/games-dashboard/**/__pycache__/

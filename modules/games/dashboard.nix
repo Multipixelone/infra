@@ -95,6 +95,7 @@
             ;
           inherit id;
           plugins = s.pluginInventory or [ ];
+          datapacks = s.datapackInventory or [ ];
           mapUrl = s.mapUrl or null;
           console = s.console // {
             command = [

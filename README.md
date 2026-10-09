@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (108)</summary>
+<summary>Packages exposed by this flake (114)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -122,11 +122,14 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`foot`](https://github.com/Multipixelone/infra/blob/main/modules/shell/terminal/foot.nix) — Fast, lightweight and minimalistic Wayland terminal emulator · `nix run github:Multipixelone/infra#foot`
 - [`forgejo-check-status`](https://github.com/Multipixelone/infra/blob/main/modules/ci/status.nix) — Report each flake check as its own Forgejo commit status from one nix-fast-build run · `nix run github:Multipixelone/infra#forgejo-check-status`
 - `games-acknowledge-unclean` · `nix run github:Multipixelone/infra#games-acknowledge-unclean`
+- `games-axgraves` · `nix run github:Multipixelone/infra#games-axgraves`
+- `games-axgraves-libraries` · `nix run github:Multipixelone/infra#games-axgraves-libraries`
 - `games-backup` · `nix run github:Multipixelone/infra#games-backup`
 - `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
 - `games-backup-run` · `nix run github:Multipixelone/infra#games-backup-run`
 - `games-bluemap` · `nix run github:Multipixelone/infra#games-bluemap`
 - `games-bluemap-offline` · `nix run github:Multipixelone/infra#games-bluemap-offline`
+- `games-chunky` · `nix run github:Multipixelone/infra#games-chunky`
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
 - `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`
@@ -136,6 +139,8 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
 - `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`
 - [`games-grafana-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/grafana.nix) · `nix run github:Multipixelone/infra#games-grafana-dashboard`
+- `games-huskhomes` · `nix run github:Multipixelone/infra#games-huskhomes`
+- `games-huskhomes-libraries` · `nix run github:Multipixelone/infra#games-huskhomes-libraries`
 - `games-lazymc` — Remote wake-up daemon for minecraft servers · `nix run github:Multipixelone/infra#games-lazymc`
 - `games-logs` · `nix run github:Multipixelone/infra#games-logs`
 - `games-luckperms-libraries` · `nix run github:Multipixelone/infra#games-luckperms-libraries`
@@ -143,6 +148,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-luckperms-velocity` · `nix run github:Multipixelone/infra#games-luckperms-velocity`
 - `games-metrics` · `nix run github:Multipixelone/infra#games-metrics`
 - `games-minecraft-client` · `nix run github:Multipixelone/infra#games-minecraft-client`
+- `games-minecraft-world-policy` · `nix run github:Multipixelone/infra#games-minecraft-world-policy`
 - `games-minimotd` · `nix run github:Multipixelone/infra#games-minimotd`
 - `games-paper-result` · `nix run github:Multipixelone/infra#games-paper-result`
 - `games-paper-stop` · `nix run github:Multipixelone/infra#games-paper-stop`

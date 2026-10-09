@@ -208,7 +208,7 @@
               assert data["missing"]["gameSecrets"] == []
               assert len(data["enabled"]["gameSecrets"]) == 5
               pre = data["enabled"]["units"]["minecraft-server-survival"]["preStart"]
-              assert len(pre) == 3 and "games-prechange" in pre[0] and "survival-start-pre" in pre[1] and "games-prepare" in pre[2]
+              assert len(pre) == 4 and "games-prechange" in pre[0] and "survival-start-pre" in pre[1] and "games-prepare" in pre[2] and "minecraft-datapacks-prepare" in pre[3]
               pre = data["enabled"]["units"]["podman-games-terraria"]["preStart"]
               assert "games-prechange" in pre[0] and "games-prepare" in pre[1] and "pre-start" in pre[2]
               stop = data["enabled"]["units"]["podman-games-terraria"]["stop"]

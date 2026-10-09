@@ -145,6 +145,20 @@ test("empty shared inventory is supported", () => {
   );
 });
 
+test("datapack inventory parses independently and defaults to empty for older manifests", () => {
+  const packs = [{ name: "Coordinates HUD", version: "1.2.19", installed: true }];
+  const manifest = (overrides: Partial<Server>) => parseManifest({
+    schemaVersion: 1,
+    host: "link",
+    servers: [server(overrides)],
+    sharedServices: [],
+  }).servers[0];
+  assert.deepEqual(manifest({}).datapacks, []);
+  assert.deepEqual(manifest({ datapacks: [] }).datapacks, []);
+  assert.deepEqual(manifest({ datapacks: packs }).datapacks, packs);
+  assert.deepEqual(manifest({ datapacks: packs }).plugins, []);
+});
+
 test("plugins group across platforms, preserving versions and the worst status", () => {
   const paper = server({
     plugins: [
@@ -329,6 +343,20 @@ test("server details render accessible, grouped inventory", async (t) => {
         );
       },
     );
+    await t.test("datapacks have a separate section with versions and declared status", () => {
+      const markup = html({ datapacks: [
+        { name: "Coordinates HUD", version: "1.2.19", installed: true },
+        { name: "Armor Statues", version: "2.8.24", installed: true },
+      ] });
+      assert.match(markup, /aria-labelledby="datapacks-heading"/);
+      assert.match(markup, />Datapacks</);
+      assert.match(markup, />Coordinates HUD</);
+      assert.match(markup, />1\.2\.19</);
+      assert.match(markup, />Installed</);
+      assert.match(markup, />World datapack</);
+      assert.ok(markup.indexOf(">Armor Statues<") < markup.indexOf(">Coordinates HUD<"));
+      assert.doesNotMatch(html({ datapacks: [] }), /datapacks-heading/);
+    });
   } finally {
     await vite.close();
   }

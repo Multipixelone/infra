@@ -58,6 +58,7 @@ class Server(StrictModel):
     statusCommand: list[str]
     logsCommand: list[str]
     plugins: list[Plugin] = Field(default_factory=list)
+    datapacks: list[Plugin] = Field(default_factory=list)
     mapUrl: str | None = None
 
     @model_validator(mode="after")

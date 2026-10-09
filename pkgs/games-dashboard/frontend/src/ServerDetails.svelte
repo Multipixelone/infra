@@ -16,6 +16,11 @@
   } = $props();
 
   const plugins = $derived(displayPlugins(server, sharedServices));
+  const datapacks = $derived(
+    [...(server.datapacks ?? [])].sort((a, b) =>
+      Number(a.installed) - Number(b.installed) || a.name.localeCompare(b.name),
+    ),
+  );
 
   function mapAddress(url: string): string {
     try {
@@ -79,6 +84,23 @@
             {#if differs}
               <span class="detail-note plugin-detail">{plugin.installations.map((entry) => `${entry.platform}: ${entry.version} · ${entry.installed ? "Enabled" : "Awaiting setup"}`).join("; ")}</span>
             {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+  {#if datapacks.length}
+    <section class="addresses" aria-labelledby="datapacks-heading">
+      <h3 id="datapacks-heading" class="eyebrow address-label">Datapacks</h3>
+      <ul class="plugin-list">
+        {#each datapacks as pack (pack.name)}
+          <li class="plugin-row">
+            <div class="plugin-summary">
+              <span class="plugin-name">{pack.name}</span>
+              <code class="plugin-version">{pack.version}</code>
+              <span class="plugin-status" class:needs-setup={!pack.installed}>{pack.installed ? "Installed" : "Deferred"}</span>
+            </div>
+            <span class="plugin-platforms">World datapack</span>
           </li>
         {/each}
       </ul>

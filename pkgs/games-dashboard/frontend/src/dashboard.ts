@@ -20,6 +20,7 @@ export type Plugin = { name: string; version: string; installed: boolean };
 
 export type Server = {
   plugins?: Plugin[];
+  datapacks?: Plugin[];
   mapUrl?: string | null;
   id: string;
   game: string;
@@ -323,6 +324,7 @@ function parseServer(value: unknown): Server {
     },
     status: parseStatus(server.status, id),
     plugins: parsePlugins(server.plugins),
+    datapacks: parsePlugins(server.datapacks),
     mapUrl: nullableString(server.mapUrl ?? null, "server.mapUrl"),
   };
 }

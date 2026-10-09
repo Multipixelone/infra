@@ -21,6 +21,23 @@ def test_manifest_schema_parity(manifest_data, manifest):
     }
 
 
+def test_datapack_inventory_is_optional_and_survives_sleep(manifest_data):
+    for server in manifest_data["servers"]:
+        server.pop("datapacks", None)
+    older = Manifest.model_validate(manifest_data)
+    assert all(server.datapacks == [] for server in older.servers)
+    survival = next(server for server in manifest_data["servers"] if server["id"] == "survival")
+    packs = [{"name": "Coordinates HUD", "version": "1.2.19", "installed": True}]
+    survival["datapacks"] = packs
+    manifest = Manifest.model_validate(manifest_data)
+    with TestClient(create_app(MockAdapter(manifest))) as client:
+        client.post("/api/servers/survival/start")
+        servers = client.get("/api/servers").json()["servers"]
+        server = next(server for server in servers if server["id"] == "survival")
+        assert server["status"]["state"] == "sleeping"
+        assert server["datapacks"] == packs
+
+
 @pytest.mark.parametrize("mutation", ["version", "extra", "missing", "argv", "unit"])
 def test_manifest_rejects_drift(manifest_data, mutation):
     server = manifest_data["servers"][0]

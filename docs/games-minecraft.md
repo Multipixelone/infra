@@ -66,6 +66,204 @@ skin services; this is separate from downloading plugin code.
 Custom `minecraft.plugins` names cannot replace managed JAR names. A Paper
 version change requires a new compatibility review and matching asset pins.
 
+## Pregeneration and borders
+
+[Chunky 1.5.3](https://hangar.papermc.io/pop4959/Chunky/versions/1.5.3) is
+installed on Paper, with its configuration and saved task state in
+`plugins/Chunky`, included in clean-stop backups. The pinned JAR bundles its
+dependencies and has no runtime downloader/updater. Backend bStats is disabled.
+No task starts automatically; `continue-on-restart=false` means a saved task
+also requires an explicit `chunky continue` after a wake/restart.
+
+**ChunkyBorder is deferred:** its published
+[Paper 1.2.23 release](https://modrinth.com/plugin/chunkyborder/version/asaBBItO)
+declares support through 26.2, with no verified 26.3 release on 2026-10-09.
+Finn chose to wait for verified compatibility. No custom border is installed,
+set, resized or enforced. Pregeneration alone does not limit exploration.
+
+Wake Paper by joining first. Keep someone connected throughout a long task:
+the existing wake-once marker only starts Paper, and neither console commands
+nor Chunky activity prevent lazymc's 15-minute empty-server sleep. There is no
+declarative maintenance keep-awake control in the current runtime. Do not
+disable the clean-stop guard or rely on a status ping to hold Paper awake.
+
+For example, Finn can run these in the Survival dashboard console, choosing
+the radius deliberately (1000 below is only an example, not configuration):
+
+```text
+chunky world world
+chunky shape square
+chunky center 0 0
+chunky radius 1000
+chunky selection
+chunky start
+chunky progress
+```
+
+Use `chunky pause` before leaving or a maintenance stop; use `chunky continue`
+after joining again. Choose other dimensions explicitly rather than starting
+parallel tasks by default. Do not run `chunky trim` for ordinary pregeneration:
+it deletes terrain outside the selection. Finn's existing administrator
+permissions cover Chunky; friends do not receive generation/admin commands.
+
+BlueMap will discover and render the newly generated chunks afterwards. Its
+existing player-present pause means it renders when the connected player
+leaves, during the empty-but-awake window, and can need several wake windows
+for a large area. Pregeneration does not force a full map render or change the
+existing CPU, memory or idle-sleep budgets.
+
+## World datapacks and game rules
+
+The separate dashboard **Datapacks** list shows the following installed set,
+plus the generated Survival World Policy pack. Installation status describes
+the declaration; it does not assert that Paper is awake or a player's HUD is on.
+
+| Vanilla Tweaks pack | Pinned version | Minecraft / format |
+| --- | --- | --- |
+| Confetti Creepers | 2.2.19 | 26.3 / 121.0 |
+| Player Head Drops | 1.1.18 | 26.3 / 121.0 |
+| Mini Blocks | 1.1.8 | 26.3 / 121.0 |
+| More Mob Heads | 2.20.1 | 26.3 / 121.0 |
+| Custom Nether Portals | 2.3.21 | 26.3 / 121.0 |
+| Double Shulker Shells | 1.3.18 | 26.3 / 121.0 |
+| AFK Display | 1.1.18 | 26.3 / 121.0 |
+
+Coordinates HUD, Silence Mobs, Durability Ping and Armor Statues are no longer
+managed. The next stopped-server reconcile removes their four previously
+managed ZIPs and ledger entries, preserving unrelated datapacks and world data.
+It does not run the removed packs' uninstall functions or erase persistent
+scoreboards/items they created. Anti Enderman Grief remains absent: endermen
+retain vanilla behavior. No second sleep/graves/home datapack is included.
+
+**Official source and reproducibility:** Finn downloaded the official
+[Vanilla Tweaks picker](https://vanillatweaks.net/picker/datapacks/) bundle
+`VanillaTweaks_d326112_UNZIP_ME.zip` on October 9, 2026. Its SHA-256 is
+`05f9f2a4256b4bf3a40e10b1a250959e6850e9ecf6ff55e68f6aebe0a0f53ce4`.
+`modules/games/datapacks/sources.json` records that provenance and each inner
+ZIP's original filename, canonical import filename, version and SHA-256.
+All seven declare `[121,0]` as both minimum and maximum format. Their bytes
+and metadata are unchanged; the outer bundle is unwrapped before importing.
+
+This public repository contains metadata and attribution only, with no
+Vanilla Tweaks archive bytes. Each `pkgs.requireFile` input has a flat
+SHA-256 hash and a canonical basename. Missing inputs fail the build with the
+exact import command, rather than downloading anything. Neither runtime nor
+build-time code contacts the pack builder. Future updates require obtaining
+and reviewing new official files and hashes. Vanilla Tweaks attribution stays
+in `credits.txt`. The packs remain subject to the
+[Vanilla Tweaks terms](https://vanillatweaks.net/terms/); obtain them separately
+from the official picker. Archives must not be committed here or added to
+nix-secrets. The repository's unfree allowance covers only these seven manual
+inputs.
+
+### Provisioning a builder
+
+On each fresh machine or CI builder, obtain the exact official bundle and
+verify its recorded SHA-256. Work outside the repository; unwrap it once with
+`unzip VanillaTweaks_d326112_UNZIP_ME.zip`. Rename each inner ZIP without
+recompressing it, then import it:
+
+```console
+mv 'confetti creepers v2.2.19 (MC 26.3).zip' confetti-creepers-2.2.19-mc26.3.zip
+mv 'player head drops v1.1.18 (MC 26.3).zip' player-head-drops-1.1.18-mc26.3.zip
+mv 'mini blocks v1.1.8 (MC 26.3).zip' mini-blocks-1.1.8-mc26.3.zip
+mv 'more mob heads v2.20.1 (MC 26.3).zip' more-mob-heads-2.20.1-mc26.3.zip
+mv 'custom nether portals v2.3.21 (MC 26.3).zip' custom-nether-portals-2.3.21-mc26.3.zip
+mv 'double shulker shells v1.3.18 (MC 26.3).zip' double-shulker-shells-1.3.18-mc26.3.zip
+mv 'afk display v1.1.18 (MC 26.3).zip' afk-display-1.1.18-mc26.3.zip
+nix-store --add-fixed sha256 ./confetti-creepers-2.2.19-mc26.3.zip
+nix-store --add-fixed sha256 ./player-head-drops-1.1.18-mc26.3.zip
+nix-store --add-fixed sha256 ./mini-blocks-1.1.8-mc26.3.zip
+nix-store --add-fixed sha256 ./more-mob-heads-2.20.1-mc26.3.zip
+nix-store --add-fixed sha256 ./custom-nether-portals-2.3.21-mc26.3.zip
+nix-store --add-fixed sha256 ./double-shulker-shells-1.3.18-mc26.3.zip
+nix-store --add-fixed sha256 ./afk-display-1.1.18-mc26.3.zip
+```
+
+`nix-store --add-fixed sha256` uses flat hashing without `--recursive` and
+matches `requireFile`'s hash mode. Both bytes **and basename** must match; an
+import under the original filename containing spaces is not the declared
+input. `nix store add --mode flat --hash-algo sha256` is an alternative when
+used with the same canonical filenames.
+
+Imports alone are not GC roots. Before an installed system retains the inputs,
+create a root for each returned store path, for example:
+
+```console
+mkdir -p .gcroots/vanillatweaks
+nix-store --realise --add-root "$PWD/.gcroots/vanillatweaks/confetti-creepers" /nix/store/<returned-path>-confetti-creepers-2.2.19-mc26.3.zip
+```
+
+Repeat for all seven, keeping that root directory at its original path. This
+worktree's `.gcroots/` is ignored by git; deleting the worktree removes those
+local roots. On link, `system.extraDependencies` retains all seven ZIPs in the
+installed system closure, rooted by the system profile and its retained
+generations, even while Paper sleeps. Merely evaluating or building with
+`--no-link` does not create that installed-profile root. A store that has lost
+its roots and been garbage-collected needs the import step again. Provision
+remote builders' stores too, or explicitly transfer the required closure to
+them; these inputs are not automatically fetched from a public cache.
+
+### Pack behavior and client caveats
+
+Player Head Drops requires a player killer (PvP), not every death. More Mob
+Heads and Double Shulker Shells use merged Vanilla Tweaks loot-table tags so
+heads and two shells coexist.
+
+Confetti Creepers produces cosmetic firework bursts, **and changes explosion
+mechanics**: the supplied pack defaults to a 100% confetti chance and sets
+selected creepers' explosion radius to zero, preventing block destruction.
+It is not purely cosmetic. Mini Blocks 1.1.8 provides stonecutter recipes that
+turn blocks into textured player heads; this bundle contains no wandering
+trader trades. Custom Nether Portals changes vanilla portal mechanics by
+enabling nonrectangular frames and crying obsidian by default (10–84 frame
+blocks). The official archives and their upstream defaults are preserved.
+
+AFK Display samples position every 150 seconds, places stationary players in
+the gray `afkDis.afk` scoreboard team and checks movement every second while
+AFK. It does not detect chat, looking around or inventory activity. Joining
+that team replaces previous team membership; leaving AFK clears it rather
+than restoring the previous team. Other plugins/datapacks that assign teams,
+name colors, tab-list formatting or scoreboard presentation can conflict.
+This display does not exempt players from sleeping or lazymc's online count.
+
+None of the seven requires an additional Java resource pack: mini blocks and
+heads use vanilla player-head profiles, and confetti uses vanilla fireworks.
+Normal client skin-texture requests are separate from downloading pack code.
+[Bedrock/Geyser custom-head limitations](https://geysermc.org/wiki/geyser/custom-skulls/)
+apply to Mini Blocks, More Mob Heads and Player Head Drops: placed heads can
+use Geyser's existing rendering, but correct inventory/held/worn textures
+require explicit skull mappings and Geyser's generated Bedrock resource pack.
+Those mappings are not added by this change. AFK membership is server-side;
+verify gray names, tab-list display and scoreboard/team interactions on Java
+and Geyser clients after a future authorized deployment. Paper smoke tests
+cannot establish client presentation parity.
+
+The installer writes stable `infra-*.zip` names into `world/datapacks/` as the
+Minecraft unit user, after `games-prechange`, upstream server preparation and
+`games-prepare`, before lazymc can start Paper. It copies archive bytes, so world
+backups contain usable packs rather than symlinks into a particular Nix store.
+The `.infra-managed.json` ledger also lives in that backed-up directory.
+Reconciliation is idempotent and journals both old/new hashes so interrupted
+updates can resume. It removes only previously managed archives, preserves
+unrelated packs/world data, and refuses unowned filename collisions, manually
+modified managed files or symlinked directories/files. Resolve such a collision
+while stopped; do not delete unrelated datapacks to bypass it.
+
+Pack additions, updates and removals participate in the same prechange
+fingerprint as plugin JARs/configurations. The existing clean-stop proof and
+snapshot must succeed before pack changes reach the world. Restore pack bytes
+and their ledger with the world, and select matching declarations before the
+next start; a different declaration reconciles after its prechange snapshot.
+
+`spawn-protection=0` is generated in `server.properties`. The policy pack's
+`minecraft:load` function executes
+`gamerule minecraft:players_sleeping_percentage 50` (the current name for
+`playersSleepingPercentage`) after the world loads on every Paper wake and
+`/reload`. Minecraft owns the resulting `level.dat` persistence; Nix never
+patches NBT directly. A manual gamerule change is overridden on the next load.
+The policy pack runs without a polling unit, extra wake or RCON credential.
+
 ## Sleep, map and resource budgets
 
 Velocity answers pings while Paper sleeps. BlueMap serves only static files

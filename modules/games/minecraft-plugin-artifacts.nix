@@ -1,6 +1,11 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-chunky = pkgs.fetchurl {
+        name = "chunky-bukkit-1.5.3.jar";
+        url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";
+        sha256 = "530d2c7430a96a39957391b7088be144daa3108f7665896d1c23aa8dd4af32f3";
+      };
       games-huskhomes = pkgs.fetchurl {
         name = "huskhomes-paper-4.11-9ed80cc.jar";
         url = "https://cdn.modrinth.com/data/J6U9o3JG/versions/eXHdkjXf/HuskHomes-Paper-4.11-9ed80cc.jar";
