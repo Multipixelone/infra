@@ -59,12 +59,27 @@ let
             type = types.str;
             default = "-Xms1G -Xmx4G";
           };
-          voicechatPort = mkOption { type = types.port; default = 24454; };
-          metricsPort = mkOption { type = types.port; default = 9225; };
+          voicechatPort = mkOption {
+            type = types.port;
+            default = 24454;
+          };
+          metricsPort = mkOption {
+            type = types.port;
+            default = 9225;
+          };
           discord = {
-            enable = mkOption { type = types.bool; default = true; };
-            guildId = mkOption { type = types.strMatching "([0-9]{17,20})?"; default = ""; };
-            channelId = mkOption { type = types.strMatching "([0-9]{17,20})?"; default = ""; };
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+            };
+            guildId = mkOption {
+              type = types.strMatching "([0-9]{17,20})?";
+              default = "";
+            };
+            channelId = mkOption {
+              type = types.strMatching "([0-9]{17,20})?";
+              default = "";
+            };
           };
           maxPlayers = mkOption {
             type = types.ints.positive;
@@ -125,7 +140,8 @@ let
   secrets = {
     "games/minecraft/velocity-forwarding" = "${inputs.secrets}/games/minecraft/velocity-forwarding.age";
     "games/minecraft/floodgate-key" = "${inputs.secrets}/games/minecraft/floodgate-key.age";
-    "games/minecraft/luckperms-db-password" = "${inputs.secrets}/games/minecraft/luckperms-db-password.age";
+    "games/minecraft/luckperms-db-password" =
+      "${inputs.secrets}/games/minecraft/luckperms-db-password.age";
     "games/minecraft/discordsrv-token" = "${inputs.secrets}/games/minecraft/discordsrv-token.age";
     "games/restic-password" = "${inputs.secrets}/games/restic-password.age";
   }
@@ -162,7 +178,11 @@ in
       type = types.attrsOf types.path;
       default = secrets;
     };
-    minecraft.adminUuid = mkOption { type = types.nullOr uuidType; default = null; description = "Finn's verified Minecraft UUID; null leaves admin membership unassigned."; };
+    minecraft.adminUuid = mkOption {
+      type = types.nullOr uuidType;
+      default = null;
+      description = "Finn's verified Minecraft UUID; null leaves admin membership unassigned.";
+    };
     minecraft.defaultServer = mkOption {
       type = idType;
       default = "survival";

@@ -1,6 +1,6 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
-    infra.games.artifacts = {
+    config.infra.games.artifacts = {
       games-skinsrestorer = pkgs.fetchurl {
         name = "skinsrestorer-15.12.6.jar";
         url = "https://github.com/SkinsRestorer/SkinsRestorer/releases/download/15.12.6/SkinsRestorer.jar";
@@ -47,17 +47,42 @@
         sha256 = "4508d006323f24fa02876310c192d739af56516eb259000ac50f0909a68c9a2d";
       };
     };
-    options.infra.games.minecraftPlugins = let
-      pluginSet = lib.types.submodule { options = {
-        jars = lib.mkOption { type = lib.types.attrsOf lib.types.package; default = {}; };
-        templates = lib.mkOption { type = lib.types.attrs; default = {}; };
-        statePaths = lib.mkOption { type = lib.types.listOf lib.types.str; default = []; };
-        secretNames = lib.mkOption { type = lib.types.listOf lib.types.str; default = []; };
-        inventory = lib.mkOption { type = lib.types.listOf lib.types.attrs; default = []; };
-      }; };
-    in {
-      proxy = lib.mkOption { type = pluginSet; default = {}; };
-      backends = lib.mkOption { type = lib.types.attrsOf pluginSet; default = {}; };
-    };
+    options.infra.games.minecraftPlugins =
+      let
+        pluginSet = lib.types.submodule {
+          options = {
+            jars = lib.mkOption {
+              type = lib.types.attrsOf lib.types.package;
+              default = { };
+            };
+            templates = lib.mkOption {
+              type = lib.types.attrs;
+              default = { };
+            };
+            statePaths = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+            };
+            secretNames = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+            };
+            inventory = lib.mkOption {
+              type = lib.types.listOf lib.types.attrs;
+              default = [ ];
+            };
+          };
+        };
+      in
+      {
+        proxy = lib.mkOption {
+          type = pluginSet;
+          default = { };
+        };
+        backends = lib.mkOption {
+          type = lib.types.attrsOf pluginSet;
+          default = { };
+        };
+      };
   };
 }
