@@ -1,5 +1,19 @@
-{ lib, ... }:
+{ lib, inputs, ... }:
 {
+  # Temporary Zotero-only downgrade to compatible Zotero 10.0.0 / Firefox ESR140.
+  # Remove the input and overlay once https://github.com/NixOS/nixpkgs/issues/568692 is fixed.
+  flake-file.inputs.nixpkgs-zotero.url =
+    "github:nixos/nixpkgs/c27cdad491a991b11ed731760aa2ef8db0cb0410";
+
+  nixpkgs.overlays = [
+    (_final: prev: {
+      zotero =
+        (import inputs.nixpkgs-zotero {
+          system = prev.stdenv.hostPlatform.system;
+        }).zotero;
+    })
+  ];
+
   flake.modules.homeManager.gui =
     { pkgs, ... }:
     let
