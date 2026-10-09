@@ -647,6 +647,21 @@ let
         && !(hasAccessApplicationFor "albums" inventory)
       )
       "albums must be public without Access, with verified tunnel TLS, an internal redirect, and Link loopback proxying on port 8765";
+    assert lib.assertMsg
+      (
+        inventory.applications.map.canonical == "dawarich.finnrut.is"
+        && inventory.routes."map/root".backend.host == "iot"
+        && inventory.cloudflare.dnsRecords.map.hostname == "dawarich.finnrut.is"
+        && inventory.applications.minecraft-map.canonical == "map.finnrut.is"
+        && inventory.routes."minecraft-map/root".backend.host == "link"
+        && inventory.routes."minecraft-map/root".backendAddress == "127.0.0.1"
+        && inventory.routes."minecraft-map/root".backend.port == 8766
+        && inventory.routes."minecraft-map/root".access.bypassAccess
+        && inventory.cloudflare.dnsRecords.minecraft-map.hostname == "map.finnrut.is"
+        && inventory.cloudflare.dnsRecords.minecraft-map.accessDependency == null
+        && !(hasAccessApplicationFor "minecraft-map" inventory)
+      )
+      "Dawarich must retain its application identity on dawarich.finnrut.is and BlueMap must publicly serve map.finnrut.is from Link loopback without Access";
     inventory;
 in
 {
@@ -700,7 +715,9 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "homeassistant", "map", "romm", "saves", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "homeassistant", "map", "minecraft-map", "romm", "saves", "seerr"]) and
+              (.cloudflare.dnsRecords.map.hostname == "dawarich.finnrut.is") and
+              (.cloudflare.dnsRecords["minecraft-map"].hostname == "map.finnrut.is") and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
               (.cloudflare.accessApplications.seerr.access.policy == "family") and
               (.cloudflare.dnsRecords.forgejo.hostname == "git.finnrut.is") and
