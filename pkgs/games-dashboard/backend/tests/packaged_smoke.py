@@ -117,6 +117,11 @@ def main():
                     and inventory["schemaVersion"] == 1
                     and inventory["servers"]
                 )
+                assert all(
+                    item["status"]["id"] == item["id"]
+                    and item["status"]["playersOnline"] is None
+                    for item in inventory["sharedServices"]
+                )
                 identifier = inventory["servers"][0]["id"]
                 events(backend_port, identifier)
                 print(

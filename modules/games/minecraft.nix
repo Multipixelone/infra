@@ -184,6 +184,7 @@
           );
           proxy = {
             id = "velocity";
+            serverPort = 25565;
             unit = "minecraft-server-velocity.service";
             dataDir = "${dataRoot}/velocity";
             available = ready proxySecrets;

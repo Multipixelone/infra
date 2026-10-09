@@ -20,6 +20,7 @@ let
         path = [
           pkgs.systemd
           cfg.packages.status
+          cfg.packages.shared-status
           cfg.packages.logs
           cfg.packages.backup
         ];

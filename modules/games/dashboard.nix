@@ -49,6 +49,10 @@
         recover = helper "games-backup-recover" "recover";
         prune = helper "games-prune" "prune";
         status = helper "games-status" "status";
+        shared-status = pkgs.writeShellApplication {
+          name = "games-shared-status";
+          text = "exec ${pkgs.python3}/bin/python3 ${./shared-status.py} --inventory ${inventory} --runtime ${./runtime.py}";
+        };
         backup = helper "games-backup" "backup";
         console = pkgs.writeShellApplication {
           name = "games-console";

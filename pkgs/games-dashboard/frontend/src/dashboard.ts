@@ -31,15 +31,22 @@ export type Server = {
   status: ServerStatus;
 };
 
+export type SharedStatus = Omit<ServerStatus, "state"> & {
+  state: "running" | "stopped" | "failed";
+};
+
+export type SharedService = {
+  id: string;
+  unit: string;
+  available: boolean;
+  logsCommand: string[];
+  status: SharedStatus;
+};
+
 export type Manifest = {
   schemaVersion: 1;
   host: string;
-  sharedServices: {
-    id: string;
-    unit: string;
-    available: boolean;
-    logsCommand: string[];
-  }[];
+  sharedServices: SharedService[];
   servers: Server[];
 };
 
@@ -63,11 +70,34 @@ export function stateLabel(server: Server): string {
 export function stateTone(
   server: Server,
 ): "good" | "warm" | "muted" | "danger" {
-  const label = stateLabel(server);
+  return labelTone(stateLabel(server));
+}
+
+function labelTone(label: string): "good" | "warm" | "muted" | "danger" {
   if (label === "Unavailable" || label === "Failed") return "danger";
   if (label === "Running") return "good";
   if (label === "Sleeping" || label === "Starting") return "warm";
   return "muted";
+}
+
+export function sharedStateLabel(service: SharedService): string {
+  if (!service.available || !service.status.available) return "Unavailable";
+  if (
+    service.status.state === "failed" ||
+    service.status.unitState === "failed"
+  ) {
+    return "Failed";
+  }
+  if (service.status.state === "running") {
+    return service.status.unitState === "activating" ? "Starting" : "Running";
+  }
+  return "Stopped";
+}
+
+export function sharedStateTone(
+  service: SharedService,
+): "good" | "warm" | "muted" | "danger" {
+  return labelTone(sharedStateLabel(service));
 }
 
 export function stateDescription(server: Server): string {
@@ -138,12 +168,30 @@ function strings(value: unknown, field: string): string[] {
   );
 }
 
-export function parseStatus(value: unknown, serverId: string): ServerStatus {
+export function parseStatus(value: unknown, serverId: string): ServerStatus;
+export function parseStatus(
+  value: unknown,
+  serverId: string,
+  shared: true,
+): SharedStatus;
+export function parseStatus(
+  value: unknown,
+  serverId: string,
+  shared = false,
+): ServerStatus | SharedStatus {
   const status = record(value, "status");
   const id = string(status.id, "status.id");
   if (id !== serverId) return invalid("status ID does not match its server");
   const state = status.state;
-  if (state !== "running" && state !== "sleeping" && state !== "stopped") {
+  if (
+    state !== "running" &&
+    state !== "stopped" &&
+    state !== "sleeping" &&
+    state !== "failed"
+  ) {
+    return invalid("status.state is not supported");
+  }
+  if ((shared && state === "sleeping") || (!shared && state === "failed")) {
     return invalid("status.state is not supported");
   }
   const playersOnline = status.playersOnline;
@@ -226,8 +274,10 @@ export function parseManifest(data: unknown): Manifest {
     sharedServices: array(manifest.sharedServices, "sharedServices").map(
       (value) => {
         const service = record(value, "shared service");
+        const id = string(service.id, "shared service.id");
         return {
-          id: string(service.id, "shared service.id"),
+          id,
+          status: parseStatus(service.status, id, true),
           unit: string(service.unit, "shared service.unit"),
           available: boolean(service.available, "shared service.available"),
           logsCommand: strings(

@@ -79,7 +79,7 @@
           exporter = cfg.systemd.services.games-metrics.serviceConfig;
           exporterFlags = cfg.services.prometheus.exporters.node.extraFlags;
           backupOnFailure = enabled.systemd.services.restic-backups-games-survival.onFailure;
-          proxyConfig = toString enabled.services.minecraft-servers.servers.velocity.symlinks."velocity.toml";
+          proxyConfig = toString enabled.services.minecraft-servers.servers.velocity.files."velocity.toml";
         }
       );
     in

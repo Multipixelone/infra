@@ -8,7 +8,7 @@ import signal
 from collections import deque
 from datetime import datetime, timezone
 
-from .models import Manifest, Status
+from .models import Manifest, SharedStatus, Status
 
 ACTIONS = frozenset({"start", "stop", "restart", "backup"})
 
@@ -143,6 +143,19 @@ class MockAdapter(Adapter):
     async def statuses(self):
         return list(self.state.values())
 
+    async def shared_statuses(self):
+        return [
+            SharedStatus(
+                id=service.id,
+                state="running" if service.available else "stopped",
+                unitState="active" if service.available else "inactive",
+                ready=service.available,
+                playersOnline=None,
+                available=service.available,
+            )
+            for service in self.manifest.sharedServices
+        ]
+
     async def action(self, identifier, action):
         server = self.require_action(identifier, action)
         async with self.locks[identifier]:
@@ -192,6 +205,23 @@ class RealAdapter(Adapter):
             return statuses
         except (ValueError, TypeError) as error:
             raise HelperFailure("invalid status helper response") from error
+
+    async def shared_statuses(self):
+        if not self.manifest.sharedServices:
+            return []
+        try:
+            data = json.loads(
+                await self.runner.run(["games-shared-status"], timeout=60)
+            )
+            statuses = [SharedStatus.model_validate(item) for item in data]
+            expected = {service.id for service in self.manifest.sharedServices}
+            if {item.id for item in statuses} != expected or len(statuses) != len(
+                expected
+            ):
+                raise ValueError("shared status inventory mismatch")
+            return statuses
+        except (ValueError, TypeError) as error:
+            raise HelperFailure("invalid shared status helper response") from error
 
     async def action(self, identifier, action):
         server = self.require_action(identifier, action)

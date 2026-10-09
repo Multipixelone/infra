@@ -122,6 +122,13 @@
           python3 ${./tests/lazymc_test.py} ${lib.getExe host.config.infra.games.artifacts.games-lazymc} ${lib.getExe host.config.infra.games.artifacts.games-velocity}
           touch "$out"
         '';
+        games-shared-status =
+          pkgs.runCommand "games-shared-status-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+            ''
+              export PYTHONDONTWRITEBYTECODE=1
+              python3 ${./tests/shared_status_test.py} ${./shared-status.py} ${./runtime.py}
+              touch "$out"
+            '';
         games-runtime =
           pkgs.runCommand "games-runtime-check"
             {
@@ -151,6 +158,10 @@
                   assert manifest["schemaVersion"] == 1 and manifest["host"] == "link"
                   servers = {server["id"]: server for server in manifest["servers"]}
                   assert set(servers) == {"survival", "terraria"}
+                  assert manifest["sharedServices"] == [{
+                      "id": "velocity", "unit": "minecraft-server-velocity.service",
+                      "available": name == "enabled", "logsCommand": ["games-logs", "velocity"],
+                  }]
                   assert servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
                   assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 7777}
                   assert all(server["console"]["command"] == ["games-console", server["id"]] for server in servers.values())

@@ -75,6 +75,16 @@ class SharedService(StrictModel):
     available: bool
     logsCommand: list[str]
 
+    @model_validator(mode="after")
+    def fixed_commands(self):
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", self.id):
+            raise ValueError("invalid shared service ID")
+        if not re.fullmatch(r"[a-zA-Z0-9_.@-]+\.service", self.unit):
+            raise ValueError("invalid shared service unit")
+        if self.logsCommand != ["games-logs", self.id]:
+            raise ValueError("manifest helper argv does not match shared service ID")
+        return self
+
 
 class Manifest(StrictModel):
     schemaVersion: Literal[1]
@@ -84,9 +94,9 @@ class Manifest(StrictModel):
 
     @model_validator(mode="after")
     def unique_ids(self):
-        ids = [server.id for server in self.servers]
+        ids = [server.id for server in self.servers + self.sharedServices]
         if len(ids) != len(set(ids)):
-            raise ValueError("duplicate server IDs")
+            raise ValueError("duplicate service IDs")
         return self
 
 
@@ -97,3 +107,7 @@ class Status(StrictModel):
     ready: bool
     playersOnline: int | None
     available: bool
+
+
+class SharedStatus(Status):
+    state: Literal["running", "stopped", "failed"]

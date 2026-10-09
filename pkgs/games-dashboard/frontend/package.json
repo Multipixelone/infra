@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "test": "node --test src/dashboard.test.ts",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "build": "vite build"
   },

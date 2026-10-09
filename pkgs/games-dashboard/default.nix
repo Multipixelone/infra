@@ -11,7 +11,7 @@ let
     src = ./frontend;
     nodejs = nodejs_24;
     npmDepsHash = "sha256-Q5151Ege+3ZQcu1Uj9yjL18DDEW07Iur0W18GW7SRHg=";
-    preBuild = "npm run check";
+    preBuild = "npm run check && npm test";
     installPhase = ''
       runHook preInstall
       mkdir -p "$out"

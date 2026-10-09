@@ -107,10 +107,15 @@ def create_app(adapter=None, static_directory=None):
     async def servers(request: Request):
         adapter = request.app.state.adapter
         statuses = {item.id: item for item in await adapter.statuses()}
+        shared_statuses = {item.id: item for item in await adapter.shared_statuses()}
         data = adapter.manifest.model_dump()
         data["servers"] = [
             server.model_dump() | {"status": statuses[server.id].model_dump()}
             for server in adapter.manifest.servers
+        ]
+        data["sharedServices"] = [
+            service.model_dump() | {"status": shared_statuses[service.id].model_dump()}
+            for service in adapter.manifest.sharedServices
         ]
         return data
 

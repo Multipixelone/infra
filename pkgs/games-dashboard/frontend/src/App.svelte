@@ -6,6 +6,8 @@
     gameLabel,
     parseManifest,
     parseStatus,
+    sharedStateLabel,
+    sharedStateTone,
     stateDescription,
     stateLabel,
     stateTone,
@@ -377,10 +379,8 @@
                         ? "Velocity"
                         : service.id}</span
                     >
-                    <p>
-                      {service.available
-                        ? "Configured"
-                        : "Missing prerequisites"} · runtime not reported
+                    <p class="shared-status {sharedStateTone(service)}">
+                      {sharedStateLabel(service)}
                     </p>
                   </div>
                 </div>{/each}

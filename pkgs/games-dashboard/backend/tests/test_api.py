@@ -43,7 +43,18 @@ def test_mock_list_and_state_transitions(manifest):
     with TestClient(create_app(adapter)) as client:
         data = client.get("/api/servers").json()
         assert data["schemaVersion"] == 1
-        assert data["sharedServices"] == manifest.model_dump()["sharedServices"]
+        shared = data["sharedServices"][0]
+        assert {
+            key: value for key, value in shared.items() if key != "status"
+        } == manifest.model_dump()["sharedServices"][0]
+        assert shared["status"] == {
+            "id": "velocity",
+            "state": "running",
+            "unitState": "active",
+            "ready": True,
+            "playersOnline": None,
+            "available": True,
+        }
         servers = {item["id"]: item for item in data["servers"]}
         assert servers["survival"]["status"]["playersOnline"] == 2
         assert servers["terraria"]["status"]["playersOnline"] is None
@@ -94,11 +105,19 @@ class RecordingRunner:
         self.status = [
             item.model_dump() for item in MockAdapter(manifest).state.values()
         ]
+        self.shared_status = [
+            item.model_dump()
+            for item in asyncio.run(MockAdapter(manifest).shared_statuses())
+        ]
         self.closed = False
 
     async def run(self, argv, timeout):
         self.calls.append((argv, timeout))
-        return json.dumps(self.status).encode() if argv == ["games-status"] else b""
+        if argv == ["games-status"]:
+            return json.dumps(self.status).encode()
+        if argv == ["games-shared-status"]:
+            return json.dumps(self.shared_status).encode()
+        return b""
 
     async def lines(self, argv):
         self.calls.append((argv, None))
@@ -251,3 +270,107 @@ def test_real_mode_does_not_fall_back(monkeypatch):
     monkeypatch.setattr(Path, "read_text", missing)
     with pytest.raises(FileNotFoundError):
         configured_adapter()
+
+
+@pytest.mark.parametrize(
+    "state,unit_state,ready",
+    [
+        ("running", "active", True),
+        ("running", "activating", False),
+        ("stopped", "inactive", False),
+        ("failed", "failed", False),
+        ("failed", "inactive", False),
+    ],
+)
+def test_real_shared_status_enrichment(manifest, state, unit_state, ready):
+    runner = RecordingRunner(manifest)
+    runner.shared_status[0].update(state=state, unitState=unit_state, ready=ready)
+    with TestClient(create_app(RealAdapter(manifest, runner))) as client:
+        response = client.get("/api/servers")
+        assert response.status_code == 200
+        shared = response.json()["sharedServices"][0]
+        assert shared["status"] == runner.shared_status[0]
+        assert shared["status"]["playersOnline"] is None
+        assert all("status" in item for item in response.json()["servers"])
+    assert runner.calls == [(["games-status"], 60), (["games-shared-status"], 60)]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "duplicate", "unexpected", "malformed", "sleeping", "wrong_type"],
+)
+def test_shared_status_inventory_rejects_drift(manifest, mutation):
+    runner = RecordingRunner(manifest)
+    if mutation == "missing":
+        runner.shared_status = []
+    elif mutation == "duplicate":
+        runner.shared_status *= 2
+    elif mutation == "unexpected":
+        runner.shared_status[0]["id"] = "sshd"
+    elif mutation == "malformed":
+        del runner.shared_status[0]["ready"]
+    elif mutation == "sleeping":
+        runner.shared_status[0]["state"] = "sleeping"
+    else:
+        runner.shared_status = None
+    with TestClient(create_app(RealAdapter(manifest, runner))) as client:
+        response = client.get("/api/servers")
+        assert response.status_code == 502
+        assert response.json() == {"detail": "invalid shared status helper response"}
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_empty_shared_inventory(manifest_data, mode):
+    manifest_data["sharedServices"] = []
+    manifest = Manifest.model_validate(manifest_data)
+    runner = RecordingRunner(manifest)
+    adapter = MockAdapter(manifest) if mode == "mock" else RealAdapter(manifest, runner)
+    with TestClient(create_app(adapter)) as client:
+        response = client.get("/api/servers")
+        assert response.status_code == 200
+        assert response.json()["sharedServices"] == []
+    assert all(argv != ["games-shared-status"] for argv, _ in runner.calls)
+
+
+def test_mock_unavailable_shared_service(manifest_data):
+    manifest_data["sharedServices"][0]["available"] = False
+    with TestClient(
+        create_app(MockAdapter(Manifest.model_validate(manifest_data)))
+    ) as client:
+        shared = client.get("/api/servers").json()["sharedServices"][0]
+        assert shared["status"]["available"] is False
+        assert shared["status"]["ready"] is False
+        assert shared["status"]["state"] == "stopped"
+
+
+@pytest.mark.parametrize("mutation", ["argv", "unit", "id", "duplicate", "collision"])
+def test_shared_manifest_rejects_drift(manifest_data, mutation):
+    shared = manifest_data["sharedServices"][0]
+    if mutation == "argv":
+        shared["logsCommand"] = ["sh", "-c", "games-logs velocity"]
+    elif mutation == "unit":
+        shared["unit"] = "--user"
+    elif mutation == "id":
+        shared["id"] = "$(id)"
+    elif mutation == "duplicate":
+        manifest_data["sharedServices"].append(shared.copy())
+    else:
+        shared["id"] = manifest_data["servers"][0]["id"]
+        shared["logsCommand"] = ["games-logs", shared["id"]]
+    with pytest.raises(ValidationError):
+        Manifest.model_validate(manifest_data)
+
+
+def test_shared_helper_failure_is_sanitized(manifest):
+    class FailingRunner(RecordingRunner):
+        async def run(self, argv, timeout):
+            if argv == ["games-shared-status"]:
+                raise HelperFailure("game helper failed")
+            return await super().run(argv, timeout)
+
+    with TestClient(
+        create_app(RealAdapter(manifest, FailingRunner(manifest)))
+    ) as client:
+        response = client.get("/api/servers")
+        assert response.status_code == 502
+        assert response.json() == {"detail": "game helper failed"}
