@@ -55,6 +55,69 @@ export type Manifest = {
   servers: Server[];
 };
 
+export type PluginInstallation = Plugin & { platform: string };
+export type DisplayPlugin = {
+  name: string;
+  installations: PluginInstallation[];
+  installed: boolean;
+};
+
+export function displayPlugins(
+  server: Server,
+  sharedServices: SharedService[],
+): DisplayPlugin[] {
+  const sources = [
+    ...(server.game === "minecraft-paper"
+      ? [
+          {
+            platform: "Velocity",
+            plugins:
+              sharedServices.find((service) => service.id === "velocity")
+                ?.plugins ?? [],
+          },
+        ]
+      : []),
+    {
+      platform: server.game === "minecraft-paper" ? "Paper" : gameLabel(server),
+      plugins: server.plugins ?? [],
+    },
+  ];
+  const grouped = new Map<string, DisplayPlugin>();
+  for (const { platform, plugins } of sources) {
+    for (const plugin of plugins) {
+      let entry = grouped.get(plugin.name);
+      if (!entry) {
+        entry = { name: plugin.name, installations: [], installed: true };
+        grouped.set(plugin.name, entry);
+      }
+      entry.installed &&= plugin.installed;
+      if (
+        !entry.installations.some(
+          (installation) =>
+            installation.platform === platform &&
+            installation.version === plugin.version &&
+            installation.installed === plugin.installed,
+        )
+      ) {
+        entry.installations.push({ ...plugin, platform });
+      }
+    }
+  }
+  return [...grouped.values()].sort(
+    (left, right) =>
+      Number(left.installed) - Number(right.installed) ||
+      left.name.localeCompare(right.name),
+  );
+}
+
+export function wakeLabel(server: Server): string {
+  if (!server.wakeOnJoin) return "Off";
+  const state = stateLabel(server);
+  if (state === "Unavailable" || state === "Failed") return state;
+  if (state === "Stopped") return "Disabled";
+  return state === "Sleeping" ? "Wakes on join" : "Enabled";
+}
+
 export type LogEntry = { id: string; timestamp: string; line: string };
 
 export function gameLabel(server: Server): string {

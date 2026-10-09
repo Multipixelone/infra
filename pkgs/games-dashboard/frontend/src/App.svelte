@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Icon from "./Icon.svelte";
+  import ServerDetails from "./ServerDetails.svelte";
   import {
     actionLabel,
     gameLabel,
@@ -11,6 +12,7 @@
     stateDescription,
     stateLabel,
     stateTone,
+    wakeLabel,
   } from "./dashboard";
   import type { Action, LogEntry, Manifest, Server } from "./dashboard";
   import "./dashboard.css";
@@ -421,7 +423,7 @@
               <div>
                 <span class="eyebrow">Wake on join</span>
                 <div class="fact-value">
-                  {selected.wakeOnJoin ? "Configured" : "Off"}
+                  {busy[selected.id] ? "Updating…" : wakeLabel(selected)}
                 </div>
                 {#if selected.wakeOnJoin && selected.status.state === "stopped"}
                   <span class="fact-note">Listener stopped</span>
@@ -439,41 +441,12 @@
                 >
               </div>
             </div>
-            {#if selected.public.length}<div class="addresses">
-                <span class="eyebrow address-label">Connect</span>
-                <div>
-                  {#each selected.public as endpoint}<div class="address-row">
-                      <span class="edition"
-                        >{endpoint.edition ??
-                          endpoint.protocol.toUpperCase()}</span
-                      ><code>{endpoint.hostname}:{endpoint.port}</code><button
-                        class="copy-button"
-                        aria-label={`Copy ${endpoint.edition ?? endpoint.protocol} address ${endpoint.hostname}:${endpoint.port}`}
-                        onclick={() =>
-                          copyAddress(`${endpoint.hostname}:${endpoint.port}`)}
-                        ><Icon
-                          name={copied ===
-                          `${endpoint.hostname}:${endpoint.port}`
-                            ? "check"
-                            : "copy"}
-                        /></button
-                      >
-                    </div>{/each}
-                </div>
-              </div>{/if}
-            {#if selected.mapUrl}
-              <p><a href={selected.mapUrl} target="_blank" rel="noopener noreferrer">Open world map</a> · Available while Survival sleeps</p>
-            {/if}
-            {#if selected.plugins?.length}
-              <div class="addresses">
-                <span class="eyebrow address-label">Plugins</span>
-                <div>
-                  {#each [...selected.plugins, ...(manifest?.sharedServices.find((service) => service.id === "velocity")?.plugins ?? [])] as plugin}
-                    <div class="address-row"><span>{plugin.name}</span><code>{plugin.version}</code><span>{plugin.installed ? "Enabled" : "Awaiting setup"}</span></div>
-                  {/each}
-                </div>
-              </div>
-            {/if}
+            <ServerDetails
+              server={selected}
+              sharedServices={manifest.sharedServices}
+              {copied}
+              {copyAddress}
+            />
             <div class="action-bar">
               <div class="lifecycle-actions">
                 {#if selected.status.state === "stopped"}<button

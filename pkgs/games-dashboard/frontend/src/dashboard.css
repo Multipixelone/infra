@@ -439,22 +439,95 @@ h1 {
   padding-top: 6px;
   font-size: 9px;
 }
-.address-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 28px;
+.server-details .addresses + .addresses {
+  border-top: 1px dashed var(--border);
 }
-.edition {
+.connection-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.connection-table th,
+.connection-table td {
+  padding: 4px 0;
+  vertical-align: middle;
+}
+.connection-table .edition {
   text-transform: capitalize;
   font-size: 11px;
   color: var(--muted);
-  width: 49px;
-  flex-shrink: 0;
+  font-weight: 400;
+  width: 70px;
+  padding-right: 12px;
 }
-.address-row code {
+.connection-table code {
   font-size: 11px;
   overflow-wrap: anywhere;
+}
+.connection-action {
+  width: 25px;
+}
+.map-row th,
+.map-row td {
+  padding-top: 12px;
+  vertical-align: top;
+}
+.map-link,
+.map-link:visited {
+  color: var(--accent);
+  font: 11px var(--font-mono);
+  overflow-wrap: anywhere;
+  text-underline-offset: 3px;
+}
+.map-link:hover {
+  color: var(--accent-hover);
+}
+.map-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.detail-note {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.plugin-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.plugin-row + .plugin-row {
+  margin-top: 12px;
+}
+.plugin-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+}
+.plugin-name {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.plugin-version,
+.plugin-status,
+.plugin-platforms,
+.plugin-detail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.plugin-status {
+  margin-left: auto;
+}
+.plugin-status.needs-setup {
+  color: var(--accent);
+}
+.plugin-platforms {
+  display: block;
+  margin-top: 2px;
 }
 .copy-button {
   padding: 6px;
@@ -921,15 +994,13 @@ dialog > p:not(.eyebrow) {
   .fact-note {
     font-size: 10px;
   }
-  .address-row {
-    gap: 7px;
-  }
-  .address-row code {
+  .connection-table code {
     font-size: 10px;
   }
-  .edition {
-    width: 44px;
+  .connection-table .edition {
+    width: 60px;
     font-size: 10px;
+    padding-right: 7px;
   }
   .action-bar {
     margin-inline: -17px;
