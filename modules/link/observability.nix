@@ -6795,7 +6795,7 @@ in
               }
               {
                 alert = "PrometheusScrapeTargetDown";
-                expr = ''up{job!~"blackbox|blackbox-.*|${nodeJobRegex}|scraparr|tautulli-exporter"} == 0'';
+                expr = ''up{job!~"blackbox|blackbox-.*|${nodeJobRegex}|scraparr|tautulli-exporter|minecraft-paper"} == 0'';
                 for = "10m";
                 labels.severity = "warning";
                 annotations.summary = "Prometheus cannot scrape {{ $labels.job }}";
