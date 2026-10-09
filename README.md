@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (94)</summary>
+<summary>Packages exposed by this flake (95)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -196,6 +196,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`service-publication-smoke`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run service publication smoke probes · `nix run github:Multipixelone/infra#service-publication-smoke`
 - [`service-publication-tofu`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run OpenTofu operations for service publication · `nix run github:Multipixelone/infra#service-publication-tofu`
 - [`service-publication-validate`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run focused, provider-safe service publication validation · `nix run github:Multipixelone/infra#service-publication-validate`
+- [`streamrip`](https://github.com/Multipixelone/infra/blob/main/modules/media/streamrip.nix) — A fast, all-in-one scriptable music downloader for Qobuz, Deezer, Tidal, SoundCloud, and Spotify. · `nix run github:Multipixelone/infra#streamrip`
 - [`system`](https://github.com/Multipixelone/infra/blob/main/modules/nix/utils.nix) · `nix run github:Multipixelone/infra#system`
 - [`transparent-cursor-theme`](https://github.com/Multipixelone/infra/blob/main/modules/marin/greetd.nix) — Transparent cursor theme for Cage/Wayland sessions · `nix run github:Multipixelone/infra#transparent-cursor-theme`
 - [`upload-script`](https://github.com/Multipixelone/infra/blob/main/modules/shell/0x0.nix) · `nix run github:Multipixelone/infra#upload-script`

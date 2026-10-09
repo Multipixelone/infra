@@ -115,6 +115,85 @@ class QobuzMatcherTests(unittest.TestCase):
         self.assertEqual(ranked[0]["score"]["evidence_state"], "insufficient_evidence")
         self.assertIsNone(recommendation)
 
+    def test_pinned_year_only_note_is_display_not_date_evidence(self):
+        source = {**SOURCE, "album": "25", "artist": "Adele"}
+        for year in ("2015", "2020"):
+            with self.subTest(year=year):
+                desc = f"25 by Adele ({year})"
+                parsed = matcher.parse_sparse_candidate({"id": "good", "desc": desc})
+                self.assertEqual(parsed["fields"], {"title": "25", "artist": "Adele"})
+                self.assertEqual(parsed["desc"], desc)
+                record = matcher.build_record(
+                    self.request(
+                        source=source, candidates=[{"id": "good", "desc": desc}]
+                    )
+                )
+                self.assertEqual(record["recommended_candidate"]["score"], 90)
+                self.assertEqual(record["candidates"][0]["score"]["edition"], 0)
+                self.assertEqual(
+                    set(record["candidates"][0]["parsed"]["fields"]),
+                    {"title", "artist"},
+                )
+                matcher.validate_record(record)
+
+    def test_pinned_year_note_preserves_all_conservative_guards(self):
+        for album, artist, desc in (
+            ("25", "Adele", "25 by Adele (2015, explicit)"),
+            ("25", "Adele", "25 by Adele (explicit)"),
+            ("25", "Adele", "25 by Adele (unknown)"),
+            ("25", "Adele", "25 by Adele (２０１５)"),
+            ("25", "Adele", "25 by Adele (2015) extra"),
+            ("25", "Adele", "25 by Someone Else (2015)"),
+            ("25", "Adele", "Other by Adele (2015)"),
+            ("25", "Adele", "25 (Remastered) by Adele (2015)"),
+            ("Album (Live)", "Artist", "Album (Studio) by Artist (2020)"),
+            ("Album (Explicit)", "Artist", "Album (Clean) by Artist (2020)"),
+            ("By the Way by The Red", "Band", "By the Way by The Red by Band (2020)"),
+            (
+                "Album (Live)",
+                "Red Hot Chili Peppers",
+                "Album (Live) by Chili Peppers Red Hot (2020)",
+            ),
+        ):
+            with self.subTest(desc=desc):
+                record = matcher.build_record(
+                    self.request(
+                        source={**SOURCE, "album": album, "artist": artist},
+                        candidates=[{"id": "guarded", "desc": desc}],
+                    )
+                )
+                self.assertIsNone(record["recommended_candidate"])
+                self.assertEqual(record["candidates"][0]["desc"], desc)
+                matcher.validate_record(record)
+
+    def test_equal_candidates_with_different_display_years_remain_ambiguous(self):
+        source = {**SOURCE, "album": "25", "artist": "Adele"}
+        candidates = [
+            {"id": "b", "desc": "25 by Adele (2020)"},
+            {"id": "a", "desc": "25 by Adele (2015)"},
+        ]
+        record = matcher.build_record(
+            self.request(source=source, candidates=candidates)
+        )
+        self.assertIsNone(record["recommended_candidate"])
+        self.assertEqual(
+            record["recommendation_withheld_reasons"], ["insufficient_margin"]
+        )
+        self.assertEqual([item["id"] for item in record["candidates"]], ["a", "b"])
+        self.assertEqual(
+            [item["score"]["total"] for item in record["candidates"]], [90, 90]
+        )
+        with self.assertRaises(matcher.EvidenceError):
+            matcher.build_record(
+                self.request(
+                    source=source,
+                    candidates=[
+                        candidates[0],
+                        candidates[0] | {"desc": "25 by Adele (2015)"},
+                    ],
+                )
+            )
+
     def test_edition_vetoes(self):
         for album, desc, veto in (
             ("Album (Live)", "Album (Studio) by Artist", "live_studio_conflict"),

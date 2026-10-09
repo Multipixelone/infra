@@ -1,14 +1,21 @@
+[artist_filters]
+extras = false
+repeats = false
+non_albums = false
+features = false
+non_remaster = false
+
 [artwork]
-embed = true
+embed = false
 embed_size = "large"
 embed_max_width = -1
-save_artwork = true
+save_artwork = false
 saved_max_width = -1
 
 [cli]
-text_output = true
-progress_bars = true
+progress_bars = false
 max_search_results = 100
+no_update_check = true
 
 [conversion]
 enabled = false
@@ -27,17 +34,15 @@ failed_downloads_path = ""
 quality = 2
 lower_quality_if_not_available = true
 arl = ""
-use_deezloader = true
-deezloader_warnings = true
 
 [downloads]
 folder = ""
 source_subdirectories = false
 disc_subdirectories = true
-concurrency = true
-max_connections = 6
-requests_per_minute = 60
+max_connections = 2
+requests_per_minute = 30
 verify_ssl = true
+lyrics = false
 
 [filepaths]
 add_singles_to_folder = false
@@ -54,43 +59,42 @@ fallback_source = ""
 set_playlist_to_album = true
 renumber_playlist_tracks = true
 exclude = []
-
-[misc]
-version = "2.2.0"
-check_for_updates = true
+prefer_explicit = false
 
 [qobuz]
 quality = 3
-download_booklets = true
-use_auth_token = true
-email_or_userid = ""
-password_or_token = ""
+download_booklets = false
+user_id = ""
+auth_token = ""
 app_id = ""
 secrets = []
 
-[qobuz_filters]
-extras = false
-repeats = false
-non_albums = false
-features = false
-non_studio_albums = false
-non_remaster = false
-
 [soundcloud]
-quality = 0
 client_id = ""
 app_version = ""
 
+[spotify]
+client_id = ""
+redirect_uri = "http://127.0.0.1:9900/callback"
+audio_format = "m4a"
+audio_bitrate = 256
+match_videos = false
+access_token = ""
+refresh_token = ""
+token_expiry = ""
+
 [tidal]
 quality = 3
-download_videos = true
+hires_client = false
+client_id = ""
+client_secret = ""
+token_client_id = ""
+hires_access_token = ""
+hires_refresh_token = ""
+hires_token_expiry = ""
+hires_token_client_id = ""
 user_id = ""
 country_code = ""
 access_token = ""
 refresh_token = ""
 token_expiry = ""
-
-[youtube]
-quality = 0
-download_videos = false
-video_downloads_folder = ""

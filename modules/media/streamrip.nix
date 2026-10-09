@@ -9,6 +9,28 @@ let
   streamrip-master-config = "/home/tunnel/.config/streamrip/config.toml";
   streamrip-runtime-root = "/volume1/Media/ImportMusic/Streamrip";
   streamrip-launcher-name = "openclaw-streamrip";
+  # Upstream builds with python314 from the explicitly followed nixpkgs input.
+  # Check every dependency's interpreter rather than silently mixing closures.
+  makeStreamripPython =
+    pkgs:
+    assert lib.all (dependency: dependency.pythonModule == pkgs.python314) pkgs.streamrip.dependencies;
+    pkgs.python314.withPackages (_: pkgs.streamrip.dependencies);
+  makeStreamripMergeConfig =
+    pkgs:
+    let
+      python = makeStreamripPython pkgs;
+    in
+    pkgs.writeShellApplication {
+      name = "streamrip-merge-config";
+      runtimeInputs = [ pkgs.coreutils ];
+      text = ''
+        isolated_home=$(mktemp -d)
+        trap 'rm -rf -- "$isolated_home"' EXIT
+        export HOME="$isolated_home" XDG_CONFIG_HOME="$isolated_home/.config"
+        export PYTHONPATH=${lib.escapeShellArg "${pkgs.streamrip}/${pkgs.python314.sitePackages}"}
+        ${lib.getExe python} ${./tests/streamrip_merge.py} "$@"
+      '';
+    };
   makeStreamripLauncher =
     {
       pkgs,
@@ -97,19 +119,13 @@ let
 in
 {
   flake-file.inputs.streamrip = {
-    url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
-    flake = false;
+    url = "github:Multipixelone/streamrip/nix-build";
+    inputs.nixpkgs.follows = "nixpkgs";
   };
   nixpkgs.overlays = [
     (_final: prev: {
-      streamrip = prev.streamrip.overrideAttrs {
-        src = inputs.streamrip;
-        version = inputs.streamrip.rev;
-
-        propagatedBuildInputs = prev.streamrip.propagatedBuildInputs ++ [
-          prev.python3Packages.playwright
-        ];
-      };
+      # Upstream currently exports packages for x86_64-linux, not an overlay.
+      streamrip = inputs.streamrip.packages.${prev.stdenv.hostPlatform.system}.streamrip;
     })
   ];
 
@@ -178,6 +194,16 @@ in
         };
       in
       {
+        packages.streamrip = pkgs.streamrip;
+        checks.streamrip-config-migration = pkgs.runCommand "streamrip-config-migration" { } ''
+          export HOME="$TMPDIR/home" XDG_CONFIG_HOME="$TMPDIR/home/.config"
+          mkdir -p "$XDG_CONFIG_HOME"
+          ${lib.getExe (makeStreamripPython pkgs)} \
+            ${./tests/test_streamrip_merge.py} \
+            ${lib.getExe (makeStreamripMergeConfig pkgs)} \
+            ${inputs.streamrip}/streamrip/config.toml
+          touch "$out"
+        '';
         packages.openclaw-music-streamrip-launcher = streamrip-launcher;
         packages.openclaw-music-streamrip-confinement-probe = pkgs.writeShellApplication {
           name = "openclaw-music-streamrip-confinement-probe";
@@ -353,17 +379,15 @@ in
           mkdir -p "$work"
           cat > "$work/master.toml" <<'EOF'
           [qobuz]
-          use_auth_token = true
-          email_or_userid = "dummy"
-          password_or_token = "dummy-token"
+          user_id = "dummy"
+          auth_token = "dummy-token"
           EOF
-          HOME="$work/home" XDG_CONFIG_HOME="$work/home/.config" ${pkgs.python3}/bin/python - "${pkgs.streamrip}/bin/.rip-wrapped" "$work" <<'PY'
+          HOME="$work/home" XDG_CONFIG_HOME="$work/home/.config" ${lib.getExe (makeStreamripPython pkgs)} - "$work" <<'PY'
           import pathlib
           import sys
 
-          wrapper, root = map(pathlib.Path, sys.argv[1:])
-          prefix = wrapper.read_text().split("import re\n", 1)[0]
-          exec(compile(prefix, str(wrapper), "exec"), {"__name__": "streamrip_loader"})
+          root = pathlib.Path(sys.argv[1])
+          sys.path.insert(0, "${pkgs.streamrip}/${pkgs.python314.sitePackages}")
           sys.path.insert(0, "${rootPath}/pkgs/openclaw-music")
           from openclaw_music.streamrip import StreamripAdapter
           from streamrip.config import Config
@@ -374,19 +398,19 @@ in
           runtime = adapter.runtime("00000000-0000-0000-0000-000000000001")
           adapter.write_config(runtime)
           parsed = Config(runtime["config"]).file
-          assert parsed.qobuz.use_auth_token and parsed.qobuz.quality == 3
+          assert parsed.qobuz.user_id == "dummy" and parsed.qobuz.auth_token == "dummy-token"
+          assert parsed.qobuz.quality == 3
           assert parsed.qobuz.download_booklets is False and parsed.qobuz.secrets == []
           assert parsed.conversion.enabled is False and parsed.downloads.verify_ssl is True
           assert parsed.database.downloads_enabled and parsed.database.failed_downloads_enabled
           assert parsed.database.downloads_path == runtime["downloads_db"]
           assert parsed.database.failed_downloads_path == runtime["failed_downloads_db"]
-          assert parsed.downloads.concurrency is True and parsed.downloads.max_connections == 2
+          assert parsed.downloads.max_connections == 2 and parsed.downloads.lyrics is False
           assert parsed.downloads.requests_per_minute == 30
-          assert parsed.cli.progress_bars is False and parsed.cli.text_output is False
+          assert parsed.cli.progress_bars is False and parsed.cli.no_update_check is True
           assert parsed.artwork.embed is False and parsed.artwork.save_artwork is False
-          assert parsed.misc.check_for_updates is False
           assert not parsed.tidal.access_token and not parsed.deezer.arl and not parsed.soundcloud.client_id
-          assert not parsed.youtube.video_downloads_folder and parsed.lastfm.source == "qobuz"
+          assert not parsed.spotify.access_token and parsed.lastfm.source == "qobuz"
           assert master.read_bytes() == before
           PY
           touch "$out"
@@ -453,7 +477,6 @@ in
           folder = "${config.xdg.userDirs.music}/StreamripDownloads";
           source_subdirectories = false;
           disc_subdirectories = true;
-          concurrency = true;
           max_connections = 2;
           requests_per_minute = 30;
           verify_ssl = true;
@@ -465,59 +488,9 @@ in
           failed_downloads_enabled = true;
           failed_downloads_path = "${config.xdg.configHome}/streamrip/failed_downloads.db";
         };
-        misc = {
-          version = "2.2.0";
-        };
       };
 
-      mergeConfig =
-        pkgs.writers.writePython3Bin "streamrip-merge-config"
-          {
-            flakeIgnore = [ "E501" ];
-            libraries = [ pkgs.python3Packages.tomlkit ];
-          }
-          ''
-            import json
-            import pathlib
-            import sys
-
-            import tomlkit
-
-
-            def deep_merge(dst, src):
-                for key, value in src.items():
-                    if isinstance(value, dict):
-                        cur = dst.get(key)
-                        if cur is None or not hasattr(cur, "items"):
-                            dst[key] = tomlkit.table()
-                            cur = dst[key]
-                        deep_merge(cur, value)
-                    else:
-                        dst[key] = value
-
-
-            managed = json.loads(sys.argv[1])
-            cfg = pathlib.Path(sys.argv[2])
-
-            if cfg.is_symlink():
-                cfg.unlink()
-
-            if cfg.exists():
-                old = cfg.read_text(encoding="utf-8")
-                doc = tomlkit.parse(old)
-            else:
-                old = None
-                doc = tomlkit.document()
-
-            deep_merge(doc, managed)
-            new = tomlkit.dumps(doc)
-
-            if new != old:
-                cfg.parent.mkdir(parents=True, exist_ok=True)
-                tmp = cfg.with_suffix(cfg.suffix + ".tmp")
-                tmp.write_text(new, encoding="utf-8")
-                tmp.replace(cfg)
-          '';
+      mergeConfig = makeStreamripMergeConfig pkgs;
       streamrip-qobuz-preflight-script = pkgs.writeText "streamrip-qobuz-preflight.py" ''
         import argparse
         import asyncio
@@ -683,14 +656,23 @@ in
                         raise RuntimeError("metadata request failed") from exc
                     if not isinstance(metadata, dict):
                         raise RuntimeError(f"album {album_id}: malformed metadata response")
-                    tracks = metadata.get("tracks")
-                    if not isinstance(tracks, dict) or not isinstance(tracks.get("items"), list) or not tracks["items"]:
-                        raise RuntimeError(f"album {album_id}: malformed track metadata")
-                    track_ids = []
-                    for track in tracks["items"]:
-                        if not isinstance(track, dict) or "id" not in track or isinstance(track["id"], bool):
+                    if "tracks" not in metadata:
+                        tracks = metadata.get("track_ids")
+                        if not isinstance(tracks, list) or not tracks:
+                            raise RuntimeError(f"album {album_id}: malformed track metadata")
+                        raw_track_ids = tracks
+                    else:
+                        tracks = metadata["tracks"]
+                        if not isinstance(tracks, dict) or not isinstance(tracks.get("items"), list) or not tracks["items"]:
+                            raise RuntimeError(f"album {album_id}: malformed track metadata")
+                        if any(not isinstance(track, dict) or "id" not in track for track in tracks["items"]):
                             raise RuntimeError(f"album {album_id}: malformed track ID")
-                        track_id = str(track["id"])
+                        raw_track_ids = [track["id"] for track in tracks["items"]]
+                    track_ids = []
+                    for raw_id in raw_track_ids:
+                        if isinstance(raw_id, bool) or not isinstance(raw_id, (str, int)):
+                            raise RuntimeError(f"album {album_id}: malformed track ID")
+                        track_id = str(raw_id)
                         if not track_id or track_id in track_ids:
                             raise RuntimeError(f"album {album_id}: invalid or duplicate track ID")
                         track_ids.append(track_id)
@@ -729,7 +711,8 @@ in
                 pending = []
                 status = []
                 for record, metadata, track_ids in valid_with_metadata:
-                    missing = track_ids if not downloads_enabled else [track_id for track_id in track_ids if track_id not in downloaded]
+                    # Match upstream's source-qualified keys and legacy bare-ID fallback.
+                    missing = track_ids if not downloads_enabled else [track_id for track_id in track_ids if track_id not in downloaded and f"qobuz_{track_id}" not in downloaded]
                     complete = downloads_enabled and not missing
                     artist = metadata.get("artist", {}).get("name", "Unknown artist") if isinstance(metadata.get("artist"), dict) else "Unknown artist"
                     title = metadata.get("title", "Unknown album")
@@ -761,17 +744,8 @@ in
       streamrip-qobuz-preflight = pkgs.writeShellApplication {
         name = "streamrip-qobuz-preflight";
         text = ''
-          exec ${lib.getExe pkgs.python3} - ${pkgs.streamrip}/bin/.rip-wrapped ${streamrip-qobuz-preflight-script} "$@" <<'PY'
-          import pathlib
-          import runpy
-          import sys
-
-          wrapper, helper = map(pathlib.Path, sys.argv[1:3])
-          prefix = wrapper.read_text().split("import re\n", 1)[0]
-          exec(compile(prefix, str(wrapper), "exec"), {"__name__": "streamrip_loader"})
-          sys.argv = [str(helper), *sys.argv[3:]]
-          runpy.run_path(str(helper), run_name="__main__")
-          PY
+          export PYTHONPATH=${lib.escapeShellArg "${pkgs.streamrip}/${pkgs.python314.sitePackages}"}
+          exec ${lib.getExe (makeStreamripPython pkgs)} ${streamrip-qobuz-preflight-script} "$@"
         '';
       };
       beets-library-inventory-script = pkgs.writeText "beets-library-inventory.py" ''

@@ -293,8 +293,8 @@
       flake = false;
     };
     streamrip = {
-      url = "github:mikelandzelo173/streamrip/feat/qobuz-login-fix";
-      flake = false;
+      url = "github:Multipixelone/streamrip/nix-build";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     stylix = {
       url = "github:danth/stylix";

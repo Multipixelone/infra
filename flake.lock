@@ -4683,18 +4683,22 @@
       }
     },
     "streamrip": {
-      "flake": false,
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1775282254,
-        "narHash": "sha256-wdMnwNKA0NHSMQFtRzDvqty/KCuxov0/i19jJw/5rlg=",
-        "owner": "mikelandzelo173",
+        "lastModified": 1791503112,
+        "narHash": "sha256-vt4B3mxnGuisyH/K+YnjOB0huOMbrfJuqCFPL7WZrOA=",
+        "owner": "Multipixelone",
         "repo": "streamrip",
-        "rev": "81a803e64ef9ff34751d6eedf82471c22e1cf4c6",
+        "rev": "83f4fee66d386a72d6efcb97cce04584b14dee22",
         "type": "github"
       },
       "original": {
-        "owner": "mikelandzelo173",
-        "ref": "feat/qobuz-login-fix",
+        "owner": "Multipixelone",
+        "ref": "nix-build",
         "repo": "streamrip",
         "type": "github"
       }

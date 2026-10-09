@@ -134,9 +134,7 @@ class StreamripTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)
         self.master = root / "master.toml"
-        self.master.write_text(
-            "[qobuz]\nuse_auth_token = true\nemail_or_userid = 'user'\npassword_or_token = 'secret'\n"
-        )
+        self.master.write_text("[qobuz]\nuser_id = 'user'\nauth_token = 'secret'\n")
         self.config = TrustedConfig(
             str(root / "ledger"),
             str(root / "stage"),
@@ -342,8 +340,338 @@ class StreamripTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout.getvalue())["state"], "queued")
 
     def test_pinned_template_fixture_matches_generator_before_overrides(self):
-        fixture = Path(__file__).parent / "fixtures" / "streamrip-2.2.0.toml"
+        fixture = Path(__file__).parent / "fixtures" / "streamrip-2.4.11.toml"
         self.assertEqual(tomllib.loads(fixture.read_text()), PIN_TEMPLATE)
+
+    def test_new_and_legacy_token_credentials_are_private_and_master_is_unchanged(self):
+        legacy = (
+            "use_auth_token = true\nemail_or_userid = 'legacy-user'\n"
+            "password_or_token = 'legacy-token'\n"
+        )
+        for number, (login, expected) in enumerate(
+            (
+                (
+                    "user_id = 'new-user'\nauth_token = 'new-token'\n",
+                    {"user_id": "new-user", "auth_token": "new-token"},
+                ),
+                (legacy, {"user_id": "legacy-user", "auth_token": "legacy-token"}),
+                (
+                    "user_id = 'new-user'\nauth_token = 'new-token'\n" + legacy,
+                    {"user_id": "new-user", "auth_token": "new-token"},
+                ),
+            ),
+            start=20,
+        ):
+            with self.subTest(number=number):
+                master = (
+                    "# Master must stay byte-for-byte unchanged\r\n[qobuz]\r\n"
+                    + login
+                    + "app_id = 'master-app'\nsecrets = ['master-secret']\n"
+                    + "[downloads]\nfolder = '/shared/downloads'\nverify_ssl = false\n"
+                    + "[database]\ndownloads_path = '/shared/downloads.db'\n"
+                    + "[tidal]\naccess_token = 'other-source-secret'\n"
+                    + "[spotify]\nrefresh_token = 'other-spotify-secret'\n"
+                ).encode()
+                self.master.write_bytes(master)
+                self.master.chmod(0o640)
+                before = self.master.stat()
+                template = json.dumps(PIN_TEMPLATE, sort_keys=True)
+                runtime = self.runtime(number)
+                adapter = self.adapter()
+                self.assertEqual(adapter._credentials(), expected)
+                adapter.write_config(runtime)
+                adapter.write_config(runtime)
+                raw = Path(runtime["config"]).read_text()
+                parsed = tomllib.loads(raw)
+                self.assertEqual(parsed["qobuz"], PIN_TEMPLATE["qobuz"] | expected)
+                self.assertEqual(parsed["downloads"]["folder"], runtime["output"])
+                self.assertEqual(
+                    parsed["database"]["downloads_path"], runtime["downloads_db"]
+                )
+                self.assertEqual(
+                    parsed["database"]["failed_downloads_path"],
+                    runtime["failed_downloads_db"],
+                )
+                for section, key in (
+                    ("artwork", "embed"),
+                    ("artwork", "save_artwork"),
+                    ("conversion", "enabled"),
+                    ("downloads", "lyrics"),
+                ):
+                    self.assertFalse(parsed[section][key])
+                for forbidden in (
+                    "master-app",
+                    "master-secret",
+                    "other-source-secret",
+                    "other-spotify-secret",
+                    "/shared",
+                    "use_auth_token",
+                    "email_or_userid",
+                    "password_or_token",
+                ):
+                    self.assertNotIn(forbidden, raw)
+                self.assertEqual(
+                    stat.S_IMODE(Path(runtime["config"]).stat().st_mode), 0o600
+                )
+                self.assertEqual(self.master.read_bytes(), master)
+                after = self.master.stat()
+                self.assertEqual(
+                    (after.st_mode, after.st_mtime_ns, after.st_ino),
+                    (before.st_mode, before.st_mtime_ns, before.st_ino),
+                )
+                self.assertEqual(json.dumps(PIN_TEMPLATE, sort_keys=True), template)
+
+    def test_credentials_reject_malformed_and_password_logins_without_fallback(self):
+        legacy = "email_or_userid = 'email@example.test'\npassword_or_token = 'password-secret'\n"
+        cases = [
+            "",
+            "[other]\nvalue = 'secret'",
+            "[qobuz]\ninvalid TOML",
+            "[qobuz]\n" + legacy,
+            "[qobuz]\nuse_auth_token = false\n" + legacy,
+            "[qobuz]\nuse_auth_token = 'true'\n" + legacy,
+            "[qobuz]\nuse_auth_token = 1\n" + legacy,
+            "[qobuz]\nuse_auth_token = true\nemail_or_userid = 'user'\n",
+        ]
+        for key in ("user_id", "auth_token"):
+            for value in (
+                '""',
+                '"   "',
+                '"bad\\u0000secret"',
+                '"bad\\nsecret"',
+                '"bad\\u007fsecret"',
+                "123",
+                "true",
+                "[]",
+            ):
+                other = "auth_token" if key == "user_id" else "user_id"
+                cases.append(f"[qobuz]\n{key} = {value}\n{other} = 'valid-secret'\n")
+            # Presence of either new field disallows even a valid legacy fallback.
+            cases.append(
+                f"[qobuz]\n{key} = 'valid-secret'\nuse_auth_token = true\n" + legacy
+            )
+        for number, contents in enumerate(cases):
+            with self.subTest(number=number):
+                self.master.write_text(contents)
+                before = self.master.read_bytes()
+                runtime = self.runtime(30)
+                with self.assertRaises(Configuration) as caught:
+                    self.adapter().write_config(runtime)
+                self.assertNotIn("secret", str(caught.exception))
+                self.assertNotIn(str(self.master), str(caught.exception))
+                self.assertEqual(self.master.read_bytes(), before)
+                self.assertFalse(Path(runtime["config"]).exists())
+
+    def test_new_search_json_notes_remain_fail_closed_for_edition_matching(self):
+        # v2.4.11 Summary.summarize appends year/explicit notes; as_list keeps
+        # the source/media_type/id/desc envelope. Do not discard edition evidence.
+        adapter = self.adapter(
+            run=Runner(
+                rows=[
+                    {
+                        "source": "qobuz",
+                        "media_type": "album",
+                        "id": "provider-private",
+                        "desc": "Album by Artist (2020, explicit)",
+                    }
+                ]
+            )
+        )
+        runtime = self.runtime(31)
+        adapter.write_config(runtime)
+        results = adapter.search(runtime, "Artist Album")
+        self.assertEqual(results[0]["description"], "Album by Artist (2020, explicit)")
+        self.assertFalse(
+            adapter.description_matches(results[0]["description"], self.release())
+        )
+
+    def test_year_only_search_description_matches_only_the_frozen_year(self):
+        adapter = self.adapter()
+        release = self.release()
+        for desc, expected in (
+            ("Album by Artist", True),
+            ("Album by Artist (2020)", True),
+            ("Album by Artist (2019)", False),
+            ("Album by Artist (2020, explicit)", False),
+            ("Album by Artist (explicit)", False),
+            ("Album by Artist (unknown)", False),
+            ("Album (Remastered) by Artist (2020)", False),
+            ("Album by Other (2020)", False),
+            ("Album by Artist (2020) extra", False),
+            ("Album by Artist (２０２０)", False),
+            ("Album by Artist (2020) (2020)", False),
+        ):
+            with self.subTest(desc=desc):
+                self.assertEqual(adapter.description_matches(desc, release), expected)
+        for details in ({}, {"date": ""}, {"date": "202"}, None):
+            with self.subTest(details=details):
+                self.assertFalse(
+                    adapter.description_matches(
+                        "Album by Artist (2020)", release | {"details": details}
+                    )
+                )
+
+    def test_year_only_workflow_adopts_pinned_composite_failed_database(self):
+        class PinnedRunner(Runner):
+            def __call__(self, argv, **kwargs):
+                if "search" in argv:
+                    parsed = tomllib.loads(
+                        Path(argv[argv.index("--config-path") + 1]).read_text()
+                    )
+                    # Emulate pinned failed-table initialization at the search
+                    # boundary, leaving its exact composite-key schema behind.
+                    with sqlite3.connect(
+                        parsed["database"]["failed_downloads_path"]
+                    ) as db:
+                        db.execute("DROP TABLE failed_downloads")
+                        db.execute(
+                            "CREATE TABLE failed_downloads (source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE (source, media_type, id))"
+                        )
+                return super().__call__(argv, **kwargs)
+
+        runner = PinnedRunner(
+            rows=[
+                {
+                    "source": "qobuz",
+                    "media_type": "album",
+                    "id": "provider-private",
+                    "desc": "Album by Artist (2020)",
+                }
+            ]
+        )
+        service = self.service(runner)
+        master = self.master.read_bytes()
+        job = self._chosen_streamrip_download(service, "pinned-year-workflow")
+        self.assertEqual(service.worker_once()["state"], "downloading")
+        self.assertEqual(service.worker_once()["state"], "validating")
+        self.assertEqual(service.worker_once()["state"], "validating")
+        final = service.worker_once()
+        self.assertEqual(final["state"], "ready")
+        self.assertEqual(len(runner.argv), 2)
+        self.assertEqual(self.master.read_bytes(), master)
+        self.assert_private(final)
+        self.assertEqual(service.ledger.get(job)["state"], "ready")
+
+    def test_wrong_year_and_edition_search_notes_never_complete_workflow(self):
+        for number, desc in enumerate(
+            (
+                "Album by Artist (2019)",
+                "Album by Artist (2020, explicit)",
+                "Album by Artist (unknown)",
+                "Album (Remastered) by Artist (2020)",
+            )
+        ):
+            with self.subTest(desc=desc):
+                runner = Runner(
+                    rows=[
+                        {
+                            "source": "qobuz",
+                            "media_type": "album",
+                            "id": "provider-private",
+                            "desc": desc,
+                        }
+                    ]
+                )
+                service = self.service(runner)
+                self._chosen_streamrip_download(service, f"rejected-note-{number}")
+                self.assertEqual(service.worker_once()["state"], "downloading")
+                final = service.worker_once()
+                self.assertEqual(final["state"], "needs_review")
+                self.assert_private(final)
+
+    def test_failed_database_supports_only_validated_new_and_legacy_schemas(self):
+        adapter = self.adapter()
+        runtime = self.runtime(32)
+        adapter.establish_baseline(runtime)
+        failed = Path(runtime["failed_downloads_db"])
+        fields = ("source", "media_type", "id")
+        adapter.adopt_baseline(runtime)
+        with sqlite3.connect(failed) as db:
+            indexes = db.execute("PRAGMA index_list(failed_downloads)").fetchall()
+            self.assertEqual(
+                [row[2] for row in db.execute(f'PRAGMA index_info("{indexes[0][1]}")')],
+                list(fields),
+            )
+        for schema, index, valid in (
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE(source, media_type, id)",
+                None,
+                True,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT UNIQUE NOT NULL",
+                None,
+                True,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL",
+                None,
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE(source, id)",
+                None,
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE(media_type, id)",
+                None,
+                False,
+            ),
+            (
+                "source TEXT, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE(source, media_type, id)",
+                None,
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id INTEGER NOT NULL, UNIQUE(source, media_type, id)",
+                None,
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, extra TEXT, UNIQUE(source, media_type, id)",
+                None,
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL",
+                "CREATE UNIQUE INDEX partial ON failed_downloads(source, media_type, id) WHERE source = 'qobuz'",
+                False,
+            ),
+            (
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL",
+                "CREATE UNIQUE INDEX expression ON failed_downloads(source, media_type, lower(id))",
+                False,
+            ),
+        ):
+            with self.subTest(schema=schema, index=index):
+                failed.unlink()
+                with sqlite3.connect(failed) as db:
+                    db.execute(f"CREATE TABLE failed_downloads ({schema})")
+                    if index:
+                        db.execute(index)
+                if valid:
+                    adapter.adopt_baseline(runtime)
+                    self.assertEqual(
+                        adapter._db_rows(failed, "failed_downloads", fields), []
+                    )
+                    with sqlite3.connect(failed) as db:
+                        db.execute(
+                            "INSERT INTO failed_downloads VALUES ('qobuz', 'album', 'provider-private')"
+                        )
+                    with self.assertRaises(InvalidInput):
+                        adapter.adopt_baseline(runtime)
+                    with self.assertRaises(InvalidInput):
+                        adapter._db_evidence(runtime, "provider-private", 0)
+                else:
+                    with self.assertRaises(InvalidInput):
+                        adapter.adopt_baseline(runtime)
+        failed.unlink()
+        failed.write_bytes(b"corrupt sqlite")
+        with self.assertRaises(InvalidInput):
+            adapter.adopt_baseline(runtime)
+        with self.assertRaises(InvalidInput):
+            adapter._db_rows(Path(runtime["downloads_db"]), "unknown", ("id",))
 
     def test_production_run_bounds_output_and_timeout(self):
         adapter = StreamripAdapter(
@@ -369,14 +697,57 @@ class StreamripTests(unittest.TestCase):
         runtime = self.runtime(11)
         child_pid = Path(self.temp.name) / "child.pid"
         child = (
-            "import os,signal,time;"
+            "import os,pathlib,signal,time;"
             "signal.signal(signal.SIGTERM, signal.SIG_IGN);"
-            f"open({str(child_pid)!r}, 'w').write(str(os.getpid()));time.sleep(30)"
+            f"p=pathlib.Path({str(child_pid)!r});"
+            "tmp=p.with_suffix('.tmp');tmp.write_text(str(os.getpid()));"
+            "tmp.replace(p);time.sleep(30)"
         )
         parent = (
             f"import subprocess,sys;subprocess.Popen([sys.executable, '-c', {child!r}])"
         )
+        actual_popen = streamrip_module.subprocess.Popen
+
+        def ready_popen(*args, **kwargs):
+            process = actual_popen(*args, **kwargs)
+            # Fixture startup has its own budget, before the short invocation
+            # timeout starts. Atomic publication guarantees the PID write closed.
+            startup_deadline = time.monotonic() + 10
+            try:
+                while time.monotonic() < startup_deadline:
+                    try:
+                        pid = int(child_pid.read_text())
+                    except (OSError, ValueError):
+                        time.sleep(0.02)
+                        continue
+                    self.assertGreater(pid, 0, "invalid fixture readiness PID")
+                    try:
+                        process.wait(
+                            timeout=max(0.01, startup_deadline - time.monotonic())
+                        )
+                    except subprocess.TimeoutExpired:
+                        self.fail(
+                            "descendant fixture parent did not exit within startup budget"
+                        )
+                    return process
+                self.fail(
+                    "descendant fixture did not publish a readable PID within 10s"
+                )
+            except BaseException:
+                try:
+                    self.assertTrue(
+                        adapter._kill_group(process),
+                        "descendant fixture startup failed and group cleanup failed",
+                    )
+                finally:
+                    if process.stdout:
+                        process.stdout.close()
+                    if process.stderr:
+                        process.stderr.close()
+                raise
+
         with (
+            patch.object(streamrip_module.subprocess, "Popen", side_effect=ready_popen),
             patch.object(streamrip_module, "PROCESS_TIMEOUT", 0.15),
             self.assertRaises(BackendUncertain),
         ):
@@ -854,7 +1225,7 @@ class StreamripTests(unittest.TestCase):
                 "folder",
                 "source_subdirectories",
                 "disc_subdirectories",
-                "concurrency",
+                "lyrics",
                 "max_connections",
                 "requests_per_minute",
                 "verify_ssl",
@@ -862,15 +1233,21 @@ class StreamripTests(unittest.TestCase):
             "qobuz": {
                 "quality",
                 "download_booklets",
-                "use_auth_token",
-                "email_or_userid",
-                "password_or_token",
+                "user_id",
+                "auth_token",
                 "app_id",
                 "secrets",
             },
             "tidal": {
                 "quality",
-                "download_videos",
+                "hires_client",
+                "client_id",
+                "client_secret",
+                "token_client_id",
+                "hires_access_token",
+                "hires_refresh_token",
+                "hires_token_expiry",
+                "hires_token_client_id",
                 "user_id",
                 "country_code",
                 "access_token",
@@ -881,11 +1258,18 @@ class StreamripTests(unittest.TestCase):
                 "quality",
                 "lower_quality_if_not_available",
                 "arl",
-                "use_deezloader",
-                "deezloader_warnings",
             },
-            "soundcloud": {"quality", "client_id", "app_version"},
-            "youtube": {"quality", "download_videos", "video_downloads_folder"},
+            "soundcloud": {"client_id", "app_version"},
+            "spotify": {
+                "client_id",
+                "redirect_uri",
+                "audio_format",
+                "audio_bitrate",
+                "match_videos",
+                "access_token",
+                "refresh_token",
+                "token_expiry",
+            },
             "database": {
                 "downloads_enabled",
                 "downloads_path",
@@ -899,12 +1283,11 @@ class StreamripTests(unittest.TestCase):
                 "bit_depth",
                 "lossy_bitrate",
             },
-            "qobuz_filters": {
+            "artist_filters": {
                 "extras",
                 "repeats",
                 "non_albums",
                 "features",
-                "non_studio_albums",
                 "non_remaster",
             },
             "artwork": {
@@ -918,6 +1301,7 @@ class StreamripTests(unittest.TestCase):
                 "set_playlist_to_album",
                 "renumber_playlist_tracks",
                 "exclude",
+                "prefer_explicit",
             },
             "filepaths": {
                 "add_singles_to_folder",
@@ -927,13 +1311,15 @@ class StreamripTests(unittest.TestCase):
                 "truncate_to",
             },
             "lastfm": {"source", "fallback_source"},
-            "cli": {"text_output", "progress_bars", "max_search_results"},
-            "misc": {"version", "check_for_updates"},
+            "cli": {"progress_bars", "max_search_results", "no_update_check"},
         }
         self.assertEqual({name: set(value) for name, value in parsed.items()}, expected)
-        self.assertEqual(parsed["downloads"]["concurrency"], True)
+        self.assertEqual(parsed["downloads"]["max_connections"], 2)
+        self.assertEqual(parsed["downloads"]["requests_per_minute"], 30)
+        self.assertTrue(parsed["downloads"]["verify_ssl"])
+        self.assertFalse(parsed["downloads"]["lyrics"])
         self.assertEqual(parsed["database"]["downloads_enabled"], True)
-        self.assertEqual(parsed["misc"]["version"], "2.2.0")
+        self.assertTrue(parsed["cli"]["no_update_check"])
         self.assertEqual(self.master.read_text().count("secret"), 1)
         self.assertEqual(
             runner.argv[0],

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import selectors
 import signal
 import sqlite3
@@ -29,29 +30,36 @@ MAX_OUTPUT_ENTRIES = 500
 MAX_OUTPUT_BYTES = 4_000_000_000
 AUDIO_EXTENSIONS = {"flac", "alac", "wav", "ape", "wv", "m4a"}
 
-# Complete typed ConfigData.from_toml shape for pinned Streamrip 2.2.0.
+# Complete typed ConfigData.from_toml shape for Stensel8/streamrip 2.4.11,
+# commit 6c9c67838422ec4f6b2b6f00fc07d4a4f68316f1. Never copy master defaults.
 PIN_TEMPLATE = {
     "downloads": {
         "folder": "",
         "source_subdirectories": False,
         "disc_subdirectories": True,
-        "concurrency": True,
-        "max_connections": 6,
-        "requests_per_minute": 60,
+        "max_connections": 2,
+        "requests_per_minute": 30,
         "verify_ssl": True,
+        "lyrics": False,
     },
     "qobuz": {
         "quality": 3,
-        "download_booklets": True,
-        "use_auth_token": True,
-        "email_or_userid": "",
-        "password_or_token": "",
+        "download_booklets": False,
+        "user_id": "",
+        "auth_token": "",
         "app_id": "",
         "secrets": [],
     },
     "tidal": {
         "quality": 3,
-        "download_videos": True,
+        "hires_client": False,
+        "client_id": "",
+        "client_secret": "",
+        "token_client_id": "",
+        "hires_access_token": "",
+        "hires_refresh_token": "",
+        "hires_token_expiry": "",
+        "hires_token_client_id": "",
         "user_id": "",
         "country_code": "",
         "access_token": "",
@@ -62,11 +70,18 @@ PIN_TEMPLATE = {
         "quality": 2,
         "lower_quality_if_not_available": True,
         "arl": "",
-        "use_deezloader": True,
-        "deezloader_warnings": True,
     },
-    "soundcloud": {"quality": 0, "client_id": "", "app_version": ""},
-    "youtube": {"quality": 0, "download_videos": False, "video_downloads_folder": ""},
+    "soundcloud": {"client_id": "", "app_version": ""},
+    "spotify": {
+        "client_id": "",
+        "redirect_uri": "http://127.0.0.1:9900/callback",
+        "audio_format": "m4a",
+        "audio_bitrate": 256,
+        "match_videos": False,
+        "access_token": "",
+        "refresh_token": "",
+        "token_expiry": "",
+    },
     "database": {
         "downloads_enabled": True,
         "downloads_path": "",
@@ -80,25 +95,25 @@ PIN_TEMPLATE = {
         "bit_depth": 24,
         "lossy_bitrate": 320,
     },
-    "qobuz_filters": {
+    "artist_filters": {
         "extras": False,
         "repeats": False,
         "non_albums": False,
         "features": False,
-        "non_studio_albums": False,
         "non_remaster": False,
     },
     "artwork": {
-        "embed": True,
+        "embed": False,
         "embed_size": "large",
         "embed_max_width": -1,
-        "save_artwork": True,
+        "save_artwork": False,
         "saved_max_width": -1,
     },
     "metadata": {
         "set_playlist_to_album": True,
         "renumber_playlist_tracks": True,
         "exclude": [],
+        "prefer_explicit": False,
     },
     "filepaths": {
         "add_singles_to_folder": False,
@@ -108,8 +123,7 @@ PIN_TEMPLATE = {
         "truncate_to": 120,
     },
     "lastfm": {"source": "qobuz", "fallback_source": ""},
-    "cli": {"text_output": True, "progress_bars": True, "max_search_results": 100},
-    "misc": {"version": "2.2.0", "check_for_updates": True},
+    "cli": {"progress_bars": False, "max_search_results": 100, "no_update_check": True},
 }
 
 
@@ -224,7 +238,7 @@ class StreamripAdapter:
             "search_results": str(root / "search.json"),
         }
 
-    def _credentials(self) -> dict[str, object]:
+    def _credentials(self) -> dict[str, str]:
         try:
             info = self.master_config.lstat()
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
@@ -236,16 +250,29 @@ class StreamripAdapter:
         qobuz = master.get("qobuz") if isinstance(master, dict) else None
         if not isinstance(qobuz, dict):
             raise Configuration("Streamrip Qobuz credentials are malformed")
-        fields = {
-            key: qobuz.get(key)
-            for key in ("use_auth_token", "email_or_userid", "password_or_token")
-        }
-        if type(fields["use_auth_token"]) is not bool or not all(
-            isinstance(fields[key], str) and fields[key] and "\x00" not in fields[key]
-            for key in ("email_or_userid", "password_or_token")
-        ):
+        # A partial/malformed new login must not silently select stale legacy
+        # credentials. Legacy email/password logins are never token credentials.
+        if "user_id" in qobuz or "auth_token" in qobuz:
+            fields = {key: qobuz.get(key) for key in ("user_id", "auth_token")}
+        elif qobuz.get("use_auth_token") is True:
+            fields = {
+                "user_id": qobuz.get("email_or_userid"),
+                "auth_token": qobuz.get("password_or_token"),
+            }
+        else:
             raise Configuration("Streamrip Qobuz credentials are malformed")
-        return fields
+        credentials = {}
+        for key, value in fields.items():
+            if (
+                not isinstance(value, str)
+                or not value.strip()
+                or any(
+                    ord(character) < 32 or ord(character) == 127 for character in value
+                )
+            ):
+                raise Configuration("Streamrip Qobuz credentials are malformed")
+            credentials[key] = value
+        return credentials
 
     def establish_baseline(self, runtime: dict[str, str]) -> None:
         for key, table, schema in (
@@ -253,7 +280,7 @@ class StreamripAdapter:
             (
                 "failed_downloads_db",
                 "failed_downloads",
-                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT UNIQUE NOT NULL",
+                "source TEXT NOT NULL, media_type TEXT NOT NULL, id TEXT NOT NULL, UNIQUE (source, media_type, id)",
             ),
         ):
             path = Path(runtime[key])
@@ -311,8 +338,7 @@ class StreamripAdapter:
             credentials | {"quality": 3, "download_booklets": False}
         )
         config_data["artwork"].update({"embed": False, "save_artwork": False})
-        config_data["cli"].update({"text_output": False, "progress_bars": False})
-        config_data["misc"]["check_for_updates"] = False
+        config_data["cli"].update({"progress_bars": False, "no_update_check": True})
         lines = []
         for section, values in config_data.items():
             lines.append(f"[{section}]")
@@ -538,11 +564,23 @@ class StreamripAdapter:
 
     @staticmethod
     def description_matches(description: str, release: dict) -> bool:
-        # The only accepted sparse form is the provider display title followed by
-        # the artist; parentheses/descriptions are edition evidence we cannot prove.
+        # The pinned CLI appends a year-only display note. Accept that exact
+        # suffix only when the frozen release supplies the same year; do not
+        # remove explicit/edition notes or weaken the downstream tag checks.
         expected = f"{release['title']} by {release['artist']}"
         normalize = lambda value: " ".join(value.casefold().split())
-        return normalize(description) == normalize(expected)
+        if normalize(description) == normalize(expected):
+            return True
+        match = re.fullmatch(r"(.+) \(([0-9]{4})\)", description)
+        details = release.get("details")
+        date = details.get("date") if isinstance(details, dict) else None
+        return bool(
+            match
+            and isinstance(date, str)
+            and re.fullmatch(r"[0-9]{4}(?:-[0-9]{2}){0,2}", date)
+            and match[2] == date[:4]
+            and normalize(match[1]) == normalize(expected)
+        )
 
     @staticmethod
     def edition_compatible(release: object) -> bool:
@@ -767,21 +805,36 @@ class StreamripAdapter:
             info = path.lstat()
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
                 raise OSError
+            schemas = {
+                "downloads": (("id",), {("id",)}),
+                # Only the pinned composite key and the validated legacy key
+                # are supported. Partial/expression indexes prove neither.
+                "failed_downloads": (
+                    ("source", "media_type", "id"),
+                    {("source", "media_type", "id"), ("id",)},
+                ),
+            }
+            if table not in schemas or fields != schemas[table][0]:
+                raise sqlite3.DatabaseError
             connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
             columns = connection.execute(f"PRAGMA table_info({table})").fetchall()
             names = {row[1]: row for row in columns}
-            if set(fields) - set(names) or any(
-                names[field][3] != 1 for field in fields
+            if set(fields) != set(names) or any(
+                names[field][3] != 1 or names[field][2].upper() != "TEXT"
+                for field in fields
             ):
                 raise sqlite3.DatabaseError
             indexes = connection.execute(f"PRAGMA index_list({table})").fetchall()
             if not any(
                 row[2]
-                and {
+                and not row[4]
+                and tuple(
                     item[2]
-                    for item in connection.execute(f'PRAGMA index_info("{row[1]}")')
-                }
-                == {"id"}
+                    for item in connection.execute(
+                        'PRAGMA index_info("' + row[1].replace('"', '""') + '")'
+                    )
+                )
+                in schemas[table][1]
                 for row in indexes
             ):
                 raise sqlite3.DatabaseError

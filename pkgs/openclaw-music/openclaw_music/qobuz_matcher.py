@@ -25,6 +25,7 @@ MAX_QUERY_STAGES = 4
 MAX_CANDIDATES = 200
 
 _SPACE = re.compile(r"\s+")
+_DISPLAY_YEAR = re.compile(r" \([0-9]{4}\)$")
 _PUNCTUATION = re.compile(r"[\W_]+", re.UNICODE)
 _EDITION_PATTERNS = {
     "live": re.compile(r"\blive\b", re.IGNORECASE),
@@ -167,12 +168,15 @@ def parse_sparse_candidate(record: Mapping[str, Any]) -> dict[str, Any]:
     # final-delimiter interpretation for exploratory ranking, but label it so
     # it can never authorize a recommendation.
     fields: dict[str, str] = {}
-    delimiters = list(re.finditer(r"\s+by\s+", desc, flags=re.IGNORECASE))
+    # This is a pinned display decoration, not date evidence: the source
+    # contract has no year. Keep desc intact and score only title/artist.
+    display = _DISPLAY_YEAR.sub("", desc)
+    delimiters = list(re.finditer(r"\s+by\s+", display, flags=re.IGNORECASE))
     if delimiters:
         delimiter = delimiters[-1]
         title, artist = (
-            desc[: delimiter.start()].strip(),
-            desc[delimiter.end() :].strip(),
+            display[: delimiter.start()].strip(),
+            display[delimiter.end() :].strip(),
         )
         if title and artist:
             fields = {"title": title, "artist": artist}
