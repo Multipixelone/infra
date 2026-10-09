@@ -211,6 +211,7 @@ in
   };
   config = {
     gameServers = {
+      minecraft.adminUuid = "3f771d00-3456-4007-8d66-13fe158488fa";
       adapters = {
         minecraft-paper = config.flake.modules.nixos.games-minecraft;
         terraria-tmodloader = config.flake.modules.nixos.games-tmodloader;
@@ -219,6 +220,8 @@ in
         survival = {
           game = "minecraft-paper";
           displayName = "Survival";
+          minecraft.whitelist.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
+          minecraft.operators.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.discord = {
             guildId = "1518484285466873997";
             channelId = "1557960229528797265";

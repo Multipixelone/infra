@@ -97,7 +97,12 @@ for field, directory, server in (
     assert "default" in bootstrap["groups"]
     assert {"key": "group.default", "value": True} in bootstrap["groups"]["admin"]["nodes"]
     assert {"key": "*", "value": True} in bootstrap["groups"]["admin"]["nodes"]
-    assert bootstrap["users"] == {}
+    assert bootstrap["users"] == {
+        "3f771d00-3456-4007-8d66-13fe158488fa": {
+            "primaryGroup": "admin",
+            "nodes": [{"key": "group.admin", "value": True}],
+        }
+    }
 
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)
