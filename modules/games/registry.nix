@@ -80,6 +80,16 @@ let
               type = types.strMatching "([0-9]{17,20})?";
               default = "";
             };
+            eventsChannelId = mkOption {
+              type = types.strMatching "([0-9]{17,20})?";
+              default = "";
+              description = "Join/leave channel; empty uses the main chat channel.";
+            };
+            consoleChannelId = mkOption {
+              type = types.strMatching "([0-9]{17,20})?";
+              default = "";
+              description = "Private console logs and list/tps diagnostics; empty disables it.";
+            };
           };
           maxPlayers = mkOption {
             type = types.ints.positive;
@@ -209,6 +219,12 @@ in
         survival = {
           game = "minecraft-paper";
           displayName = "Survival";
+          minecraft.discord = {
+            guildId = "1518484285466873997";
+            channelId = "1557960229528797265";
+            eventsChannelId = "1518484285982769204";
+            consoleChannelId = "1557960243101831168";
+          };
           hostnames = [
             "survival.mc.finnrut.is"
             "mc.finnrut.is"

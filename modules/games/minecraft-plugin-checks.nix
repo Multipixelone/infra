@@ -3,7 +3,7 @@ let
   host = config.flake.nixosConfigurations.link;
   base = host.config.infra.games.servers;
   evaluate =
-    secrets: guild: channel: enabled:
+    secrets: guild: channel: enabled: overrides:
     (host.extendModules {
       modules = [
         {
@@ -13,11 +13,14 @@ let
             // {
               survival = base.survival // {
                 minecraft = base.survival.minecraft // {
-                  discord = {
-                    enable = enabled;
-                    guildId = guild;
-                    channelId = channel;
-                  };
+                  discord =
+                    base.survival.minecraft.discord
+                    // {
+                      enable = enabled;
+                      guildId = guild;
+                      channelId = channel;
+                    }
+                    // overrides;
                 };
               };
             }
@@ -32,7 +35,7 @@ let
         let
           cfg = evaluate (lib.optionalAttrs case.token {
             "games/minecraft/discordsrv-token" = ./tests/fixture.age;
-          }) case.guild case.channel case.enable;
+          }) case.guild case.channel case.enable (case.overrides or { });
           plugins = cfg.infra.games.minecraftPlugins.backends.survival;
           runtime = cfg.infra.games.runtime.survival;
         in
@@ -43,6 +46,11 @@ let
           declaredSecret = cfg.age.secrets."games/minecraft/discordsrv-token".mode or null;
           baseAvailable = runtime.available;
           statePaths = runtime.worldPaths;
+          discord = cfg.infra.games.servers.survival.minecraft.discord;
+          configuration =
+            plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/config.yml".source or null;
+          messages =
+            plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/messages.yml".source or null;
         }
       )
       [
@@ -82,12 +90,26 @@ let
           channel = "234567890123456789";
           enable = true;
         }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.eventsChannelId = "";
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.consoleChannelId = "";
+        }
       ];
   cfg = host.config;
   vhost = cfg.services.nginx.virtualHosts.minecraft-map-origin;
   permissions = evaluate {
     "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
-  } "" "" true;
+  } "" "" true { };
   permissionsFixture = {
     proxyInstalled = permissions.infra.games.minecraftPlugins.proxy.jars ? luckperms;
     backendInstalled = permissions.infra.games.minecraftPlugins.backends.survival.jars ? luckperms;
@@ -143,7 +165,8 @@ in
             ''} \
             ${cfg.infra.games.artifacts.games-bluemap-offline} \
             ${cfg.infra.games.artifacts.games-luckperms-libraries} \
-            ${pkgs.writeText "minecraft-permissions-fixture.json" (builtins.toJSON permissionsFixture)}
+            ${pkgs.writeText "minecraft-permissions-fixture.json" (builtins.toJSON permissionsFixture)} \
+            ${cfg.infra.games.artifacts.games-discordsrv}
           touch "$out"
         '';
   };

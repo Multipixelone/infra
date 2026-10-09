@@ -151,25 +151,50 @@ ready. Do not paste it into this repo. The decrypted credential is copied into
 DiscordSRV's supported private `.token` file; periods in Discord tokens bypass
 the unrelated password-placeholder validator safely.
 
-Set these declared options for the existing bot's guild/text channel:
+Survival declares the following `gameServers.servers.survival.minecraft.discord`
+options for Finn's existing bot:
 
-- `gameServers.servers.survival.minecraft.discord.guildId`
-- `gameServers.servers.survival.minecraft.discord.channelId`
+| Option | Discord ID | Purpose |
+| --- | --- | --- |
+| `guildId` | `1518484285466873997` | Guild owning the channels |
+| `channelId` | `1557960229528797265` | Main bidirectional chat, deaths and advancements |
+| `eventsChannelId` | `1518484285982769204` | Join, first join and leave messages |
+| `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands |
 
-Both IDs default to empty. Either missing ID, missing token or `enable = false`
+The defaults for other servers are empty. Either missing guild/chat ID, missing token or `enable = false`
 means no DiscordSRV JAR is installed; Minecraft itself remains independently
 gated by its existing mandatory credentials. The guild ID documents the guild
 owning the selected channel; DiscordSRV resolves that guild from the channel.
 Use Discord Developer Mode to copy the IDs and ensure the bot is in that guild.
+An empty events ID keeps join/leave messages in chat; an empty console ID
+disables console forwarding without disabling the bridge.
+
+The pinned 1.30.5 JAR's `config/en.yml` and `messages/en.yml` were inspected.
+Routing uses `Channels.global`, `Channels.join` and `Channels.leave`; the message
+templates have no channel selector. Deaths and advancements use distinct
+`deaths`/`awards` routes and fall back to the first channel, `global`, here.
+Server startup/shutdown messages also remain in chat.
 
 Enable **Message Content** and **Server Members** privileged intents. Grant
 **View Channel**, **Send Messages**, **Read Message History** and **Embed Links**
-in that channel. Presence is disabled. Webhooks, console commands, topic edits,
+in the chat and events channels. Make the events channel read-only to ordinary
+members so it remains a bot event feed. Presence is disabled. Webhooks, chat-channel console commands, topic edits,
 role/nickname/ban synchronization and mandatory account linking are disabled;
 no Administrator or Manage Roles permission is needed. Join/leave, first join,
 death, advancement and bidirectional chat messages are enabled. Test them after
 the first configured wake. Confirm token permissions remain private and neither
 configuration nor logs expose it.
+
+**Lock the console channel's permissions to Finn.** Deny other members View
+Channel and Send Messages, and permit Finn and the bot to access it, including
+any inherited role permissions. DiscordSRV does not check operator roles for
+console-channel commands: anyone able to post can run the allowed commands.
+The whitelist is exactly `list` and `tps`, with
+`DiscordConsoleChannelBlacklistActsAsWhitelist = true`; no other command names
+are allowed. Bot commands and command execution from the chat channel are
+disabled. INFO/WARN/ERROR Paper logs are forwarded every five seconds. Treat
+these logs as private. Forwarding and diagnostics stop while Paper sleeps, and
+Discord commands cannot wake Paper.
 
 ## Metrics
 

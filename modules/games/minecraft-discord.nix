@@ -53,8 +53,28 @@
                 config = {
                   ConfigVersion = "1.30.5";
                   BotToken = "";
-                  Channels.global = s.minecraft.discord.channelId;
-                  DiscordConsoleChannelId = "";
+                  # 1.30.5 routes these events by Channels keys, not messages.yml fields.
+                  # global sorts first and remains the fallback for deaths/awards/status.
+                  Channels = {
+                    global = s.minecraft.discord.channelId;
+                  }
+                  // lib.optionalAttrs (s.minecraft.discord.eventsChannelId != "") {
+                    join = s.minecraft.discord.eventsChannelId;
+                    leave = s.minecraft.discord.eventsChannelId;
+                  };
+                  DiscordConsoleChannelId = s.minecraft.discord.consoleChannelId;
+                  DiscordConsoleChannelBlacklistActsAsWhitelist = true;
+                  DiscordConsoleChannelBlacklistedCommands = [
+                    "list"
+                    "tps"
+                  ];
+                  DiscordConsoleChannelBlockBots = true;
+                  DiscordConsoleChannelLogRefreshRateInSeconds = 5;
+                  DiscordConsoleChannelLevels = [
+                    "info"
+                    "warn"
+                    "error"
+                  ];
                   DiscordChatChannelConsoleCommandEnabled = false;
                   DiscordChatChannelRequireLinkedAccount = false;
                   DiscordChatChannelDiscordToMinecraft = true;

@@ -13,6 +13,10 @@ import zipfile
 import yaml
 
 cases = json.loads(pathlib.Path(sys.argv[1]).read_text())
+with zipfile.ZipFile(sys.argv[6]) as jar:
+    discord_defaults = yaml.safe_load(jar.read("config/en.yml"))
+    message_defaults = yaml.safe_load(jar.read("messages/en.yml"))
+assert discord_defaults["ConfigVersion"] == "1.30.5"
 for case in cases:
     assert case["installed"] == case["expected"]
     assert not case["baseAvailable"]  # No mandatory Minecraft credentials in these fixtures.
@@ -20,6 +24,25 @@ for case in cases:
         assert case["tokenCopy"] == {"secret": "/run/agenix/games/minecraft/discordsrv-token"}
         assert case["declaredSecret"] == "0400"
         assert any(path.endswith("plugins/DiscordSRV") for path in case["statePaths"])
+        configuration = yaml.safe_load(pathlib.Path(case["configuration"]).read_text())
+        messages = yaml.safe_load(pathlib.Path(case["messages"]).read_text())
+        assert configuration.keys() <= discord_defaults.keys()
+        assert messages.keys() <= message_defaults.keys()
+        channels = {"global": case["discord"]["channelId"]}
+        if case["discord"]["eventsChannelId"]:
+            channels.update(join=case["discord"]["eventsChannelId"], leave=case["discord"]["eventsChannelId"])
+        assert configuration["Channels"] == channels
+        assert next(iter(configuration["Channels"])) == "global"
+        assert configuration["DiscordConsoleChannelId"] == case["discord"]["consoleChannelId"]
+        assert configuration["DiscordConsoleChannelBlacklistActsAsWhitelist"] is True
+        assert configuration["DiscordConsoleChannelBlacklistedCommands"] == ["list", "tps"]
+        assert configuration["DiscordConsoleChannelBlockBots"] is True
+        assert not configuration["DiscordChatChannelConsoleCommandEnabled"]
+        assert configuration["DiscordConsoleChannelLogRefreshRateInSeconds"] == 5
+        assert configuration["DiscordConsoleChannelLevels"] == ["info", "warn", "error"]
+        for event in ("Join", "FirstJoin", "Leave", "Death", "Achievement"):
+            assert messages[f"MinecraftPlayer{event}Message"]["Enabled"]
+            assert "Channel" not in messages[f"MinecraftPlayer{event}Message"]
     else:
         assert case["tokenCopy"] is None
         assert not any(path.endswith("plugins/DiscordSRV") for path in case["statePaths"])
