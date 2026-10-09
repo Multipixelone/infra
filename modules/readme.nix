@@ -12,6 +12,7 @@
         "commands"
         "wrappers"
         "packages"
+        "minecraft"
         "dendritic"
         "github-actions"
         "files"
@@ -50,6 +51,18 @@
 
           Built on top of [flake-parts](https://flake.parts/), this setup manages system configurations, dotfiles, user secrets (via `agenix`), custom packages, and portable applications runnable anywhere via `nix run`.
         '';
+
+      parts.minecraft = ''
+        ## Minecraft survival
+
+        Link hosts Finn's sleeping Paper survival server behind Velocity, with
+        pinned skins, MOTD, static BlueMap, shared PostgreSQL permissions, optional
+        Discord bridging, voice chat and sleep-aware telemetry. See
+        [Minecraft operator notes](docs/games-minecraft.md) for setup, backups,
+        limits and deferred vane/rollback work. The public map is
+        [map.finnrut.is](https://map.finnrut.is); Dawarich now uses
+        [dawarich.finnrut.is](https://dawarich.finnrut.is).
+      '';
 
       parts.structure =
         # markdown

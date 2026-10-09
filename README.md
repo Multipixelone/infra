@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (95)</summary>
+<summary>Packages exposed by this flake (106)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -124,27 +124,38 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-backup` · `nix run github:Multipixelone/infra#games-backup`
 - `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
 - `games-backup-run` · `nix run github:Multipixelone/infra#games-backup-run`
+- `games-bluemap` · `nix run github:Multipixelone/infra#games-bluemap`
+- `games-bluemap-offline` · `nix run github:Multipixelone/infra#games-bluemap-offline`
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
 - `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`
 - [`games-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-package.nix) — Private game server dashboard with packaged frontend · `nix run github:Multipixelone/infra#games-dashboard`
 - [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
+- `games-discordsrv` · `nix run github:Multipixelone/infra#games-discordsrv`
 - `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
 - `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`
 - [`games-grafana-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/grafana.nix) · `nix run github:Multipixelone/infra#games-grafana-dashboard`
 - `games-lazymc` — Remote wake-up daemon for minecraft servers · `nix run github:Multipixelone/infra#games-lazymc`
 - `games-logs` · `nix run github:Multipixelone/infra#games-logs`
+- `games-luckperms-libraries` · `nix run github:Multipixelone/infra#games-luckperms-libraries`
+- `games-luckperms-paper` · `nix run github:Multipixelone/infra#games-luckperms-paper`
+- `games-luckperms-velocity` · `nix run github:Multipixelone/infra#games-luckperms-velocity`
 - `games-metrics` · `nix run github:Multipixelone/infra#games-metrics`
+- `games-minecraft-client` · `nix run github:Multipixelone/infra#games-minecraft-client`
+- `games-minimotd` · `nix run github:Multipixelone/infra#games-minimotd`
 - `games-paper-result` · `nix run github:Multipixelone/infra#games-paper-result`
 - `games-paper-stop` · `nix run github:Multipixelone/infra#games-paper-stop`
 - `games-paper-survival` — A high performance spigot fork · `nix run github:Multipixelone/infra#games-paper-survival`
 - `games-prechange` · `nix run github:Multipixelone/infra#games-prechange`
 - `games-prepare` · `nix run github:Multipixelone/infra#games-prepare`
 - `games-prune` · `nix run github:Multipixelone/infra#games-prune`
+- `games-skinsrestorer` · `nix run github:Multipixelone/infra#games-skinsrestorer`
 - `games-status` · `nix run github:Multipixelone/infra#games-status`
 - `games-survival-lazy` · `nix run github:Multipixelone/infra#games-survival-lazy`
+- `games-tickscope` · `nix run github:Multipixelone/infra#games-tickscope`
 - `games-tmodloader-runtime` · `nix run github:Multipixelone/infra#games-tmodloader-runtime`
 - `games-velocity` — A modern, next-generation Minecraft server proxy · `nix run github:Multipixelone/infra#games-velocity`
+- `games-voicechat` · `nix run github:Multipixelone/infra#games-voicechat`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
 - [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`
@@ -205,6 +216,16 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `write-lock` — Detect existing lock file and delegate to the appropriate writer. · `nix run github:Multipixelone/infra#write-lock`
 
 </details>
+
+## Minecraft survival
+
+Link hosts Finn's sleeping Paper survival server behind Velocity, with
+pinned skins, MOTD, static BlueMap, shared PostgreSQL permissions, optional
+Discord bridging, voice chat and sleep-aware telemetry. See
+[Minecraft operator notes](docs/games-minecraft.md) for setup, backups,
+limits and deferred vane/rollback work. The public map is
+[map.finnrut.is](https://map.finnrut.is); Dawarich now uses
+[dawarich.finnrut.is](https://dawarich.finnrut.is).
 
 
 ## Dendritic Pattern
