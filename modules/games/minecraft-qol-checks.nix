@@ -64,6 +64,18 @@ in
           url = "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar";
           sha256 = "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3";
         };
+        gson = pkgs.fetchurl {
+          url = "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar";
+          sha256 = "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f";
+        };
+        examinationApi = pkgs.fetchurl {
+          url = "https://repo.maven.apache.org/maven2/net/kyori/examination-api/1.3.0/examination-api-1.3.0.jar";
+          sha256 = "c9237ffecb05428f6eff86216246ac70ce0b47b04c08ea7ca35020fde57f8492";
+        };
+        examinationString = pkgs.fetchurl {
+          url = "https://repo.maven.apache.org/maven2/net/kyori/examination-string/1.3.0/examination-string-1.3.0.jar";
+          sha256 = "7d01fc25a4bb3af0e1662685455f4541fbf4626216ea5846e455c1491e156b8c";
+        };
         fastutil = pkgs.fetchurl {
           url = "https://repo.maven.apache.org/maven2/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18.jar";
           sha256 = "9094ae67d01d0ad246f886f11ad557fc2e79c72cbf3feed83e1512a8ae90a74a";
@@ -86,7 +98,9 @@ in
             ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \
             ${guava} ${fastutil} ${./tests} \
             ${cfg.infra.games.artifacts.games-openinv} \
-            ${cfg.infra.games.artifacts.games-openinv-libraries}
+            ${cfg.infra.games.artifacts.games-openinv-libraries} \
+            ${cfg.infra.games.artifacts.games-bluemap-offline} ${gson} \
+            ${examinationApi} ${examinationString}
           touch "$out"
         '';
   };

@@ -33,6 +33,9 @@
         economy.enabled = false;
         luckperms.enabled = true;
         map_hook = {
+          # 4.11 supports only these switches; en-gb supplies "Public Homes"
+          # and "Warps" labels. BlueMap's sets are visible and toggleable.
+          # Private homes are excluded by HuskHomes' query/cache update path.
           enabled = true;
           show_public_homes = true;
           show_warps = true;

@@ -9,7 +9,7 @@ import zipfile
 
 import yaml
 
-fixtures_file, husk, graves, husk_cache, graves_cache, paper, guava, fastutil, sources, openinv, openinv_cache = sys.argv[1:]
+fixtures_file, husk, graves, husk_cache, graves_cache, paper, guava, fastutil, sources, openinv, openinv_cache, bluemap, gson, examination_api, examination_string = sys.argv[1:]
 fixtures = json.loads(pathlib.Path(fixtures_file).read_text())
 assert fixtures["noPaper"]["backends"] == {}
 for name in ("missingSecrets", "additionalBackend"):
@@ -69,6 +69,11 @@ with zipfile.ZipFile(husk) as jar:
     descriptor = yaml.safe_load(jar.read("paper-plugin.yml"))
     assert descriptor["version"] == "4.11-9ed80cc"
     assert descriptor["dependencies"]["server"]["BlueMap"]["join-classpath"]
+    assert descriptor["dependencies"]["server"]["BlueMap"]["load"] == "BEFORE"
+    assert not descriptor["dependencies"]["server"]["BlueMap"]["required"]
+    locales = yaml.safe_load(jar.read("locales/en-gb.yml"))["locales"]
+    assert locales["map_hook_public_homes_marker_set_name"] == "Public Homes"
+    assert locales["map_hook_warps_marker_set_name"] == "Warps"
     assert "net/william278/huskhomes/hook/BlueMapHook.class" in jar.namelist()
     declarations = yaml.safe_load(jar.read("paper-libraries.yml"))["libraries"]
     assert len(declarations) == 6
@@ -90,8 +95,8 @@ with tempfile.TemporaryDirectory() as directory:
     classes = root / "classes"
     classes.mkdir()
     extra = [str(path) for path in pathlib.Path(husk_cache).rglob("*.jar")]
-    classpath = ":".join([str(classes), husk, graves, f"{embedded}/*", guava, fastutil, *extra])
-    java_sources = [str(pathlib.Path(sources) / f"{name}.java") for name in ("ResolveHusk", "ResolveAxGraves", "ReadHuskSettings", "ResolveOpenInv")]
+    classpath = ":".join([str(classes), husk, graves, bluemap, f"{embedded}/*", guava, gson, fastutil, examination_api, examination_string, *extra])
+    java_sources = [str(pathlib.Path(sources) / f"{name}.java") for name in ("ResolveHusk", "ResolveAxGraves", "ReadHuskSettings", "ResolveOpenInv", "BlueMapFixture", "CheckHuskMap")]
     subprocess.run(["javac", "-cp", classpath, "-d", str(classes), *java_sources], check=True)
     # Invoke the plugin's real Paper loader/resolver; fail on any transfer.
     subprocess.run(["java", "-cp", classpath, "ResolveHusk", "offline"], cwd=root, check=True)
@@ -99,6 +104,7 @@ with tempfile.TemporaryDirectory() as directory:
     subprocess.run(["java", "-cp", classpath, "ResolveAxGraves", graves_cache], cwd=root, check=True)
     # The upstream parser, not just PyYAML, must recognize our generated keys.
     subprocess.run(["java", "-cp", classpath, "ReadHuskSettings", str(home_config)], cwd=root, check=True)
+    subprocess.run(["java", "-cp", classpath, "CheckHuskMap", str(home_config)], cwd=root, check=True)
     # Bukkit's LibraryLoader uses a different repository id from Paper's loader.
     (root / "libraries").unlink()
     (root / "libraries").symlink_to(openinv_cache, target_is_directory=True)
