@@ -145,6 +145,40 @@ let
         }
       ];
   cfg = host.config;
+  buildingNames = [
+    "FastAsyncWorldEdit"
+    "FastAsyncVoxelSniper"
+    "WorldEditSelectionVisualizer"
+  ];
+  buildingFixture = {
+    plugins = lib.mapAttrs (_: toString) (
+      lib.getAttrs [
+        "fawe"
+        "voxelsniper"
+        "worldedit-visualizer"
+      ] cfg.infra.games.minecraftPlugins.backends.survival.jars
+    );
+    templates = lib.filterAttrs (
+      path: _: lib.any (name: lib.hasInfix "/plugins/${name}/" path) buildingNames
+    ) cfg.infra.games.minecraftPlugins.backends.survival.templates;
+    statePaths = cfg.infra.games.runtime.survival.worldPaths;
+    inventory = cfg.infra.games.runtime.survival.pluginInventory;
+    symlinks = lib.mapAttrs (_: toString) (
+      lib.filterAttrs (
+        path: _:
+        lib.elem path [
+          "plugins/fawe.jar"
+          "plugins/voxelsniper.jar"
+          "plugins/worldedit-visualizer.jar"
+        ]
+      ) cfg.services.minecraft-servers.servers.survival.symlinks
+    );
+    proxyInventory = cfg.infra.games.minecraftPlugins.proxy.inventory;
+    withoutBackends =
+      (host.extendModules {
+        modules = [ { infra.games.servers = lib.mkForce { }; } ];
+      }).config.infra.games.minecraftPlugins.backends;
+  };
   vhost = cfg.services.nginx.virtualHosts.minecraft-map-origin;
   permissions = evaluate {
     "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
@@ -211,7 +245,8 @@ in
             ${cfg.infra.games.artifacts.games-bluemap-offline} \
             ${cfg.infra.games.artifacts.games-luckperms-libraries} \
             ${pkgs.writeText "minecraft-permissions-fixture.json" (builtins.toJSON permissionsFixture)} \
-            ${cfg.infra.games.artifacts.games-discordsrv}
+            ${cfg.infra.games.artifacts.games-discordsrv} \
+            ${pkgs.writeText "minecraft-building-fixture.json" (builtins.toJSON buildingFixture)}
           touch "$out"
         '';
   };

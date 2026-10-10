@@ -1,6 +1,23 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-fawe = pkgs.fetchurl {
+        # 2.16.1's FluidState.is(Fluid) call fails on pinned Paper 26.3 build 159;
+        # 2.16.0 uses is(Object) and passes the isolated runtime checks.
+        name = "fastasyncworldedit-paper-2.16.0.jar";
+        url = "https://cdn.modrinth.com/data/z4HZZnLr/versions/U2dcKa9T/FastAsyncWorldEdit-Paper-2.16.0.jar";
+        sha256 = "1a3cf8178f22d97fe78db100c7d50ebe57acdb59f3df1a972c29761ebba6f0cd";
+      };
+      games-voxelsniper = pkgs.fetchurl {
+        name = "fastasyncvoxelsniper-3.2.5.jar";
+        url = "https://cdn.modrinth.com/data/D7XBSI1y/versions/AnYq3r1h/fastasyncvoxelsniper-3.2.5.jar";
+        sha256 = "485e8b5694df0dbda96038049cb9a73bee4e37d9ec8c7f589af5e8a590fca2e9";
+      };
+      games-worldedit-visualizer = pkgs.fetchurl {
+        name = "worldeditselectionvisualizer-2.1.10.jar";
+        url = "https://github.com/MrMicky-FR/WorldEditSelectionVisualizer/releases/download/v2.1.10/WorldEditSelectionVisualizer-2.1.10.jar";
+        sha256 = "5897fd8de2fafa3fadcde94bb4e48d69047817548bcb9190254190a596509bd2";
+      };
       games-chunky = pkgs.fetchurl {
         name = "chunky-bukkit-1.5.3.jar";
         url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";

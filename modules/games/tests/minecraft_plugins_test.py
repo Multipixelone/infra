@@ -223,6 +223,89 @@ for field, directory, server in (
         }
     }
 
+building = json.loads(pathlib.Path(sys.argv[7]).read_text())
+assert building["withoutBackends"] == {}
+expected_building = {
+    "FastAsyncWorldEdit": "2.16.0",
+    "FastAsyncVoxelSniper": "3.2.5",
+    "WorldEditSelectionVisualizer": "2.1.10",
+}
+inventory = {plugin["name"]: plugin for plugin in building["inventory"]}
+for name, version in expected_building.items():
+    assert inventory[name] == {"name": name, "version": version, "installed": True}
+    assert f"/srv/games/minecraft/survival/plugins/{name}" in building["statePaths"]
+assert not expected_building.keys() & {
+    plugin["name"] for plugin in building["proxyInventory"]
+}
+for key, name in zip(
+    ("fawe", "voxelsniper", "worldedit-visualizer"), expected_building
+):
+    assert building["symlinks"][f"plugins/{key}.jar"] == building["plugins"][key]
+    with zipfile.ZipFile(building["plugins"][key]) as jar:
+        metadata = yaml.safe_load(jar.read("plugin.yml"))
+        assert metadata["name"] == name
+        assert str(metadata["version"]).startswith(expected_building[name])
+        if key == "fawe":
+            assert "WorldEdit" in metadata["provides"]
+        else:
+            assert (
+                "FastAsyncWorldEdit" if key == "voxelsniper" else "WorldEdit"
+            ) in metadata["depend"]
+            defaults = yaml.safe_load(jar.read("config.yml"))
+            configured = yaml.safe_load(
+                pathlib.Path(
+                    building["templates"][
+                        f"/srv/games/minecraft/survival/plugins/{name}/config.yml"
+                    ]["source"]
+                ).read_text()
+            )
+            assert configured.keys() <= defaults.keys()
+
+
+def building_config(name):
+    return yaml.safe_load(
+        pathlib.Path(
+            building["templates"][
+                f"/srv/games/minecraft/survival/plugins/{name}/config.yml"
+            ]["source"]
+        ).read_text()
+    )
+
+
+fawe = building_config("FastAsyncWorldEdit")
+assert not fawe["region-restrictions"]
+assert not any(fawe["enabled-components"].values())
+for profile in ("default", "builder"):
+    limit = fawe["limits"][profile]
+    assert limit["max-actions"] == 1
+    assert limit["max-changes"] == 100000
+    assert limit["max-checks"] == 1000000
+    assert limit["max-radius"] == 32
+    assert limit["max-brush-radius"] == 8
+    assert limit["max-iterations"] == 10
+    assert limit["max-entities"] == 0
+    assert limit["max-blockstates"] == 1000
+    assert limit["max-history-mb"] == 128
+    assert limit["inventory-mode"] == 0
+    assert limit["confirm-large"]
+assert fawe["history"]["use-disk"] and fawe["history"]["store-redo"]
+assert fawe["history"]["delete-after-days"] == 7
+assert not fawe["history"]["delete-disk-on-logout"]
+sniper = building_config("FastAsyncVoxelSniper")
+assert sniper["config-version"] == 7
+assert not sniper["update-checker"]["enabled"]
+assert sniper["litesniper-max-brush-size"] == 8
+visualizer = building_config("WorldEditSelectionVisualizer")
+assert not visualizer["check-updates"]
+assert visualizer["default-enabled"] == {"selection": True, "clipboard": False}
+for mode in ("selection", "clipboard"):
+    visualization = visualizer["visualization"][mode]
+    assert visualization["max-selection-size"] == 100000
+    for points in ("primary", "secondary", "origin"):
+        assert visualization[points]["view-distance"] == 32
+        assert visualization[points]["update-interval"] == 20
+        assert visualization[points]["particles"]["type"] == "FLAME"
+
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)
     (root / "web").mkdir()
