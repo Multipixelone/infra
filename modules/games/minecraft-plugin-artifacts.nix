@@ -23,6 +23,21 @@
         url = "https://github.com/Jikoo/OpenInv/releases/download/5.3.5/OpenInv.jar";
         sha256 = "7b37f3909a75dd8c1d81aed52fcf66cf16cc266dcdb607b3df600e7644d48c5e";
       };
+      games-carbon = pkgs.fetchurl {
+        name = "carbonchat-paper-3.0.0-beta.39.jar";
+        url = "https://github.com/Hexaoxide/Carbon/releases/download/v3.0.0-beta.39/carbonchat-paper-3.0.0-beta.39.jar";
+        sha256 = "bc79bba5b67f4ceeca531775970ce6e2922ddff87999e12e463cdffa8e6fe4f5";
+      };
+      games-miniplaceholders = pkgs.fetchurl {
+        name = "miniplaceholders-paper-3.2.0.jar";
+        url = "https://github.com/MiniPlaceholders/MiniPlaceholders/releases/download/3.2.0/MiniPlaceholders-Paper-3.2.0.jar";
+        sha256 = "559f40c6d5e9eaad49fb5fb67c8e9d5163dc9ab22753eb709792d52989fb626a";
+      };
+      games-miniplaceholders-luckperms = pkgs.fetchurl {
+        name = "miniplaceholders-luckperms-2.1.0.jar";
+        url = "https://github.com/MiniPlaceholders/LuckPerms-Expansion/releases/download/2.1.0/LuckPerms-Expansion-2.1.0.jar";
+        sha256 = "5c788b69b63c4e5f54c8fbe8580ffba1d3d09bfd43a6d3b4232665ef7a15099a";
+      };
       games-chunky = pkgs.fetchurl {
         name = "chunky-bukkit-1.5.3.jar";
         url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";

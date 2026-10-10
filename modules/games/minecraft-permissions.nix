@@ -7,21 +7,29 @@
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       secret = "games/minecraft/luckperms-db-password";
       ready = cfg.secretFiles ? ${secret} && builtins.pathExists cfg.secretFiles.${secret};
-      # Keep rank colors and prefix priorities together for the chat formatter.
+      # One presentation table shared by prefix and name metadata. Keep the
+      # builder palette until a new palette is chosen; replacing a prefix with
+      # its icon variant is a one-line change (mod ◆, admin ★).
       ranks = {
         default = {
           weight = 0;
+          color = "#cba6f7";
         };
         builder = {
           weight = 10;
+          color = "gold";
           prefix = "&6[Builder]&r ";
         };
         mod = {
           weight = 20;
+          color = "light_purple";
+          # Icon variant: prefix = "&d◆&r ";
           prefix = "&d[Mod]&r ";
         };
         admin = {
           weight = 30;
+          color = "green";
+          # Icon variant: prefix = "&a★&r ";
           prefix = "&a[Admin]&r ";
         };
       };
@@ -35,9 +43,50 @@
           style = ranks.${rank};
         in
         grants (
-          [ "weight.${toString style.weight}" ]
+          [
+            "weight.${toString style.weight}"
+            "meta.chat_color.<${style.color}>"
+          ]
           ++ lib.optional (style ? prefix) "prefix.${toString style.weight}.${style.prefix}"
         );
+      polishPermissions = {
+        default = [
+          "openinv.enderchest.edit.self"
+          "openinv.access.online"
+          "carbon.channel.global"
+          "carbon.channel.global.see"
+          "carbon.channel.global.speak"
+        ];
+        mod = [
+          "openinv.inventory.open.other"
+          "openinv.enderchest.open.other"
+          "openinv.access.offline"
+          "openinv.access.crossworld"
+          "openinv.access.level.1"
+        ];
+      };
+      # Bootstrap imports initialize fresh databases. Existing databases need
+      # additive commands, never a replacement import that loses user grants.
+      polishCommands =
+        lib.concatStringsSep "\n" (
+          lib.concatMap (
+            rank:
+            let
+              style = ranks.${rank};
+            in
+            [
+              "lp group ${rank} setweight ${toString style.weight}"
+              "lp group ${rank} meta set chat_color <${style.color}>"
+            ]
+            ++ lib.optional (
+              style ? prefix
+            ) "lp group ${rank} meta setprefix ${toString style.weight} ${builtins.toJSON style.prefix}"
+            ++ map (permission: "lp group ${rank} permission set ${permission} true") (
+              polishPermissions.${rank} or [ ]
+            )
+          ) (lib.attrNames ranks)
+        )
+        + "\n";
       builderPermissions = [
         "group.default"
         "minecraft.command.gamemode"
@@ -152,6 +201,9 @@
         ) definitions
       );
       templates = dir: server: {
+        "${dir}/chat-inventory.commands".source = toString (
+          pkgs.writeText "luckperms-chat-inventory.commands" polishCommands
+        );
         "${dir}/config.yml" = {
           source = toString (
             (pkgs.formats.yaml { }).generate "luckperms-${server}.yml" {
@@ -185,7 +237,7 @@
             };
             groups = {
               default.nodes =
-                
+
                 map
                   (key: {
                     inherit key;
@@ -215,9 +267,8 @@
                     "axgraves.help"
                     "axgraves.list"
                     "axgraves.allowgraves"
-                    "openinv.enderchest.edit.self"
-                    "openinv.access.online"
                   ]
+                ++ grants polishPermissions.default
                 ++ rankNodes "default"
                 # These visualizer permissions default to true upstream.
                 ++
@@ -233,7 +284,7 @@
                     ];
               builder.nodes = grants builderPermissions ++ rankNodes "builder";
               mod.nodes =
-                
+
                 map
                   (key: {
                     inherit key;
@@ -251,12 +302,8 @@
                     "minecraft.command.gamemode.adventure"
                     "axgraves.list.other"
                     "axgraves.admin"
-                    "openinv.inventory.open.other"
-                    "openinv.enderchest.open.other"
-                    "openinv.access.offline"
-                    "openinv.access.crossworld"
-                    "openinv.access.level.1"
                   ]
+                ++ grants polishPermissions.mod
                 ++ rankNodes "mod";
               admin.nodes = [
                 {

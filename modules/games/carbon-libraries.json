@@ -1,0 +1,177 @@
+[
+  {
+    "path": "aopalliance/aopalliance/1.0/aopalliance-1.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.jar",
+    "sha256": "0addec670fedcd3f113c5c8091d783280d23f75e3acb841b61a9cdb079376a08"
+  },
+  {
+    "path": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+    "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+  },
+  {
+    "path": "com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar",
+    "sha256": "9d9d2cfd681fd9272ded3d27c9930db12f89f732345975aa113ebc223bbf1224"
+  },
+  {
+    "path": "com/github/luben/zstd-jni/1.5.7-17/zstd-jni-1.5.7-17.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/github/luben/zstd-jni/1.5.7-17/zstd-jni-1.5.7-17.jar",
+    "sha256": "c9043e2da8a16c13b6cd7661a5cb56685a573c3546ef4bd0ead67b0b67c2e107"
+  },
+  {
+    "path": "com/google/inject/extensions/guice-assistedinject/7.0.0/guice-assistedinject-7.0.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/google/inject/extensions/guice-assistedinject/7.0.0/guice-assistedinject-7.0.0.jar",
+    "sha256": "c07125fff9372bd6562e986bc9f3092694db9649a79761683adc9da6ffeb33e6"
+  },
+  {
+    "path": "com/google/inject/guice/7.0.0/guice-7.0.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/google/inject/guice/7.0.0/guice-7.0.0.jar",
+    "sha256": "de5b0e359bd7b03ca42806b368846efd95484380fe05ae2a4ea71bc338c59c00"
+  },
+  {
+    "path": "com/h2database/h2/2.5.250/h2-2.5.250.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/h2database/h2/2.5.250/h2-2.5.250.jar",
+    "sha256": "82a80a2ac06901b03cdb233c663d21c4f49c884bf6d0cf85022729e8db9ab86f"
+  },
+  {
+    "path": "com/rabbitmq/amqp-client/5.36.0/amqp-client-5.36.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/rabbitmq/amqp-client/5.36.0/amqp-client-5.36.0.jar",
+    "sha256": "333fd284b0166d2aeb7519f63860edfe1e0cbcdc915da22bf41f460f9ac7c872"
+  },
+  {
+    "path": "io/nats/jnats/2.26.3/jnats-2.26.3.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/nats/jnats/2.26.3/jnats-2.26.3.jar",
+    "sha256": "dad5c08148220792c0f6b21f042f4d7128f9565466f945644a93484b4e29f9cd"
+  },
+  {
+    "path": "io/netty/netty-buffer/4.2.18.Final/netty-buffer-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.2.18.Final/netty-buffer-4.2.18.Final.jar",
+    "sha256": "fdf236d2b76aa9710684401fdad7dff9dec56e43da5d39172c9a55ba5f14b360"
+  },
+  {
+    "path": "io/netty/netty-codec-base/4.2.18.Final/netty-codec-base-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-codec-base/4.2.18.Final/netty-codec-base-4.2.18.Final.jar",
+    "sha256": "7e4612bead7ba88ac6f7908fa722f90ad6835ea96505c9e40b2f93686c1f61f3"
+  },
+  {
+    "path": "io/netty/netty-codec-compression/4.2.18.Final/netty-codec-compression-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-codec-compression/4.2.18.Final/netty-codec-compression-4.2.18.Final.jar",
+    "sha256": "9d8a4b9a6a2a166ec5a4bbe51a78b4f6a726457c51d81495743c7e7ccb9f4765"
+  },
+  {
+    "path": "io/netty/netty-codec-marshalling/4.2.18.Final/netty-codec-marshalling-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-codec-marshalling/4.2.18.Final/netty-codec-marshalling-4.2.18.Final.jar",
+    "sha256": "eccf83cbbd1319db879424c4559d465dc43251fe1a8ff759c4320b5adbcf26b7"
+  },
+  {
+    "path": "io/netty/netty-codec-protobuf/4.2.18.Final/netty-codec-protobuf-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-codec-protobuf/4.2.18.Final/netty-codec-protobuf-4.2.18.Final.jar",
+    "sha256": "1bcaedd0da94f8579477f0848e910c24aced8b1ed7c3e1bff16d56fd0229b516"
+  },
+  {
+    "path": "io/netty/netty-codec/4.2.18.Final/netty-codec-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-codec/4.2.18.Final/netty-codec-4.2.18.Final.jar",
+    "sha256": "439645eb5061f8f50fbf27afacce394e4cecc4d373e1f7a384837e4661d5f430"
+  },
+  {
+    "path": "io/netty/netty-common/4.2.18.Final/netty-common-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-common/4.2.18.Final/netty-common-4.2.18.Final.jar",
+    "sha256": "5d97cae5669685872339698efe13f74fe3cdb2dccdb36963b2352bd95acf7070"
+  },
+  {
+    "path": "io/netty/netty-handler/4.2.18.Final/netty-handler-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.2.18.Final/netty-handler-4.2.18.Final.jar",
+    "sha256": "6d5a08d9dd6d7d0211202e22dbb1629b23a62550335c7e80892da1d4cb115540"
+  },
+  {
+    "path": "io/netty/netty-resolver/4.2.18.Final/netty-resolver-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.2.18.Final/netty-resolver-4.2.18.Final.jar",
+    "sha256": "68373ec544cf769ba17bf2ef455166d98f2c260dff536edf35ef57067a9c155f"
+  },
+  {
+    "path": "io/netty/netty-transport-native-unix-common/4.2.18.Final/netty-transport-native-unix-common-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-transport-native-unix-common/4.2.18.Final/netty-transport-native-unix-common-4.2.18.Final.jar",
+    "sha256": "cada7023d09136af128511ca94421d69dc84d0f1f64c9e1f127a1271bb62932a"
+  },
+  {
+    "path": "io/netty/netty-transport/4.2.18.Final/netty-transport-4.2.18.Final.jar",
+    "url": "https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.2.18.Final/netty-transport-4.2.18.Final.jar",
+    "sha256": "eac4f12068db4489e60c6520fad663e5d872f0436a7c641aa9e08db649947863"
+  },
+  {
+    "path": "jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+    "sha256": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
+  },
+  {
+    "path": "org/apache/commons/commons-pool2/2.13.1/commons-pool2-2.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-pool2/2.13.1/commons-pool2-2.13.1.jar",
+    "sha256": "f77a5060d6936a9144023584232f9de3f2248f1abfe156e9d31795f18770674f"
+  },
+  {
+    "path": "org/bouncycastle/bcprov-lts8on/2.73.12.1/bcprov-lts8on-2.73.12.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-lts8on/2.73.12.1/bcprov-lts8on-2.73.12.1.jar",
+    "sha256": "7514e0d8b9987b1cce93c15d8379d14fed2663b37e7c0b0692e596ed6b6e58a7"
+  },
+  {
+    "path": "org/flywaydb/flyway-core/13.7.0/flyway-core-13.7.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/flywaydb/flyway-core/13.7.0/flyway-core-13.7.0.jar",
+    "sha256": "d651e7640ddb761ad6ecd584d91cbbe5f5fdd4d43a26684bccb79d78c71dd9c7"
+  },
+  {
+    "path": "org/flywaydb/flyway-database-postgresql/13.7.0/flyway-database-postgresql-13.7.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/flywaydb/flyway-database-postgresql/13.7.0/flyway-database-postgresql-13.7.0.jar",
+    "sha256": "9bff50752b1d336d48a92ea30b4efb52b1b2e2703d230753fed083adf633534f"
+  },
+  {
+    "path": "org/flywaydb/flyway-mysql/13.7.0/flyway-mysql-13.7.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/flywaydb/flyway-mysql/13.7.0/flyway-mysql-13.7.0.jar",
+    "sha256": "a9c2789d6601bdd2f39ec68303001279df94223f7d00925f5bdc8fa1cdafee4b"
+  },
+  {
+    "path": "org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar",
+    "sha256": "2fd7938a701d60fa02e394250328be2d9415728cb636e24eeba4da3e0afcef9a"
+  },
+  {
+    "path": "org/jdbi/jdbi3-postgres/3.54.0/jdbi3-postgres-3.54.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jdbi/jdbi3-postgres/3.54.0/jdbi3-postgres-3.54.0.jar",
+    "sha256": "6b0716ad4f49a5132f239d4e9d77582548280a0f0dee88bc2b92351a4ea49308"
+  },
+  {
+    "path": "org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar",
+    "sha256": "ced2576e0106da2c50b25aaa3a7e239d385615adc92595a251b14966553fb4e8"
+  },
+  {
+    "path": "org/json/json/20260719/json-20260719.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/json/json/20260719/json-20260719.jar",
+    "sha256": "c243f45f9590c12694a4142ed3f07fc70dfb71e4daebd05ae234bf92a2da92a6"
+  },
+  {
+    "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+    "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+  },
+  {
+    "path": "org/mariadb/jdbc/mariadb-java-client/3.5.10/mariadb-java-client-3.5.10.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.5.10/mariadb-java-client-3.5.10.jar",
+    "sha256": "919b8c1c771d9ee3465811462f242c9543ab401e140c64988ddbf1d8abcb18b2"
+  },
+  {
+    "path": "org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
+    "sha256": "6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93"
+  },
+  {
+    "path": "redis/clients/authentication/redis-authx-core/0.1.1-beta2/redis-authx-core-0.1.1-beta2.jar",
+    "url": "https://repo.maven.apache.org/maven2/redis/clients/authentication/redis-authx-core/0.1.1-beta2/redis-authx-core-0.1.1-beta2.jar",
+    "sha256": "cc56edb08b3df8562cddac108dca61907d21cc4ad04de05e9f5d1b01058390af"
+  },
+  {
+    "path": "redis/clients/jedis/8.0.1/jedis-8.0.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/redis/clients/jedis/8.0.1/jedis-8.0.1.jar",
+    "sha256": "22f4bac5eacd70825f8cb7a9810f252f4e739d2e567b2ddd6860e771801096db"
+  }
+]
