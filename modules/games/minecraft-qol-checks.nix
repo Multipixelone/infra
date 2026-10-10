@@ -84,7 +84,9 @@ in
             ${cfg.infra.games.artifacts.games-huskhomes-libraries} \
             ${cfg.infra.games.artifacts.games-axgraves-libraries} \
             ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \
-            ${guava} ${fastutil} ${./tests}
+            ${guava} ${fastutil} ${./tests} \
+            ${cfg.infra.games.artifacts.games-openinv} \
+            ${cfg.infra.games.artifacts.games-openinv-libraries}
           touch "$out"
         '';
   };

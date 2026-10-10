@@ -185,6 +185,7 @@
             };
             groups = {
               default.nodes =
+                
                 map
                   (key: {
                     inherit key;
@@ -214,6 +215,8 @@
                     "axgraves.help"
                     "axgraves.list"
                     "axgraves.allowgraves"
+                    "openinv.enderchest.edit.self"
+                    "openinv.access.online"
                   ]
                 ++ rankNodes "default"
                 # These visualizer permissions default to true upstream.
@@ -230,6 +233,7 @@
                     ];
               builder.nodes = grants builderPermissions ++ rankNodes "builder";
               mod.nodes =
+                
                 map
                   (key: {
                     inherit key;
@@ -247,6 +251,11 @@
                     "minecraft.command.gamemode.adventure"
                     "axgraves.list.other"
                     "axgraves.admin"
+                    "openinv.inventory.open.other"
+                    "openinv.enderchest.open.other"
+                    "openinv.access.offline"
+                    "openinv.access.crossworld"
+                    "openinv.access.level.1"
                   ]
                 ++ rankNodes "mod";
               admin.nodes = [

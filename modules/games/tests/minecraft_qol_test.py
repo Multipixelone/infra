@@ -9,7 +9,7 @@ import zipfile
 
 import yaml
 
-fixtures_file, husk, graves, husk_cache, graves_cache, paper, guava, fastutil, sources = sys.argv[1:]
+fixtures_file, husk, graves, husk_cache, graves_cache, paper, guava, fastutil, sources, openinv, openinv_cache = sys.argv[1:]
 fixtures = json.loads(pathlib.Path(fixtures_file).read_text())
 assert fixtures["noPaper"]["backends"] == {}
 for name in ("missingSecrets", "additionalBackend"):
@@ -21,6 +21,15 @@ for name in ("missingSecrets", "additionalBackend"):
         directory = f"/srv/games/minecraft/{server_id}/plugins"
         plugins = case["backends"][server_id]
         assert {"huskhomes", "axgraves"} <= plugins["jars"].keys()
+        assert plugins["jars"]["openinv"] == openinv
+        assert f"{directory}/OpenInv" in server["worldPaths"]
+        own = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/OpenInv/config.yml"]["source"]).read_text())
+        assert own["config-version"] == 8
+        assert own["settings"]["command"]["open"]["no-args-opens-self"]
+        assert not own["settings"]["disable-offline-access"]
+        assert not own["settings"]["disable-saving"]
+        aliases = yaml.safe_load(pathlib.Path(plugins["templates"][f"/srv/games/minecraft/{server_id}/commands.yml"]["source"]).read_text())["aliases"]
+        assert aliases == {"invsee": ["openinv:openinv $1-"], "endersee": ["openinv:openender $1-"], "ec": ["openinv:openender"]}
         assert not {"simplehome", "simpletpa"} & plugins["jars"].keys()
         assert f"{directory}/HuskHomes" in server["worldPaths"]
         assert f"{directory}/AxGraves" in server["worldPaths"]
@@ -82,7 +91,7 @@ with tempfile.TemporaryDirectory() as directory:
     classes.mkdir()
     extra = [str(path) for path in pathlib.Path(husk_cache).rglob("*.jar")]
     classpath = ":".join([str(classes), husk, graves, f"{embedded}/*", guava, fastutil, *extra])
-    java_sources = [str(pathlib.Path(sources) / f"{name}.java") for name in ("ResolveHusk", "ResolveAxGraves", "ReadHuskSettings")]
+    java_sources = [str(pathlib.Path(sources) / f"{name}.java") for name in ("ResolveHusk", "ResolveAxGraves", "ReadHuskSettings", "ResolveOpenInv")]
     subprocess.run(["javac", "-cp", classpath, "-d", str(classes), *java_sources], check=True)
     # Invoke the plugin's real Paper loader/resolver; fail on any transfer.
     subprocess.run(["java", "-cp", classpath, "ResolveHusk", "offline"], cwd=root, check=True)
@@ -90,3 +99,7 @@ with tempfile.TemporaryDirectory() as directory:
     subprocess.run(["java", "-cp", classpath, "ResolveAxGraves", graves_cache], cwd=root, check=True)
     # The upstream parser, not just PyYAML, must recognize our generated keys.
     subprocess.run(["java", "-cp", classpath, "ReadHuskSettings", str(home_config)], cwd=root, check=True)
+    # Bukkit's LibraryLoader uses a different repository id from Paper's loader.
+    (root / "libraries").unlink()
+    (root / "libraries").symlink_to(openinv_cache, target_is_directory=True)
+    subprocess.run(["java", "-cp", classpath, "ResolveOpenInv", openinv], cwd=root, check=True)

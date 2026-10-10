@@ -18,6 +18,11 @@
         url = "https://github.com/MrMicky-FR/WorldEditSelectionVisualizer/releases/download/v2.1.10/WorldEditSelectionVisualizer-2.1.10.jar";
         sha256 = "5897fd8de2fafa3fadcde94bb4e48d69047817548bcb9190254190a596509bd2";
       };
+      games-openinv = pkgs.fetchurl {
+        name = "openinv-5.3.5.jar";
+        url = "https://github.com/Jikoo/OpenInv/releases/download/5.3.5/OpenInv.jar";
+        sha256 = "7b37f3909a75dd8c1d81aed52fcf66cf16cc266dcdb607b3df600e7644d48c5e";
+      };
       games-chunky = pkgs.fetchurl {
         name = "chunky-bukkit-1.5.3.jar";
         url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";

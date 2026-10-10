@@ -1,0 +1,12 @@
+[
+  {
+    "path": "org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar",
+    "sha256": "5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291"
+  },
+  {
+    "path": "org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.pom",
+    "sha256": "09fbfea30d3d386fad03a84a71f96142108075ea33daa034e51eb7a02e4bfa80"
+  }
+]
