@@ -1,0 +1,74 @@
+[
+  {
+    "id": "first-visit-to-new-york",
+    "date": "2022-04-12",
+    "precision": "day",
+    "title": "First visit to New York",
+    "category": "travel",
+    "visibility": "public"
+  },
+  {
+    "id": "freshman-year-move-in",
+    "date": "2022-09-05",
+    "precision": "day",
+    "title": "Freshman year move-in",
+    "category": "move",
+    "visibility": "public"
+  },
+  {
+    "id": "met-ciara",
+    "date": "2022-09-05",
+    "precision": "approximate",
+    "title": "Met Ciara",
+    "category": "relationship",
+    "visibility": "public"
+  },
+  {
+    "id": "king-gizzard-with-ciara",
+    "date": "2022-10-21",
+    "precision": "day",
+    "title": "King Gizzard & the Lizard Wizard with Ciara",
+    "category": "concert",
+    "visibility": "public"
+  },
+  {
+    "id": "flight-home-for-summer",
+    "date": "2023-05-12",
+    "precision": "day",
+    "title": "Flight home for summer",
+    "category": "travel",
+    "visibility": "public"
+  },
+  {
+    "id": "in-pieces-in-portland",
+    "date": "2023-07-28",
+    "precision": "day",
+    "title": "In Pieces in Portland",
+    "category": "show",
+    "visibility": "public"
+  },
+  {
+    "id": "first-ny-apartment-flatbush",
+    "date": "2023-08-01",
+    "precision": "day",
+    "title": "First NY apartment (Flatbush)",
+    "category": "move",
+    "visibility": "public"
+  },
+  {
+    "id": "start-of-sophomore-year",
+    "date": "2023-09-06",
+    "precision": "day",
+    "title": "Start of sophomore year",
+    "category": "school",
+    "visibility": "public"
+  },
+  {
+    "id": "sober-date",
+    "date": "2024-08-21",
+    "precision": "day",
+    "title": "Sober date",
+    "category": "health",
+    "visibility": "private"
+  }
+]
