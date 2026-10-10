@@ -96,7 +96,7 @@
                 # responsive on the static webroot without publishing players.
                 write-markers-interval = 30;
                 write-players-interval = 0;
-                skin-download = false;
+                skin-download = true;
                 player-render-limit = 1;
               };
               "storages/file" = {

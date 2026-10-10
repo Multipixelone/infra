@@ -3,6 +3,7 @@
 import json
 import pathlib
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -104,7 +105,10 @@ for case in cases:
             )
         assert configuration["Channels"] == channels
         assert next(iter(configuration["Channels"])) == "global"
-        for key in ("MinecraftChatToDiscordMessageFormat", "MinecraftChatToDiscordMessageFormatNoPrimaryGroup"):
+        for key in (
+            "MinecraftChatToDiscordMessageFormat",
+            "MinecraftChatToDiscordMessageFormatNoPrimaryGroup",
+        ):
             assert messages[key] == "%username% › %message%"
         assert (
             configuration["DiscordConsoleChannelId"]
@@ -137,6 +141,91 @@ for case in cases:
 with zipfile.ZipFile(sys.argv[3]) as jar:
     assert "libraries:" not in jar.read("plugin.yml").decode()
     assert "com/flowpowered/math/vector/Vector3d.class" in jar.namelist()
+
+map_data = json.loads(pathlib.Path(sys.argv[8]).read_text())
+map_fixtures = map_data["fixtures"]
+assert map_fixtures["noPaper"]["backends"] == {}
+with zipfile.ZipFile(map_data["floodgate"]) as jar:
+    descriptor = yaml.safe_load(jar.read("plugin.yml"))
+    assert descriptor["name"] == "BlueMapFloodgate"
+    assert str(descriptor["version"]) == "3.6"
+    assert str(descriptor["api-version"]) == "1.17"
+    assert descriptor["depend"] == ["BlueMap"]
+    assert descriptor["softdepend"] == ["floodgate"]
+    assert "libraries" not in descriptor
+    assert "bluemap.addon.json" not in jar.namelist()
+    assert descriptor["main"].replace(".", "/") + ".class" in jar.namelist()
+    for entry in jar.namelist():
+        if entry.endswith(".class"):
+            minor, major = struct.unpack(">HH", jar.read(entry)[4:8])
+            assert minor == 0 and major <= 69, entry
+for name, case in map_fixtures.items():
+    if name == "noPaper":
+        continue
+    assert "bluemap-floodgate" not in case["proxyJars"]
+    for server_id, server in case["servers"].items():
+        plugins = case["backends"][server_id]
+        assert plugins["jars"]["bluemap-floodgate"] == map_data["floodgate"]
+        assert (
+            server["symlinks"]["plugins/bluemap-floodgate.jar"] == map_data["floodgate"]
+        )
+        assert not any(
+            "/packs/" in key and "floodgate" in key for key in server["symlinks"]
+        )
+        inventory = {entry["name"]: entry for entry in plugins["inventory"]}
+        assert inventory["BlueMapFloodgate"] == {
+            "name": "BlueMapFloodgate",
+            "version": "3.6",
+            "installed": True,
+        }
+        assert (
+            f"/srv/games/minecraft/{server_id}/plugins/BlueMapFloodgate"
+            in server["worldPaths"]
+        )
+        assert (
+            "-Dtechnicjelle.updatechecker.disabled"
+            in server["environment"]["JAVA_TOOL_OPTIONS"]
+        )
+
+with tempfile.TemporaryDirectory() as directory:
+    root = pathlib.Path(directory)
+    embedded = root / "paperlibs"
+    embedded.mkdir()
+    with zipfile.ZipFile(
+        pathlib.Path(map_data["paper"]) / "lib/minecraft/server.jar"
+    ) as jar:
+        for entry in jar.namelist():
+            if entry.startswith("META-INF/libraries/") and entry.endswith(".jar"):
+                (embedded / pathlib.Path(entry).name).write_bytes(jar.read(entry))
+    classes = root / "classes"
+    classes.mkdir()
+    classpath = ":".join(
+        [str(classes), sys.argv[3], map_data["floodgate"], map_data["gson"], f"{embedded}/*"]
+    )
+    sources = pathlib.Path(sys.argv[9])
+    subprocess.run(
+        [
+            "javac",
+            "-cp",
+            classpath,
+            "-d",
+            str(classes),
+            str(sources / "BlueMapFixture.java"),
+            str(sources / "CheckFloodgate.java"),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "java",
+            "-Dtechnicjelle.updatechecker.disabled",
+            "-cp",
+            classpath,
+            "CheckFloodgate",
+        ],
+        cwd=root,
+        check=True,
+    )
 cache = pathlib.Path(sys.argv[4])
 assert (cache / "postgresql-driver-42.7.6.jar").exists()
 with zipfile.ZipFile(cache / "postgresql-driver-42.7.6-remapped.jar") as jar:

@@ -68,6 +68,13 @@
         url = "https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v5.28/bluemap-5.28-paper.jar";
         sha256 = "4cfb4a9963132d5be0a9db031a28a98e9df92deed37ebb0756d3a7dd8721ab98";
       };
+      games-bluemap-floodgate = pkgs.fetchurl {
+        # Paper plugin (not a native packs addon); no backend Floodgate needed.
+        # Java 21/API 1.17, BlueMap API 2.7.7; linkage checked on 26.3/5.28.
+        name = "bluemap-floodgate-3.6.jar";
+        url = "https://github.com/TechnicJelle/BlueMapFloodgate/releases/download/v3.6/BlueMapFloodgate-3.6.jar";
+        sha256 = "bff1a585a59a88ebf7944b372d0654db8d99af0d8d8ed357272a96b5b7760f27";
+      };
       games-minimotd = pkgs.fetchurl {
         name = "minimotd-2.2.5.jar";
         url = "https://cdn.modrinth.com/data/16vhQOQN/versions/B4VwaP78/minimotd-velocity-2.2.5.jar";

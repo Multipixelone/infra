@@ -228,6 +228,7 @@ let
     proxyJars = lib.attrNames c.infra.games.minecraftPlugins.proxy.jars;
     servers = lib.mapAttrs (id: _: {
       inherit (c.infra.games.runtime.${id}) available worldPaths;
+      environment = c.systemd.services."minecraft-server-${id}".environment;
       symlinks = c.services.minecraft-servers.servers.${id}.symlinks;
     }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.servers);
   };
@@ -335,7 +336,21 @@ in
             ${cfg.infra.games.artifacts.games-luckperms-libraries} \
             ${pkgs.writeText "minecraft-permissions-fixture.json" (builtins.toJSON permissionsFixture)} \
             ${cfg.infra.games.artifacts.games-discordsrv} \
-            ${pkgs.writeText "minecraft-building-fixture.json" (builtins.toJSON buildingFixture)}
+            ${pkgs.writeText "minecraft-building-fixture.json" (builtins.toJSON buildingFixture)} \
+            ${
+              pkgs.writeText "minecraft-map-fixture.json" (
+                builtins.toJSON {
+                  fixtures = polishFixtures;
+                  floodgate = cfg.infra.games.artifacts.games-bluemap-floodgate;
+                  paper = cfg.infra.games.artifacts.games-paper-survival;
+                  # Supplied by Minecraft rather than Paper's bootstrap bundle.
+                  gson = pkgs.fetchurl {
+                    url = "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar";
+                    sha256 = "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f";
+                  };
+                }
+              )
+            } ${./tests}
           touch "$out"
         '';
   };
