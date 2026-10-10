@@ -15,6 +15,11 @@
       --covers-dir "$BEETS_GRAPH_COVERS" --cache-dir "$BEETS_GRAPH_CACHE" \
       -o "$staging/albums.json"
 
+    # Validate and allowlist public life events before publishing staged JSON.
+    # The canonical file and its private context never enter the served state.
+    "$BEETS_GRAPH_BOOKMARKS" export "$BEETS_GRAPH_LIFE_EVENTS" \
+      "$BEETS_GRAPH_LIFE_EVENTS_SCHEMA" "$staging/albums.json"
+
     # Covers and their ownership manifest stay in the persistent cache. Only
     # JSON is staged; upstream owns thumbnail writes, reuse, and pruning.
     # Prepare reader permissions before replacing JSON on the same filesystem.

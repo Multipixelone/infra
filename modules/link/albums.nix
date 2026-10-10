@@ -134,6 +134,9 @@ in
       beetsDirectory = "${home.xdg.configHome}/beets";
       store = home.programs.beets.settings.embed.store;
       rawBeets = withSystem pkgs.stdenv.hostPlatform.system (args: args.config.packages.beets-plugins);
+      lifeEventsTool = withSystem pkgs.stdenv.hostPlatform.system (
+        args: args.config.packages.life-events
+      );
       viewerPackage = inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-album-graph;
       proxy = textProxy {
         inherit canonical connectorAddresses;
@@ -161,6 +164,9 @@ in
           export BEETS_GRAPH_STORE=${lib.escapeShellArg store}
           export BEETS_GRAPH_LIBRARY=${lib.escapeShellArg home.programs.beets.settings.library}
           export BEETS_GRAPH_SNAPSHOT=${lib.escapeShellArg (lib.getExe (snapshot pkgs))}
+          export BEETS_GRAPH_BOOKMARKS=${lib.escapeShellArg (lib.getExe lifeEventsTool)}
+          export BEETS_GRAPH_LIFE_EVENTS=${lib.escapeShellArg (toString ../../data/life-events.json)}
+          export BEETS_GRAPH_LIFE_EVENTS_SCHEMA=${lib.escapeShellArg (toString ../../data/life-events.schema.json)}
           export BEETS_GRAPH_CONFIG=${lib.escapeShellArg "${beetsDirectory}/config.yaml"}
           export BEETS_GRAPH_LAUNCHER=${lib.escapeShellArg (lib.getExe rawBeets)}
           ${launchers.export}
@@ -304,7 +310,7 @@ in
     };
 
   perSystem =
-    { pkgs, ... }:
+    { pkgs, self', ... }:
     let
       fixtureExport = pkgs.writeShellApplication {
         name = "album-graph-fixture-export";
@@ -315,7 +321,10 @@ in
         name = "album-graph-fixture-viewer";
         text = launchers.viewer;
       };
-      fixturePython = pkgs.python3.withPackages (packages: [ packages.pillow ]);
+      fixturePython = pkgs.python3.withPackages (packages: [
+        packages.pillow
+        packages.jsonschema
+      ]);
       fixtureAcl = ''
         allow 127.0.0.1;
         allow 127.0.0.2;
@@ -382,8 +391,12 @@ in
               ${inputs.beets-plugins}/plugins/embed/beets_embed/covers.py \
               ${lib.getExe pkgs.nginx} ${fixtureProxyConfig} \
               ${inputs.beets-plugins}/plugins/embed/viewer/server.py \
-              ${lib.getExe (snapshot pkgs)}
+              ${lib.getExe (snapshot pkgs)} \
+              ${lib.getExe self'.packages.life-events} \
+              ${../../data/life-events.json} ${../../data/life-events.schema.json}
             python3 ${./tests/albums_snapshot_test.py} ${../../lib/album-graph-snapshot.py}
+            python3 ${./tests/albums_bookmarks_test.py} ${../../lib/life-events.py} \
+              ${../../data/life-events.json} ${../../data/life-events.schema.json}
             touch "$out"
           '';
     };

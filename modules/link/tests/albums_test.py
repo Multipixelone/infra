@@ -26,6 +26,9 @@ NGINX = Path(sys.argv.pop(1))
 PROXY_CONFIG = Path(sys.argv.pop(1))
 SERVER_MODULE = Path(sys.argv.pop(1))
 SNAPSHOT = Path(sys.argv.pop(1))
+BOOKMARKS = Path(sys.argv.pop(1))
+LIFE_EVENTS = Path(sys.argv.pop(1))
+LIFE_EVENTS_SCHEMA = Path(sys.argv.pop(1))
 
 
 class AlbumGraphHostTest(unittest.TestCase):
@@ -53,6 +56,8 @@ class AlbumGraphHostTest(unittest.TestCase):
             database.execute("INSERT INTO fixture VALUES (2)")
         self.config = self.root / "config.yaml"
         self.config.write_text("synthetic config\n")
+        self.events = self.root / "life-events.json"
+        self.events.write_bytes(LIFE_EVENTS.read_bytes())
         self.output = self.state / "albums.json"
         self.launcher = self.root / "beet"
         self.launcher.write_text(
@@ -80,6 +85,8 @@ class AlbumGraphHostTest(unittest.TestCase):
             "if not phrase_cache.exists():\n"
             "    phrase_cache.write_bytes(b'synthetic phrase cache')\n"
             "exported = {'schema_version': 3, 'albums': [{'cover': name, 'cover_large': large}]}\n"
+            "exported['albums'].extend(json.loads(os.environ.get('TEST_ALBUMS', '[]')))\n"
+            "Path(os.environ['TEST_UNENRICHED']).write_text(json.dumps(exported))\n"
             "out.write_text('partial' if os.environ.get('TEST_FAIL') else json.dumps(exported))\n"
             "out.chmod(0o600)\n"
             "if os.environ.get('TEST_FAIL'):\n"
@@ -95,6 +102,9 @@ class AlbumGraphHostTest(unittest.TestCase):
             "BEETS_GRAPH_STORE": str(self.store),
             "BEETS_GRAPH_LIBRARY": str(self.library),
             "BEETS_GRAPH_SNAPSHOT": str(SNAPSHOT),
+            "BEETS_GRAPH_BOOKMARKS": str(BOOKMARKS),
+            "BEETS_GRAPH_LIFE_EVENTS": str(self.events),
+            "BEETS_GRAPH_LIFE_EVENTS_SCHEMA": str(LIFE_EVENTS_SCHEMA),
             "BEETS_GRAPH_CONFIG": str(self.config),
             "BEETS_GRAPH_LAUNCHER": str(self.launcher),
             "TEST_LOCK": str(self.root / ".import.lock"),
@@ -102,6 +112,7 @@ class AlbumGraphHostTest(unittest.TestCase):
             "TEST_ARGS": str(self.root / "args.json"),
             "TEST_ART": str(self.art),
             "TEST_COVERS_MODULE": str(COVERS_MODULE),
+            "TEST_UNENRICHED": str(self.root / "unenriched.json"),
         }
 
     def command(self):
@@ -170,6 +181,15 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.assertEqual(Path(arguments[-1]).parent.parent, self.state)
         exported = json.loads(self.output.read_text())
         self.assertEqual(exported["schema_version"], 3)
+        self.assertEqual(len(exported["bookmarks"]), 8)
+        self.assertNotIn("sober-date", {e["id"] for e in exported["bookmarks"]})
+        self.assertNotIn(
+            "beets-library-import", {e["id"] for e in exported["bookmarks"]}
+        )
+        self.assertEqual(
+            {key: value for key, value in exported.items() if key != "bookmarks"},
+            json.loads((self.root / "unenriched.json").read_text()),
+        )
         thumbnail = self.covers / exported["albums"][0]["cover"]
         self.assertTrue(thumbnail.is_file())
         self.assertEqual(thumbnail.stat().st_mode & 0o777, 0o640)
@@ -209,6 +229,71 @@ class AlbumGraphHostTest(unittest.TestCase):
             set(self.state.iterdir()), {self.output, self.covers, self.cache}
         )
         self.assertEqual(list(self.covers.iterdir()), [])
+
+    def test_bookmarks_exclude_private_events_and_all_notes(self):
+        events = json.loads(self.events.read_text())
+        events[0]["note"] = "public event private note sentinel"
+        events[-1]["note"] = "private event note sentinel"
+        self.events.write_text(json.dumps(events))
+        result = self.run_export(
+            TEST_ALBUMS=json.dumps(
+                [
+                    {"added": "2024-03-04T12:00:00Z"},
+                    {"added": "2020-12-31T23:30:00-02:00"},
+                    {"added": None},
+                ]
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        exported = self.output.read_text()
+        for private_value in (
+            "sober-date",
+            "Sober date",
+            "2024-08-21",
+            events[0]["note"],
+            events[-1]["note"],
+        ):
+            self.assertNotIn(private_value, exported)
+        bookmarks = json.loads(exported)["bookmarks"]
+        self.assertEqual(len(bookmarks), 9)
+        for bookmark in bookmarks:
+            self.assertEqual(
+                set(bookmark),
+                {
+                    "id",
+                    "date",
+                    "end_date",
+                    "precision",
+                    "title",
+                    "category",
+                },
+            )
+        derived = next(e for e in bookmarks if e["id"] == "beets-library-import")
+        self.assertEqual(derived["date"], "2021-01-01")
+
+    def test_invalid_life_events_preserve_previous_export_and_clean_staging(self):
+        self.assertEqual(self.run_export().returncode, 0)
+        previous = self.output.read_bytes()
+        events = json.loads(self.events.read_text())
+        del events[0]["visibility"]
+        self.events.write_text(json.dumps(events))
+        result = self.run_export()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("required", result.stderr)
+        self.assertEqual(self.output.read_bytes(), previous)
+        self.assertEqual(
+            set(self.state.iterdir()), {self.output, self.covers, self.cache}
+        )
+
+    def test_missing_life_events_fail_closed(self):
+        self.output.write_text("previous")
+        self.events.unlink()
+        result = self.run_export()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(self.output.read_text(), "previous")
+        self.assertEqual(
+            set(self.state.iterdir()), {self.output, self.covers, self.cache}
+        )
 
     def test_export_creates_cache_with_group_traverse_permission(self):
         self.covers.rmdir()
