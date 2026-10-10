@@ -284,6 +284,9 @@ def prepare(cfg, identifier):
             path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
         if "secret" in template:
             content = Path(template["secret"]).read_bytes()
+        elif not template.get("replacements") and path.name != "lazymc.toml":
+            # Unsubstituted sources can be binary, such as LuckPerms exports.
+            content = Path(template["source"]).read_bytes()
         else:
             text = Path(template["source"]).read_text()
             for token, secret in template.get("replacements", {}).items():

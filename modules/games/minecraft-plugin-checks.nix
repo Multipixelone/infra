@@ -235,6 +235,18 @@ let
   polishFixtures = {
     missingSecrets = polishFixture (evaluate { } "" "" false { });
     withLuckPerms = polishFixture permissions;
+    withoutAdmin = polishFixture (
+      (host.extendModules {
+        modules = [
+          {
+            infra.games.secretFiles = lib.mkForce {
+              "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+            };
+            infra.games.minecraftAdminUuid = lib.mkForce null;
+          }
+        ];
+      }).config
+    );
     withDiscord = polishFixture (
       evaluate {
         "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
@@ -283,6 +295,7 @@ in
           nativeBuildInputs = [
             (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
             pkgs.nginx
+            pkgs.gzip
             pkgs.jdk25_headless
           ];
         }

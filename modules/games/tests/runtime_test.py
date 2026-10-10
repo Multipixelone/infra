@@ -1,5 +1,6 @@
 """Behavior checks for the fixed-inventory privilege and backup boundaries."""
 
+import gzip
 import importlib.util
 import json
 import os
@@ -126,6 +127,51 @@ class RuntimeTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-secret templates"):
                 runtime.prepare(self.cfg, "survival")
         self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+
+    def test_binary_template_is_atomic_private_and_written_after_owner_drop(self):
+        source = self.directory / "bootstrap.json.gz"
+        payload = {"groups": {"admin": {"nodes": [{"key": "*", "value": True}]}}}
+        compressed = gzip.compress(json.dumps(payload).encode(), mtime=0)
+        source.write_bytes(compressed)
+        destination = self.world / "plugins/LuckPerms/bootstrap.json.gz"
+        self.item.update(
+            owner="minecraft",
+            configTemplates={str(destination): {"source": str(source), "mode": "0600"}},
+        )
+        events = []
+        original_mkstemp = runtime.tempfile.mkstemp
+
+        def create_temporary(*args, **kwargs):
+            if kwargs.get("dir") == destination.parent:
+                events.append("write")
+            return original_mkstemp(*args, **kwargs)
+
+        with (
+            patch.object(runtime.pwd, "getpwnam") as identity,
+            patch.object(runtime.os, "chown"),
+            patch.object(runtime.os, "setgroups") as groups,
+            patch.object(
+                runtime.os, "setgid", side_effect=lambda _: events.append("gid")
+            ) as gid,
+            patch.object(
+                runtime.os, "setuid", side_effect=lambda _: events.append("uid")
+            ) as uid,
+            patch.object(runtime.tempfile, "mkstemp", side_effect=create_temporary),
+        ):
+            identity.return_value.pw_uid = 1234
+            identity.return_value.pw_gid = 5678
+            for _ in range(2):
+                runtime.prepare(self.cfg, "survival")
+                self.assertEqual(destination.read_bytes(), compressed)
+                self.assertEqual(
+                    json.loads(gzip.decompress(destination.read_bytes())), payload
+                )
+                self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(list(destination.parent.glob(".games-*")), [])
+            groups.assert_called_with([])
+            gid.assert_called_with(5678)
+            uid.assert_called_with(1234)
+        self.assertEqual(events, ["gid", "uid", "write"] * 2)
 
     def test_terraria_join_password_accepts_short_phrase_and_boundaries(self):
         for value in ("abcdefgh", "friendtime", "a" * 256, "ABcd_012-", "friendtime\n"):

@@ -1,7 +1,9 @@
 """Check managed inventory access, optional chat, and event ownership together."""
 
+import gzip
 import json
 import pathlib
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -111,11 +113,87 @@ for name, fixture in fixtures.items():
         assert 'quick-prefix=""' in global_channel and "cross-server=false" in global_channel
         assert "<luckperms_prefix>" in global_channel
         assert "<luckperms_meta:chat_color:s>" in global_channel
-        bootstrap = json.loads(template(f"{directory}/LuckPerms/bootstrap.json").read_text())
+        bootstrap_path = f"{directory}/LuckPerms/bootstrap.json.gz"
+        compressed = template(bootstrap_path).read_bytes()
+        assert compressed[:3] == b"\x1f\x8b\x08"
+        assert compressed[3] == 0  # No filename or optional gzip header fields.
+        assert compressed[4:8] == b"\0" * 4  # No build timestamp.
+        raw = gzip.decompress(compressed)
+        assert (
+            subprocess.run(
+                ["gzip", "-n", "-c"], input=raw, capture_output=True, check=True
+            ).stdout
+            == compressed
+        )
+        assert plugins["templates"][bootstrap_path]["mode"] == "0600"
+        bootstrap = json.loads(raw)
+        assert (not bootstrap["users"]) == (name == "withoutAdmin")
+        if bootstrap["users"]:
+            assert bootstrap["users"] == {
+                "3f771d00-3456-4007-8d66-13fe158488fa": {
+                    "primaryGroup": "admin",
+                    "nodes": [{"key": "group.admin", "value": True}],
+                }
+            }
+        commands = [
+            shlex.split(line)
+            for line in template(f"{directory}/LuckPerms/chat-inventory.commands")
+            .read_text()
+            .splitlines()
+        ]
+        groups = bootstrap["tracks"]["staff"]["groups"]
+        assert commands[: len(groups)] == [
+            ["lp", "creategroup", group] for group in groups
+        ]
+        expected = commands[: len(groups)].copy()
+        for group, data in bootstrap["groups"].items():
+            for node in data["nodes"]:
+                key, value = node["key"], str(node["value"]).lower()
+                if key.startswith("group.") and node["value"]:
+                    command = ["parent", "add", key.removeprefix("group.")]
+                elif key.startswith("weight."):
+                    command = ["setweight", key.removeprefix("weight.")]
+                elif key.startswith("meta."):
+                    meta, content = key.removeprefix("meta.").split(".", 1)
+                    command = ["meta", "set", meta, content]
+                elif key.startswith("prefix."):
+                    priority, prefix = key.removeprefix("prefix.").split(".", 1)
+                    command = ["meta", "setprefix", priority, prefix]
+                else:
+                    command = ["permission", "set", key, value]
+                expected.append(["lp", "group", group, *command])
+        for uuid, user in bootstrap["users"].items():
+            expected.extend(
+                [
+                    ["lp", "user", uuid, "parent", "add", "admin"],
+                    [
+                        "lp",
+                        "user",
+                        uuid,
+                        "parent",
+                        "switchprimarygroup",
+                        user["primaryGroup"],
+                    ],
+                ]
+            )
+        # Exact command coverage also excludes imports, clearing, removals and
+        # track writes that could discard unrelated interactive state.
+        assert sorted(commands) == sorted(expected)
         default = permission_nodes(bootstrap, "default")
         mod = permission_nodes(bootstrap, "mod")
-        assert {"openinv.enderchest.edit.self", "openinv.access.online", "carbon.channel.global", "carbon.channel.global.see", "carbon.channel.global.speak"} <= default
-        assert {"openinv.inventory.open.other", "openinv.enderchest.open.other", "openinv.access.offline", "openinv.access.crossworld"} <= mod
+        assert {
+            "openinv.enderchest.edit.self",
+            "openinv.access.online",
+            "carbon.channel.global",
+            "carbon.channel.global.see",
+            "carbon.channel.global.speak",
+        } <= default
+        assert {
+            "openinv.inventory.open.other",
+            "openinv.enderchest.open.other",
+            "openinv.access.offline",
+            "openinv.access.crossworld",
+        } <= mod
         assert not {"openinv.inventory.edit.other", "openinv.enderchest.edit.other"} & (default | mod)
         assert "*" in permission_nodes(bootstrap, "admin")
         for group, weight in (("default", 0), ("builder", 10), ("mod", 20), ("admin", 30)):
@@ -147,7 +225,7 @@ with tempfile.TemporaryDirectory() as directory:
     subprocess.run(["java", "-cp", classpath, "ResolveCarbon", artifacts["carbonCache"], str(root / "carbon-libraries")], check=True)
     template_dir = "/srv/games/minecraft/survival/plugins"
     templates = fixtures["withLuckPerms"]["backends"]["survival"]["templates"]
-    subprocess.run(["java", "-cp", classpath, "ReadCarbon", *[templates[f"{template_dir}/{path}"]["source"] for path in ("CarbonChat/config.conf", "CarbonChat/channels/global.conf", "LuckPerms/bootstrap.json")]], check=True)
+    subprocess.run(["java", "-cp", classpath, "ReadCarbon", *[templates[f"{template_dir}/{path}"]["source"] for path in ("CarbonChat/config.conf", "CarbonChat/channels/global.conf", "LuckPerms/bootstrap.json.gz")]], check=True)
     subprocess.run(["java", "-cp", classpath, "CheckCarbonBridge"], check=True)
     (root / "libraries").symlink_to(artifacts["flectonepulseCache"], target_is_directory=True)
     subprocess.run(["java", "-cp", classpath, "ResolveFlectone", str(root)], check=True)

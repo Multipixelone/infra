@@ -1,5 +1,6 @@
 """Optional credentials must not disable Minecraft; static maps survive sleep."""
 
+import gzip
 import json
 import pathlib
 import socket
@@ -335,10 +336,11 @@ for field, directory, server in (
     assert configuration["data"]["database"] == "luckperms"
     assert configuration["data"]["username"] == "luckperms"
     assert configuration["data"]["password"] == "@LUCKPERMS_PASSWORD@"
+    template = permissions[field][f"{directory}/bootstrap.json.gz"]
+    assert template["mode"] == "0600"
+    assert f"{directory}/bootstrap.json" not in permissions[field]
     bootstrap = json.loads(
-        pathlib.Path(
-            permissions[field][f"{directory}/bootstrap.json"]["source"]
-        ).read_text()
+        gzip.decompress(pathlib.Path(template["source"]).read_bytes())
     )
     assert "default" in bootstrap["groups"]
     assert {"key": "group.default", "value": True} in bootstrap["groups"]["builder"][

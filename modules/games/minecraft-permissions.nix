@@ -65,28 +65,6 @@
           "openinv.access.level.1"
         ];
       };
-      # Bootstrap imports initialize fresh databases. Existing databases need
-      # additive commands, never a replacement import that loses user grants.
-      polishCommands =
-        lib.concatStringsSep "\n" (
-          lib.concatMap (
-            rank:
-            let
-              style = ranks.${rank};
-            in
-            [
-              "lp group ${rank} setweight ${toString style.weight}"
-              "lp group ${rank} meta set chat_color <${style.color}>"
-            ]
-            ++ lib.optional (
-              style ? prefix
-            ) "lp group ${rank} meta setprefix ${toString style.weight} ${builtins.toJSON style.prefix}"
-            ++ map (permission: "lp group ${rank} permission set ${permission} true") (
-              polishPermissions.${rank} or [ ]
-            )
-          ) (lib.attrNames ranks)
-        )
-        + "\n";
       builderPermissions = [
         "group.default"
         "minecraft.command.gamemode"
@@ -159,6 +137,158 @@
         "wesv.use"
         "wesv.toggle"
       ];
+      bootstrap = {
+        metadata = {
+          generatedBy = "Nix";
+          generatedAt = "declarative";
+        };
+        groups = {
+          default.nodes =
+
+            map
+              (key: {
+                inherit key;
+                value = true;
+              })
+              [
+                "skinsrestorer.command.set"
+                "voicechat.listen"
+                "voicechat.speak"
+                "voicechat.groups"
+                "huskhomes.max_homes.10"
+                "huskhomes.command.home"
+                "huskhomes.command.sethome"
+                "huskhomes.command.delhome"
+                "huskhomes.command.homelist"
+                "huskhomes.command.edithome"
+                "huskhomes.command.edithome.privacy"
+                "huskhomes.command.phome"
+                "huskhomes.command.phomelist"
+                "huskhomes.command.warp"
+                "huskhomes.command.warplist"
+                "huskhomes.command.tpa"
+                "huskhomes.command.tpahere"
+                "huskhomes.command.tpaccept"
+                "huskhomes.command.tpdecline"
+                "huskhomes.command.tpignore"
+                "axgraves.help"
+                "axgraves.list"
+                "axgraves.allowgraves"
+              ]
+            ++ grants polishPermissions.default
+            ++ rankNodes "default"
+            # These visualizer permissions default to true upstream.
+            ++
+              map
+                (key: {
+                  inherit key;
+                  value = false;
+                })
+                [
+                  "wesv.use"
+                  "wesv.toggle"
+                  "wesv.lock"
+                ];
+          builder.nodes = grants builderPermissions ++ rankNodes "builder";
+          mod.nodes =
+
+            map
+              (key: {
+                inherit key;
+                value = true;
+              })
+              [
+                "group.builder"
+                "minecraft.command.kick"
+                "velocity.command.kick"
+                "huskhomes.command.tp"
+                "minecraft.command.gamemode"
+                "minecraft.command.gamemode.survival"
+                "minecraft.command.gamemode.spectator"
+                "minecraft.command.gamemode.creative"
+                "minecraft.command.gamemode.adventure"
+                "axgraves.list.other"
+                "axgraves.admin"
+              ]
+            ++ grants polishPermissions.mod
+            ++ rankNodes "mod";
+          admin.nodes = [
+            {
+              key = "group.mod";
+              value = true;
+            }
+            {
+              key = "*";
+              value = true;
+            }
+          ]
+          ++ rankNodes "admin"
+          ++ grants [ "wesv.lock" ];
+        };
+        tracks.staff.groups = [
+          "default"
+          "builder"
+          "mod"
+          "admin"
+        ];
+        users = lib.optionalAttrs (cfg.minecraftAdminUuid != null) {
+          ${cfg.minecraftAdminUuid} = {
+            primaryGroup = "admin";
+            nodes = [
+              {
+                key = "group.admin";
+                value = true;
+              }
+            ];
+          };
+        };
+      };
+      bootstrapJson = (pkgs.formats.json { }).generate "luckperms-bootstrap.json" bootstrap;
+      bootstrapGzip = pkgs.runCommand "luckperms-bootstrap.json.gz" { } ''
+        ${pkgs.gzip}/bin/gzip -n -c ${bootstrapJson} > "$out"
+      '';
+      # ImportCommand merges group/user nodes unless --replace is used, but
+      # Importer always replaces tracks and applies supplied primary groups.
+      # Import bootstrap.json.gz for fresh data or an intentional replacement.
+      # These commands preserve unrelated grants when repairing existing data;
+      # check asynchronous results in logs and inspect tracks separately.
+      polishCommands =
+        lib.concatStringsSep "\n" (
+          map (rank: "lp creategroup ${rank}") bootstrap.tracks.staff.groups
+          ++ lib.concatMap (
+            rank:
+            let
+              style = ranks.${rank};
+              permissions = builtins.filter (
+                node:
+                !(lib.any (prefix: lib.hasPrefix prefix node.key) [
+                  "weight."
+                  "meta."
+                  "prefix."
+                ])
+              ) bootstrap.groups.${rank}.nodes;
+            in
+            [
+              "lp group ${rank} setweight ${toString style.weight}"
+              "lp group ${rank} meta set chat_color <${style.color}>"
+            ]
+            ++ lib.optional (
+              style ? prefix
+            ) "lp group ${rank} meta setprefix ${toString style.weight} ${builtins.toJSON style.prefix}"
+            ++ map (
+              node:
+              if lib.hasPrefix "group." node.key && node.value then
+                "lp group ${rank} parent add ${lib.removePrefix "group." node.key}"
+              else
+                "lp group ${rank} permission set ${node.key} ${lib.boolToString node.value}"
+            ) permissions
+          ) bootstrap.tracks.staff.groups
+          ++ lib.concatMap (uuid: [
+            "lp user ${uuid} parent add admin"
+            "lp user ${uuid} parent switchprimarygroup admin"
+          ]) (lib.attrNames bootstrap.users)
+        )
+        + "\n";
       definitions = builtins.fromJSON (builtins.readFile ./luckperms-libraries.json);
       libraries = lib.listToAttrs (
         map (d: lib.nameValuePair d.name (pkgs.fetchurl { inherit (d) name url sha256; })) definitions
@@ -229,114 +359,10 @@
           );
           replacements."@LUCKPERMS_PASSWORD@" = "/run/agenix/${secret}";
         };
-        "${dir}/bootstrap.json".source = toString (
-          (pkgs.formats.json { }).generate "luckperms-bootstrap.json" {
-            metadata = {
-              generatedBy = "Nix";
-              generatedAt = "declarative";
-            };
-            groups = {
-              default.nodes =
-
-                map
-                  (key: {
-                    inherit key;
-                    value = true;
-                  })
-                  [
-                    "skinsrestorer.command.set"
-                    "voicechat.listen"
-                    "voicechat.speak"
-                    "voicechat.groups"
-                    "huskhomes.max_homes.10"
-                    "huskhomes.command.home"
-                    "huskhomes.command.sethome"
-                    "huskhomes.command.delhome"
-                    "huskhomes.command.homelist"
-                    "huskhomes.command.edithome"
-                    "huskhomes.command.edithome.privacy"
-                    "huskhomes.command.phome"
-                    "huskhomes.command.phomelist"
-                    "huskhomes.command.warp"
-                    "huskhomes.command.warplist"
-                    "huskhomes.command.tpa"
-                    "huskhomes.command.tpahere"
-                    "huskhomes.command.tpaccept"
-                    "huskhomes.command.tpdecline"
-                    "huskhomes.command.tpignore"
-                    "axgraves.help"
-                    "axgraves.list"
-                    "axgraves.allowgraves"
-                  ]
-                ++ grants polishPermissions.default
-                ++ rankNodes "default"
-                # These visualizer permissions default to true upstream.
-                ++
-                  map
-                    (key: {
-                      inherit key;
-                      value = false;
-                    })
-                    [
-                      "wesv.use"
-                      "wesv.toggle"
-                      "wesv.lock"
-                    ];
-              builder.nodes = grants builderPermissions ++ rankNodes "builder";
-              mod.nodes =
-
-                map
-                  (key: {
-                    inherit key;
-                    value = true;
-                  })
-                  [
-                    "group.builder"
-                    "minecraft.command.kick"
-                    "velocity.command.kick"
-                    "huskhomes.command.tp"
-                    "minecraft.command.gamemode"
-                    "minecraft.command.gamemode.survival"
-                    "minecraft.command.gamemode.spectator"
-                    "minecraft.command.gamemode.creative"
-                    "minecraft.command.gamemode.adventure"
-                    "axgraves.list.other"
-                    "axgraves.admin"
-                  ]
-                ++ grants polishPermissions.mod
-                ++ rankNodes "mod";
-              admin.nodes = [
-                {
-                  key = "group.mod";
-                  value = true;
-                }
-                {
-                  key = "*";
-                  value = true;
-                }
-              ]
-              ++ rankNodes "admin"
-              ++ grants [ "wesv.lock" ];
-            };
-            tracks.staff.groups = [
-              "default"
-              "builder"
-              "mod"
-              "admin"
-            ];
-            users = lib.optionalAttrs (cfg.minecraftAdminUuid != null) {
-              ${cfg.minecraftAdminUuid} = {
-                primaryGroup = "admin";
-                nodes = [
-                  {
-                    key = "group.admin";
-                    value = true;
-                  }
-                ];
-              };
-            };
-          }
-        );
+        "${dir}/bootstrap.json.gz" = {
+          source = toString bootstrapGzip;
+          mode = "0600";
+        };
       };
       python = pkgs.python3.withPackages (ps: [ ps.psycopg ]);
       provision = pkgs.writeScript "luckperms-provision" ''

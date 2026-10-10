@@ -1,5 +1,8 @@
 import java.lang.reflect.Proxy;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.zip.GZIPInputStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -65,7 +68,10 @@ public class ReadCarbon {
         require(channel.node("radius").getInt() == -1 && !channel.node("cross-server").getBoolean(), "Wrong delivery scope");
         require(channel.node("quick-prefix").getString().isEmpty(), "Quick routing should be disabled");
         String format = channel.node("format","basic","default_format").getString();
-        var groups = JsonParser.parseString(Files.readString(Path.of(args[2]))).getAsJsonObject().getAsJsonObject("groups");
+        com.google.gson.JsonObject groups;
+        try (var reader = new InputStreamReader(new GZIPInputStream(Files.newInputStream(Path.of(args[2]))), StandardCharsets.UTF_8)) {
+            groups = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("groups");
+        }
         for (var entry : groups.entrySet()) {
             String prefix = "", color = null;
             int priority = -1;

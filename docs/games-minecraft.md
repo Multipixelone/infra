@@ -445,8 +445,9 @@ LuckPerms' SQL messaging queue supports MySQL/MariaDB, not PostgreSQL: this
 single-proxy arrangement uses `pluginmsg` plus a one-minute database sync.
 Permissions load from the shared database when Paper wakes.
 
-A generated `bootstrap.json` declares the `staff` track in order
-`default → mod → admin`. `mod` inherits `default`; `admin` inherits `mod`
+A deterministic gzip export, `bootstrap.json.gz`, declares the `staff` track in
+order `default → builder → mod → admin`. `builder` inherits `default`; `mod`
+inherits `builder`; `admin` inherits `mod`
 and retains `*`. Finn's verified UUID is declared through
 `gameServers.minecraft.adminUuid`; the bootstrap assigns him to `admin`.
 
@@ -467,66 +468,77 @@ node. `axgraves.admin` is AxGraves' owner-protection bypass; this does not grant
 its separate reload command. Bukkit/Velocity op accounts retain upstream op
 permissions independently of the LuckPerms groups.
 
-For a **new database only**, run `lp import bootstrap.json` in the Paper console
-once after the first wake, then verify both platforms see the groups. Generated
-bootstrap files are not ongoing database reconciliation. Do not re-import an
-already-bootstrapped database: that can replace interactive groups/users.
+The pinned Paper and Velocity **5.5.71** jars have identical import classes
+(their SHA-256 hashes match `minecraft-plugin-artifacts.nix`).
+[`ImportCommand`](https://github.com/LuckPerms/LuckPerms/blob/master/common/src/main/java/me/lucko/luckperms/common/commands/misc/ImportCommand.java)
+reads local files as **gzip-compressed UTF-8 JSON**, regardless of filename.
+Files must be readable directly inside the plugin directory; subdirectories and
+`config.yml` are rejected. It only tries appending `.json.gz` when the requested
+file does not exist and its name contains no dot. Use the full
+`bootstrap.json.gz` name; `bootstrap.json` is not an alias. Template preparation
+copies the gzip bytes atomically as the Minecraft owner with mode `0600`.
 
-For Finn's **existing database**, run these individual Paper console commands.
-They add grants and change the admin inheritance without clearing users or
-other group nodes. `mod` and `staff` are new; if they already exist, inspect
-`lp track staff info` and skip creation/append commands that are already applied.
+[`Importer`](https://github.com/LuckPerms/LuckPerms/blob/master/common/src/main/java/me/lucko/luckperms/common/backup/Importer.java)
+merges group/user nodes by default. With `--replace`, it replaces the normal
+nodes of the groups and users included in the file; unlisted groups/users are
+untouched. **Tracks are always overwritten**, and supplied user primary groups
+are applied even during a merge. Generated files are not ongoing database
+reconciliation.
 
-```text
-lp creategroup mod
-lp group mod parent add default
-lp group admin parent add mod
-lp group admin parent remove default
-lp group admin permission set * true
-lp createtrack staff
-lp track staff append default
-lp track staff append mod
-lp track staff append admin
-lp group default permission set huskhomes.max_homes.10 true
-lp group default permission set huskhomes.command.home true
-lp group default permission set huskhomes.command.sethome true
-lp group default permission set huskhomes.command.delhome true
-lp group default permission set huskhomes.command.homelist true
-lp group default permission set huskhomes.command.edithome true
-lp group default permission set huskhomes.command.edithome.privacy true
-lp group default permission set huskhomes.command.phome true
-lp group default permission set huskhomes.command.phomelist true
-lp group default permission set huskhomes.command.warp true
-lp group default permission set huskhomes.command.warplist true
-lp group default permission set huskhomes.command.tpa true
-lp group default permission set huskhomes.command.tpahere true
-lp group default permission set huskhomes.command.tpaccept true
-lp group default permission set huskhomes.command.tpdecline true
-lp group default permission set huskhomes.command.tpignore true
-lp group default permission set axgraves.help true
-lp group default permission set axgraves.list true
-lp group default permission set axgraves.allowgraves true
-lp group mod permission set minecraft.command.kick true
-lp group mod permission set velocity.command.kick true
-lp group mod permission set huskhomes.command.tp true
-lp group mod permission set minecraft.command.gamemode true
-lp group mod permission set minecraft.command.gamemode.survival true
-lp group mod permission set minecraft.command.gamemode.spectator true
-lp group mod permission set minecraft.command.gamemode.creative true
-lp group mod permission set minecraft.command.gamemode.adventure true
-lp group mod permission set axgraves.list.other true
-lp group mod permission set axgraves.admin true
-lp user 3f771d00-3456-4007-8d66-13fe158488fa parent add admin
-lp user 3f771d00-3456-4007-8d66-13fe158488fa primarygroup set admin
-lp track staff info
-lp group default permission info
-lp group mod permission info
-lp group admin parent info
-lp sync
+For **this server**, Finn confirmed there are no existing tracks and approved
+replacing the included data. After deploying and waking Paper, follow its log
+in a separate terminal:
+
+```fish
+sudo games-logs survival --follow
 ```
 
-Existing skin/voice grants and user assignments remain in place. Run `lpv sync`
-in the Velocity console to refresh immediately (or wait for database sync).
+Import the declared state, then wait for the import completion message and
+check for errors before querying the user:
+
+```fish
+sudo games-console survival 'lp import bootstrap.json.gz --replace'
+```
+
+This overwrites `default`, `builder`, `mod`, `admin`, Tunnelmaker's direct nodes,
+and the `staff` track with the declarations. The import assigns Tunnelmaker's
+verified UUID to admin. Confirm the user's admin membership in the log, then
+synchronize Paper and Velocity, waiting for each asynchronous result:
+
+```fish
+sudo games-console survival 'lp user 3f771d00-3456-4007-8d66-13fe158488fa info'
+sudo games-console survival 'lp sync'
+sudo games-console velocity 'lpv sync'
+sudo games-logs velocity
+```
+
+LuckPerms replies asynchronously: an empty RCON response is expected and does
+not confirm success. Read Paper results with `games-logs survival` and Velocity
+results with `games-logs velocity`. The default primary-group calculation is
+`parents-by-weight`, so membership plus admin's weight of 30 determines the
+displayed primary group among the declared ranks. Custom higher-weight parents
+can change that display without removing admin membership.
+
+For a **fresh database**, import once with
+`sudo games-console survival 'lp import bootstrap.json.gz'`, without
+`--replace`, then perform the same log verification and synchronization.
+
+As a **secondary option for existing databases whose grants must be retained**,
+inspect `/srv/games/minecraft/survival/plugins/LuckPerms/chat-inventory.commands`.
+Despite the historical filename, it now contains the complete additive rank
+repair: group creation, all declared inheritance and permission nodes (including
+explicit denials), weights, colors, prefixes, and the configured user's admin
+membership/stored primary group. Run its commands individually through
+`games-console survival`, checking log completion before the next command.
+Already-existing groups during creation are expected. Unrelated permissions
+and memberships remain; explicitly managed permission/style values are updated.
+The file does not modify tracks: inspect existing tracks separately if using
+this path. It contains no import, clearing, or removal commands.
+
+The correct command for the stored primary group is
+`lp user <uuid> parent switchprimarygroup admin`; `primarygroup set admin` is
+not valid. With the default weight calculation, switching the stored value
+also prints a warning that the displayed group is calculated from parents.
 Assign a moderator later with `lp user <uuid> parent add mod`.
 
 ## Homes, requests and graves
