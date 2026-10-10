@@ -156,6 +156,11 @@
         }
       ];
     };
+  configurations.nixos.link.module = {
+    # RCON secrets remain minecraft:games-dashboard 0440. Supplementary
+    # membership takes effect in a new login session after activation.
+    users.users.tunnel.extraGroups = [ "games-dashboard" ];
+  };
   perSystem = _: {
     packages =
       lib.mapAttrs' (

@@ -948,11 +948,113 @@ class RuntimeTest(unittest.TestCase):
     def test_console_cannot_inject_extra_arguments_or_newlines(self):
         path = self.directory / "inventory.json"
         path.write_text(json.dumps(self.cfg))
-        for command in ("stop\nsave", "\0", "", "x" * 1025):
-            with self.assertRaises(ValueError):
+        with (
+            patch.object(runtime, "rcon") as rcon,
+            patch.object(runtime, "console_root") as writer,
+            patch.object(runtime.os, "execv") as execv,
+        ):
+            for action, prefix in (
+                ("console", ["/fixed/writer"]),
+                ("console-root", []),
+            ):
+                arguments = [
+                    ["survival", command]
+                    for command in ("stop\nsave", "stop\rsave", "\0", "", "x" * 1025)
+                ] + [
+                    [],
+                    ["survival"],
+                    ["survival", "list", "extra"],
+                    ["unknown", "list"],
+                ]
+                for args in arguments:
+                    with (
+                        self.subTest(action=action, args=args),
+                        self.assertRaises(ValueError),
+                    ):
+                        runtime.main(["--inventory", str(path), action, *prefix, *args])
+            rcon.assert_not_called()
+            writer.assert_not_called()
+            execv.assert_not_called()
+
+    def test_readable_rcon_console_prints_response_without_sudo(self):
+        path = self.directory / "inventory.json"
+        path.write_text(json.dumps(self.cfg))
+        with (
+            patch.object(
+                runtime, "rcon", return_value="There are 3 players online"
+            ) as rcon,
+            patch.object(runtime.os, "execv") as execv,
+            patch("builtins.print") as output,
+        ):
+            for command in ("list", "x" * 1024, "say $(touch /escape)"):
                 runtime.main(
-                    ["--inventory", str(path), "console-root", "survival", command]
+                    [
+                        "--inventory",
+                        str(path),
+                        "console",
+                        "/fixed/writer",
+                        "survival",
+                        command,
+                    ]
                 )
+                rcon.assert_called_with(self.item, command)
+                output.assert_called_with("There are 3 players online")
+            execv.assert_not_called()
+
+    def rcon_password_fixture(self):
+        password = self.directory / "password"
+        password.write_text("fixture-password")
+        self.item["console"] = {
+            "method": "rcon",
+            "host": "127.0.0.1",
+            "port": 25575,
+            "passwordFile": str(password),
+        }
+        return password
+
+    def test_unreadable_rcon_secret_has_actionable_error_without_connecting(self):
+        password = self.rcon_password_fixture()
+        with (
+            patch.object(
+                Path,
+                "read_text",
+                side_effect=PermissionError(13, "Permission denied", str(password)),
+            ),
+            patch.object(runtime.socket, "create_connection") as connect,
+            self.assertRaises(PermissionError) as raised,
+        ):
+            runtime.rcon(self.item, "list")
+        message = str(raised.exception)
+        self.assertIn(f"cannot read RCON secret '{password}'", message)
+        self.assertIn("sudo", message)
+        self.assertIn("games-dashboard", message)
+        self.assertIn("new login session", message)
+        self.assertNotIn("Errno", message)
+        self.assertNotIn("fixture-password", message)
+        self.assertTrue(raised.exception.__suppress_context__)
+        connect.assert_not_called()
+
+    def test_missing_rcon_secret_keeps_file_not_found_error(self):
+        password = self.rcon_password_fixture()
+        password.unlink()
+        with (
+            patch.object(runtime.socket, "create_connection") as connect,
+            self.assertRaises(FileNotFoundError),
+        ):
+            runtime.rcon(self.item, "list")
+        connect.assert_not_called()
+
+    def test_rcon_authentication_failure_is_not_a_secret_read_error(self):
+        self.rcon_password_fixture()
+        packet = struct.pack("<ii", -1, 2) + b"\0\0"
+        with patch.object(runtime.socket, "create_connection") as connect:
+            connection = connect.return_value.__enter__.return_value
+            connection.recv.side_effect = [struct.pack("<i", len(packet)), packet]
+            with self.assertRaisesRegex(
+                PermissionError, "^RCON authentication failed$"
+            ):
+                runtime.rcon(self.item, "list")
+            self.assertEqual(connection.sendall.call_count, 1)
 
     def test_container_console_uses_literal_tmux_input(self):
         self.item.update(

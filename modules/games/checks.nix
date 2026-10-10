@@ -76,6 +76,10 @@
           inherit (cfg.users.users.games-dashboard) isSystemUser extraGroups;
           group = cfg.users.users.games-dashboard.group;
         };
+        operatorGroups = cfg.users.users.tunnel.extraGroups;
+        consoleSudoRules = lib.filter (
+          rule: lib.any (command: lib.hasSuffix "/bin/games-console-writer" command.command) rule.commands
+        ) cfg.security.sudo.extraRules;
         gameSecrets = lib.filter (name: builtins.hasAttr name cfg.age.secrets) secretNames;
         acknowledgement = {
           executable = lib.getExe cfg.infra.games.packages.acknowledge-unclean;
@@ -121,6 +125,7 @@
         );
         rconMode = enabled.age.secrets."games/minecraft/survival-rcon".mode;
         rconGroup = enabled.age.secrets."games/minecraft/survival-rcon".group;
+        rconOwner = enabled.age.secrets."games/minecraft/survival-rcon".owner;
         privateSecretGroups = map (name: enabled.age.secrets.${name}.group) (
           lib.filter (name: !lib.hasSuffix "-rcon" name) secretNames
         );
@@ -207,6 +212,12 @@
                   assert '["start", "stop", "restart"].indexOf(verb)' in fixture["polkit"]
                   assert 'verb === "start"' in fixture["polkit"] and 'return polkit.Result.NO' in fixture["polkit"]
                   assert fixture["dashboardUser"] == {"isSystemUser": True, "extraGroups": [], "group": "games-dashboard"}
+                  assert "games-dashboard" in fixture["operatorGroups"]
+                  assert len(fixture["consoleSudoRules"]) == 1
+                  rule = fixture["consoleSudoRules"][0]
+                  assert rule["users"] == ["games-dashboard"] and rule["groups"] == [] and rule["runAs"] == "root"
+                  assert {command["command"].rsplit("/", 1)[-1] for command in rule["commands"]} == {"games-console-writer", "games-journal-reader"}
+                  assert all(command["options"] == ["NOPASSWD"] for command in rule["commands"])
                   assert fixture["batch"] == data["baselineBatch"]
                   assert fixture["acknowledgement"]["installed"]
                   assert fixture["acknowledgement"]["executable"].endswith("/bin/games-acknowledge-unclean")
@@ -236,6 +247,7 @@
               assert not data["ddns"]["proxied"] and data["ddns"]["ipv4"] and not data["ddns"]["ipv6"]
               assert data["gamesPublished"] and not data["productionFixtureSecrets"]
               assert data["rconMode"] == "0440" and data["rconGroup"] == "games-dashboard"
+              assert data["rconOwner"] == "minecraft"
               assert "games-dashboard" not in data["privateSecretGroups"]
               assert data["terrariaPassword"] == {"game": "terraria-tmodloader", "replacements": {"@PASSWORD@": "/run/agenix/games/terraria/terraria-password"}}
               assert {server["id"] for server in data["discovery"]["servers"]} == {"creative", "survival", "terraria"}

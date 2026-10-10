@@ -143,7 +143,15 @@ def read_exact(connection, count):
 
 def rcon(item, command):
     console = item["console"]
-    password = Path(console["passwordFile"]).read_text().strip()
+    password_file = Path(console["passwordFile"])
+    try:
+        password = password_file.read_text().strip()
+    except PermissionError:
+        raise PermissionError(
+            f"cannot read RCON secret '{password_file}'; use an authorized account "
+            "or rerun games-console with sudo. After joining games-dashboard, "
+            "start a new login session"
+        ) from None
     with socket.create_connection(
         (console["host"], console["port"]), timeout=3
     ) as connection:
