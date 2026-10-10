@@ -124,8 +124,8 @@ class NightlyUnitsTest(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertEqual(case["beetsSlices"], ["batch-beets"])
                 self.assertEqual(case["workers"], 14)
-                self.assertEqual(case["threads"], 10)
-                quotas = (700, 300) if name == "quotaOverrides" else (1400, 1000)
+                self.assertEqual(case["threads"], 16)
+                quotas = (700, 300) if name == "quotaOverrides" else (1400, 1600)
                 shared = case["slices"]["batch-beets"]
                 self.assertEqual(shared["CPUQuota"], f"{sum(quotas)}%")
                 self.assertEqual(shared["CPUWeight"], 10)

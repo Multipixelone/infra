@@ -193,8 +193,9 @@ in
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
-            # Ten inference threads on link's 32-thread CPU after burn-in.
-            default = lib.min 16 (lib.max 1 (builtins.div (config.link.cpu.threads * 5) 16));
+            # CPU burn-in is complete; at 10 threads the quota throttled
+            # 14,194 of 15,288 periods (93%). Use half the CPU, capped at 16.
+            default = lib.min 16 (lib.max 1 (builtins.div config.link.cpu.threads 2));
             description = "Native ONNX/Torch inference threads; preparation uses one worker and FFmpeg one decode thread.";
           };
           cpuQuotaPercent = lib.mkOption {
