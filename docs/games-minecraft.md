@@ -157,6 +157,127 @@ from the official picker. Archives must not be committed here or added to
 nix-secrets. The repository's unfree allowance covers only these seven manual
 inputs.
 
+### PaperTweaks evaluation (2026-10-10)
+
+**Keep all seven official Vanilla Tweaks packs and the local Survival World
+Policy pack.** PaperTweaks is maintained and now publishes 26.3 metadata, but
+does not cover this installed set. No PaperTweaks JAR or permissions are added,
+and no datapacks or world state are removed by this evaluation. The inventory
+above is the repository's declaration; this audit did not inspect the live
+server or enumerate unmanaged packs there. All seven official ZIPs in the local
+Nix store were inspected and matched the SHA-256 values in `sources.json`.
+
+The latest release in the
+[Modrinth API](https://api.modrinth.com/v2/project/papertweaks/version) is
+[PaperTweaks 0.7.3](https://api.modrinth.com/v2/version/2zcgGHsV), published
+October 9, 2026, for Paper/Purpur, explicitly including Minecraft 26.3.
+[Hangar](https://hangar.papermc.io/Machine_Maker/PaperTweaks/versions) and
+[GitHub Releases](https://github.com/MC-Machinations/PaperTweaks/releases/tag/v0.5.0)
+still show 0.5.0 (January 1, 2025; Paper 1.21.4); those listings alone give an
+outdated impression of compatibility and maintenance. Current source commit
+[`b6e68bd1`](https://github.com/MC-Machinations/PaperTweaks/commit/b6e68bd1c3009d136ec0fc460486af567550bf90)
+declares 0.7.3, targets the 26.3 Paper API and Java 25, and has a
+[successful CI run](https://github.com/MC-Machinations/PaperTweaks/actions/runs/37870079882).
+The 26.3 update merged October 8, followed by fixes October 9. The survival
+backend resolves to **Paper 26.3 build 159** under this repository's lock.
+Release metadata and source targeting support that version family; this audit
+does not establish a successful PaperTweaks startup on build 159.
+
+The published Modrinth JAR was inspected in memory and matched its API SHA-512.
+Its `paper-plugin.yml` reports **0.7.0-SNAPSHOT**, despite the published 0.7.3
+label. Any future integration must distinguish that internal version from the
+artifact pin in inventory tests. The JAR contains the four matching modules
+below and the MoreMobHeads deprecation warning, with no Mini Blocks or Double
+Shulker Shells module classes.
+
+| Current pack / behavior                                                                     | PaperTweaks module and enablement key                    | Coverage                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Confetti Creepers: default 100% confetti; sets explosion radius to zero                     | `ConfettiCreepers` / `experimental.confetti-creepers`    | Similar outcome; plugin cancels the explosion and replaces the creeper with a firework. Firework damage and charged-creeper settings need comparison.                                   |
+| Player Head Drops: head drops on PvP kills                                                  | `PlayerHeadDrops` / `items.player-head-drops`            | Supports player-kill requirement and drop chance.                                                                                                                                       |
+| Mini Blocks: 209 stonecutter recipes producing textured heads                               | None                                                     | `WanderingTrades` / `hermitcraft.wandering-trades` adds trader offers, not these recipes or their acquisition mechanics.                                                                |
+| More Mob Heads: mob-specific head loot and conditions                                       | `MoreMobHeads` / `mobs.more-mob-heads`                   | Deprecated; the module explicitly recommends the official datapack for improved functionality without a performance hit.                                                                |
+| Custom Nether Portals: nonrectangular/crying-obsidian frames; 10–84 frame blocks            | `CustomNetherPortals` / `survival.custom-nether-portals` | Supports custom shapes/materials, but config limits portal interior size, width and height rather than the pack's frame-block count.                                                    |
+| Double Shulker Shells: two shells per shulker, alongside head loot                          | None                                                     | Retain the loot-table datapack; an old wiki module listing does not establish current support.                                                                                          |
+| AFK Display: 150-second position samples; gray team; movement checks every second while AFK | `AFKDisplay` / `survival.afk-display`                    | Plugin defaults to 300 seconds, checks block-position inactivity each second, colors display/tab names directly, and clears AFK on a player-move event. Timing and presentation differ. |
+| Survival World Policy: reapplies 50% sleeping on world load                                 | Local pack                                               | Retain; do not enable a second sleep implementation.                                                                                                                                    |
+
+Module names, configuration keys and behavior above are from the
+[reviewed source tree](https://github.com/MC-Machinations/PaperTweaks/tree/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules).
+In particular,
+[MoreMobHeads' lifecycle](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules/mobs/moremobheads/Lifecycle.java)
+asks operators to disable that module in favor of Vanilla Tweaks. Thus even
+a verified 26.3 release cannot replace all seven packs. Keeping the current
+set preserves recipes, drops and gameplay without adding another plugin.
+A partial switch of the four matching modules is a possible future task,
+requiring explicit behavior choices and client/startup validation; this audit
+does not perform that switch.
+
+**Declarative configuration and permissions:** PaperTweaks reads enablement
+booleans from `plugins/PaperTweaks/modules.yml` (all modules default disabled)
+and module settings from
+`plugins/PaperTweaks/modules/<lowercase-module-name>/config.yml`. Global settings
+live in `plugins/PaperTweaks/config.yml`. YAML files suffice for configuration;
+the GUI and commands are optional. A future Nix integration should use the
+existing writable configuration templates, preserving the plugin's state
+directory in backups. GUI/command changes write files and would be overwritten
+by the next declarative preparation. See the source
+[module registry](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules/ModuleRegistry.java)
+and [config binding](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules/ConfigModule.java).
+
+Permissions retain the `vanillatweaks.*` prefix. A future partial integration
+must grant default players the behavior nodes `vanillatweaks.playerheaddrops`
+and `vanillatweaks.afkdisplay`, plus public information commands only where
+needed; the four matching modules have no equivalent player-toggle commands
+to add. Confetti and portal mechanics themselves have no player permission
+gate. Restrict `vanillatweaks.main.enable`, `.disable`, `.reload`, and module
+`*.admin.config` permissions to the LuckPerms admin group, including denying
+those nodes for default/mod if necessary to override Bukkit's operator
+defaults. Do not grant the broad `vanillatweaks.*` wildcard to players or mods.
+The datapack's `/trigger cusNetPor` is a public information display, whereas
+its global `/function ...:config` actions require operator authority. Preserve
+that separation in any replacement. The
+[plugin permission declarations](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/resources/paper-plugin.yml)
+and `minecraft-permissions.nix` are the sources for a future permissions change.
+
+### State left by a future datapack removal
+
+Keeping this set requires no cleanup. Removing its ZIPs alone would stop
+loading their functions, recipes and loot tables but would not uninstall the
+state they created. The current reconciler only removes ledger-owned archive
+bytes; it never edits scoreboards, entities, items, advancements or world NBT.
+The following inventory comes from the exact pinned official ZIPs:
+
+| Pack                  | State that can survive removal                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Confetti Creepers     | Objectives `cftCreep` and `cftCreep.config` with player/fake-player scores; scheduled `tick`, `check_trigger`, `give_effects`, and temporary `restore_command_feedback` functions under `confetti_creepers:`. Existing entities can retain `cftCreep.done` / `cftCreep.confetti` tags; selected creepers retain `ExplosionRadius:0` and the long Luck effect.                                     |
+| Player Head Drops     | Generated head items and placed heads/profiles. No pack-created scoreboard objectives, scheduled functions or command storage were found.                                                                                                                                                                                                                                                         |
+| Mini Blocks           | Crafted miniature head items and placed heads/profiles. No pack-created scoreboard objectives, scheduled functions or command storage were found.                                                                                                                                                                                                                                                 |
+| More Mob Heads        | Dropped head items and placed heads/profiles. No pack-created scoreboard objectives, scheduled functions or command storage were found.                                                                                                                                                                                                                                                           |
+| Custom Nether Portals | Objectives `cusNetPor`, `cusNetPor.config`, `cusNetPor.dummy` with player/fake-player scores; scheduled `try_to_trigger`, `enable_trigger`, and temporary `restore_command_feedback` functions under `custom_nether_portals:`. Player advancement progress for `custom_nether_portals:use_ignition` and created portal blocks may remain; `cusNetPor.marker` clouds are temporary (`Duration:0`). |
+| Double Shulker Shells | Previously dropped shells. No pack-created scoreboard objectives, scheduled functions or command storage were found. Shared vanilla loot random-sequence state must not be purged.                                                                                                                                                                                                                |
+| AFK Display           | Objectives `afkDis.x1`, `afkDis.x2`, `afkDis.y1`, `afkDis.y2`, `afkDis.z1`, `afkDis.z2`, `afkDis.checkAFK`; team `afkDis.afk` and its membership; scheduled `afk_display:second`. Team membership can leave names gray after removal; prior team membership was overwritten and cannot be reconstructed automatically.                                                                            |
+| Survival World Policy | Sleeping percentage persists in `level.dat`; removing this pack would stop reapplying it. Retain this local pack.                                                                                                                                                                                                                                                                                 |
+
+The supplied `confetti_creepers:uninstall`, `custom_nether_portals:uninstall`
+and `afk_display:uninstall` functions remove their objectives and main scheduled
+loops; AFK's uninstall also removes its team. They are not comprehensive
+migration tools: the first two omit the temporary feedback-restoration schedule,
+and none restores modified creepers, portal blocks or previous team memberships.
+Removing a pack can leave scheduled references to unavailable functions;
+inspect them during any future migration rather than deleting world files.
+
+Any future removal needs a verified clean-stop snapshot, inspection of existing
+objectives/team membership and a separately reviewed operator cleanup step.
+If invoking the pack's uninstall function, it must still be installed and
+enabled in an isolated maintenance session; clear any remaining named schedules
+and check the command-feedback gamerule before disabling/removing the pack.
+Do not remove shared objectives or storage by prefix, delete entity/player data,
+or reset creeper properties automatically. Inert namespaced objectives can be
+retained for rollback, while a stale AFK team needs deliberate review to avoid
+persisting gray names. Preserve existing items, heads and portals. Restart
+normally after reconciling, using the existing pregeneration/datapack pipeline;
+do not add live `/reload` migration hooks or bypass the prechange snapshot.
+
 ### Provisioning a builder
 
 On each fresh machine or CI builder, obtain the exact official bundle and
