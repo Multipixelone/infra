@@ -51,13 +51,19 @@ for case in cases:
         messages = yaml.safe_load(pathlib.Path(case["messages"]).read_text())
         assert configuration.keys() <= discord_defaults.keys()
         assert messages.keys() <= message_defaults.keys()
-        synchronization = yaml.safe_load(pathlib.Path(case["synchronization"]).read_text())
+        synchronization = yaml.safe_load(
+            pathlib.Path(case["synchronization"]).read_text()
+        )
         linking = yaml.safe_load(pathlib.Path(case["linking"]).read_text())
         assert synchronization.keys() <= synchronization_defaults.keys()
         assert linking.keys() <= linking_defaults.keys()
-        assert synchronization["GroupRoleSynchronizationGroupsAndRolesToSync"] == mappings
+        assert (
+            synchronization["GroupRoleSynchronizationGroupsAndRolesToSync"] == mappings
+        )
         assert "default" not in mappings
-        assert synchronization["GroupRoleSynchronizationMinecraftIsAuthoritative"] is True
+        assert (
+            synchronization["GroupRoleSynchronizationMinecraftIsAuthoritative"] is True
+        )
         assert synchronization["GroupRoleSynchronizationOneWay"] is True
         assert synchronization["GroupRoleSynchronizationPrimaryGroupOnly"] is False
         assert synchronization["GroupRoleSynchronizationEnableDenyPermission"] is False
@@ -70,15 +76,22 @@ for case in cases:
         assert linking["Require linked account to play"]["Enabled"] is False
         assert configuration["DiscordChatChannelRequireLinkedAccount"] is False
         assert configuration["MinecraftDiscordAccountLinkedUsePM"] is True
-        assert configuration["MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode"] is False
+        assert (
+            configuration["MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode"]
+            is False
+        )
         assert configuration["MinecraftDiscordAccountLinkedConsoleCommands"] == []
         assert configuration["MinecraftDiscordAccountUnlinkedConsoleCommands"] == []
         assert configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"] == ""
         assert configuration["Experiment_JdbcAccountLinkBackend"] == ""
         # Existing in-game Discord chat uses the Discord role's configured colour.
-        assert "%toprolecolor%" in message_defaults["DiscordToMinecraftChatMessageFormat"]
+        assert (
+            "%toprolecolor%" in message_defaults["DiscordToMinecraftChatMessageFormat"]
+        )
         if mappings:
-            vault_config = yaml.safe_load(pathlib.Path(case["vaultConfiguration"]).read_text())
+            vault_config = yaml.safe_load(
+                pathlib.Path(case["vaultConfiguration"]).read_text()
+            )
             assert vault_config == {"update-check": False}
         else:
             assert case["vaultConfiguration"] is None
@@ -172,7 +185,13 @@ for field, directory, server in (
         ).read_text()
     )
     assert "default" in bootstrap["groups"]
-    assert {"key": "group.default", "value": True} in bootstrap["groups"]["mod"][
+    assert {"key": "group.default", "value": True} in bootstrap["groups"]["builder"][
+        "nodes"
+    ]
+    assert {"key": "group.builder", "value": True} in bootstrap["groups"]["mod"][
+        "nodes"
+    ]
+    assert {"key": "group.default", "value": True} not in bootstrap["groups"]["mod"][
         "nodes"
     ]
     assert {"key": "group.mod", "value": True} in bootstrap["groups"]["admin"]["nodes"]
@@ -180,7 +199,100 @@ for field, directory, server in (
         "nodes"
     ]
     assert {"key": "*", "value": True} in bootstrap["groups"]["admin"]["nodes"]
-    assert bootstrap["tracks"] == {"staff": {"groups": ["default", "mod", "admin"]}}
+    assert bootstrap["tracks"] == {
+        "staff": {"groups": ["default", "builder", "mod", "admin"]}
+    }
+    for rank, weight in zip(("default", "builder", "mod", "admin"), (0, 10, 20, 30)):
+        nodes = bootstrap["groups"][rank]["nodes"]
+        assert {"key": f"weight.{weight}", "value": True} in nodes
+        prefixes = [node["key"] for node in nodes if node["key"].startswith("prefix.")]
+        if rank == "default":
+            assert prefixes == []
+        else:
+            assert len(prefixes) == 1
+            assert prefixes[0].startswith(f"prefix.{weight}.")
+            assert f"[{rank.title()}]" in prefixes[0]
+            assert prefixes[0].endswith("&r ")
+    builder_nodes = {
+        node["key"] for node in bootstrap["groups"]["builder"]["nodes"] if node["value"]
+    }
+    assert {
+        "minecraft.command.gamemode",
+        "minecraft.command.gamemode.creative",
+        "minecraft.command.gamemode.survival",
+        "worldedit.wand",
+        "worldedit.region.set",
+        "worldedit.region.replace",
+        "worldedit.clipboard.copy",
+        "worldedit.clipboard.paste",
+        "worldedit.history.undo",
+        "worldedit.history.redo",
+        "worldedit.brush.smooth",
+        "fawe.limit.builder",
+        "fawe.cancel",
+        "voxelsniper.sniper",
+        "voxelsniper.brush.ball",
+        "wesv.use",
+        "wesv.toggle",
+    } <= builder_nodes
+    assert not any("*" in node for node in builder_nodes)
+    assert (
+        not {
+            "worldedit.regen",
+            "worldedit.fast",
+            "worldedit.reload",
+            "worldedit.limit.unrestricted",
+            "worldedit.history.undo.other",
+            "worldedit.history.redo.other",
+            "worldedit.history.rollback",
+            "fawe.admin",
+            "fawe.reload",
+            "fawe.bypass",
+            "fawe.limit.unlimited",
+            "fawe.permpack.basic",
+            "voxelsniper.admin",
+            "voxelsniper.ignorelimitations",
+            "wesv.reload",
+            "wesv.lock",
+        }
+        & builder_nodes
+    )
+    assert not any(
+        node.startswith(("worldedit.schematic.", "worldedit.scripting."))
+        for node in builder_nodes
+    )
+    assert (
+        not {
+            "worldedit.brush.command",
+            "worldedit.brush.scattercommand",
+            "worldedit.clipboard.download",
+        }
+        & builder_nodes
+    )
+    brushes = {
+        node.removeprefix("voxelsniper.brush.")
+        for node in builder_nodes
+        if node.startswith("voxelsniper.brush.")
+    }
+    assert brushes == {
+        "snipe",
+        "ball",
+        "voxel",
+        "disc",
+        "voxeldisc",
+        "cylinder",
+        "overlay",
+        "underlay",
+        "blendball",
+        "blenddisc",
+        "blendvoxel",
+        "blendvoxeldisc",
+    }
+    for permission in ("wesv.use", "wesv.toggle", "wesv.lock"):
+        assert {"key": permission, "value": False} in bootstrap["groups"]["default"][
+            "nodes"
+        ]
+    assert {"key": "wesv.lock", "value": True} in bootstrap["groups"]["admin"]["nodes"]
     default_nodes = {
         node["key"] for node in bootstrap["groups"]["default"]["nodes"] if node["value"]
     }
@@ -216,6 +328,9 @@ for field, directory, server in (
         "axgraves.admin",
     } <= mod_nodes
     assert "*" not in mod_nodes
+    assert not any(
+        node.startswith(("worldedit.", "fawe.", "voxelsniper.")) for node in mod_nodes
+    )
     assert bootstrap["users"] == {
         "3f771d00-3456-4007-8d66-13fe158488fa": {
             "primaryGroup": "admin",

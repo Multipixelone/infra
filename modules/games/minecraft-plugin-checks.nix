@@ -105,6 +105,18 @@ let
           channel = "234567890123456789";
           enable = true;
           overrides.roles = {
+            builder = "";
+            mod = "";
+            admin = "";
+          };
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.roles = {
+            builder = "567890123456789012";
             mod = "";
             admin = "";
           };

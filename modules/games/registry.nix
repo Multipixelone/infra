@@ -68,7 +68,7 @@ let
             default = 9225;
           };
           discord = {
-            roles = lib.genAttrs [ "mod" "admin" ] (
+            roles = lib.genAttrs [ "builder" "mod" "admin" ] (
               rank:
               mkOption {
                 type = types.strMatching "([0-9]{17,20})?";
