@@ -75,6 +75,13 @@
         url = "https://github.com/TechnicJelle/BlueMapFloodgate/releases/download/v3.6/BlueMapFloodgate-3.6.jar";
         sha256 = "bff1a585a59a88ebf7944b372d0654db8d99af0d8d8ed357272a96b5b7760f27";
       };
+      games-bluemap-offline-markers = pkgs.fetchurl {
+        # Paper plugin; 3.3 fixes 26.1 player-data migration/zero UUID files.
+        # Java 25/API 1.13, BlueMap API 2.7.2; checked on 26.3/5.28.
+        name = "bluemap-offline-player-markers-3.3.jar";
+        url = "https://github.com/TechnicJelle/BlueMapOfflinePlayerMarkers/releases/download/v3.3/BlueMapOfflinePlayerMarkers-3.3.jar";
+        sha256 = "59b42bf0cf30f4a7baffa8de060b159e1f1813c4b0969594de664e126339d299";
+      };
       games-minimotd = pkgs.fetchurl {
         name = "minimotd-2.2.5.jar";
         url = "https://cdn.modrinth.com/data/16vhQOQN/versions/B4VwaP78/minimotd-velocity-2.2.5.jar";

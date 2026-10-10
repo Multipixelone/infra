@@ -49,6 +49,11 @@ for name in ("missingSecrets", "additionalBackend"):
         assert not settings["economy"]["enabled"] and not settings["check_for_updates"]
         assert settings["map_hook"] == {"enabled": True, "show_public_homes": True, "show_warps": True}
         assert settings["general"]["home_delimiter"] == ":"
+        offline = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/BlueMapOfflinePlayerMarkers/config.yml"]["source"]).read_text())
+        with zipfile.ZipFile(plugins["jars"]["bluemap-offline-markers"]) as jar:
+            assert offline.keys() == yaml.safe_load(jar.read("config.yml")).keys()
+        assert offline == {"MarkerSetName": "Offline Players", "Toggleable": True, "DefaultHidden": False, "ExpireTimeInHours": 0, "HiddenGameModes": ["spectator"], "HideBannedPlayers": True}
+        assert re.search(r'"?skin-download"?\s*=\s*true\b', map_config)
         grave_config = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/AxGraves/config.yml"]["source"]).read_text())
         with zipfile.ZipFile(graves) as jar:
             defaults = yaml.safe_load(jar.read("config.yml"))

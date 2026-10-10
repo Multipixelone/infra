@@ -159,10 +159,24 @@ with zipfile.ZipFile(map_data["floodgate"]) as jar:
         if entry.endswith(".class"):
             minor, major = struct.unpack(">HH", jar.read(entry)[4:8])
             assert minor == 0 and major <= 69, entry
+with zipfile.ZipFile(map_data["offline"]) as jar:
+    descriptor = yaml.safe_load(jar.read("plugin.yml"))
+    assert descriptor["name"] == "BlueMapOfflinePlayerMarkers"
+    assert str(descriptor["version"]) == "3.3"
+    assert str(descriptor["api-version"]) == "1.13"
+    assert descriptor["depend"] == ["BlueMap"]
+    assert "libraries" not in descriptor
+    assert "bluemap.addon.json" not in jar.namelist()
+    assert descriptor["main"].replace(".", "/") + ".class" in jar.namelist()
+    for entry in jar.namelist():
+        if entry.endswith(".class"):
+            minor, major = struct.unpack(">HH", jar.read(entry)[4:8])
+            assert minor == 0 and major <= 69, entry
 for name, case in map_fixtures.items():
     if name == "noPaper":
         continue
     assert "bluemap-floodgate" not in case["proxyJars"]
+    assert "bluemap-offline-markers" not in case["proxyJars"]
     for server_id, server in case["servers"].items():
         plugins = case["backends"][server_id]
         assert plugins["jars"]["bluemap-floodgate"] == map_data["floodgate"]
@@ -186,6 +200,26 @@ for name, case in map_fixtures.items():
             "-Dtechnicjelle.updatechecker.disabled"
             in server["environment"]["JAVA_TOOL_OPTIONS"]
         )
+        assert plugins["jars"]["bluemap-offline-markers"] == map_data["offline"]
+        assert (
+            server["symlinks"]["plugins/bluemap-offline-markers.jar"]
+            == map_data["offline"]
+        )
+        assert not any(
+            "/packs/" in key and "offline" in key for key in server["symlinks"]
+        )
+        assert inventory["BlueMapOfflinePlayerMarkers"] == {
+            "name": "BlueMapOfflinePlayerMarkers",
+            "version": "3.3",
+            "installed": True,
+        }
+        assert (
+            f"/srv/games/minecraft/{server_id}/plugins/BlueMapOfflinePlayerMarkers"
+            in server["worldPaths"]
+        )
+        offline_config = plugins["templates"][
+            f"/srv/games/minecraft/{server_id}/plugins/BlueMapOfflinePlayerMarkers/config.yml"
+        ]["source"]
 
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)
@@ -200,7 +234,18 @@ with tempfile.TemporaryDirectory() as directory:
     classes = root / "classes"
     classes.mkdir()
     classpath = ":".join(
-        [str(classes), sys.argv[3], map_data["floodgate"], map_data["gson"], f"{embedded}/*"]
+        [
+            str(classes),
+            sys.argv[3],
+            map_data["floodgate"],
+            map_data["offline"],
+            map_data["gson"],
+            map_data["guava"],
+            map_data["fastutil"],
+            map_data["examinationApi"],
+            map_data["examinationString"],
+            f"{embedded}/*",
+        ]
     )
     sources = pathlib.Path(sys.argv[9])
     subprocess.run(
@@ -212,9 +257,28 @@ with tempfile.TemporaryDirectory() as directory:
             str(classes),
             str(sources / "BlueMapFixture.java"),
             str(sources / "CheckFloodgate.java"),
+            str(sources / "CheckOfflineMarkers.java"),
         ],
         check=True,
     )
+    subprocess.run(
+        [
+            "java",
+            "-Dtechnicjelle.updatechecker.disabled",
+            "-cp",
+            classpath,
+            "CheckOfflineMarkers",
+            offline_config,
+        ],
+        cwd=root,
+        check=True,
+    )
+    assets_root = root / "offline-fixture/web/assets"
+    offline_assets = {
+        str(path.relative_to(assets_root)): path.read_bytes()
+        for path in assets_root.rglob("*")
+        if path.is_file()
+    }
     subprocess.run(
         [
             "java",
@@ -520,6 +584,10 @@ with tempfile.TemporaryDirectory() as directory:
     (root / "web/.token").write_text("private fixture")
     (root / "secret.txt").write_text("outside webroot")
     (root / "web/tiles").mkdir()
+    for asset, content in offline_assets.items():
+        target = root / "web/assets" / asset
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -553,6 +621,8 @@ with tempfile.TemporaryDirectory() as directory:
                 time.sleep(0.02)
         # No game/proxy process is running in this test.
         assert request("/index.html") == (200, b"persisted map")
+        for asset, content in offline_assets.items():
+            assert request(f"/assets/{asset}") == (200, content)
         assert request("/index.html", "HEAD")[0] == 200
         assert request("/index.html", "POST")[0] == 405
         assert request("/.token")[0] == 403
