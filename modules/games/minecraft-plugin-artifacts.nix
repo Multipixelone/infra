@@ -38,6 +38,11 @@
         url = "https://github.com/MiniPlaceholders/LuckPerms-Expansion/releases/download/2.1.0/LuckPerms-Expansion-2.1.0.jar";
         sha256 = "5c788b69b63c4e5f54c8fbe8580ffba1d3d09bfd43a6d3b4232665ef7a15099a";
       };
+      games-flectonepulse = pkgs.fetchurl {
+        name = "flectonepulse-bukkit-1.14.0.jar";
+        url = "https://github.com/Flectone/FlectonePulse/releases/download/v1.14.0/FlectonePulse-Bukkit-1.14.0.jar";
+        sha256 = "96e4d2f5848db107ba200f50e1d233e580e79b0ed44835b88ebbc1daccf6f692";
+      };
       games-chunky = pkgs.fetchurl {
         name = "chunky-bukkit-1.5.3.jar";
         url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";

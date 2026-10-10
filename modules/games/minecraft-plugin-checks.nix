@@ -223,6 +223,56 @@ let
     ) permissions.infra.games.minecraftPlugins.backends.survival.templates;
     proxyTemplates = permissions.infra.games.minecraftPlugins.proxy.templates;
   };
+  polishFixture = c: {
+    backends = c.infra.games.minecraftPlugins.backends;
+    proxyJars = lib.attrNames c.infra.games.minecraftPlugins.proxy.jars;
+    servers = lib.mapAttrs (id: _: {
+      inherit (c.infra.games.runtime.${id}) available worldPaths;
+      symlinks = c.services.minecraft-servers.servers.${id}.symlinks;
+    }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.servers);
+  };
+  polishFixtures = {
+    missingSecrets = polishFixture (evaluate { } "" "" false { });
+    withLuckPerms = polishFixture permissions;
+    withDiscord = polishFixture (
+      evaluate {
+        "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+        "games/minecraft/discordsrv-token" = ./tests/fixture.age;
+      } "123456789012345678" "234567890123456789" true { }
+    );
+    additionalBackend =
+      polishFixture
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.secretFiles = lib.mkForce {
+                "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+              };
+              infra.games.servers = lib.mkForce (
+                base
+                // {
+                  testing = base.survival // {
+                    minecraft = base.survival.minecraft // {
+                      serverPort = 25575;
+                      proxyPort = 25576;
+                      rconPort = 25577;
+                    };
+                  };
+                }
+              );
+            }
+          ];
+        }).config;
+    noPaper =
+      polishFixture
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.servers = lib.mkForce (lib.filterAttrs (_: s: s.game != "minecraft-paper") base);
+            }
+          ];
+        }).config;
+  };
 in
 {
   perSystem = { pkgs, ... }: {
@@ -232,10 +282,37 @@ in
           nativeBuildInputs = [
             (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
             pkgs.nginx
+            pkgs.jdk25_headless
           ];
         }
         ''
           python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
+          python3 ${./tests/minecraft_polish_test.py} \
+            ${pkgs.writeText "minecraft-polish-fixtures.json" (builtins.toJSON polishFixtures)} \
+            ${
+              pkgs.writeText "minecraft-polish-artifacts.json" (
+                builtins.toJSON {
+                  openinv = cfg.infra.games.artifacts.games-openinv;
+                  openinvCache = cfg.infra.games.artifacts.games-openinv-libraries;
+                  carbon = cfg.infra.games.artifacts.games-carbon;
+                  carbonCache = cfg.infra.games.artifacts.games-carbon-libraries;
+                  miniplaceholders = cfg.infra.games.artifacts.games-miniplaceholders;
+                  luckpermsExpansion = cfg.infra.games.artifacts.games-miniplaceholders-luckperms;
+                  flectonepulse = cfg.infra.games.artifacts.games-flectonepulse;
+                  flectonepulseCache = cfg.infra.games.artifacts.games-flectonepulse-libraries;
+                  minecraftClient = cfg.infra.games.artifacts.games-minecraft-client;
+                  paper = cfg.infra.games.artifacts.games-paper-survival;
+                  luckperms = cfg.infra.games.artifacts.games-luckperms-paper;
+                  discordsrv = cfg.infra.games.artifacts.games-discordsrv;
+                  # Bukkit Plugin exposes Log4j Logger; Minecraft supplies this
+                  # outside Paper's embedded plugin-test library bundle.
+                  log4jApi = pkgs.fetchurl {
+                    url = "https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-api/2.26.0/log4j-api-2.26.0.jar";
+                    sha256 = "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc";
+                  };
+                }
+              )
+            } ${./tests}
           python3 ${./tests/minecraft_plugins_test.py} \
             ${pkgs.writeText "minecraft-plugin-fixtures.json" (builtins.toJSON fixtures)} \
             ${pkgs.writeText "minecraft-static-nginx.conf" ''

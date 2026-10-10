@@ -59,7 +59,27 @@
               (
                 name: value:
                 lib.nameValuePair "/srv/games/minecraft/${id}/plugins/DiscordSRV/${name}.yml" {
-                  source = toString (format.generate "discordsrv-${id}-${name}.yml" value);
+                  source = toString (
+                    if name != "config" then
+                      format.generate "discordsrv-${id}-${name}.yml" value
+                    else
+                      let
+                        # DiscordSRV uses the first channel as its fallback.
+                        # Adding `death` would otherwise sort before `global`.
+                        body = format.generate "discordsrv-${id}-config-body.yml" (
+                          builtins.removeAttrs value [ "Channels" ]
+                        );
+                        channels = pkgs.writeText "discordsrv-${id}-channels.yml" (
+                          "Channels:\n"
+                          + lib.concatMapStrings (key: "  ${key}: ${builtins.toJSON value.Channels.${key}}\n") (
+                            [ "global" ] ++ lib.attrNames (builtins.removeAttrs value.Channels [ "global" ])
+                          )
+                        );
+                      in
+                      pkgs.runCommand "discordsrv-${id}-config.yml" { } ''
+                        cat ${body} ${channels} > "$out"
+                      ''
+                  );
                 }
               )
               {
@@ -67,13 +87,14 @@
                   ConfigVersion = "1.30.5";
                   BotToken = "";
                   # 1.30.5 routes these events by Channels keys, not messages.yml fields.
-                  # global sorts first and remains the fallback for deaths/awards/status.
+                  # global is rendered first and remains the fallback for awards/status.
                   Channels = {
                     global = s.minecraft.discord.channelId;
                   }
                   // lib.optionalAttrs (s.minecraft.discord.eventsChannelId != "") {
                     join = s.minecraft.discord.eventsChannelId;
                     leave = s.minecraft.discord.eventsChannelId;
+                    death = s.minecraft.discord.eventsChannelId;
                   };
                   DiscordConsoleChannelId = s.minecraft.discord.consoleChannelId;
                   DiscordConsoleChannelBlacklistActsAsWhitelist = true;
@@ -112,6 +133,10 @@
                   ChannelTopicUpdaterChannelTopicsAtShutdownEnabled = false;
                 };
                 messages = {
+                  # Rank prefixes are MiniMessage on Minecraft. Do not pass them
+                  # through Vault's legacy string path into Discord messages.
+                  MinecraftChatToDiscordMessageFormat = "%username% › %message%";
+                  MinecraftChatToDiscordMessageFormatNoPrimaryGroup = "%username% › %message%";
                   MinecraftPlayerJoinMessage = message "%username% joined Survival";
                   MinecraftPlayerFirstJoinMessage = message "%username% joined Survival for the first time";
                   MinecraftPlayerLeaveMessage = message "%username% left Survival";

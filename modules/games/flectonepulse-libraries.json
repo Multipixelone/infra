@@ -1,0 +1,1811 @@
+{
+  "files": [
+    {
+      "path": "aopalliance/aopalliance/1.0/aopalliance-1.0.jar",
+      "url": "https://repo1.maven.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.jar",
+      "sha256": "0addec670fedcd3f113c5c8091d783280d23f75e3acb841b61a9cdb079376a08"
+    },
+    {
+      "path": "aopalliance/aopalliance/1.0/aopalliance-1.0.pom",
+      "url": "https://repo1.maven.org/maven2/aopalliance/aopalliance/1.0/aopalliance-1.0.pom",
+      "sha256": "26e82330157d6b844b67a8064945e206581e772977183e3e31fec6058aa9a59b"
+    },
+    {
+      "path": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+      "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+    },
+    {
+      "path": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.pom",
+      "sha256": "38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0"
+    },
+    {
+      "path": "com/fasterxml/jackson/jackson-bom/2.21.2/jackson-bom-2.21.2.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/jackson-bom/2.21.2/jackson-bom-2.21.2.pom",
+      "sha256": "bc6c549e632927bb9d8a0ada20c8467b5007d3b797c7f5db03a9b60d1de59be3"
+    },
+    {
+      "path": "com/fasterxml/jackson/jackson-parent/2.21/jackson-parent-2.21.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/jackson-parent/2.21/jackson-parent-2.21.pom",
+      "sha256": "3851df627faeb46887b956104630b74a8bbb5f7de22e974cf15982e20e0373de"
+    },
+    {
+      "path": "com/fasterxml/jackson/jackson-parent/2.22/jackson-parent-2.22.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/jackson-parent/2.22/jackson-parent-2.22.pom",
+      "sha256": "7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129"
+    },
+    {
+      "path": "com/fasterxml/oss-parent/75/oss-parent-75.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/oss-parent/75/oss-parent-75.pom",
+      "sha256": "fcbbf1c18c9047e6917d384f2064e21b42a58fc85fb0523a9e2e015eff7c619d"
+    },
+    {
+      "path": "com/fasterxml/oss-parent/76/oss-parent-76.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/oss-parent/76/oss-parent-76.pom",
+      "sha256": "109e6c526eb2dbda3a1b21700fec4be2ddab24005ab9f1f80aa934591a1d8beb"
+    },
+    {
+      "path": "com/fasterxml/oss-parent/79/oss-parent-79.pom",
+      "url": "https://repo1.maven.org/maven2/com/fasterxml/oss-parent/79/oss-parent-79.pom",
+      "sha256": "9206b7dd67fb138036576c3dfca947a2a8f3e2c4d2d9c1f2d1dea519b3a4dae1"
+    },
+    {
+      "path": "com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.jar",
+      "url": "https://jitpack.io/com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.jar",
+      "sha256": "8e5b4926b7228c60eb5a290fa473b90ef38b9267414dd21c4d509b3ae6634124"
+    },
+    {
+      "path": "com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.pom",
+      "url": "https://jitpack.io/com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.pom",
+      "sha256": "ea47509cd1ac0cd6d9312f5ddcff1e812eed95aec8365ff4e335cc3dbf3dba37"
+    },
+    {
+      "path": "com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar",
+      "url": "https://repo1.maven.org/maven2/com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar",
+      "sha256": "9d9d2cfd681fd9272ded3d27c9930db12f89f732345975aa113ebc223bbf1224"
+    },
+    {
+      "path": "com/google/auto/service/auto-service-aggregator/1.1.1/auto-service-aggregator-1.1.1.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/auto/service/auto-service-aggregator/1.1.1/auto-service-aggregator-1.1.1.pom",
+      "sha256": "e2dc3e263a5db0cc8172fb2eb9bcd232acecfdc96e817103eab3c8d9f1900c6a"
+    },
+    {
+      "path": "com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar",
+      "sha256": "16a76dd00a2650568447f5d6e3a9e2c809d9a42367d56b45215cfb89731f4d24"
+    },
+    {
+      "path": "com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.pom",
+      "sha256": "1659fd0a25cea9fa9abfb18deb9d7b180cce3aceab16ff9e625461567e44a2df"
+    },
+    {
+      "path": "com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.jar",
+      "sha256": "c885ce34249682bc0236b4a7d56efcc12048e6135a5baf7a9cde8ad8cda13fcd"
+    },
+    {
+      "path": "com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.pom",
+      "sha256": "4170a761dc5bfd3981a8e6f7aab9e2acdce82d34fd5aa9bb11e3c090d25314ce"
+    },
+    {
+      "path": "com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f"
+    },
+    {
+      "path": "com/google/code/gson/gson/2.14.0/gson-2.14.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.pom",
+      "sha256": "1fa0122c0e3733192642861c36be4c6f799a795327a23bdd2922691b6e9ba480"
+    },
+    {
+      "path": "com/google/code/gson/gson/2.8.0/gson-2.8.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.0/gson-2.8.0.jar",
+      "sha256": "c6221763bd79c4f1c3dc7f750b5f29a0bb38b367b81314c4f71896e340c40825"
+    },
+    {
+      "path": "com/google/code/gson/gson/2.8.0/gson-2.8.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.0/gson-2.8.0.pom",
+      "sha256": "a5331a0ecb548f9942ab5b93c7ac43c38a21e897763dde1bcdbf0774f416ca6f"
+    },
+    {
+      "path": "com/google/code/gson/gson-parent/2.14.0/gson-parent-2.14.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson-parent/2.14.0/gson-parent-2.14.0.pom",
+      "sha256": "82b0f6694c5758ab8bb07e05630208d50f589d4b5e04fd0a046d59cdf7ba3d1d"
+    },
+    {
+      "path": "com/google/code/gson/gson-parent/2.8.0/gson-parent-2.8.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson-parent/2.8.0/gson-parent-2.8.0.pom",
+      "sha256": "0f1d8369b1e9f1bc4b467c8dcfdd8b59733aad5b5c8419c3a59b2f9abaf04cd2"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.jar",
+      "sha256": "9e6814cb71816988a4fd1b07a993a8f21bb7058d522c162b1de849e19bea54ae"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.pom",
+      "sha256": "920135797dcca5917b5a5c017642a58d340a4cd1bcd12f56f892a5663bd7bddc"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.jar",
+      "sha256": "b49c5c958316ed67a09c699dda9aa749caf434d51d863dea599ef36a49b9c855"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.pom",
+      "sha256": "189e09ad0489c325e90daaa9d5c8f406330602fa366609bca07cbcdad03ab9da"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_parent/2.18.0/error_prone_parent-2.18.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_parent/2.18.0/error_prone_parent-2.18.0.pom",
+      "sha256": "47f22e99c7bf466391def16f8377985e5d3ba6f5bbcf65853644805513e15fad"
+    },
+    {
+      "path": "com/google/errorprone/error_prone_parent/2.48.0/error_prone_parent-2.48.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_parent/2.48.0/error_prone_parent-2.48.0.pom",
+      "sha256": "b33fa8a45c9f1794a5008c0b2d83a84eb28b5d0117a6d156f003f9f09be7410f"
+    },
+    {
+      "path": "com/google/google/5/google-5.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/google/5/google-5.pom",
+      "sha256": "e09d345e73ca3fbca7f3e05f30deb74e9d39dd6b79a93fee8c511f23417b6828"
+    },
+    {
+      "path": "com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar",
+      "sha256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26"
+    },
+    {
+      "path": "com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.pom",
+      "sha256": "e96042ce78fecba0da2be964522947c87b40a291b5fd3cd672a434924103c4b9"
+    },
+    {
+      "path": "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+      "sha256": "d5be94d65e87bd219fb3193ad1517baa55a3b88fc91d21cf735826ab5af087b9"
+    },
+    {
+      "path": "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.pom",
+      "sha256": "2be566920c21c60c5ccaf2827867caff766646e2113b7fcc3ee9c24a40b2f396"
+    },
+    {
+      "path": "com/google/guava/guava-parent/26.0-android/guava-parent-26.0-android.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/guava-parent/26.0-android/guava-parent-26.0-android.pom",
+      "sha256": "f8698ab46ca996ce889c1afc8ca4f25eb8ac6b034dc898d4583742360016cc04"
+    },
+    {
+      "path": "com/google/guava/guava-parent/31.0.1-jre/guava-parent-31.0.1-jre.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/guava-parent/31.0.1-jre/guava-parent-31.0.1-jre.pom",
+      "sha256": "b3b6b6aa7099c11817acee85b322fd91f7ee32aea69fe083ee36c8735ec06788"
+    },
+    {
+      "path": "com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+      "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99"
+    },
+    {
+      "path": "com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.pom",
+      "sha256": "18d4b1db26153d4e55079ce1f76bb1fe05cdb862ef9954a88cbcc4ff38b8679b"
+    },
+    {
+      "path": "com/google/inject/guice/7.0.0/guice-7.0.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/inject/guice/7.0.0/guice-7.0.0.jar",
+      "sha256": "de5b0e359bd7b03ca42806b368846efd95484380fe05ae2a4ea71bc338c59c00"
+    },
+    {
+      "path": "com/google/inject/guice/7.0.0/guice-7.0.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/inject/guice/7.0.0/guice-7.0.0.pom",
+      "sha256": "9446ac2f27aaf0303a59a237e2aa95daa1dec75881f8923772f47d33a4dc7977"
+    },
+    {
+      "path": "com/google/inject/guice-parent/7.0.0/guice-parent-7.0.0.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/inject/guice-parent/7.0.0/guice-parent-7.0.0.pom",
+      "sha256": "49aebfee3e6ceb861a882b9df3fcf3bc9f5aa4625257378b0c6cdab84a3f4f64"
+    },
+    {
+      "path": "com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar",
+      "url": "https://repo1.maven.org/maven2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar",
+      "sha256": "21af30c92267bd6122c0e0b4d20cccb6641a37eaf956c6540ec471d584e64a7b"
+    },
+    {
+      "path": "com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.pom",
+      "url": "https://repo1.maven.org/maven2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.pom",
+      "sha256": "5faca824ba115bee458730337dfdb2fcea46ba2fd774d4304edbf30fa6a3f055"
+    },
+    {
+      "path": "com/h2database/h2/2.5.250/h2-2.5.250.jar",
+      "url": "https://repo1.maven.org/maven2/com/h2database/h2/2.5.250/h2-2.5.250.jar",
+      "sha256": "82a80a2ac06901b03cdb233c663d21c4f49c884bf6d0cf85022729e8db9ab86f"
+    },
+    {
+      "path": "com/h2database/h2/2.5.250/h2-2.5.250.pom",
+      "url": "https://repo1.maven.org/maven2/com/h2database/h2/2.5.250/h2-2.5.250.pom",
+      "sha256": "2255472c91077db93edf5d937ee3ead49954364164493a7b4eebd4fa55d0b51c"
+    },
+    {
+      "path": "com/zaxxer/HikariCP/7.1.0/HikariCP-7.1.0.jar",
+      "url": "https://repo1.maven.org/maven2/com/zaxxer/HikariCP/7.1.0/HikariCP-7.1.0.jar",
+      "sha256": "2be45c641b841e81df87292e181f2c203500c5f0e9a1676f135927387f3cf40b"
+    },
+    {
+      "path": "io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.jar",
+      "url": "https://repo1.maven.org/maven2/io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.jar",
+      "sha256": "7f1d591092d5142b6aaa7cf59f94c4c74d57dbeef03b2f8262949f8f36bac6e3"
+    },
+    {
+      "path": "io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.pom",
+      "url": "https://repo1.maven.org/maven2/io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.pom",
+      "sha256": "24281b63832eb4ef1064e7ddfdbe7b796aae1abf88798adbf4d0b9669baba4a4"
+    },
+    {
+      "path": "io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.jar",
+      "sha256": "386b535c079be7d65ddbe0ad9c00955155b7862225aa92b4c6553ab2b1ea95f9"
+    },
+    {
+      "path": "io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.pom",
+      "sha256": "a24a1466ff8ffa8ad1f7541841e6dbd90f8b3ca2c5d5ce3a472a366d1e43557c"
+    },
+    {
+      "path": "io/opentelemetry/opentelemetry-bom/1.60.1/opentelemetry-bom-1.60.1.pom",
+      "url": "https://repo1.maven.org/maven2/io/opentelemetry/opentelemetry-bom/1.60.1/opentelemetry-bom-1.60.1.pom",
+      "sha256": "21801b7450bf3ec3ab932165f359f476a5dbb91e0f755b430518608f214e6be4"
+    },
+    {
+      "path": "jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+      "sha256": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
+    },
+    {
+      "path": "jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.pom",
+      "sha256": "e7fd7232e96307a575b2494c9367d68cf43ec98244aace3ccc23e1773ffa6fda"
+    },
+    {
+      "path": "me/lucko/jar-relocator/1.7/jar-relocator-1.7.jar",
+      "url": "https://repo1.maven.org/maven2/me/lucko/jar-relocator/1.7/jar-relocator-1.7.jar",
+      "sha256": "6f7d1184e17a90788797e3b9b2e34b87ff9e02bd623851052d78709071c3bb82"
+    },
+    {
+      "path": "net/flectone/libby-maven-resolver/1.0.1/libby-maven-resolver-1.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/flectone/libby-maven-resolver/1.0.1/libby-maven-resolver-1.0.1.jar",
+      "sha256": "c65fe930b27255abdacbb9412527f8a502fb2d3e3eda46a6a49df079220f693e"
+    },
+    {
+      "path": "net/flectone/packeteventsmodern-api/2.14.0/packeteventsmodern-api-2.14.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/flectone/packeteventsmodern-api/2.14.0/packeteventsmodern-api-2.14.0.jar",
+      "sha256": "28a622292b7d8a8ac241c2b5d719621024672dd318b16e22d2e4b22a71f8ab45"
+    },
+    {
+      "path": "net/flectone/packeteventsmodern-netty-common/2.14.0/packeteventsmodern-netty-common-2.14.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/flectone/packeteventsmodern-netty-common/2.14.0/packeteventsmodern-netty-common-2.14.0.jar",
+      "sha256": "03d309eb980ededb19922ef941d0fb244d5871068912161fef50ffffefba23dc"
+    },
+    {
+      "path": "net/flectone/packeteventsmodern-spigot/2.14.0/packeteventsmodern-spigot-2.14.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/flectone/packeteventsmodern-spigot/2.14.0/packeteventsmodern-spigot-2.14.0.jar",
+      "sha256": "fe08c911bf951021df5b08a6c92f03d8ff05755a3df438e0c65e1f5e1ad9843c"
+    },
+    {
+      "path": "net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.jar",
+      "sha256": "551e536b9ea868f30e72c7900a309b35124ee7d4889fa3b3aed0910299751a26"
+    },
+    {
+      "path": "net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.pom",
+      "sha256": "9c7682ecb494d5bec25690f6564278261f477d351d1ab44f2f9001ea4008a818"
+    },
+    {
+      "path": "net/kyori/adventure-bom/4.26.1/adventure-bom-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-bom/4.26.1/adventure-bom-4.26.1.pom",
+      "sha256": "296b21955ff65b8b50898b4a7d59cb183703007aa31bf7617d529132e5275223"
+    },
+    {
+      "path": "net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.jar",
+      "sha256": "eec172d63db77b40eb7abeeb25f65eedea89bd30264d057b68b12fecb731be5e"
+    },
+    {
+      "path": "net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.pom",
+      "sha256": "532300907d2f7a8418c32c2d88994adbe64aa2f1130336f9f51e80d1d10cbca9"
+    },
+    {
+      "path": "net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.jar",
+      "sha256": "f26ef6bff5fcdd817902b4dfd353561d98cb131b4ecb67341ff00ef2ed1336f8"
+    },
+    {
+      "path": "net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.pom",
+      "sha256": "557e832dcda0b1b377fd8410adf0abc587f8c318c392abd0fb43019ead0b07ad"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.jar",
+      "sha256": "79507c36685932166689423be279ea796db42b95d96da2a794cf9624280cb145"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.pom",
+      "sha256": "7dd892bba0724f7c0ebddb27f4f296ec903e09be98e0e125aeb01fe6502c925b"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.jar",
+      "sha256": "66527fef559da4d91cda692491034f903d5b01e835de1b091edfbb6b51cee5a2"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.pom",
+      "sha256": "dd525c03545f6714565f2f8b0d508dc9dc6073db69d78ff3222e79aa8cab453b"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.jar",
+      "sha256": "e4a908dedc4acb4305083d916d362ddc2b21ecf452d577a0be665280bddae9fc"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.pom",
+      "sha256": "d3cad10293f1f7954b9a56094469c35663eea0876dbb096051441f7336aef795"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.jar",
+      "sha256": "55c64b4333d5d2968a0125b8f29dae7cfba15392d5f99f78dbaea711cb0d4dc2"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.pom",
+      "sha256": "576b7a1a30337e2c6516d5e5b20e0e319f3be08b87eb6df822a7678753a91682"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.jar",
+      "sha256": "cbe618e2ec55a4e77955afdeb72a2ff01dc309790c9562ae4c539bf30fe58b91"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.pom",
+      "sha256": "6a0ec3b162b5fe02db39529181d1c6bb0711814b2c76acc81ca428c77d23c21f"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.jar",
+      "sha256": "721107bc213572454df1bfbe438dba630e30457550c750b7a154b35dc3264aa8"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.pom",
+      "sha256": "242e3fb57466c2b5b795cbcc3e2e82ec809736c7a5caf3f30022dfd08a4540b0"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.jar",
+      "sha256": "39b9bfe5790f645605ff5464382c0e062476f48f9bfb2548801f275f12faf405"
+    },
+    {
+      "path": "net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.pom",
+      "sha256": "ba1839b61df0c9a32cf4e2f09b4bc1bd20d23477c232cc57ebbc020ba9df1aca"
+    },
+    {
+      "path": "net/kyori/ansi/1.1.1/ansi-1.1.1.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/ansi/1.1.1/ansi-1.1.1.jar",
+      "sha256": "b6c569e1a0925b9eeb349e12db35e2237556107e3336657e0b2ebde261d8afd7"
+    },
+    {
+      "path": "net/kyori/ansi/1.1.1/ansi-1.1.1.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/ansi/1.1.1/ansi-1.1.1.pom",
+      "sha256": "672ef2725cd890f5316756fe8dad61f626efe12a314da4052710a0e34dea9156"
+    },
+    {
+      "path": "net/kyori/examination-api/1.3.0/examination-api-1.3.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/examination-api/1.3.0/examination-api-1.3.0.jar",
+      "sha256": "c9237ffecb05428f6eff86216246ac70ce0b47b04c08ea7ca35020fde57f8492"
+    },
+    {
+      "path": "net/kyori/examination-api/1.3.0/examination-api-1.3.0.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/examination-api/1.3.0/examination-api-1.3.0.pom",
+      "sha256": "c122186bb74364add5e93471bbd1c5e738e52939bd2bb1f40b19e0a3b8b7c82e"
+    },
+    {
+      "path": "net/kyori/examination-string/1.3.0/examination-string-1.3.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/examination-string/1.3.0/examination-string-1.3.0.jar",
+      "sha256": "7d01fc25a4bb3af0e1662685455f4541fbf4626216ea5846e455c1491e156b8c"
+    },
+    {
+      "path": "net/kyori/examination-string/1.3.0/examination-string-1.3.0.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/examination-string/1.3.0/examination-string-1.3.0.pom",
+      "sha256": "5ee00410822f36e9019d94762ce01bcd6039569765351bef0660945cd4f9a56e"
+    },
+    {
+      "path": "net/kyori/option/1.1.0/option-1.1.0.jar",
+      "url": "https://repo1.maven.org/maven2/net/kyori/option/1.1.0/option-1.1.0.jar",
+      "sha256": "97b69b4b17dfe02217c9131ad342564cbc9aebd04c75eb689639b5f78fd4b11c"
+    },
+    {
+      "path": "net/kyori/option/1.1.0/option-1.1.0.pom",
+      "url": "https://repo1.maven.org/maven2/net/kyori/option/1.1.0/option-1.1.0.pom",
+      "sha256": "1f3318a1cee63e8085096242cf0619a44b8576f6b56c2391a00cc5e1275847b6"
+    },
+    {
+      "path": "org/apache/apache/35/apache-35.pom",
+      "url": "https://repo1.maven.org/maven2/org/apache/apache/35/apache-35.pom",
+      "sha256": "ea297dcd114136e8b8e8b630230d52a76c2fc69f6c5db25d672b1857000728b8"
+    },
+    {
+      "path": "org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar",
+      "sha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4"
+    },
+    {
+      "path": "org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.pom",
+      "sha256": "7ca83b2709c1e7a9e03b576cd41422190379489a80866e542f8c8b955411a2aa"
+    },
+    {
+      "path": "org/apache/commons/commons-parent/92/commons-parent-92.pom",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-parent/92/commons-parent-92.pom",
+      "sha256": "94f6c027b15f6402995dd1b2c7ea35bfe1ebc88b6832b3134368b41998721953"
+    },
+    {
+      "path": "org/apache/commons/commons-parent/93/commons-parent-93.pom",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-parent/93/commons-parent-93.pom",
+      "sha256": "a88b5f6165a659bf835441837bcc5c53e99fde79b92cfbb86988ce2954cd5267"
+    },
+    {
+      "path": "org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar",
+      "sha256": "58d2da30f058512a1e7f914e39241deca4dff5c27a085b4ed2faa9e7208067f6"
+    },
+    {
+      "path": "org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.pom",
+      "sha256": "5e5168687bcedaea2aa8556b8b32f5afa08efcbc31d11b947c8676987bc9d239"
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+      "url": "https://repo1.maven.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+      "sha256": "b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38"
+    },
+    {
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.pom",
+      "url": "https://repo1.maven.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.pom",
+      "sha256": "32355081d109095c3d5d374d5a43b4f4c1b75d549e983ef50723e2772e5302a0"
+    },
+    {
+      "path": "org/basepom/basepom-foundation/69/basepom-foundation-69.pom",
+      "url": "https://repo1.maven.org/maven2/org/basepom/basepom-foundation/69/basepom-foundation-69.pom",
+      "sha256": "f5c28d306c5cc628da9f2e0a81d1d6c797ad9bfc5f01e42bd4866f3bf4d87363"
+    },
+    {
+      "path": "org/basepom/basepom-minimal/69/basepom-minimal-69.pom",
+      "url": "https://repo1.maven.org/maven2/org/basepom/basepom-minimal/69/basepom-minimal-69.pom",
+      "sha256": "7c97c15df9c94aac25dfe9409932a27e7c95ceb8d9aac77796ba8a5df7ab32d1"
+    },
+    {
+      "path": "org/basepom/basepom-oss/69/basepom-oss-69.pom",
+      "url": "https://repo1.maven.org/maven2/org/basepom/basepom-oss/69/basepom-oss-69.pom",
+      "sha256": "239d773f442930295b7d079df20e04f4bff355b403c7dcb5b4e98e89d595e1c2"
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar",
+      "sha256": "ff10785ac2a357ec5de9c293cb982a2cbb605c0309ea4cc1cb9b9bc6dbe7f3cb"
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.pom",
+      "sha256": "775b7ae36e62820b3b86dc1aa39af37c0ac4b85ff48f7fe485a922a2790f46b9"
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.jar",
+      "sha256": "153aeffe56ca24f3a9b8b6c6ff813eace9620ccf35adfab91d491682e56cd5ce"
+    },
+    {
+      "path": "org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.pom",
+      "sha256": "750806cd9ca0999e4bf2f7a5d657d236a36bb73626ee6a48f29f555e20745150"
+    },
+    {
+      "path": "org/eclipse/ee4j/project/1.0.6/project-1.0.6.pom",
+      "url": "https://repo1.maven.org/maven2/org/eclipse/ee4j/project/1.0.6/project-1.0.6.pom",
+      "sha256": "4e7d8329d8da7dcf30779d824241be145f27108932f5a5a24eb907677bc8d72d"
+    },
+    {
+      "path": "org/immutables/annotate/2.12.2/annotate-2.12.2.jar",
+      "url": "https://repo1.maven.org/maven2/org/immutables/annotate/2.12.2/annotate-2.12.2.jar",
+      "sha256": "5d0dfbb9b504879a298326731a65c426a38a8b13c8a65e7d94af0f867a977acb"
+    },
+    {
+      "path": "org/immutables/annotate/2.12.2/annotate-2.12.2.pom",
+      "url": "https://repo1.maven.org/maven2/org/immutables/annotate/2.12.2/annotate-2.12.2.pom",
+      "sha256": "c66535daaa6e924748d5a1eb3064e55e3f3df643ec3298b49722890900ff1043"
+    },
+    {
+      "path": "org/immutables/immutables/2.12.2/immutables-2.12.2.pom",
+      "url": "https://repo1.maven.org/maven2/org/immutables/immutables/2.12.2/immutables-2.12.2.pom",
+      "sha256": "7364948e7c6da506c61aa75542a5d9601ec0e13817112d7df3ebbbcf62797720"
+    },
+    {
+      "path": "org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.jar",
+      "url": "https://repo1.maven.org/maven2/org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.jar",
+      "sha256": "6ab333ab24bbb065107facef4c22a566b6e162709ec708b31b98f0cb5f51072c"
+    },
+    {
+      "path": "org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.pom",
+      "url": "https://repo1.maven.org/maven2/org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.pom",
+      "sha256": "a572e30cd6db2460d915a7fe90b26d00b7995d3f140b52c7658c8eec82cf8eaa"
+    },
+    {
+      "path": "org/incendo/cloud-bom/2.1.0/cloud-bom-2.1.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-bom/2.1.0/cloud-bom-2.1.0.pom",
+      "sha256": "38d350c407be2f0d7ead3d4e25108789947ff53f1eb6bea64d2d766f12537b8c"
+    },
+    {
+      "path": "org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.jar",
+      "sha256": "4c2c0418052dc4317cd7efe75ba355fe5f77faae015aad2410c801e498e37506"
+    },
+    {
+      "path": "org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.pom",
+      "sha256": "be984b98817440887beb5ffe910561e9ec72404921f544aa2ebb909db263e11c"
+    },
+    {
+      "path": "org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.jar",
+      "sha256": "95f50374dae55ff3bd1235e882125adc984678736f32daff65fddf73677b7bcd"
+    },
+    {
+      "path": "org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.pom",
+      "sha256": "8a6be0ff4ae94f0f3d06158f9b676a33960ed10800604cccbf3b7311e862f7ad"
+    },
+    {
+      "path": "org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.jar",
+      "sha256": "65ee6ef052aff50904ae534a807d5cd36dc74a33b18aa173b77058eca05154d2"
+    },
+    {
+      "path": "org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.pom",
+      "sha256": "72e4ef3cec81737dfb8edb1ffc753ca45905aab646d3693df67c652850a119a9"
+    },
+    {
+      "path": "org/incendo/cloud-minecraft-bom/2.0.1/cloud-minecraft-bom-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-minecraft-bom/2.0.1/cloud-minecraft-bom-2.0.1.pom",
+      "sha256": "c7fe899aa26e33284c8e34b3f05dffae574725f81433cb73d853655eed080fa3"
+    },
+    {
+      "path": "org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.jar",
+      "sha256": "ea0c979485c8818d7f7850f96c34643e2638541031264efdae98979c1e42f039"
+    },
+    {
+      "path": "org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.pom",
+      "sha256": "719f90758d49b8894cd14668e24cf9ea3b36d2c50606311af1e0a000b1ec420b"
+    },
+    {
+      "path": "org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.jar",
+      "sha256": "f660b3768142c8e10e15290827c33db8bae3a458faa6a5bbe7b30d86fa9a8e30"
+    },
+    {
+      "path": "org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.pom",
+      "sha256": "89ff961c6558b05cbb7ed5a758a239d5dbe5de425fe5eb8a68f47d68b92ed8e4"
+    },
+    {
+      "path": "org/jdbi/internal/jdbi3-parent/3.54.0/jdbi3-parent-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/internal/jdbi3-parent/3.54.0/jdbi3-parent-3.54.0.pom",
+      "sha256": "fcae8876418f4566945a98bf26487d4d9da66bbf6f698905c54e899f172e89c2"
+    },
+    {
+      "path": "org/jdbi/internal/jdbi3-root/3.54.0/jdbi3-root-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/internal/jdbi3-root/3.54.0/jdbi3-root-3.54.0.pom",
+      "sha256": "e51b53846cdb56ec38a672a49669959e8cf45e1b55853a8cb852aa25f06acd8a"
+    },
+    {
+      "path": "org/jdbi/jdbi3-bom/3.54.0/jdbi3-bom-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-bom/3.54.0/jdbi3-bom-3.54.0.pom",
+      "sha256": "8a93414eefc9627e4ea2791cf58660946dce1afc19b6982feab6c99be5a5d09b"
+    },
+    {
+      "path": "org/jdbi/jdbi3-build-parent/3.54.0/jdbi3-build-parent-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-build-parent/3.54.0/jdbi3-build-parent-3.54.0.pom",
+      "sha256": "ccc00e76d4b0272d3279de3184238124cde6f5d2f5a80da73978dd712fb49925"
+    },
+    {
+      "path": "org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar",
+      "sha256": "2fd7938a701d60fa02e394250328be2d9415728cb636e24eeba4da3e0afcef9a"
+    },
+    {
+      "path": "org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.pom",
+      "sha256": "4db7e21555d74b6c3af29080c16b311f3f1573182fd099a01aff186032b0c6a4"
+    },
+    {
+      "path": "org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar",
+      "sha256": "ced2576e0106da2c50b25aaa3a7e239d385615adc92595a251b14966553fb4e8"
+    },
+    {
+      "path": "org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.pom",
+      "sha256": "8a928d77cf0d3dce819847357ad8c263ffb4896068dd3198bfa8289897f28480"
+    },
+    {
+      "path": "org/jetbrains/annotations/22.0.0/annotations-22.0.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/22.0.0/annotations-22.0.0.pom",
+      "sha256": "a5ef0ce1dc5d3bfd6f6100fadc0377455b1cfb0251c2c217d3266a5a43585bb5"
+    },
+    {
+      "path": "org/jetbrains/annotations/26.0.1/annotations-26.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.0.1/annotations-26.0.1.pom",
+      "sha256": "90406e283907442ab3f3c65fb6a3b6e517482cd6f863081ea7bd2c82010dac57"
+    },
+    {
+      "path": "org/jetbrains/annotations/26.0.2/annotations-26.0.2.pom",
+      "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.0.2/annotations-26.0.2.pom",
+      "sha256": "7ebeceade8dada7cb17eff3e014922c39022d2a378e3e2d2461f28f016ffc7f7"
+    },
+    {
+      "path": "org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.jar",
+      "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.jar",
+      "sha256": "2037be378980d3ba9333e97955f3b2cde392aa124d04ca73ce2eee6657199297"
+    },
+    {
+      "path": "org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.pom",
+      "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.pom",
+      "sha256": "9a7e1ede1b90173052c1e6ed724fb0f0ebcc88ff682d023f0c9b343e1377a7ff"
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+      "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+    },
+    {
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.pom",
+      "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.pom",
+      "sha256": "cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6"
+    },
+    {
+      "path": "org/junit/junit-bom/5.13.4/junit-bom-5.13.4.pom",
+      "url": "https://repo1.maven.org/maven2/org/junit/junit-bom/5.13.4/junit-bom-5.13.4.pom",
+      "sha256": "d7a08a99b2502f0bb68cd4e1f984f0bf69324aaa208bd0f73366c03fc3548a42"
+    },
+    {
+      "path": "org/junit/junit-bom/5.14.1/junit-bom-5.14.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/junit/junit-bom/5.14.1/junit-bom-5.14.1.pom",
+      "sha256": "01b01dfa366550b40ac5760548a7d728b6109d17c451e83864d1e5e0ce862c94"
+    },
+    {
+      "path": "org/junit/junit-bom/5.9.1/junit-bom-5.9.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/junit/junit-bom/5.9.1/junit-bom-5.9.1.pom",
+      "sha256": "b163c1cfc8fc1fd58b457a00d586c04c46e986d75904e9ca54c03a97d65b496c"
+    },
+    {
+      "path": "org/junit/junit-bom/6.0.3/junit-bom-6.0.3.pom",
+      "url": "https://repo1.maven.org/maven2/org/junit/junit-bom/6.0.3/junit-bom-6.0.3.pom",
+      "sha256": "a655b6a5dc00d1bebc91fb2b15c0c7e8aeac9d6bdcf879595505370e27530287"
+    },
+    {
+      "path": "org/ow2/asm/asm/9.5/asm-9.5.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.5/asm-9.5.jar",
+      "sha256": "b62e84b5980729751b0458c534cf1366f727542bb8d158621335682a460f0353"
+    },
+    {
+      "path": "org/ow2/asm/asm/9.5/asm-9.5.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.5/asm-9.5.pom",
+      "sha256": "2c9cceb951cc6586de8d9a16c672ad3e4c30b9c323028d7a3c3366560d5627b1"
+    },
+    {
+      "path": "org/ow2/asm/asm/9.9/asm-9.9.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.9/asm-9.9.jar",
+      "sha256": "03d99a74ad1ee5c71334ef67437f4ef4fe3488caa7c96d8645abc73c8e2017d4"
+    },
+    {
+      "path": "org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar",
+      "sha256": "db2f6f26150bbe7c126606b4a1151836bcc22a1e05a423b3585698bece995ff8"
+    },
+    {
+      "path": "org/ow2/ow2/1.5.1/ow2-1.5.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/ow2/1.5.1/ow2-1.5.1.pom",
+      "sha256": "321ddbb7ee6fe4f53dea6b4cd6db74154d6bfa42391c1f763b361b9f485acf05"
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.pom",
+      "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.pom",
+      "sha256": "150c40287f7cecdc21b9380caac98e928c4f33c023db6b348df1c5ac977026bf"
+    },
+    {
+      "path": "org/slf4j/slf4j-bom/2.0.17/slf4j-bom-2.0.17.pom",
+      "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-bom/2.0.17/slf4j-bom-2.0.17.pom",
+      "sha256": "f78d27b642b4b886eb839fc102b5cd9fe7f30f37599ffe68185be4e1609031e9"
+    },
+    {
+      "path": "org/slf4j/slf4j-parent/2.0.17/slf4j-parent-2.0.17.pom",
+      "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-parent/2.0.17/slf4j-parent-2.0.17.pom",
+      "sha256": "95cd71e852dfdb29126e58b7b939d57ec2b2e6024391852e0b545dee082bbf3b"
+    },
+    {
+      "path": "org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.jar",
+      "sha256": "0b638c8806112215e02e58e95cbd9e9a69d4bd540991f47553d053919994cc94"
+    },
+    {
+      "path": "org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.pom",
+      "sha256": "03559cfc71af8ef4af83385d25d93bf38dfc7a43169b83defc70acdfde14b6d9"
+    },
+    {
+      "path": "org/sonatype/oss/oss-parent/7/oss-parent-7.pom",
+      "url": "https://repo1.maven.org/maven2/org/sonatype/oss/oss-parent/7/oss-parent-7.pom",
+      "sha256": "b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454"
+    },
+    {
+      "path": "org/sonatype/oss/oss-parent/9/oss-parent-9.pom",
+      "url": "https://repo1.maven.org/maven2/org/sonatype/oss/oss-parent/9/oss-parent-9.pom",
+      "sha256": "fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a"
+    },
+    {
+      "path": "org/testcontainers/testcontainers-bom/2.0.5/testcontainers-bom-2.0.5.pom",
+      "url": "https://repo1.maven.org/maven2/org/testcontainers/testcontainers-bom/2.0.5/testcontainers-bom-2.0.5.pom",
+      "sha256": "bbba1376021fbf4e14663a61f10cd1aff14a5d74fb55f1a14be6fd6de83d7eef"
+    },
+    {
+      "path": "tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.jar",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.jar",
+      "sha256": "93d9090b8c505b2f942ad85dd5821e8c401bfbafafff11708a3fbe2ef9da18ca"
+    },
+    {
+      "path": "tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.pom",
+      "sha256": "32f6e0acf6c798c8ba5101d73fe5401b5c20f435779241134a99fe9f2cc29632"
+    },
+    {
+      "path": "tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.jar",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.jar",
+      "sha256": "d27509f990d990fc779a01f3f612005ff6c67dc3bb0a720f5f4d9b2f5c713401"
+    },
+    {
+      "path": "tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.pom",
+      "sha256": "afb706b09466b4308c449c944497818eea8ef9cdc012ca2e5a8d466709aab296"
+    },
+    {
+      "path": "tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.jar",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.jar",
+      "sha256": "c2c24e93676832dbb14196685e24292bb04258165c70d6c1e41e475e34fc93d3"
+    },
+    {
+      "path": "tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.pom",
+      "sha256": "947554b8da1de909550c357753bb929ae6aa06152c8cacdb2a216e9a517e0722"
+    },
+    {
+      "path": "tools/jackson/dataformat/jackson-dataformats-text/3.2.2/jackson-dataformats-text-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/dataformat/jackson-dataformats-text/3.2.2/jackson-dataformats-text-3.2.2.pom",
+      "sha256": "3e7e638768eccd2a13de865b2447eae92d25dd52206446e7ca64cdb5d58ae55e"
+    },
+    {
+      "path": "tools/jackson/jackson-base/3.2.2/jackson-base-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/jackson-base/3.2.2/jackson-base-3.2.2.pom",
+      "sha256": "4e4daa8acdcc2b445575f8fd064058e642f218cb5d4de35f099854f4ba147864"
+    },
+    {
+      "path": "tools/jackson/jackson-bom/3.1.0/jackson-bom-3.1.0.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/jackson-bom/3.1.0/jackson-bom-3.1.0.pom",
+      "sha256": "abf90b664283a6b4ecd16d7ca3e2b31a6c5cc495c1079a77992549c4829420b8"
+    },
+    {
+      "path": "tools/jackson/jackson-bom/3.2.2/jackson-bom-3.2.2.pom",
+      "url": "https://repo1.maven.org/maven2/tools/jackson/jackson-bom/3.2.2/jackson-bom-3.2.2.pom",
+      "sha256": "1d6ca81311534231b34da71f0c8b2b08b0888333069d56edb05b9c5c00f51c29"
+    }
+  ],
+  "relocations": [
+    {
+      "source": "com/google/inject/guice/7.0.0/guice-7.0.0.jar",
+      "path": "com/google/inject/guice/7.0.0/guice-7.0.0.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+      "path": "jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "aopalliance/aopalliance/1.0/aopalliance-1.0.jar",
+      "path": "aopalliance/aopalliance/1.0/aopalliance-1.0.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+      "path": "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar",
+      "path": "com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+      "path": "com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.jar",
+      "path": "com/google/code/findbugs/jsr305/3.0.1/jsr305-3.0.1.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar",
+      "path": "org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar",
+      "path": "com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.jar",
+      "path": "com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "org/ow2/asm/asm/9.5/asm-9.5.jar",
+      "path": "org/ow2/asm/asm/9.5/asm-9.5.jar-relocated-738011080.jar",
+      "rules": [
+        {
+          "from": "com.google.inject",
+          "to": "net.flectone.pulse.library.guice"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "path": "com/google/code/gson/gson/2.14.0/gson-2.14.0.jar-relocated-1421587444.jar",
+      "rules": [
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.jar",
+      "path": "com/google/errorprone/error_prone_annotations/2.48.0/error_prone_annotations-2.48.0.jar-relocated-1421587444.jar",
+      "rules": [
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar",
+      "path": "com/github/ben-manes/caffeine/caffeine/3.2.4/caffeine-3.2.4.jar-relocated-349916667.jar",
+      "rules": [
+        {
+          "from": "com.github.benmanes.caffeine",
+          "to": "net.flectone.pulse.library.caffeine"
+        }
+      ]
+    },
+    {
+      "source": "tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.jar",
+      "path": "tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/jackson-dataformat-yaml-3.2.2.jar-relocated-140020951.jar",
+      "rules": [
+        {
+          "from": "com.fasterxml.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "tools.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "org.snakeyaml.engine",
+          "to": "net.flectone.pulse.library.snakeyaml"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.jar",
+      "path": "tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.jar-relocated-140020951.jar",
+      "rules": [
+        {
+          "from": "com.fasterxml.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "tools.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "org.snakeyaml.engine",
+          "to": "net.flectone.pulse.library.snakeyaml"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.jar",
+      "path": "tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.jar-relocated-140020951.jar",
+      "rules": [
+        {
+          "from": "com.fasterxml.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "tools.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "org.snakeyaml.engine",
+          "to": "net.flectone.pulse.library.snakeyaml"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+      "path": "com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar-relocated-140020951.jar",
+      "rules": [
+        {
+          "from": "com.fasterxml.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "tools.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "org.snakeyaml.engine",
+          "to": "net.flectone.pulse.library.snakeyaml"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.jar",
+      "path": "org/snakeyaml/snakeyaml-engine/3.0.1/snakeyaml-engine-3.0.1.jar-relocated-140020951.jar",
+      "rules": [
+        {
+          "from": "com.fasterxml.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "tools.jackson",
+          "to": "net.flectone.pulse.library.jackson"
+        },
+        {
+          "from": "org.snakeyaml.engine",
+          "to": "net.flectone.pulse.library.snakeyaml"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/zaxxer/HikariCP/7.1.0/HikariCP-7.1.0.jar",
+      "path": "com/zaxxer/HikariCP/7.1.0/HikariCP-7.1.0.jar-relocated-1657368735.jar",
+      "rules": [
+        {
+          "from": "com.zaxxer.hikari",
+          "to": "net.flectone.pulse.library.hikari"
+        }
+      ]
+    },
+    {
+      "source": "org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar",
+      "path": "org/jdbi/jdbi3-core/3.54.0/jdbi3-core-3.54.0.jar-relocated-1826929979.jar",
+      "rules": [
+        {
+          "from": "org.jdbi",
+          "to": "net.flectone.pulse.library.jdbi3"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "path": "org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar-relocated-1826929979.jar",
+      "rules": [
+        {
+          "from": "org.jdbi",
+          "to": "net.flectone.pulse.library.jdbi3"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.jar",
+      "path": "io/leangen/geantyref/geantyref/2.0.1/geantyref-2.0.1.jar-relocated-1826929979.jar",
+      "rules": [
+        {
+          "from": "org.jdbi",
+          "to": "net.flectone.pulse.library.jdbi3"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar",
+      "path": "org/jdbi/jdbi3-sqlobject/3.54.0/jdbi3-sqlobject-3.54.0.jar-relocated-1826929979.jar",
+      "rules": [
+        {
+          "from": "org.jdbi",
+          "to": "net.flectone.pulse.library.jdbi3"
+        },
+        {
+          "from": "com.google.common",
+          "to": "net.flectone.pulse.library.guava"
+        }
+      ]
+    },
+    {
+      "source": "org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar",
+      "path": "org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar-relocated-1796024298.jar",
+      "rules": [
+        {
+          "from": "org.apache.commons",
+          "to": "net.flectone.pulse.library.apache"
+        }
+      ]
+    },
+    {
+      "source": "org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar",
+      "path": "org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar-relocated-1796024298.jar",
+      "rules": [
+        {
+          "from": "org.apache.commons",
+          "to": "net.flectone.pulse.library.apache"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.jar",
+      "path": "net/kyori/adventure-nbt/4.26.1/adventure-nbt-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/examination-api/1.3.0/examination-api-1.3.0.jar",
+      "path": "net/kyori/examination-api/1.3.0/examination-api-1.3.0.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/examination-string/1.3.0/examination-string-1.3.0.jar",
+      "path": "net/kyori/examination-string/1.3.0/examination-string-1.3.0.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.jar",
+      "path": "org/jetbrains/annotations/26.0.2-1/annotations-26.0.2-1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.jar",
+      "path": "net/kyori/adventure-key/4.26.1/adventure-key-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-ansi/4.26.1/adventure-text-serializer-ansi-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.jar",
+      "path": "net/kyori/adventure-api/4.26.1/adventure-api-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/ansi/1.1.1/ansi-1.1.1.jar",
+      "path": "net/kyori/ansi/1.1.1/ansi-1.1.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-plain/4.26.1/adventure-text-serializer-plain-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-legacy/4.26.1/adventure-text-serializer-legacy-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/adventure-text-serializer-json-legacy-impl-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-json/4.26.1/adventure-text-serializer-json-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/option/1.1.0/option-1.1.0.jar",
+      "path": "net/kyori/option/1.1.0/option-1.1.0.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+      "path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-commons/4.26.1/adventure-text-serializer-commons-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.jar",
+      "path": "net/kyori/adventure-text-serializer-gson/4.26.1/adventure-text-serializer-gson-4.26.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/google/code/gson/gson/2.8.0/gson-2.8.0.jar",
+      "path": "com/google/code/gson/gson/2.8.0/gson-2.8.0.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar",
+      "path": "com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar-relocated-2127621616.jar",
+      "rules": [
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/flectone/packeteventsmodern-spigot/2.14.0/packeteventsmodern-spigot-2.14.0.jar",
+      "path": "net/flectone/packeteventsmodern-spigot/2.14.0/packeteventsmodern-spigot-2.14.0.jar-relocated-1832392201.jar",
+      "rules": [
+        {
+          "from": "com.github.retrooper",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "io.github.retrooper.packetevents",
+          "to": "net.flectone.pulse.library.packetevents.impl"
+        },
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/flectone/packeteventsmodern-api/2.14.0/packeteventsmodern-api-2.14.0.jar",
+      "path": "net/flectone/packeteventsmodern-api/2.14.0/packeteventsmodern-api-2.14.0.jar-relocated-1832392201.jar",
+      "rules": [
+        {
+          "from": "com.github.retrooper",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "io.github.retrooper.packetevents",
+          "to": "net.flectone.pulse.library.packetevents.impl"
+        },
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "net/flectone/packeteventsmodern-netty-common/2.14.0/packeteventsmodern-netty-common-2.14.0.jar",
+      "path": "net/flectone/packeteventsmodern-netty-common/2.14.0/packeteventsmodern-netty-common-2.14.0.jar-relocated-1832392201.jar",
+      "rules": [
+        {
+          "from": "com.github.retrooper",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "io.github.retrooper.packetevents",
+          "to": "net.flectone.pulse.library.packetevents.impl"
+        },
+        {
+          "from": "net.kyori",
+          "to": "net.flectone.pulse.library"
+        },
+        {
+          "from": "com.google.gson",
+          "to": "net.flectone.pulse.library.gson"
+        }
+      ]
+    },
+    {
+      "source": "com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.jar",
+      "path": "com/github/Anon8281/UniversalScheduler/0.1.7/UniversalScheduler-0.1.7.jar-relocated-252078463.jar",
+      "rules": [
+        {
+          "from": "com.github.Anon8281",
+          "to": "net.flectone.pulse.library.universalscheduler"
+        }
+      ]
+    },
+    {
+      "source": "org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.jar",
+      "path": "org/incendo/cloud-paper/2.0.1/cloud-paper-2.0.1.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.jar",
+      "path": "org/incendo/cloud-bukkit/2.0.1/cloud-bukkit-2.0.1.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.jar",
+      "path": "org/incendo/cloud-core/2.1.0/cloud-core-2.1.0.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.jar",
+      "path": "org/incendo/cloud-services/2.1.0/cloud-services-2.1.0.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.jar",
+      "path": "io/leangen/geantyref/geantyref/1.3.16/geantyref-1.3.16.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.jar",
+      "path": "org/checkerframework/checker-qual/3.51.1/checker-qual-3.51.1.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+      "path": "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.jar",
+      "path": "org/incendo/cloud-brigadier/2.0.1/cloud-brigadier-2.0.1.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.jar",
+      "path": "org/immutables/value-annotations/2.12.2/value-annotations-2.12.2.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    },
+    {
+      "source": "org/immutables/annotate/2.12.2/annotate-2.12.2.jar",
+      "path": "org/immutables/annotate/2.12.2/annotate-2.12.2.jar-relocated-1339088704.jar",
+      "rules": [
+        {
+          "from": "org.incendo",
+          "to": "net.flectone.pulse.library.cloud"
+        },
+        {
+          "from": "io.leangen.geantyref",
+          "to": "net.flectone.pulse.library.geantyref"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "io/leangen/geantyref/geantyref/2.0.1/_remote.repositories": "geantyref-2.0.1.jar>repo12=\ngeantyref-2.0.1.jar>repo9=\ngeantyref-2.0.1.pom>repo12=\ngeantyref-2.0.1.pom>repo9=\n",
+    "io/leangen/geantyref/geantyref/1.3.16/_remote.repositories": "geantyref-1.3.16.jar>repo42=\ngeantyref-1.3.16.pom>repo42=\n",
+    "io/opentelemetry/opentelemetry-bom/1.60.1/_remote.repositories": "opentelemetry-bom-1.60.1.pom>repo12=\nopentelemetry-bom-1.60.1.pom>repo9=\n",
+    "tools/jackson/core/jackson-databind/3.2.2/_remote.repositories": "jackson-databind-3.2.2.jar>repo6=\njackson-databind-3.2.2.pom>repo6=\n",
+    "tools/jackson/core/jackson-core/3.2.2/_remote.repositories": "jackson-core-3.2.2.jar>repo6=\njackson-core-3.2.2.pom>repo6=\n",
+    "tools/jackson/jackson-bom/3.2.2/_remote.repositories": "jackson-bom-3.2.2.pom>repo6=\n",
+    "tools/jackson/jackson-bom/3.1.0/_remote.repositories": "jackson-bom-3.1.0.pom>repo12=\njackson-bom-3.1.0.pom>repo42=\njackson-bom-3.1.0.pom>repo9=\n",
+    "tools/jackson/jackson-base/3.2.2/_remote.repositories": "jackson-base-3.2.2.pom>repo6=\n",
+    "tools/jackson/dataformat/jackson-dataformats-text/3.2.2/_remote.repositories": "jackson-dataformats-text-3.2.2.pom>repo6=\n",
+    "tools/jackson/dataformat/jackson-dataformat-yaml/3.2.2/_remote.repositories": "jackson-dataformat-yaml-3.2.2.pom>repo6=\n",
+    "aopalliance/aopalliance/1.0/_remote.repositories": "aopalliance-1.0.jar>repo0=\naopalliance-1.0.pom>repo0=\n",
+    "jakarta/inject/jakarta.inject-api/2.0.1/_remote.repositories": "jakarta.inject-api-2.0.1.jar>repo0=\njakarta.inject-api-2.0.1.pom>repo0=\n",
+    "net/kyori/adventure-text-serializer-gson/4.26.1/_remote.repositories": "adventure-text-serializer-gson-4.26.1.pom>repo36=\n",
+    "net/kyori/adventure-text-serializer-commons/4.26.1/_remote.repositories": "adventure-text-serializer-commons-4.26.1.jar>repo33=\nadventure-text-serializer-commons-4.26.1.jar>repo36=\nadventure-text-serializer-commons-4.26.1.pom>repo33=\nadventure-text-serializer-commons-4.26.1.pom>repo36=\n",
+    "net/kyori/option/1.1.0/_remote.repositories": "option-1.1.0.jar>repo33=\noption-1.1.0.jar>repo36=\noption-1.1.0.pom>repo33=\noption-1.1.0.pom>repo36=\n",
+    "net/kyori/adventure-text-serializer-json/4.26.1/_remote.repositories": "adventure-text-serializer-json-4.26.1.jar>repo33=\nadventure-text-serializer-json-4.26.1.jar>repo36=\nadventure-text-serializer-json-4.26.1.pom>repo33=\nadventure-text-serializer-json-4.26.1.pom>repo36=\n",
+    "net/kyori/adventure-text-serializer-json-legacy-impl/4.26.1/_remote.repositories": "adventure-text-serializer-json-legacy-impl-4.26.1.pom>repo33=\n",
+    "net/kyori/adventure-text-serializer-legacy/4.26.1/_remote.repositories": "adventure-text-serializer-legacy-4.26.1.pom>repo30=\n",
+    "net/kyori/adventure-text-serializer-plain/4.26.1/_remote.repositories": "adventure-text-serializer-plain-4.26.1.pom>repo27=\n",
+    "net/kyori/ansi/1.1.1/_remote.repositories": "ansi-1.1.1.jar>repo24=\nansi-1.1.1.pom>repo24=\n",
+    "net/kyori/adventure-api/4.26.1/_remote.repositories": "adventure-api-4.26.1.jar>repo24=\nadventure-api-4.26.1.jar>repo27=\nadventure-api-4.26.1.jar>repo30=\nadventure-api-4.26.1.jar>repo33=\nadventure-api-4.26.1.jar>repo36=\nadventure-api-4.26.1.pom>repo24=\nadventure-api-4.26.1.pom>repo27=\nadventure-api-4.26.1.pom>repo30=\nadventure-api-4.26.1.pom>repo33=\nadventure-api-4.26.1.pom>repo36=\n",
+    "net/kyori/adventure-text-serializer-ansi/4.26.1/_remote.repositories": "adventure-text-serializer-ansi-4.26.1.pom>repo24=\n",
+    "net/kyori/adventure-key/4.26.1/_remote.repositories": "adventure-key-4.26.1.pom>repo21=\nadventure-key-4.26.1.pom>repo24=\nadventure-key-4.26.1.pom>repo27=\nadventure-key-4.26.1.pom>repo30=\nadventure-key-4.26.1.pom>repo33=\nadventure-key-4.26.1.pom>repo36=\n",
+    "net/kyori/examination-string/1.3.0/_remote.repositories": "examination-string-1.3.0.jar>repo18=\nexamination-string-1.3.0.jar>repo21=\nexamination-string-1.3.0.jar>repo24=\nexamination-string-1.3.0.jar>repo27=\nexamination-string-1.3.0.jar>repo30=\nexamination-string-1.3.0.jar>repo33=\nexamination-string-1.3.0.jar>repo36=\nexamination-string-1.3.0.pom>repo18=\nexamination-string-1.3.0.pom>repo21=\nexamination-string-1.3.0.pom>repo24=\nexamination-string-1.3.0.pom>repo27=\nexamination-string-1.3.0.pom>repo30=\nexamination-string-1.3.0.pom>repo33=\nexamination-string-1.3.0.pom>repo36=\n",
+    "net/kyori/examination-api/1.3.0/_remote.repositories": "examination-api-1.3.0.jar>repo18=\nexamination-api-1.3.0.jar>repo21=\nexamination-api-1.3.0.jar>repo24=\nexamination-api-1.3.0.jar>repo27=\nexamination-api-1.3.0.jar>repo30=\nexamination-api-1.3.0.jar>repo33=\nexamination-api-1.3.0.jar>repo36=\nexamination-api-1.3.0.pom>repo18=\nexamination-api-1.3.0.pom>repo21=\nexamination-api-1.3.0.pom>repo24=\nexamination-api-1.3.0.pom>repo27=\nexamination-api-1.3.0.pom>repo30=\nexamination-api-1.3.0.pom>repo33=\nexamination-api-1.3.0.pom>repo36=\n",
+    "net/kyori/adventure-bom/4.26.1/_remote.repositories": "adventure-bom-4.26.1.pom>repo18=\nadventure-bom-4.26.1.pom>repo21=\nadventure-bom-4.26.1.pom>repo24=\nadventure-bom-4.26.1.pom>repo27=\nadventure-bom-4.26.1.pom>repo30=\nadventure-bom-4.26.1.pom>repo33=\nadventure-bom-4.26.1.pom>repo36=\n",
+    "net/kyori/adventure-nbt/4.26.1/_remote.repositories": "adventure-nbt-4.26.1.pom>repo18=\nadventure-nbt-4.26.1.pom>repo33=\n",
+    "org/apiguardian/apiguardian-api/1.1.2/_remote.repositories": "apiguardian-api-1.1.2.jar>repo42=\napiguardian-api-1.1.2.pom>repo42=\n",
+    "org/immutables/annotate/2.12.2/_remote.repositories": "annotate-2.12.2.jar>repo42=\nannotate-2.12.2.pom>repo42=\n",
+    "org/immutables/immutables/2.12.2/_remote.repositories": "immutables-2.12.2.pom>repo42=\n",
+    "org/immutables/value-annotations/2.12.2/_remote.repositories": "value-annotations-2.12.2.jar>repo42=\nvalue-annotations-2.12.2.pom>repo42=\n",
+    "org/incendo/cloud-brigadier/2.0.1/_remote.repositories": "cloud-brigadier-2.0.1.jar>repo42=\ncloud-brigadier-2.0.1.pom>repo42=\n",
+    "org/incendo/cloud-services/2.1.0/_remote.repositories": "cloud-services-2.1.0.jar>repo42=\ncloud-services-2.1.0.pom>repo42=\n",
+    "org/incendo/cloud-bom/2.1.0/_remote.repositories": "cloud-bom-2.1.0.pom>repo42=\n",
+    "org/incendo/cloud-core/2.1.0/_remote.repositories": "cloud-core-2.1.0.jar>repo42=\ncloud-core-2.1.0.pom>repo42=\n",
+    "org/incendo/cloud-bukkit/2.0.1/_remote.repositories": "cloud-bukkit-2.0.1.jar>repo42=\ncloud-bukkit-2.0.1.pom>repo42=\n",
+    "org/incendo/cloud-minecraft-bom/2.0.1/_remote.repositories": "cloud-minecraft-bom-2.0.1.pom>repo42=\n",
+    "org/incendo/cloud-paper/2.0.1/_remote.repositories": "cloud-paper-2.0.1.pom>repo42=\n",
+    "org/jspecify/jspecify/1.0.0/_remote.repositories": "jspecify-1.0.0.jar>repo33=\njspecify-1.0.0.jar>repo36=\njspecify-1.0.0.pom>repo33=\njspecify-1.0.0.pom>repo36=\n",
+    "org/jetbrains/annotations/22.0.0/_remote.repositories": "annotations-22.0.0.pom>repo18=\nannotations-22.0.0.pom>repo21=\nannotations-22.0.0.pom>repo24=\nannotations-22.0.0.pom>repo27=\nannotations-22.0.0.pom>repo30=\nannotations-22.0.0.pom>repo33=\nannotations-22.0.0.pom>repo36=\n",
+    "org/jetbrains/annotations/26.0.2-1/_remote.repositories": "annotations-26.0.2-1.jar>repo18=\nannotations-26.0.2-1.jar>repo21=\nannotations-26.0.2-1.jar>repo24=\nannotations-26.0.2-1.jar>repo27=\nannotations-26.0.2-1.jar>repo30=\nannotations-26.0.2-1.jar>repo33=\nannotations-26.0.2-1.jar>repo36=\nannotations-26.0.2-1.pom>repo18=\nannotations-26.0.2-1.pom>repo21=\nannotations-26.0.2-1.pom>repo24=\nannotations-26.0.2-1.pom>repo27=\nannotations-26.0.2-1.pom>repo30=\nannotations-26.0.2-1.pom>repo33=\nannotations-26.0.2-1.pom>repo36=\n",
+    "org/jetbrains/annotations/26.0.1/_remote.repositories": "annotations-26.0.1.pom>repo24=\n",
+    "org/jetbrains/annotations/26.0.2/_remote.repositories": "annotations-26.0.2.pom>repo33=\nannotations-26.0.2.pom>repo36=\n",
+    "org/apache/apache/35/_remote.repositories": "apache-35.pom>repo15=\n",
+    "org/apache/commons/commons-lang3/3.20.0/_remote.repositories": "commons-lang3-3.20.0.jar>repo15=\ncommons-lang3-3.20.0.pom>repo15=\n",
+    "org/apache/commons/commons-parent/93/_remote.repositories": "commons-parent-93.pom>repo15=\n",
+    "org/apache/commons/commons-parent/92/_remote.repositories": "commons-parent-92.pom>repo15=\n",
+    "org/apache/commons/commons-text/1.15.0/_remote.repositories": "commons-text-1.15.0.pom>repo15=\n",
+    "org/slf4j/slf4j-bom/2.0.17/_remote.repositories": "slf4j-bom-2.0.17.pom>repo12=\nslf4j-bom-2.0.17.pom>repo9=\n",
+    "org/slf4j/slf4j-parent/2.0.17/_remote.repositories": "slf4j-parent-2.0.17.pom>repo12=\nslf4j-parent-2.0.17.pom>repo9=\n",
+    "org/slf4j/slf4j-api/2.0.17/_remote.repositories": "slf4j-api-2.0.17.jar>repo12=\nslf4j-api-2.0.17.jar>repo9=\nslf4j-api-2.0.17.pom>repo12=\nslf4j-api-2.0.17.pom>repo9=\n",
+    "org/testcontainers/testcontainers-bom/2.0.5/_remote.repositories": "testcontainers-bom-2.0.5.pom>repo12=\ntestcontainers-bom-2.0.5.pom>repo9=\n",
+    "org/basepom/basepom-foundation/69/_remote.repositories": "basepom-foundation-69.pom>repo12=\nbasepom-foundation-69.pom>repo9=\n",
+    "org/basepom/basepom-minimal/69/_remote.repositories": "basepom-minimal-69.pom>repo12=\nbasepom-minimal-69.pom>repo9=\n",
+    "org/basepom/basepom-oss/69/_remote.repositories": "basepom-oss-69.pom>repo12=\nbasepom-oss-69.pom>repo9=\n",
+    "org/jdbi/jdbi3-sqlobject/3.54.0/_remote.repositories": "jdbi3-sqlobject-3.54.0.pom>repo12=\n",
+    "org/jdbi/jdbi3-bom/3.54.0/_remote.repositories": "jdbi3-bom-3.54.0.pom>repo12=\njdbi3-bom-3.54.0.pom>repo9=\n",
+    "org/jdbi/jdbi3-build-parent/3.54.0/_remote.repositories": "jdbi3-build-parent-3.54.0.pom>repo12=\njdbi3-build-parent-3.54.0.pom>repo9=\n",
+    "org/jdbi/internal/jdbi3-root/3.54.0/_remote.repositories": "jdbi3-root-3.54.0.pom>repo12=\njdbi3-root-3.54.0.pom>repo9=\n",
+    "org/jdbi/internal/jdbi3-parent/3.54.0/_remote.repositories": "jdbi3-parent-3.54.0.pom>repo12=\njdbi3-parent-3.54.0.pom>repo9=\n",
+    "org/jdbi/jdbi3-core/3.54.0/_remote.repositories": "jdbi3-core-3.54.0.pom>repo12=\njdbi3-core-3.54.0.pom>repo9=\n",
+    "org/snakeyaml/snakeyaml-engine/3.0.1/_remote.repositories": "snakeyaml-engine-3.0.1.jar>repo6=\nsnakeyaml-engine-3.0.1.pom>repo6=\n",
+    "org/junit/junit-bom/6.0.3/_remote.repositories": "junit-bom-6.0.3.pom>repo12=\njunit-bom-6.0.3.pom>repo6=\njunit-bom-6.0.3.pom>repo9=\n",
+    "org/junit/junit-bom/5.14.1/_remote.repositories": "junit-bom-5.14.1.pom>repo15=\n",
+    "org/junit/junit-bom/5.13.4/_remote.repositories": "junit-bom-5.13.4.pom>repo15=\n",
+    "org/junit/junit-bom/5.9.1/_remote.repositories": "junit-bom-5.9.1.pom>repo42=\n",
+    "org/checkerframework/checker-qual/3.12.0/_remote.repositories": "checker-qual-3.12.0.jar>repo0=\nchecker-qual-3.12.0.pom>repo0=\n",
+    "org/checkerframework/checker-qual/3.51.1/_remote.repositories": "checker-qual-3.51.1.jar>repo42=\nchecker-qual-3.51.1.pom>repo42=\n",
+    "org/sonatype/oss/oss-parent/9/_remote.repositories": "oss-parent-9.pom>repo0=\n",
+    "org/sonatype/oss/oss-parent/7/_remote.repositories": "oss-parent-7.pom>repo0=\noss-parent-7.pom>repo36=\n",
+    "org/eclipse/ee4j/project/1.0.6/_remote.repositories": "project-1.0.6.pom>repo0=\n",
+    "org/ow2/ow2/1.5.1/_remote.repositories": "ow2-1.5.1.pom>repo0=\n",
+    "org/ow2/asm/asm/9.5/_remote.repositories": "asm-9.5.jar>repo0=\nasm-9.5.pom>repo0=\n",
+    "com/h2database/h2/2.5.250/_remote.repositories": "h2-2.5.250.pom>repo45=\n",
+    "com/fasterxml/jackson/jackson-bom/2.21.2/_remote.repositories": "jackson-bom-2.21.2.pom>repo12=\njackson-bom-2.21.2.pom>repo42=\njackson-bom-2.21.2.pom>repo9=\n",
+    "com/fasterxml/jackson/jackson-parent/2.22/_remote.repositories": "jackson-parent-2.22.pom>repo6=\n",
+    "com/fasterxml/jackson/jackson-parent/2.21/_remote.repositories": "jackson-parent-2.21.pom>repo12=\njackson-parent-2.21.pom>repo42=\njackson-parent-2.21.pom>repo9=\n",
+    "com/fasterxml/jackson/core/jackson-annotations/2.22/_remote.repositories": "jackson-annotations-2.22.jar>repo6=\njackson-annotations-2.22.pom>repo6=\n",
+    "com/fasterxml/oss-parent/79/_remote.repositories": "oss-parent-79.pom>repo6=\n",
+    "com/fasterxml/oss-parent/75/_remote.repositories": "oss-parent-75.pom>repo12=\noss-parent-75.pom>repo42=\noss-parent-75.pom>repo9=\n",
+    "com/fasterxml/oss-parent/76/_remote.repositories": "oss-parent-76.pom>repo12=\noss-parent-76.pom>repo42=\noss-parent-76.pom>repo9=\n",
+    "com/github/Anon8281/UniversalScheduler/0.1.7/_remote.repositories": "UniversalScheduler-0.1.7.pom>repo39=\n",
+    "com/google/auto/service/auto-service-aggregator/1.1.1/_remote.repositories": "auto-service-aggregator-1.1.1.pom>repo36=\n",
+    "com/google/auto/service/auto-service-annotations/1.1.1/_remote.repositories": "auto-service-annotations-1.1.1.jar>repo36=\nauto-service-annotations-1.1.1.pom>repo36=\n",
+    "com/google/j2objc/j2objc-annotations/1.3/_remote.repositories": "j2objc-annotations-1.3.jar>repo0=\nj2objc-annotations-1.3.pom>repo0=\n",
+    "com/google/errorprone/error_prone_parent/2.18.0/_remote.repositories": "error_prone_parent-2.18.0.pom>repo0=\n",
+    "com/google/errorprone/error_prone_parent/2.48.0/_remote.repositories": "error_prone_parent-2.48.0.pom>repo3=\n",
+    "com/google/errorprone/error_prone_annotations/2.18.0/_remote.repositories": "error_prone_annotations-2.18.0.jar>repo0=\nerror_prone_annotations-2.18.0.pom>repo0=\n",
+    "com/google/errorprone/error_prone_annotations/2.48.0/_remote.repositories": "error_prone_annotations-2.48.0.jar>repo3=\nerror_prone_annotations-2.48.0.pom>repo3=\n",
+    "com/google/code/gson/gson-parent/2.14.0/_remote.repositories": "gson-parent-2.14.0.pom>repo3=\n",
+    "com/google/code/gson/gson-parent/2.8.0/_remote.repositories": "gson-parent-2.8.0.pom>repo36=\n",
+    "com/google/code/gson/gson/2.14.0/_remote.repositories": "gson-2.14.0.pom>repo3=\n",
+    "com/google/code/gson/gson/2.8.0/_remote.repositories": "gson-2.8.0.jar>repo36=\ngson-2.8.0.pom>repo36=\n",
+    "com/google/code/findbugs/jsr305/3.0.1/_remote.repositories": "jsr305-3.0.1.jar>repo0=\njsr305-3.0.1.pom>repo0=\n",
+    "com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/_remote.repositories": "listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar>repo0=\nlistenablefuture-9999.0-empty-to-avoid-conflict-with-guava.pom>repo0=\n",
+    "com/google/guava/failureaccess/1.0.1/_remote.repositories": "failureaccess-1.0.1.jar>repo0=\nfailureaccess-1.0.1.pom>repo0=\n",
+    "com/google/guava/guava-parent/31.0.1-jre/_remote.repositories": "guava-parent-31.0.1-jre.pom>repo0=\n",
+    "com/google/guava/guava-parent/26.0-android/_remote.repositories": "guava-parent-26.0-android.pom>repo0=\n",
+    "com/google/guava/guava/31.0.1-jre/_remote.repositories": "guava-31.0.1-jre.jar>repo0=\nguava-31.0.1-jre.pom>repo0=\n",
+    "com/google/google/5/_remote.repositories": "google-5.pom>repo0=\n",
+    "com/google/inject/guice-parent/7.0.0/_remote.repositories": "guice-parent-7.0.0.pom>repo0=\n",
+    "com/google/inject/guice/7.0.0/_remote.repositories": "guice-7.0.0.pom>repo0=\n"
+  }
+}

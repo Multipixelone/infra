@@ -100,9 +100,12 @@ for case in cases:
             channels.update(
                 join=case["discord"]["eventsChannelId"],
                 leave=case["discord"]["eventsChannelId"],
+                death=case["discord"]["eventsChannelId"],
             )
         assert configuration["Channels"] == channels
         assert next(iter(configuration["Channels"])) == "global"
+        for key in ("MinecraftChatToDiscordMessageFormat", "MinecraftChatToDiscordMessageFormatNoPrimaryGroup"):
+            assert messages[key] == "%username% › %message%"
         assert (
             configuration["DiscordConsoleChannelId"]
             == case["discord"]["consoleChannelId"]

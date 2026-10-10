@@ -114,7 +114,10 @@ public class ReadCarbon {
                 TagResolver.resolver("username", Tag.preProcessParsed(".Bedrock_Friend")),
                 TagResolver.resolver("message", Tag.selfClosingInserting(Component.text(body))));
             String plain = PlainTextComponentSerializer.plainText().serialize(rendered);
-            String expectedPrefix = PlainTextComponentSerializer.plainText().serialize(MiniMessage.miniMessage().deserialize(prefix));
+            String expectedPrefix = PlainTextComponentSerializer.plainText().serialize(
+                prefix.matches(".*&[0-9a-fk-or].*")
+                    ? net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand().deserialize(prefix)
+                    : MiniMessage.miniMessage().deserialize(prefix));
             require(plain.equals(expectedPrefix + ".Bedrock_Friend › " + body), "Unresolved placeholders or unsafe body: " + plain);
             require(!hasClick(rendered), "Player acquired click event");
             TextColor nameColor = MiniMessage.miniMessage().deserialize(color + "name").color();
