@@ -39,7 +39,7 @@
     "group": "org.apache.commons",
     "artifact": "commons-math3",
     "version": "3.6.1",
-    "classifier": "",
+    "classifier": null,
     "name": "org.apache.commons.commons-math3-3.6.1.jar",
     "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar",
     "sha256": "1e56d7b058d28b65abd256b8458e3885b674c1d588fa43cd7d1cbb9c7ef2b308"
@@ -48,7 +48,7 @@
     "group": "com.github.ben-manes.caffeine",
     "artifact": "caffeine",
     "version": "3.2.3",
-    "classifier": "",
+    "classifier": null,
     "name": "com.github.ben-manes.caffeine.caffeine-3.2.3.jar",
     "url": "https://repo.maven.apache.org/maven2/com/github/ben-manes/caffeine/caffeine/3.2.3/caffeine-3.2.3.jar",
     "sha256": "ca70c90a5d1ce1511880ce9c93d4ad22108f61111d3daf91eb52762b571bd179"

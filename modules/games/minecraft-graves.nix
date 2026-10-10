@@ -28,6 +28,8 @@
             "com.artillexstudios.axapi"
           ];
       entry = d: {
+        # DependencyManagerWrapper uses null for unclassified direct libraries;
+        # AxAPI's cache identity distinguishes null from the tools' empty string.
         inherit (d) group version classifier;
         artifact-id = d.artifact;
         transitive-dependencies = map entry (
@@ -162,7 +164,10 @@
       infra.games.artifacts.games-axgraves-libraries = cache;
       infra.games.minecraftPlugins.backends = lib.mapAttrs (id: _: {
         jars.axgraves = cfg.artifacts.games-axgraves;
-        templates."/srv/games/minecraft/${id}/plugins/AxGraves/config.yml".source = toString configuration;
+        templates = {
+          "/srv/games/minecraft/${id}/plugins/AxGraves/config.yml".source = toString configuration;
+          "/srv/games/minecraft/${id}/plugins/AxAPI/libraries/AxGraves/cache.yml".source = toString metadata;
+        };
         statePaths = [ "/srv/games/minecraft/${id}/plugins/AxGraves" ];
         inventory = [
           {
@@ -173,7 +178,13 @@
         ];
       }) servers;
       services.minecraft-servers.servers = lib.mapAttrs (_: _: {
-        symlinks."plugins/AxAPI/libraries/AxGraves" = cache;
+        # AxAPI rewrites cache.yml with a sibling temporary file on every load.
+        # Link jars individually so metadata and its parent remain writable.
+        symlinks = lib.listToAttrs (
+          map (
+            d: lib.nameValuePair "plugins/AxAPI/libraries/AxGraves/${d.name}" "${cache}/${d.name}"
+          ) definitions
+        );
       }) servers;
     };
 }

@@ -2,6 +2,7 @@
 import json
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,13 @@ import yaml
 
 fixtures_file, husk, graves, husk_cache, graves_cache, paper, guava, fastutil, sources, openinv, openinv_cache, bluemap, gson, examination_api, examination_string = sys.argv[1:]
 fixtures = json.loads(pathlib.Path(fixtures_file).read_text())
+graves_libraries = pathlib.Path(graves_cache)
+graves_metadata = yaml.safe_load((graves_libraries / "cache.yml").read_text())
+graves_jars = {path.name for path in graves_libraries.glob("*.jar")}
+assert len(graves_jars) == len(graves_metadata["libraries"]) == 9
+for library in graves_metadata["libraries"]:
+    expected_classifier = None if library["artifact-id"] in {"caffeine", "commons-math3"} else "all" if library["artifact-id"] == "axapi" else ""
+    assert library["classifier"] == expected_classifier
 assert fixtures["noPaper"]["backends"] == {}
 for name in ("missingSecrets", "additionalBackend"):
     case = fixtures[name]
@@ -33,7 +41,14 @@ for name in ("missingSecrets", "additionalBackend"):
         assert not {"simplehome", "simpletpa"} & plugins["jars"].keys()
         assert f"{directory}/HuskHomes" in server["worldPaths"]
         assert f"{directory}/AxGraves" in server["worldPaths"]
-        assert server["symlinks"]["plugins/AxAPI/libraries/AxGraves"] == graves_cache
+        cache_relative = "plugins/AxAPI/libraries/AxGraves"
+        assert cache_relative not in server["symlinks"]
+        assert f"{cache_relative}/cache.yml" not in server["symlinks"]
+        cache_links = {path: source for path, source in server["symlinks"].items() if path.startswith(f"{cache_relative}/")}
+        assert cache_links == {f"{cache_relative}/{name}": str(graves_libraries / name) for name in graves_jars}
+        metadata_template = plugins["templates"][f"/srv/games/minecraft/{server_id}/{cache_relative}/cache.yml"]
+        assert metadata_template.get("mode", "0600") == "0600"
+        assert pathlib.Path(metadata_template["source"]).read_bytes() == (graves_libraries / "cache.yml").read_bytes()
         for path in pathlib.Path(husk_cache).rglob("_remote.repositories"):
             relative = path.parent.relative_to(husk_cache)
             assert server["symlinks"][f"libraries/{relative}"] == str(path.parent)
@@ -105,8 +120,66 @@ with tempfile.TemporaryDirectory() as directory:
     subprocess.run(["javac", "-cp", classpath, "-d", str(classes), *java_sources], check=True)
     # Invoke the plugin's real Paper loader/resolver; fail on any transfer.
     subprocess.run(["java", "-cp", classpath, "ResolveHusk", "offline"], cwd=root, check=True)
-    # AxAPI's real cache loader must neither download nor invalidate the cache.
-    subprocess.run(["java", "-cp", classpath, "ResolveAxGraves", graves_cache], cwd=root, check=True)
+    def graves_fixture(name):
+        cache = root / name / "plugins" / "AxAPI" / "libraries" / "AxGraves"
+        cache.mkdir(parents=True)
+        # Reproduce declarative jar links and games-prepare's writable copy.
+        for filename in graves_jars:
+            (cache / filename).symlink_to(graves_libraries / filename)
+        shutil.copyfile(graves_libraries / "cache.yml", cache / "cache.yml")
+        (cache / "cache.yml").chmod(0o600)
+        return cache
+
+    def resolve_graves(cache, expected_failure=None):
+        result = subprocess.run(["java", "-cp", classpath, "ResolveAxGraves", str(cache)], cwd=root, text=True, capture_output=True)
+        output = result.stdout + result.stderr
+        if expected_failure:
+            assert result.returncode != 0 and expected_failure in output, output
+        else:
+            assert result.returncode == 0, output
+            assert "An unexpected error" not in output and "ERROR" not in output, output
+            print(result.stdout, end="")
+
+    # Fresh JVMs must resolve real production identities and attach the jars,
+    # including after AxAPI atomically rewrites metadata on the first load.
+    cache = graves_fixture("axgraves-runtime")
+    for _ in range(2):
+        resolve_graves(cache)
+        assert yaml.safe_load((cache / "cache.yml").read_text()) == graves_metadata
+        assert all((cache / filename).is_symlink() for filename in graves_jars)
+        assert not (cache / "cache.yml").is_symlink()
+        assert {path.name for path in cache.iterdir()} == graves_jars | {"cache.yml"}
+
+    # The previous fixture hid null/empty classifier mismatches. Both direct
+    # libraries must fail offline if their identities regress independently.
+    for artifact in ("commons-math3", "caffeine"):
+        broken = graves_fixture(f"axgraves-empty-{artifact}")
+        metadata = yaml.safe_load((broken / "cache.yml").read_text())
+        for library in metadata["libraries"]:
+            if library["artifact-id"] == artifact:
+                library["classifier"] = ""
+        (broken / "cache.yml").write_text(yaml.safe_dump(metadata))
+        resolve_graves(broken, "NETWORK ATTEMPT:")
+
+    caffeine_filename = "com.github.ben-manes.caffeine.caffeine-3.2.3.jar"
+    broken = graves_fixture("axgraves-missing-jar")
+    (broken / caffeine_filename).unlink()
+    resolve_graves(broken, "NETWORK ATTEMPT:")
+
+    broken = graves_fixture("axgraves-missing-class")
+    (broken / caffeine_filename).unlink()
+    # Point to a separate jar missing precisely the class from the live error.
+    damaged = root / "damaged-caffeine.jar"
+    with zipfile.ZipFile(graves_libraries / caffeine_filename) as original, zipfile.ZipFile(damaged, "w") as replacement:
+        for entry in original.infolist():
+            if entry.filename != "com/artillexstudios/axgraves/libs/axapi/libs/caffeine/caffeine/cache/Caffeine.class":
+                replacement.writestr(entry, original.read(entry))
+    (broken / caffeine_filename).symlink_to(damaged)
+    resolve_graves(broken, "ClassNotFoundException: com.artillexstudios.axgraves.libs.axapi.libs.caffeine.caffeine.cache.Caffeine")
+
+    broken = root / "axgraves-immutable-parent"
+    broken.symlink_to(graves_libraries, target_is_directory=True)
+    resolve_graves(broken, "Metadata must be a writable runtime copy")
     # The upstream parser, not just PyYAML, must recognize our generated keys.
     subprocess.run(["java", "-cp", classpath, "ReadHuskSettings", str(home_config)], cwd=root, check=True)
     subprocess.run(["java", "-cp", classpath, "CheckHuskMap", str(home_config)], cwd=root, check=True)
