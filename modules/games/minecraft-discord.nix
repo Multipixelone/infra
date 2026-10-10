@@ -15,10 +15,56 @@
         && s.minecraft.discord.channelId != "";
       roles = s: lib.filterAttrs (_: role: role != "") s.minecraft.discord.roles;
       syncEnabled = s: roles s != { };
-      message = content: {
+      palette = {
+        awake = "#a6e3a1";
+        starting = "#fab387";
+        resting = "#6c7086";
+        stopped = "#f38ba8";
+        failed = "#f38ba8";
+        disabled = "#6c7086";
+        join = "#a6e3a1";
+        firstJoin = "#cba6f7";
+        leave = "#a6adc8";
+        death = "#f38ba8";
+        advancement = "#f9e2af";
+      };
+      notifierReady = s: ready s && cfg.observability.inventory != { };
+      notifierConfig =
+        id: s:
+        pkgs.writeText "minecraft-discord-${id}.json" (
+          builtins.toJSON {
+            serverId = id;
+            inherit (s) displayName;
+            channelId = s.minecraft.discord.channelId;
+            colors = palette;
+          }
+        );
+      notifierPython = pkgs.python3.withPackages (ps: [ ps.prometheus-client ]);
+      message = color: author: {
         Enabled = true;
-        Content = content;
-        Embed.Enabled = false;
+        Content = "";
+        Embed = {
+          Enabled = true;
+          Color = color;
+          Author = {
+            ImageUrl = "%embedavatarurl%";
+            Name = author;
+            Url = "";
+          };
+          ThumbnailUrl = "";
+          Title = {
+            Text = "";
+            Url = "";
+          };
+          Description = "";
+          Fields = [ ];
+          ImageUrl = "";
+          Footer = {
+            Text = "";
+            IconUrl = "";
+          };
+          Timestamp = false;
+        };
         Webhook.Enable = false;
       };
       format = pkgs.formats.yaml { };
@@ -66,13 +112,11 @@
                       let
                         # DiscordSRV uses the first channel as its fallback.
                         # Adding `death` would otherwise sort before `global`.
-                        body = format.generate "discordsrv-${id}-config-body.yml" (
-                          builtins.removeAttrs value [ "Channels" ]
-                        );
+                        body = format.generate "discordsrv-${id}-config-body.yml" (removeAttrs value [ "Channels" ]);
                         channels = pkgs.writeText "discordsrv-${id}-channels.yml" (
                           "Channels:\n"
                           + lib.concatMapStrings (key: "  ${key}: ${builtins.toJSON value.Channels.${key}}\n") (
-                            [ "global" ] ++ lib.attrNames (builtins.removeAttrs value.Channels [ "global" ])
+                            [ "global" ] ++ lib.attrNames (removeAttrs value.Channels [ "global" ])
                           )
                         );
                       in
@@ -127,7 +171,13 @@
                   Experiment_JdbcAccountLinkBackend = "";
                   UseModernPaperChatEvent = true;
                   EnablePresenceInformation = false;
-                  Experiment_WebhookChatMessageDelivery = false;
+                  DiscordGameStatus = "playing mc.finnrut.is";
+                  Experiment_WebhookChatMessageDelivery = true;
+                  Experiment_WebhookChatMessageUsernameFormat = "%username%";
+                  Experiment_WebhookChatMessageFormat = "%message%";
+                  Experiment_WebhookChatMessageUsernameFromDiscord = false;
+                  Experiment_WebhookChatMessageAvatarFromDiscord = false;
+                  AvatarUrl = "";
                   ServerWatchdogEnabled = false;
                   ChannelTopicUpdaterRateInMinutes = 0;
                   ChannelTopicUpdaterChannelTopicsAtShutdownEnabled = false;
@@ -137,13 +187,15 @@
                   # through Vault's legacy string path into Discord messages.
                   MinecraftChatToDiscordMessageFormat = "%username% › %message%";
                   MinecraftChatToDiscordMessageFormatNoPrimaryGroup = "%username% › %message%";
-                  MinecraftPlayerJoinMessage = message "%username% joined Survival";
-                  MinecraftPlayerFirstJoinMessage = message "%username% joined Survival for the first time";
-                  MinecraftPlayerLeaveMessage = message "%username% left Survival";
-                  MinecraftPlayerDeathMessage = message "%deathmessage%";
-                  MinecraftPlayerAchievementMessage = message "%username% earned %achievement%";
-                  DiscordChatChannelServerStartupMessage = "Survival is awake.";
-                  DiscordChatChannelServerShutdownMessage = "Survival is resting; join Minecraft to wake it.";
+                  MinecraftPlayerJoinMessage = message palette.join "%username% joined ${s.displayName}";
+                  MinecraftPlayerFirstJoinMessage = message palette.firstJoin "%username% joined ${s.displayName} for the first time";
+                  MinecraftPlayerLeaveMessage = message palette.leave "%username% left ${s.displayName}";
+                  MinecraftPlayerDeathMessage = message palette.death "%deathmessage%";
+                  MinecraftPlayerAchievementMessage = message palette.advancement "%username% earned %achievement%";
+                  # These are plain strings in 1.30.5 and fire for every Paper cycle.
+                  # The independent notifier owns the coalesced status embed instead.
+                  DiscordChatChannelServerStartupMessage = "";
+                  DiscordChatChannelServerShutdownMessage = "";
                 };
                 synchronization = {
                   NicknameSynchronizationEnabled = false;
@@ -170,16 +222,59 @@
             };
         }
       ) servers;
-      systemd.services = lib.mapAttrs' (
-        id: s:
-        lib.nameValuePair "minecraft-server-${id}" {
-          serviceConfig.ExecStartPre = lib.mkIf (ready s) (
-            # games-prepare has mkAfter priority 1500; trim after its private configs.
-            lib.mkOrder 1600 [
-              "+${tokenPrepare} /run/agenix/${secret} /srv/games/minecraft/${id}/plugins/DiscordSRV/.token"
-            ]
-          );
+      systemd.services =
+        lib.mapAttrs' (
+          id: s:
+          lib.nameValuePair "minecraft-server-${id}" {
+            serviceConfig.ExecStartPre = lib.mkIf (ready s) (
+              # games-prepare has mkAfter priority 1500; trim after its private configs.
+              lib.mkOrder 1600 [
+                "+${tokenPrepare} /run/agenix/${secret} /srv/games/minecraft/${id}/plugins/DiscordSRV/.token"
+              ]
+            );
+          }
+        ) servers
+        // lib.mapAttrs' (
+          id: s:
+          lib.nameValuePair "minecraft-discord-${id}" {
+            description = "Coalesce ${s.displayName} Discord lifecycle status";
+            after = [
+              "agenix.service"
+              "games-metrics.service"
+              "network-online.target"
+            ];
+            wants = [ "network-online.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              DynamicUser = true;
+              StateDirectory = "minecraft-discord-${id}";
+              StateDirectoryMode = "0700";
+              UMask = "0077";
+              LoadCredential = [ "discord-token:/run/agenix/${secret}" ];
+              ExecStart = "${notifierPython}/bin/python3 ${./minecraft-discord-status.py} --config ${notifierConfig id s}";
+              TimeoutStartSec = "45s";
+              NoNewPrivileges = true;
+              ProtectSystem = "strict";
+              ProtectHome = true;
+              PrivateTmp = true;
+              PrivateDevices = true;
+              RestrictAddressFamilies = [
+                "AF_INET"
+                "AF_INET6"
+              ];
+            };
+          }
+        ) (lib.filterAttrs (_: notifierReady) servers);
+      systemd.timers = lib.mapAttrs' (
+        id: _:
+        lib.nameValuePair "minecraft-discord-${id}" {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnBootSec = "60s";
+            OnUnitInactiveSec = "30s";
+            AccuracySec = "1s";
+          };
         }
-      ) servers;
+      ) (lib.filterAttrs (_: notifierReady) servers);
     };
 }

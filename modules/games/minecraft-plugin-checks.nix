@@ -3,11 +3,12 @@ let
   host = config.flake.nixosConfigurations.link;
   base = host.config.infra.games.servers;
   evaluate =
-    secrets: guild: channel: enabled: overrides:
+    secrets: guild: channel: enabled: overrides: telemetry:
     (host.extendModules {
       modules = [
         {
           infra.games.secretFiles = lib.mkForce secrets;
+          infra.games.observability.inventory = lib.mkIf (!telemetry) (lib.mkForce { });
           infra.games.servers = lib.mkForce (
             base
             // {
@@ -35,12 +36,14 @@ let
         let
           cfg = evaluate (lib.optionalAttrs case.token {
             "games/minecraft/discordsrv-token" = ./tests/fixture.age;
-          }) case.guild case.channel case.enable (case.overrides or { });
+          }) case.guild case.channel case.enable (case.overrides or { }) (case.telemetry or true);
           plugins = cfg.infra.games.minecraftPlugins.backends.survival;
           runtime = cfg.infra.games.runtime.survival;
         in
         {
           expected = case.token && case.guild != "" && case.channel != "" && case.enable;
+          notifierExpected =
+            case.token && case.guild != "" && case.channel != "" && case.enable && (case.telemetry or true);
           installed = plugins.jars ? discordsrv;
           vaultInstalled = plugins.jars ? vault;
           vaultConfiguration =
@@ -51,6 +54,14 @@ let
           baseAvailable = runtime.available;
           statePaths = runtime.worldPaths;
           discord = cfg.infra.games.servers.survival.minecraft.discord;
+          notifier =
+            if cfg.systemd.services ? minecraft-discord-survival then
+              {
+                service = cfg.systemd.services.minecraft-discord-survival.serviceConfig;
+                timer = cfg.systemd.timers.minecraft-discord-survival.timerConfig;
+              }
+            else
+              null;
           configuration =
             plugins.templates."/srv/games/minecraft/survival/plugins/DiscordSRV/config.yml".source or null;
           messages =
@@ -154,6 +165,13 @@ let
           channel = "234567890123456789";
           enable = true;
           overrides.consoleChannelId = "";
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          telemetry = false;
         }
       ];
   cfg = host.config;
@@ -289,6 +307,25 @@ let
 in
 {
   perSystem = { pkgs, ... }: {
+    checks.games-minecraft-discord =
+      pkgs.runCommand "games-minecraft-discord-check"
+        {
+          nativeBuildInputs = [
+            (pkgs.python3.withPackages (ps: [
+              ps.pyyaml
+              ps.prometheus-client
+            ]))
+          ];
+        }
+        ''
+          python3 ${./tests/minecraft_discord_test.py} \
+            ${pkgs.writeText "minecraft-discord-fixtures.json" (builtins.toJSON fixtures)} \
+            ${cfg.infra.games.artifacts.games-discordsrv}
+          python3 ${./tests/minecraft_discord_status_test.py} ${./minecraft-discord-status.py} \
+            ${./tests/metrics_exposition.py} ${./metrics.py} ${./log-patterns.json}
+          python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
+          touch "$out"
+        '';
     checks.games-minecraft-plugins =
       pkgs.runCommand "games-minecraft-plugins-check"
         {
@@ -301,6 +338,9 @@ in
         }
         ''
           python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
+          python3 ${./tests/minecraft_discord_test.py} \
+            ${pkgs.writeText "minecraft-discord-fixtures.json" (builtins.toJSON fixtures)} \
+            ${cfg.infra.games.artifacts.games-discordsrv}
           python3 ${./tests/minecraft_polish_test.py} \
             ${pkgs.writeText "minecraft-polish-fixtures.json" (builtins.toJSON polishFixtures)} \
             ${
