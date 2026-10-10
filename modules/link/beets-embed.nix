@@ -89,6 +89,7 @@ in
             StartLimitBurst = 4;
           };
           environment = {
+            BEETS_EMBED_STYLE_BACKEND = cfg.styleBackend;
             HOME = home.home.homeDirectory;
             TMPDIR = scratchDirectory;
             XDG_CACHE_HOME = cacheDirectory;
@@ -193,10 +194,19 @@ in
           };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
-            # CPU burn-in is complete; at 10 threads the quota throttled
-            # 14,194 of 15,288 periods (93%). Use half the CPU, capped at 16.
-            default = lib.min 16 (lib.max 1 (builtins.div config.link.cpu.threads 2));
+            # A 30-track torch/ROCm benchmark with batch 8 reached ~1 track/s
+            # at 250-260% CPU with 4 threads, versus ~0.43 tracks/s with
+            # 16 threads and 91% of quota periods throttled.
+            default = 4;
             description = "Native ONNX/Torch inference threads; preparation uses one worker and FFmpeg one decode thread.";
+          };
+          styleBackend = lib.mkOption {
+            type = lib.types.enum [
+              "onnx"
+              "torch"
+            ];
+            default = "torch";
+            description = "Style inference backend; torch uses the ROCm worker's GPU support. The worker's --style-backend flag overrides this environment default.";
           };
           cpuQuotaPercent = lib.mkOption {
             type = lib.types.ints.positive;

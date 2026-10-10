@@ -124,8 +124,8 @@ class NightlyUnitsTest(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertEqual(case["beetsSlices"], ["batch-beets"])
                 self.assertEqual(case["workers"], 14)
-                self.assertEqual(case["threads"], 16)
-                quotas = (700, 300) if name == "quotaOverrides" else (1400, 1600)
+                self.assertEqual(case["threads"], 4)
+                quotas = (700, 300) if name == "quotaOverrides" else (1400, 400)
                 shared = case["slices"]["batch-beets"]
                 self.assertEqual(shared["CPUQuota"], f"{sum(quotas)}%")
                 self.assertEqual(shared["CPUWeight"], 10)
@@ -151,6 +151,18 @@ class NightlyUnitsTest(unittest.TestCase):
                     if job not in case["jobs"]:
                         continue
                     service = unit(case, job + ".service")["Service"]
+                    if job == "beets-embed-backfill":
+                        for suffix in (".service", "-now.service"):
+                            self.assertEqual(
+                                environment(case, job + suffix)[
+                                    "BEETS_EMBED_STYLE_BACKEND"
+                                ],
+                                "torch",
+                            )
+                            self.assertEqual(
+                                unit(case, job + suffix)["Service"]["CPUQuota"],
+                                f"{quota}%",
+                            )
                     self.assertEqual(service["Slice"], "batch-beets.slice")
                     self.assertEqual(service["CPUQuota"], f"{quota}%")
                     self.assertEqual(service["CPUWeight"], "10")

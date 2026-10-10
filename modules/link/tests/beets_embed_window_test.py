@@ -110,6 +110,23 @@ class WindowTest(unittest.TestCase):
                     self.run_launcher(RUNNER_EXIT=str(status)).returncode, status
                 )
 
+    def test_style_backend_environment_reaches_runner(self):
+        (self.bin / "timeout").unlink()
+        self.tool(
+            "runner",
+            "import os\n"
+            "from pathlib import Path\n"
+            "Path(os.environ['FIXTURE_ARGS']).write_text(os.environ['BEETS_EMBED_STYLE_BACKEND'])\n",
+        )
+        for mode in ("nightly", "now"):
+            for backend in ("torch", "onnx"):
+                with self.subTest(mode=mode, backend=backend):
+                    result = self.run_launcher(
+                        mode=mode, BEETS_EMBED_STYLE_BACKEND=backend
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(self.args.read_text(), backend)
+
     def test_outside_window_skips_all_work(self):
         for now in ("999", "29740", "40000"):
             result = self.run_launcher(CLOCK_NOW=now)
