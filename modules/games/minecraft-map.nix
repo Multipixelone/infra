@@ -38,6 +38,10 @@
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       dir = id: "/srv/games/minecraft/${id}/plugins/BlueMap";
       format = pkgs.formats.hocon { };
+      # Compose only shared tokens and BlueMap chrome, never Homepage layout.
+      theme = pkgs.writeText "bluemap-homepage-theme.css" (
+        builtins.readFile ../link/homepage-theme-tokens.css + "\n" + builtins.readFile ./bluemap-theme.css
+      );
       flowMath = pkgs.fetchurl {
         url = "https://repo.maven.apache.org/maven2/com/flowpowered/flow-math/1.0.3/flow-math-1.0.3.jar";
         sha256 = "dea201031f7660ebcc76041365d78d74b9bfb36faec70d3ea0dcfc503d3dc674";
@@ -81,6 +85,9 @@
                 enabled = true;
                 webroot = "${dir id}/web";
                 client-decompression = true;
+                # BlueMap 5.28 publishes these URLs in settings.json; the client
+                # appends stylesheet links. nginx serves the persisted webroot.
+                styles = [ "css/homepage-theme.css" ];
               };
               webserver.enabled = false;
               plugin = {
@@ -97,7 +104,15 @@
                 root = "${dir id}/web/maps";
                 compression = "gzip";
               };
+            }
+          // {
+            "${dir id}/web/css/homepage-theme.css" = {
+              source = toString theme;
+              # Config templates default to 0600. This public asset needs the
+              # webroot's minecraft-map ACL to remain effective for nginx.
+              mode = "0644";
             };
+          };
       }) servers;
       # BlueMap otherwise downloads its vanilla assets at first wake.
       services.minecraft-servers.servers = lib.mapAttrs (id: _: {

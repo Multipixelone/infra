@@ -1,0 +1,286 @@
+/* Homepage chrome for BlueMap 5.28 (verified against its bundled webapp).
+ * webapp.conf styles -> settings.json styles -> dynamically appended CSS link:
+ * https://github.com/BlueMap-Minecraft/BlueMap/blob/v5.28/common/src/main/resources/de/bluecolored/bluemap/config/webapp.conf
+ *
+ * Prefer upstream --theme-* variables and readable component/marker classes.
+ * Component classes (.side-menu, .svg-button, .map-state-message, etc.) are
+ * still upstream implementation details: the map check guards their presence
+ * on upgrades. No hashed filenames, Vue attributes, SVG paths, or canvas rules.
+ * BlueMap mirrors theme classes on #app and #map-container. Select the palette
+ * on :root so shared shadow tokens and marker popups resolve the same colors.
+ * No script is needed; auto follows the OS, explicit themes override it.
+ */
+
+:root {
+  --paper: var(--homepage-light-paper);
+  --paper-shade: var(--homepage-light-paper-shade);
+  --ink: var(--homepage-light-ink);
+  --muted: var(--homepage-light-muted);
+  --accent: var(--homepage-light-accent);
+  --accent-hover: var(--homepage-light-accent-hover);
+  --selection-bg: var(--homepage-light-selection-bg);
+  --border: var(--homepage-light-border);
+  --shadow: var(--homepage-light-shadow);
+  --glow: var(--homepage-light-glow);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: var(--homepage-dark-paper);
+    --paper-shade: var(--homepage-dark-paper-shade);
+    --ink: var(--homepage-dark-ink);
+    --muted: var(--homepage-dark-muted);
+    --accent: var(--homepage-dark-accent);
+    --accent-hover: var(--homepage-dark-accent-hover);
+    --selection-bg: var(--homepage-dark-selection-bg);
+    --border: var(--homepage-dark-border);
+    --shadow: var(--homepage-dark-shadow);
+    --glow: var(--homepage-dark-glow);
+    color-scheme: dark;
+  }
+}
+
+:root:has(#app.theme-dark),
+:root:has(#app.theme-contrast) {
+  --paper: var(--homepage-dark-paper);
+  --paper-shade: var(--homepage-dark-paper-shade);
+  --ink: var(--homepage-dark-ink);
+  --muted: var(--homepage-dark-muted);
+  --accent: var(--homepage-dark-accent);
+  --accent-hover: var(--homepage-dark-accent-hover);
+  --selection-bg: var(--homepage-dark-selection-bg);
+  --border: var(--homepage-dark-border);
+  --shadow: var(--homepage-dark-shadow);
+  --glow: var(--homepage-dark-glow);
+  color-scheme: dark;
+}
+
+:root:has(#app.theme-light) {
+  --paper: var(--homepage-light-paper);
+  --paper-shade: var(--homepage-light-paper-shade);
+  --ink: var(--homepage-light-ink);
+  --muted: var(--homepage-light-muted);
+  --accent: var(--homepage-light-accent);
+  --accent-hover: var(--homepage-light-accent-hover);
+  --selection-bg: var(--homepage-light-selection-bg);
+  --border: var(--homepage-light-border);
+  --shadow: var(--homepage-light-shadow);
+  --glow: var(--homepage-light-glow);
+  color-scheme: light;
+}
+
+/* Override BlueMap's local theme variables too; leave its contrast colors
+   intact. These variables are only used by UI CSS, not the Three.js renderer. */
+:root,
+:root .theme-light,
+:root .theme-dark {
+  --theme-bg: var(--paper);
+  --theme-bg-hover: var(--paper-shade);
+  --theme-bg-light: var(--border);
+  --theme-fg: var(--ink);
+  --theme-fg-light: var(--muted);
+  --theme-switch-button-on: var(--accent);
+  --theme-moon-day: var(--accent);
+  --theme-stars-day: var(--muted);
+  --theme-moon-night: var(--muted);
+  --theme-stars-night: var(--accent);
+}
+
+:root,
+:root .theme-light,
+:root .theme-dark,
+:root .theme-contrast {
+  font-family: var(--font-serif);
+  font-variant-ligatures: common-ligatures;
+  text-rendering: optimizeLegibility;
+}
+
+:root .theme-contrast {
+  --surface-shadow: none;
+  --surface-shadow-hover: none;
+}
+
+/* Framed paper surfaces. Do not put a background on #app or #map-container:
+   their transparent space must continue to reveal the map and accept clicks. */
+#app .side-menu,
+#app .svg-button,
+#app .number-input,
+#app .choice-box,
+#app .map-state-message,
+#map-container .bm-marker-poi-label,
+#map-container .bm-marker-labelpopup,
+#map-container .bm-marker-popup {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+}
+
+#app .side-menu,
+#app .choice-box,
+#app .map-state-message,
+#map-container .bm-marker-poi-label,
+#map-container .bm-marker-labelpopup,
+#map-container .bm-marker-popup {
+  border: 1px solid var(--theme-bg-light);
+}
+
+#app .side-menu {
+  box-sizing: border-box;
+  border-block: 0;
+  border-left: 0;
+  border-radius: 0 var(--surface-radius) var(--surface-radius) 0;
+}
+
+#app .side-menu,
+#app .control-bar,
+#app #zoom-buttons,
+#map-container .bm-marker-poi-label,
+#map-container .bm-marker-labelpopup,
+#map-container .bm-marker-popup {
+  filter: none;
+}
+
+#app .side-menu > .title,
+#app .side-menu .group > .title {
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+#app .side-menu > .title {
+  border-bottom-color: var(--theme-bg-light);
+}
+
+#app .side-menu .group {
+  border: 1px dashed var(--theme-bg-light);
+  border-radius: var(--surface-radius);
+}
+
+#app .side-menu .content hr {
+  border-bottom: 1px dashed var(--theme-bg-light);
+}
+
+#app .side-menu .simple-button,
+#app .side-menu .switch-button,
+#app .side-menu .map-button,
+#app .side-menu .marker-button,
+#app .choice-box .choice {
+  border-radius: var(--surface-radius);
+}
+
+#app .svg-button:hover {
+  box-shadow: var(--surface-shadow-hover);
+}
+
+#app .svg-button:hover svg,
+#app .svg-button.active svg,
+#app .compass svg .north {
+  fill: var(--accent);
+}
+
+#app .svg-button:active svg,
+#app .compass:active svg .north {
+  fill: var(--theme-bg);
+}
+
+#app .side-menu .simple-button:hover,
+#app .side-menu .map-button.selected,
+#app .choice-box .choice.selected {
+  color: var(--accent);
+}
+
+#app .side-menu .text-input {
+  width: calc(100% - 1em - 2px);
+  background: var(--theme-bg-hover);
+  border: 1px solid var(--theme-bg-light);
+  border-radius: var(--surface-radius);
+}
+
+#app input::placeholder {
+  color: var(--theme-fg-light);
+}
+
+#app .position-input,
+#app .marker-item .stats,
+#app .marker-set .stats,
+#app .slider .value,
+#app .info-content td,
+#map-container .bm-marker-popup .files,
+#map-container .bm-marker-popup .entry {
+  font-family: var(--font-mono);
+}
+
+#app .slider input {
+  accent-color: var(--accent);
+}
+
+#app .slider input::-webkit-slider-thumb {
+  background: var(--accent);
+}
+
+#app .slider input::-moz-range-thumb {
+  background: var(--accent);
+}
+
+#app .map-state-message {
+  padding: 0.75em 1em;
+  max-width: calc(100% - 4em);
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+  line-height: 1.4;
+}
+
+#app a,
+#map-container .bm-marker-popup a,
+#bm-app-err a {
+  color: var(--accent);
+  text-underline-offset: 0.12em;
+}
+
+#app a:hover,
+#map-container .bm-marker-popup a:hover,
+#bm-app-err a:hover {
+  color: var(--accent-hover);
+}
+
+#app :is(a, button, input, [tabindex]):focus-visible,
+#map-container
+  .bm-marker-popup
+  :is(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#app ::selection,
+#map-container .bm-marker-popup ::selection {
+  background: var(--selection-bg);
+  color: var(--ink);
+}
+
+#app .side-menu .content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-fg-light) var(--theme-bg);
+}
+
+#app ::-webkit-scrollbar-track {
+  background: var(--theme-bg);
+}
+
+#app ::-webkit-scrollbar-thumb {
+  background: var(--theme-bg-light);
+  border-color: var(--theme-bg);
+  border-radius: var(--surface-radius);
+}
+
+#app ::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-fg-light);
+}
+
+/* Preserve contrast-mode foregrounds for the additional accent treatments. */
+#app.theme-contrast,
+#map-container.theme-contrast {
+  --accent: var(--theme-fg);
+  --accent-hover: var(--theme-fg-light);
+  --selection-bg: var(--theme-bg-light);
+  --ink: var(--theme-fg);
+}

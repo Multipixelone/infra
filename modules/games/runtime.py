@@ -264,6 +264,11 @@ def prepare(cfg, identifier):
     if item.get("childExitFile"):
         atomic_json(item["childExitFile"], previously_saved)
     for destination, template in item.get("configTemplates", {}).items():
+        mode = template.get("mode", "0600")
+        if mode not in ("0600", "0644") or (
+            mode == "0644" and ("secret" in template or template.get("replacements"))
+        ):
+            raise ValueError("only non-secret templates may use public mode 0644")
         path = Path(destination)
         if identity.pw_uid == 0:
             safe_directory(path.parent)
@@ -295,6 +300,10 @@ def prepare(cfg, identifier):
         temporary = Path(filename)
         with os.fdopen(fd, "wb") as stream:
             stream.write(content)
+            if mode == "0644":
+                # mkstemp's 0600 masks inherited webroot ACLs. Restore read
+                # access on the completed asset before atomically publishing it.
+                os.fchmod(stream.fileno(), 0o644)
         temporary.replace(path)
     if "mods" in item:
         safe_directory(item["logDir"])

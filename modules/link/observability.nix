@@ -7705,7 +7705,8 @@ in
           color = "stone";
         };
         # Restyled to match blog.finnrut.is; see the file header for how.
-        customCSS = builtins.readFile ./homepage-theme.css;
+        customCSS =
+          builtins.readFile ./homepage-theme-tokens.css + "\n" + builtins.readFile ./homepage-theme.css;
         services =
           if localCutover then
             homepageServiceGroups

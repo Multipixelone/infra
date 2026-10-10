@@ -93,6 +93,40 @@ class RuntimeTest(unittest.TestCase):
             runtime.prepare(self.cfg, identifier)
         return destination.read_text()
 
+    def test_public_assets_are_readable_and_secret_templates_stay_private(self):
+        self.prepare_secret("a" * 16)
+        private = self.directory / "rendered/serverconfig.txt"
+        self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+        source = self.directory / "theme.css"
+        source.write_text(":root { --theme-bg: paper; }\n")
+        public = self.directory / "web/css/theme.css"
+        self.item["configTemplates"][str(public)] = {
+            "source": str(source),
+            "mode": "0644",
+        }
+        with (
+            patch.object(runtime.pwd, "getpwnam") as identity,
+            patch.object(runtime.os, "chown"),
+        ):
+            identity.return_value.pw_uid = 0
+            identity.return_value.pw_gid = 0
+            # Repeated preparation replaces assets with the intended mode.
+            for _ in range(2):
+                runtime.prepare(self.cfg, "survival")
+                self.assertEqual(public.read_text(), source.read_text())
+                self.assertEqual(public.stat().st_mode & 0o777, 0o644)
+                self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+            for mode in ("0644", "0777"):
+                self.item["configTemplates"][str(private)]["mode"] = mode
+                with self.assertRaisesRegex(ValueError, "non-secret templates"):
+                    runtime.prepare(self.cfg, "survival")
+            self.item["configTemplates"] = {
+                str(private): {"secret": str(source), "mode": "0644"},
+            }
+            with self.assertRaisesRegex(ValueError, "non-secret templates"):
+                runtime.prepare(self.cfg, "survival")
+        self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+
     def test_terraria_join_password_accepts_short_phrase_and_boundaries(self):
         for value in ("abcdefgh", "friendtime", "a" * 256, "ABcd_012-", "friendtime\n"):
             with self.subTest(value=value):

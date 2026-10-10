@@ -4,10 +4,10 @@
  * paper/ink palette and the serif type. Homepage is Tailwind-based and reads
  * every surface colour from --color-50 .. --color-900 (RGB triples set by the
  * .theme-<name> class on <html>), so redefining that ramp re-skins the whole
- * app in one place. The ramp below is literally the blog's two palettes joined
+ * app in one place. The shared token file contains the blog's two palettes joined
  * end to end: 50..300 are the light theme's paper/border tones, 700..900 the
  * dark theme's — which is why Homepage's own light/dark toggle keeps working
- * without a second ramp.
+ * without a second ramp. Nix prepends homepage-theme-tokens.css here.
  *
  * Fonts are named, not fetched. The blog's Sabon Next and PragmataPro faces
  * live on fonts.finnrut.is behind CORS locked to blog.finnrut.is, so an
@@ -21,39 +21,16 @@
  */
 
 :root {
-  /* Warm ramp — see header. Values are RGB triples, the format Tailwind's
-     rgb(var(--color-N) / <alpha>) utilities expect. */
-  --color-50: 247 244 237 !important; /* --paper       light */
-  --color-100: 239 234 221 !important; /* --paper-shade light */
-  --color-200: 232 226 216 !important; /* --ink         dark  */
-  --color-300: 221 214 198 !important; /* --border      light */
-  --color-400: 184 174 156 !important;
-  --color-500: 111 100 86 !important; /* --muted       light */
-  --color-600: 91 81 69 !important;
-  --color-700: 59 52 44 !important; /* --border      dark  */
-  --color-800: 36 32 25 !important; /* --paper-shade dark  */
-  --color-900: 28 25 21 !important; /* --paper       dark  */
-  --color-logo-start: 181 74 0 !important;
-  --color-logo-stop: 111 100 86 !important;
-
-  /* Blog tokens, light. */
-  --paper: #f7f4ed;
-  --paper-shade: #efeadd;
-  --ink: #2b2520;
-  --muted: #6f6456;
-  --accent: #b54a00;
-  --accent-hover: #8c3800;
-  --selection-bg: #f5d9c4;
-  --border: #ddd6c6;
-  --shadow: rgba(43, 37, 32, 0.06);
-  /* Top ambient highlight in the page background gradient. */
-  --glow: rgba(255, 255, 255, 0.5);
-
-  --font-serif: "Sabon Next", Georgia, "Times New Roman", serif;
-  --font-display: "Cooper Black", "Cooper", Georgia, serif;
-  --font-mono:
-    "PragmataPro Mono Liga", "PragmataPro Mono", ui-monospace, SFMono-Regular,
-    "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --paper: var(--homepage-light-paper);
+  --paper-shade: var(--homepage-light-paper-shade);
+  --ink: var(--homepage-light-ink);
+  --muted: var(--homepage-light-muted);
+  --accent: var(--homepage-light-accent);
+  --accent-hover: var(--homepage-light-accent-hover);
+  --selection-bg: var(--homepage-light-selection-bg);
+  --border: var(--homepage-light-border);
+  --shadow: var(--homepage-light-shadow);
+  --glow: var(--homepage-light-glow);
 
   color-scheme: light;
 }
@@ -61,16 +38,16 @@
 /* Homepage puts .dark on <html> for its dark theme; the blog's dark values map
    onto the same tokens. The ramp is shared, so only the tokens flip here. */
 .dark {
-  --paper: #1c1915;
-  --paper-shade: #242019;
-  --ink: #e8e2d8;
-  --muted: #9e9486;
-  --accent: #ff9e42;
-  --accent-hover: #ffb366;
-  --selection-bg: #5a2e0f;
-  --border: #3b342c;
-  --shadow: rgba(0, 0, 0, 0.2);
-  --glow: rgba(255, 255, 255, 0.04);
+  --paper: var(--homepage-dark-paper);
+  --paper-shade: var(--homepage-dark-paper-shade);
+  --ink: var(--homepage-dark-ink);
+  --muted: var(--homepage-dark-muted);
+  --accent: var(--homepage-dark-accent);
+  --accent-hover: var(--homepage-dark-accent-hover);
+  --selection-bg: var(--homepage-dark-selection-bg);
+  --border: var(--homepage-dark-border);
+  --shadow: var(--homepage-dark-shadow);
+  --glow: var(--homepage-dark-glow);
 
   color-scheme: dark;
 }
@@ -216,10 +193,8 @@ body,
 a:has(> .bookmark-text) {
   background: var(--paper-shade) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 4px !important;
-  box-shadow:
-    inset 0 0 0 1px var(--paper),
-    0 2px 6px var(--shadow) !important;
+  border-radius: var(--surface-radius) !important;
+  box-shadow: var(--surface-shadow) !important;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -228,9 +203,7 @@ a:has(> .bookmark-text) {
 .service-card:hover,
 a:has(> .bookmark-text):hover {
   border-color: var(--accent) !important;
-  box-shadow:
-    inset 0 0 0 1px var(--paper),
-    0 3px 10px var(--shadow) !important;
+  box-shadow: var(--surface-shadow-hover) !important;
 }
 
 .service-name,
@@ -289,7 +262,7 @@ button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--accent) !important;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--surface-radius);
 }
 
 /* Tabs read as the blog's nav: small caps, letter-spaced, ink until hovered. */
@@ -326,7 +299,7 @@ input,
 .widget-search input {
   background: var(--paper-shade) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 4px !important;
+  border-radius: var(--surface-radius) !important;
   color: var(--ink) !important;
   font-family: var(--font-serif) !important;
 }

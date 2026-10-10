@@ -1,0 +1,56 @@
+/* Shared Homepage/BlueMap design tokens, originally from blog.finnrut.is.
+ * Nix prepends this file to each app's stylesheet; app-specific mappings select
+ * a palette. Fonts are local family names with fallbacks, never downloaded.
+ */
+
+:root {
+  /* Warm ramp — see header. Values are RGB triples, the format Tailwind's
+     rgb(var(--color-N) / <alpha>) utilities expect. */
+  --color-50: 247 244 237 !important; /* --paper       light */
+  --color-100: 239 234 221 !important; /* --paper-shade light */
+  --color-200: 232 226 216 !important; /* --ink         dark  */
+  --color-300: 221 214 198 !important; /* --border      light */
+  --color-400: 184 174 156 !important;
+  --color-500: 111 100 86 !important; /* --muted       light */
+  --color-600: 91 81 69 !important;
+  --color-700: 59 52 44 !important; /* --border      dark  */
+  --color-800: 36 32 25 !important; /* --paper-shade dark  */
+  --color-900: 28 25 21 !important; /* --paper       dark  */
+  --color-logo-start: 181 74 0 !important;
+  --color-logo-stop: 111 100 86 !important;
+
+  --font-serif: "Sabon Next", Georgia, "Times New Roman", serif;
+  --font-display: "Cooper Black", "Cooper", Georgia, serif;
+  --font-mono:
+    "PragmataPro Mono Liga", "PragmataPro Mono", ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Light paper/ink palette. */
+  --homepage-light-paper: #f7f4ed;
+  --homepage-light-paper-shade: #efeadd;
+  --homepage-light-ink: #2b2520;
+  --homepage-light-muted: #6f6456;
+  --homepage-light-accent: #b54a00;
+  --homepage-light-accent-hover: #8c3800;
+  --homepage-light-selection-bg: #f5d9c4;
+  --homepage-light-border: #ddd6c6;
+  --homepage-light-shadow: rgba(43, 37, 32, 0.06);
+  --homepage-light-glow: rgba(255, 255, 255, 0.5);
+
+  /* Dark paper/ink palette. */
+  --homepage-dark-paper: #1c1915;
+  --homepage-dark-paper-shade: #242019;
+  --homepage-dark-ink: #e8e2d8;
+  --homepage-dark-muted: #9e9486;
+  --homepage-dark-accent: #ff9e42;
+  --homepage-dark-accent-hover: #ffb366;
+  --homepage-dark-selection-bg: #5a2e0f;
+  --homepage-dark-border: #3b342c;
+  --homepage-dark-shadow: rgba(0, 0, 0, 0.2);
+  --homepage-dark-glow: rgba(255, 255, 255, 0.04);
+
+  --surface-radius: 4px;
+  --surface-shadow: inset 0 0 0 1px var(--paper), 0 2px 6px var(--shadow);
+  --surface-shadow-hover:
+    inset 0 0 0 1px var(--paper), 0 3px 10px var(--shadow);
+}
