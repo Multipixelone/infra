@@ -10,9 +10,13 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
+import minecraft_status
 
 spec = importlib.util.spec_from_file_location("games_runtime", sys.argv.pop(1))
 runtime = importlib.util.module_from_spec(spec)
@@ -44,6 +48,7 @@ class RuntimeTest(unittest.TestCase):
             "proxy": {},
             "stateDir": str(self.directory / "state"),
             "runDir": str(self.directory / "run"),
+            "statusCacheDir": str(self.directory / "status-cache"),
             "backup": {
                 "enabled": True,
                 "repository": str(self.directory / "repo"),
@@ -54,6 +59,7 @@ class RuntimeTest(unittest.TestCase):
         runtime.atomic_json(
             runtime.stop_result_path(self.cfg, "survival"), {"graceful": True}
         )
+        Path(self.cfg["statusCacheDir"]).mkdir(mode=0o2770)
         self.root = patch.object(runtime, "root")
         self.root.start()
         self.addCleanup(self.root.stop)
@@ -817,7 +823,8 @@ class RuntimeTest(unittest.TestCase):
                 "unit_state",
                 return_value={"ActiveState": "active", "MainPID": "0"},
             ),
-            patch.object(runtime, "listening", return_value=False),
+            patch.object(runtime, "passive_listening", return_value=False),
+            patch.object(runtime, "process_children", return_value=[]),
             patch.object(runtime, "run") as run,
         ):
             result = runtime.status(self.cfg, "survival")
@@ -852,6 +859,255 @@ class RuntimeTest(unittest.TestCase):
         with patch.object(runtime, "status", return_value={}) as status:
             runtime.main(["--inventory", str(path), "status", "--no-query", "survival"])
         status.assert_called_once_with(self.cfg, "survival", query=False)
+
+    def awake_status(self):
+        self.status_unit = {
+            "ActiveState": "active",
+            "MainPID": "123",
+            "InvocationID": "first",
+        }
+        self.status_children = ["456"]
+        for name, options in (
+            ("unit_state", {"return_value": self.status_unit}),
+            ("process_children", {"side_effect": lambda _: self.status_children}),
+            ("passive_listening", {"return_value": True}),
+            ("listening", {"side_effect": AssertionError("must inspect passively")}),
+            ("rcon", {"side_effect": AssertionError("status must not use RCON")}),
+        ):
+            mock = patch.object(runtime, name, **options)
+            mock.start()
+            self.addCleanup(mock.stop)
+
+    def test_status_players_are_shared_for_twenty_seconds(self):
+        self.awake_status()
+        with (
+            patch.object(
+                minecraft_status.time, "monotonic", return_value=1000
+            ) as clock,
+            patch.object(
+                minecraft_status, "minecraft_players", side_effect=[3, 4]
+            ) as query,
+        ):
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 3)
+            clock.return_value = 1019.9
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 3)
+            query.assert_called_once_with(25567)
+            clock.return_value = 1020
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 4)
+            self.assertEqual(query.call_count, 2)
+
+    def test_status_cache_never_delays_lifecycle_or_reuses_a_previous_child(self):
+        self.awake_status()
+        with patch.object(
+            minecraft_status, "minecraft_players", side_effect=[3, 4, 5]
+        ) as query:
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 3)
+            self.status_children = []
+            sleeping = runtime.status(self.cfg, "survival")
+            self.assertEqual(
+                (sleeping["state"], sleeping["ready"], sleeping["playersOnline"]),
+                ("sleeping", False, 0),
+            )
+            self.status_children = ["789"]
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 4)
+            self.status_unit["ActiveState"] = "inactive"
+            stopped = runtime.status(self.cfg, "survival")
+            self.assertEqual(
+                (stopped["state"], stopped["ready"], stopped["playersOnline"]),
+                ("stopped", False, None),
+            )
+            self.status_unit.update(ActiveState="active", InvocationID="second")
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 5)
+            self.assertEqual(query.call_count, 3)
+
+    def test_unavailable_and_no_query_status_do_not_touch_cache(self):
+        self.awake_status()
+        with patch.object(runtime, "cached_players") as cache:
+            self.assertIsNone(
+                runtime.status(self.cfg, "survival", query=False)["playersOnline"]
+            )
+            self.item["available"] = False
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            cache.assert_not_called()
+
+    def test_status_failed_queries_are_cached_without_stale_player_counts(self):
+        self.awake_status()
+        with (
+            patch.object(
+                minecraft_status.time, "monotonic", return_value=1000
+            ) as clock,
+            patch.object(
+                minecraft_status,
+                "minecraft_players",
+                side_effect=[3, TimeoutError(), 4],
+            ) as query,
+        ):
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 3)
+            clock.return_value = 1020
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            clock.return_value = 1039
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            self.assertEqual(query.call_count, 2)
+            clock.return_value = 1040
+            self.assertEqual(runtime.status(self.cfg, "survival")["playersOnline"], 4)
+
+    def test_status_cache_recovers_from_malformed_or_oversized_records(self):
+        self.awake_status()
+        cache = Path(self.cfg["statusCacheDir"]) / "survival.json"
+        with patch.object(
+            minecraft_status, "minecraft_players", return_value=3
+        ) as query:
+            records = (
+                "broken",
+                "[]",
+                '{"updated": true}',
+                " " * 4097,
+                '{"updated": ' + "9" * 400 + "}",
+                "[" * 1500 + "0" + "]" * 1500,
+            )
+            for content in records:
+                with self.subTest(content=content[:30]):
+                    cache.write_text(content)
+                    self.assertEqual(
+                        runtime.status(self.cfg, "survival")["playersOnline"], 3
+                    )
+            self.assertEqual(query.call_count, len(records))
+
+    def test_unsafe_status_cache_paths_are_rejected_without_queries(self):
+        self.awake_status()
+        directory = Path(self.cfg["statusCacheDir"])
+        outside = self.directory / "outside-status"
+        outside.write_text("preserve")
+        with patch.object(minecraft_status, "minecraft_players") as query:
+            for name in ("survival.lock", "survival.json"):
+                with self.subTest(name=name):
+                    path = directory / name
+                    path.unlink(missing_ok=True)
+                    path.symlink_to(outside)
+                    self.assertIsNone(
+                        runtime.status(self.cfg, "survival")["playersOnline"]
+                    )
+                    path.unlink()
+                    self.assertEqual(outside.read_text(), "preserve")
+            os.mkfifo(directory / "survival.json")
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            link = self.directory / "status-link"
+            link.symlink_to(directory, target_is_directory=True)
+            self.cfg["statusCacheDir"] = str(link)
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            query.assert_not_called()
+
+    def test_status_cache_access_failure_does_not_probe(self):
+        self.awake_status()
+        with (
+            patch.object(
+                minecraft_status, "publish_cache", side_effect=PermissionError()
+            ),
+            patch.object(minecraft_status, "minecraft_players") as query,
+        ):
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            query.assert_not_called()
+
+    def test_status_failed_result_publication_keeps_attempt_backoff(self):
+        self.awake_status()
+        publish = minecraft_status.publish_cache
+        with (
+            patch.object(minecraft_status, "publish_cache") as writer,
+            patch.object(
+                minecraft_status, "minecraft_players", return_value=3
+            ) as query,
+        ):
+            # Publish the reservation for real, then fail the result write.
+            def reserve(*args):
+                publish(*args)
+                writer.side_effect = PermissionError()
+
+            writer.side_effect = reserve
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            self.assertIsNone(runtime.status(self.cfg, "survival")["playersOnline"])
+            query.assert_called_once_with(25567)
+
+    def test_status_cache_files_remain_group_writable_under_restrictive_umask(self):
+        self.awake_status()
+        previous = os.umask(0o077)
+        try:
+            with patch.object(minecraft_status, "minecraft_players", return_value=3):
+                self.assertEqual(
+                    runtime.status(self.cfg, "survival")["playersOnline"], 3
+                )
+        finally:
+            os.umask(previous)
+        for name in ("survival.lock", "survival.json"):
+            self.assertEqual(
+                (Path(self.cfg["statusCacheDir"]) / name).stat().st_mode & 0o777, 0o660
+            )
+
+    def test_status_cache_shares_one_probe_across_processes(self):
+        body = json.dumps({"players": {"online": 7}}).encode()
+        packet = b"\x00" + minecraft_status.varint(len(body)) + body
+        reply = minecraft_status.varint(len(packet)) + packet
+        requests = []
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(8)
+            listener.settimeout(5)
+
+            def fixture():
+                connection, _ = listener.accept()
+                with connection:
+                    connection.settimeout(5)
+                    deadline = time.monotonic() + 5
+                    length = minecraft_status.read_varint(connection, deadline)
+                    requests.append(
+                        minecraft_status.read_exact(connection, length, deadline)
+                        + minecraft_status.read_exact(connection, 2, deadline)
+                    )
+                    connection.sendall(reply)
+
+            thread = threading.Thread(target=fixture)
+            thread.start()
+            code = (
+                "import sys; from minecraft_status import cached_players; "
+                "print(cached_players(sys.argv[1], 'survival', ['fixture'], int(sys.argv[2])))"
+            )
+            processes = []
+            try:
+                for _ in range(8):
+                    processes.append(
+                        subprocess.Popen(
+                            [
+                                sys.executable,
+                                "-B",
+                                "-c",
+                                code,
+                                self.cfg["statusCacheDir"],
+                                str(listener.getsockname()[1]),
+                            ],
+                            env=os.environ
+                            | {
+                                "PYTHONPATH": str(
+                                    Path(minecraft_status.__file__).parent
+                                )
+                            },
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                        )
+                    )
+                for process in processes:
+                    output, error = process.communicate(timeout=10)
+                    self.assertEqual(
+                        (process.returncode, output.strip(), error), (0, "7", "")
+                    )
+            finally:
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
+                thread.join(timeout=6)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(requests), 1)
+            self.assertTrue(requests[0].endswith(b"\x01\x01\x00"))
 
     def test_backup_metadata_records_validation_failure(self):
         with (

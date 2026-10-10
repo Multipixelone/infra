@@ -98,6 +98,7 @@
           "d /srv/games/.state 0700 root root -"
           "d /run/games 0755 root root -"
           "d /run/games/locks 0755 root root -"
+          "d /run/games-status 2770 root games-dashboard -"
         ];
         networking.firewall = {
           allowedTCPPorts =

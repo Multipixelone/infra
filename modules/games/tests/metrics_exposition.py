@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
 spec = importlib.util.spec_from_file_location("metrics", sys.argv[1])
 metrics = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(metrics)

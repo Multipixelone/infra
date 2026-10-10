@@ -50,9 +50,10 @@ let
           ];
           IPAddressDeny = "any";
           IPAddressAllow = "localhost";
-          # Sudo may maintain timestamps/lecture state. These exceptions do
-          # not make game data, journals, secrets or the store writable.
+          # Share only the status cache with metrics. Sudo also needs its
+          # timestamp/lecture state; game data and secrets remain read-only.
           ReadWritePaths = [
+            "/run/games-status"
             "-/run/sudo"
             "-/var/lib/sudo"
           ];

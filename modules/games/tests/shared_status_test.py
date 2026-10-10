@@ -20,6 +20,7 @@ def load(name, path):
 helper_path, runtime_path = sys.argv[1:3]
 del sys.argv[1:3]
 shared = load("shared_status", helper_path)
+sys.path.insert(0, str(Path(runtime_path).parent))
 runtime = load("runtime", runtime_path)
 
 
@@ -67,7 +68,7 @@ class SharedStatusTest(unittest.TestCase):
                 "systemctl",
                 "show",
                 self.item["unit"],
-                "--property=ActiveState,SubState,Result,MainPID,ControlGroup",
+                "--property=ActiveState,SubState,Result,MainPID,ControlGroup,InvocationID",
             )
             if ready or (
                 listening is False and expected == "running" and active == "active"

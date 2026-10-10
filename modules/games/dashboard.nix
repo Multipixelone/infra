@@ -5,6 +5,7 @@
     let
       cfg = config.infra.games;
       secret = "games/restic-password";
+      pythonHelpers = pkgs.writeTextDir "minecraft_status.py" (builtins.readFile ./minecraft_status.py);
       backupEnabled =
         cfg.backup.enable
         && builtins.hasAttr secret cfg.secretFiles
@@ -21,6 +22,7 @@
           };
           stateDir = "/srv/games/.state";
           runDir = "/run/games";
+          statusCacheDir = "/run/games-status";
           commands = {
             systemctl = "${pkgs.systemd}/bin/systemctl";
             journalctl = "${pkgs.systemd}/bin/journalctl";
@@ -34,7 +36,7 @@
         name: verb:
         pkgs.writeShellApplication {
           inherit name;
-          text = ''exec ${pkgs.python3}/bin/python3 ${./runtime.py} --inventory ${inventory} ${verb} "$@"'';
+          text = ''PYTHONPATH=${pythonHelpers} exec ${pkgs.python3}/bin/python3 ${./runtime.py} --inventory ${inventory} ${verb} "$@"'';
         };
       journalReader = helper "games-journal-reader" "logs";
       privilegedConsole = helper "games-console-writer" "console-root";
@@ -52,12 +54,12 @@
         status = helper "games-status" "status";
         shared-status = pkgs.writeShellApplication {
           name = "games-shared-status";
-          text = "exec ${pkgs.python3}/bin/python3 ${./shared-status.py} --inventory ${inventory} --runtime ${./runtime.py}";
+          text = "PYTHONPATH=${pythonHelpers} exec ${pkgs.python3}/bin/python3 ${./shared-status.py} --inventory ${inventory} --runtime ${./runtime.py}";
         };
         backup = helper "games-backup" "backup";
         console = pkgs.writeShellApplication {
           name = "games-console";
-          text = ''exec ${pkgs.python3}/bin/python3 ${./runtime.py} --inventory ${inventory} console ${lib.getExe privilegedConsole} "$@"'';
+          text = ''PYTHONPATH=${pythonHelpers} exec ${pkgs.python3}/bin/python3 ${./runtime.py} --inventory ${inventory} console ${lib.getExe privilegedConsole} "$@"'';
         };
         logs = pkgs.writeShellApplication {
           name = "games-logs";

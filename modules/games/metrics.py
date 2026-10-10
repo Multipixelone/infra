@@ -5,13 +5,13 @@ import hashlib
 import json
 import os
 import re
-import socket
 import stat
-import struct
 import subprocess
 import tempfile
 import time
 from pathlib import Path
+
+from minecraft_status import minecraft_players
 
 HELP = {
     "games_server_enabled": "Whether the server is effectively enabled with required credentials present.",
@@ -109,73 +109,6 @@ class Metrics:
             f"# HELP {name} {HELP[name]}\n# TYPE {name} {kind}\n"
             for name, kind in sorted(self.types.items())
         ) + "".join(self.samples)
-
-
-def varint(value):
-    encoded = bytearray()
-    while value >= 128:
-        encoded.append((value & 127) | 128)
-        value >>= 7
-    encoded.append(value)
-    return bytes(encoded)
-
-
-def read_exact(connection, size):
-    result = bytearray()
-    while len(result) < size:
-        part = connection.recv(size - len(result))
-        if not part:
-            raise ValueError("short Minecraft status packet")
-        result.extend(part)
-    return bytes(result)
-
-
-def read_varint(connection):
-    result = 0
-    for index in range(5):
-        byte = read_exact(connection, 1)[0]
-        result |= (byte & 127) << (index * 7)
-        if byte < 128:
-            return result
-    raise ValueError("oversized Minecraft varint")
-
-
-def minecraft_players(port):
-    """Only called for awake direct Paper ports or ping-isolated Velocity."""
-    with socket.create_connection(("127.0.0.1", port), timeout=2) as connection:
-        connection.settimeout(2)
-        handshake = (
-            b"\x00" + varint(777) + b"\x09localhost" + struct.pack(">H", port) + b"\x01"
-        )
-        connection.sendall(varint(len(handshake)) + handshake + b"\x01\x00")
-        length = read_varint(connection)
-        if not 2 <= length <= 65536:
-            raise ValueError("invalid Minecraft packet size")
-        packet = read_exact(connection, length)
-        if packet[0] != 0:
-            raise ValueError("unexpected Minecraft status packet")
-        # Decode the JSON string's VarInt inside the already bounded packet.
-        size, offset = 0, 1
-        for index in range(5):
-            byte = packet[offset]
-            offset += 1
-            size |= (byte & 127) << (7 * index)
-            if byte < 128:
-                break
-        else:
-            raise ValueError("oversized Minecraft string")
-        if size != len(packet) - offset:
-            raise ValueError("invalid Minecraft JSON length")
-        response = json.loads(packet[offset:])
-        if not isinstance(response, dict) or not isinstance(
-            response.get("players"), dict
-        ):
-            # Malformed wire data is a protocol error, not a caller type error.
-            raise ValueError("invalid Minecraft status object")  # noqa: TRY004
-        players = response["players"].get("online")
-        if type(players) is not int or players < 0:
-            raise ValueError("invalid player count")
-        return players
 
 
 def cgroup_path(root, relative):
@@ -379,9 +312,12 @@ def collect(inventory, persisted, now=None):
                 ) not in ("success", "")
                 value = "running" if active else "stopped"
                 if item["game"] != "minecraft-velocity":
-                    statuses = json.loads(
-                        command(inventory, "status", "--no-query", identifier)
+                    args = (
+                        (identifier,)
+                        if item["game"] == "minecraft-paper"
+                        else ("--no-query", identifier)
                     )
+                    statuses = json.loads(command(inventory, "status", *args))
                     if (
                         not isinstance(statuses, list)
                         or not statuses
@@ -396,6 +332,12 @@ def collect(inventory, persisted, now=None):
                     ):
                         raise ValueError("invalid games-status")
                     value, ready = status["state"], status["ready"]
+                    if item["game"] == "minecraft-paper" and active and ready:
+                        players = status["playersOnline"]
+                        if players is not None and (
+                            type(players) is not int or players < 0
+                        ):
+                            raise ValueError("invalid cached player count")
                     if item["wakeOnJoin"] and value == "sleeping":
                         proof = exit_proof(item["childExitFile"])
                         if proof is False:
@@ -406,17 +348,12 @@ def collect(inventory, persisted, now=None):
                             players = 0
                     if item["wakeOnJoin"] and ready:
                         state["launched"] = True
-                if (
-                    active
-                    and (ready or item["game"] == "minecraft-velocity")
-                    and item["game"].startswith("minecraft-")
-                ):
+                if active and item["game"] == "minecraft-velocity":
                     try:
                         players = minecraft_players(item["serverPort"])
                         ready = True
                     except (OSError, ValueError, KeyError, IndexError):
-                        if item["game"] == "minecraft-velocity":
-                            ready = False
+                        ready = False
             except (
                 OSError,
                 subprocess.SubprocessError,

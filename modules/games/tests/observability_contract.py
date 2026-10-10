@@ -36,6 +36,9 @@ assert (
 )
 assert "games-metrics" in data["exporter"]["ExecStart"]
 assert data["exporter"]["ProtectSystem"] == "strict"
+assert "/run/games-status" in data["exporter"]["ReadWritePaths"]
+assert "/run/games-status" in data["dashboardService"]["ReadWritePaths"]
+assert "d /run/games-status 2770 root games-dashboard -" in data["statusTmpfiles"]
 assert data["alloy"].count('loki.source.journal "system"') == 1
 assert '"__journal_container_name"' in data["alloy"]
 assert 'target_label = "server_id"' in data["alloy"]

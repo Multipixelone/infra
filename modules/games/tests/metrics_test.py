@@ -11,6 +11,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
+import minecraft_status
+
 spec = importlib.util.spec_from_file_location("metrics", sys.argv.pop(1))
 metrics = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(metrics)
@@ -80,7 +83,12 @@ class ExporterTests(unittest.TestCase):
                 return "inactive\n"
             return f"ActiveState={self.active}\nResult={self.result}\nMainPID=0\nControlGroup=\nInvocationID=invocation\n"
         if tool == "status":
-            self.assertEqual(args, ("--no-query", "survival"))
+            expected = (
+                ("survival",)
+                if self.item["game"] == "minecraft-paper"
+                else ("--no-query", "survival")
+            )
+            self.assertEqual(args, expected)
             return json.dumps(self.status)
         raise AssertionError((tool, args))
 
@@ -156,18 +164,27 @@ class ExporterTests(unittest.TestCase):
             sample(output, "games_server_disabled", reason="missing-secrets"), 1
         )
 
-    def test_awake_query_uses_actual_paper_port(self):
-        self.status = fixtures["running"]
-        output, query = self.collect(query=lambda port: 3)
-        query.assert_called_once_with(25567)
+    def test_awake_paper_uses_shared_status_players_without_duplicate_ping(self):
+        self.status = [fixtures["running"][0] | {"playersOnline": 3}]
+        output, query = self.collect()
+        query.assert_not_called()
         self.assertEqual(sample(output, "games_players_online"), 3)
         self.assertEqual(sample(output, "games_player_capacity"), 20)
 
     def test_awake_query_failure_leaves_players_unknown(self):
         self.status = fixtures["running"]
-        output, _ = self.collect(query=OSError("private diagnostic"))
+        output, query = self.collect()
+        query.assert_not_called()
         self.assertEqual(sample(output, "games_players_known"), 0)
         self.assertEqual(sample(output, "games_server_failed"), 0)
+
+    def test_invalid_shared_player_counts_fail_collection(self):
+        for players in (True, -1, "3", 1.5):
+            with self.subTest(players=players):
+                self.status = [fixtures["running"][0] | {"playersOnline": players}]
+                output, query = self.collect()
+                query.assert_not_called()
+                self.assertEqual(sample(output, "games_metrics_collection_success"), 0)
 
     def test_malformed_status_is_collection_failure(self):
         for value in ([{"id": "other", "state": "running"}], [None], None, []):
@@ -489,9 +506,11 @@ class SourceTests(unittest.TestCase):
     def test_status_protocol_is_bounded_and_not_a_login(self):
         body = json.dumps({"players": {"online": 7}}).encode()
         reply = (
-            metrics.varint(len(body) + len(metrics.varint(len(body))) + 1)
+            minecraft_status.varint(
+                len(body) + len(minecraft_status.varint(len(body))) + 1
+            )
             + b"\x00"
-            + metrics.varint(len(body))
+            + minecraft_status.varint(len(body))
             + body
         )
         with patch.object(socket, "create_connection") as connection:
@@ -504,6 +523,60 @@ class SourceTests(unittest.TestCase):
                 packet.endswith(b"\x01\x01\x00")
             )  # status state, status request
             self.assertIn(struct.pack(">H", 25567), packet)
+
+    def test_status_protocol_rejects_malformed_packets_and_player_counts(self):
+        def packet(body):
+            payload = b"\x00" + minecraft_status.varint(len(body)) + body
+            return minecraft_status.varint(len(payload)) + payload
+
+        replies = [
+            b"\x80" * 5,
+            minecraft_status.varint(65537),
+            b"\x01\x00",
+            b"\x02\x01\x00",
+            b"\x02\x00\x80",
+            b"\x06\x00" + b"\x80" * 5,
+            b"\x02\x00\x01",
+            packet(b"broken"),
+            packet(b"[]"),
+            packet(b'{"players": []}'),
+            packet(b"[" * 1500 + b"0" + b"]" * 1500),
+        ]
+        for players in (True, -1, "3", 1.5, None):
+            replies.append(
+                packet(json.dumps({"players": {"online": players}}).encode())
+            )
+        for reply in replies:
+            with (
+                self.subTest(reply=reply),
+                patch.object(socket, "create_connection") as connection,
+            ):
+                stream = connection.return_value.__enter__.return_value
+                parts = iter(bytes([byte]) for byte in reply)
+                stream.recv.side_effect = lambda size, parts=parts: next(parts, b"")
+                with self.assertRaises(ValueError):
+                    metrics.minecraft_players(25567)
+
+    def test_status_protocol_disconnect_and_timeout_are_bounded(self):
+        for error in (b"", TimeoutError()):
+            with (
+                self.subTest(error=error),
+                patch.object(socket, "create_connection") as connection,
+            ):
+                stream = connection.return_value.__enter__.return_value
+                if isinstance(error, Exception):
+                    stream.recv.side_effect = error
+                else:
+                    stream.recv.return_value = error
+                with self.assertRaises((ValueError, TimeoutError)):
+                    metrics.minecraft_players(25567)
+        with (
+            patch.object(socket, "create_connection") as connection,
+            patch.object(minecraft_status.time, "monotonic", side_effect=[100, 103]),
+            self.assertRaises(TimeoutError),
+        ):
+            metrics.minecraft_players(25567)
+        connection.return_value.__enter__.return_value.recv.assert_not_called()
 
 
 unittest.main()

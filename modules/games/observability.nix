@@ -7,6 +7,7 @@ in
     { config, pkgs, ... }:
     let
       cfg = config.infra.games;
+      pythonHelpers = pkgs.writeTextDir "minecraft_status.py" (builtins.readFile ./minecraft_status.py);
       registered = cfg.registeredServers // cfg.servers;
       bytes =
         value:
@@ -78,7 +79,7 @@ in
       exporter = pkgs.writeShellApplication {
         name = "games-metrics";
         text = ''
-          exec ${pkgs.python3}/bin/python3 ${./metrics.py} \
+          PYTHONPATH=${pythonHelpers} exec ${pkgs.python3}/bin/python3 ${./metrics.py} \
             --inventory ${inventoryFile} \
             --state /var/lib/games-metrics/state.json \
             --output /var/lib/prometheus-node-exporter-text-files/games.prom
@@ -189,6 +190,7 @@ in
             PrivateTmp = true;
             # Podman inspect needs its existing storage/runtime locks.
             ReadWritePaths = [
+              "/run/games-status"
               "/var/lib/games-metrics"
               "/var/lib/prometheus-node-exporter-text-files"
               "-/run/containers"

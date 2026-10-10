@@ -4,6 +4,7 @@
     { pkgs, system, ... }:
     let
       host = config.flake.nixosConfigurations.link;
+      pythonHelpers = pkgs.writeTextDir "minecraft_status.py" (builtins.readFile ./minecraft_status.py);
       gameUnitNames = [
         "minecraft-server-survival"
         "minecraft-server-velocity"
@@ -141,7 +142,11 @@
           touch "$out"
         '';
         games-shared-status =
-          pkgs.runCommand "games-shared-status-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+          pkgs.runCommand "games-shared-status-check"
+            {
+              nativeBuildInputs = [ pkgs.python3 ];
+              PYTHONPATH = pythonHelpers;
+            }
             ''
               export PYTHONDONTWRITEBYTECODE=1
               python3 ${./tests/shared_status_test.py} ${./shared-status.py} ${./runtime.py}
@@ -152,6 +157,7 @@
             {
               nativeBuildInputs = [ pkgs.python3 ];
               RESTIC_EXE = lib.getExe pkgs.restic;
+              PYTHONPATH = pythonHelpers;
             }
             ''
               export PYTHONDONTWRITEBYTECODE=1

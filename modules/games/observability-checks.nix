@@ -5,6 +5,7 @@
     let
       host = config.flake.nixosConfigurations.link;
       cfg = host.config;
+      pythonHelpers = pkgs.writeTextDir "minecraft_status.py" (builtins.readFile ./minecraft_status.py);
       rules = pkgs.writeText "game-alerts.json" (
         builtins.toJSON (
           import ../../lib/game-alerts.nix {
@@ -79,6 +80,8 @@
           manifest = builtins.fromJSON cfg.environment.etc."games/manifest.json".text;
           alloy = cfg.environment.etc."alloy/config.alloy".text;
           exporter = cfg.systemd.services.games-metrics.serviceConfig;
+          dashboardService = cfg.systemd.services.games-dashboard.serviceConfig;
+          statusTmpfiles = cfg.systemd.tmpfiles.rules;
           exporterFlags = cfg.services.prometheus.exporters.node.extraFlags;
           backupOnFailure = enabled.systemd.services.restic-backups-games-survival.onFailure;
           proxyConfig = toString enabled.services.minecraft-servers.servers.velocity.files."velocity.toml";
@@ -101,6 +104,7 @@
                 pkgs.python3
                 pkgs.prometheus.cli
               ];
+              PYTHONPATH = pythonHelpers;
             }
             ''
               export PYTHONDONTWRITEBYTECODE=1

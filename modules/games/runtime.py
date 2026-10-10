@@ -17,6 +17,8 @@ import time
 import uuid
 from pathlib import Path
 
+from minecraft_status import cached_players
+
 
 def run(cfg, tool, *args, timeout=30):
     return subprocess.run(
@@ -114,7 +116,7 @@ def unit_state(cfg, item):
             "systemctl",
             "show",
             item["unit"],
-            "--property=ActiveState,SubState,Result,MainPID,ControlGroup",
+            "--property=ActiveState,SubState,Result,MainPID,ControlGroup,InvocationID",
         )
     except subprocess.CalledProcessError:
         if not item["available"]:
@@ -217,21 +219,26 @@ def status(cfg, identifier, query=True):
     item = server(cfg, identifier)
     state = unit_state(cfg, item)
     active = state.get("ActiveState") in ("active", "activating", "reloading")
-    ready = active and (listening if query else passive_listening)(item["serverPort"])
+    ready = active and passive_listening(item["serverPort"])
     value = "running" if active else "stopped"
-    if active and item["wakeOnJoin"] and not ready:
-        pid = state.get("MainPID", "0")
-        if not process_children(pid):
+    children = []
+    if active and item["wakeOnJoin"]:
+        children = process_children(state.get("MainPID", "0"))
+        if not children:
             value = "sleeping"
+            ready = False
     players = 0 if value == "sleeping" else None
-    if query and ready and item["console"]["method"] == "rcon":
-        try:
-            response = rcon(item, "list")
-            match = re.search(r"There are (\d+) of a max", response)
-            if match:
-                players = int(match.group(1))
-        except (OSError, ValueError, PermissionError):
-            pass
+    if query and ready and item["available"] and item["game"] == "minecraft-paper":
+        generation = [
+            item["unit"],
+            item["serverPort"],
+            state.get("InvocationID", ""),
+            state.get("MainPID", "0"),
+            children,
+        ]
+        players = cached_players(
+            cfg["statusCacheDir"], identifier, generation, item["serverPort"]
+        )
     return {
         "id": identifier,
         "state": value,
