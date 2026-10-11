@@ -57,6 +57,7 @@ class AlbumGraphBookmarksTest(unittest.TestCase):
             )
         by_id = {e["id"]: e for e in bookmarks}
         self.assertNotIn("sober-date", by_id)
+        self.assertEqual(by_id["met-ciara"]["category"], "friend")
         self.assertEqual(by_id["met-ciara"]["precision"], "approximate")
         self.assertIsNone(by_id["met-ciara"]["end_date"])
 

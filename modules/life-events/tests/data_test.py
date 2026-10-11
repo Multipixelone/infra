@@ -45,7 +45,7 @@ class LifeEventsDataTest(unittest.TestCase):
             [
                 ("2022-04-12", "First visit to New York", "travel", "day", "public"),
                 ("2022-09-05", "Freshman year move-in", "move", "day", "public"),
-                ("2022-09-05", "Met Ciara", "relationship", "approximate", "public"),
+                ("2022-09-05", "Met Ciara", "friend", "approximate", "public"),
                 (
                     "2022-10-21",
                     "King Gizzard & the Lizard Wizard with Ciara",
