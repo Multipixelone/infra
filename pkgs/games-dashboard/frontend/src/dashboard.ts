@@ -22,6 +22,7 @@ export type Server = {
   plugins?: Plugin[];
   datapacks?: Plugin[];
   mapUrl?: string | null;
+  discordInviteUrl?: string | null;
   id: string;
   game: string;
   displayName: string;
@@ -326,6 +327,10 @@ function parseServer(value: unknown): Server {
     plugins: parsePlugins(server.plugins),
     datapacks: parsePlugins(server.datapacks),
     mapUrl: nullableString(server.mapUrl ?? null, "server.mapUrl"),
+    discordInviteUrl: nullableString(
+      server.discordInviteUrl ?? null,
+      "server.discordInviteUrl",
+    ),
   };
 }
 

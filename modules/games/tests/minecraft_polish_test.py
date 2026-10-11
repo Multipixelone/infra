@@ -14,7 +14,11 @@ import yaml
 fixtures = json.loads(pathlib.Path(sys.argv[1]).read_text())
 artifacts = json.loads(pathlib.Path(sys.argv[2]).read_text())
 sources = pathlib.Path(sys.argv[3])
+sys.path.insert(0, str(sources))
+from minecraft_tab_test import check_tab
+
 assert fixtures["noPaper"]["backends"] == {}
+check_tab(fixtures, artifacts)
 
 with zipfile.ZipFile(artifacts["openinv"]) as jar:
     descriptor = yaml.safe_load(jar.read("plugin.yml"))
@@ -35,7 +39,7 @@ for name, fixture in fixtures.items():
     if name == "noPaper":
         continue
     chat = name != "missingSecrets"
-    assert not {"openinv", "carbon", "miniplaceholders", "flectonepulse"} & set(
+    assert not {"openinv", "carbon", "miniplaceholders", "flectonepulse", "tab"} & set(
         fixture["proxyJars"]
     )
     assert set(fixture["servers"]) == (
@@ -113,6 +117,13 @@ for name, fixture in fixtures.items():
             "joined Survival for the first time"
             in event_language["join"]["format_first_time"]
         )
+        invite = server["inviteUrl"]
+        assert ("Discord:" in event_language["join"]["format_first_time"]) == bool(
+            invite
+        )
+        if invite:
+            assert invite in event_language["join"]["format_first_time"]
+        assert "Discord:" not in event_language["join"]["format"]
         assert "left Survival" in event_language["quit"]["format"]
         death_types = event_messages["vanilla"]["types"]
         assert len(death_types) == 1 and death_types[0]["name"] == "DEATH"
@@ -307,12 +318,19 @@ with tempfile.TemporaryDirectory() as directory:
                     "log4jApi",
                     "discordsrv",
                     "geyser",
+                    "tab",
                 )
             ],
             *libraries,
         ]
     )
-    helpers = ("ResolveCarbon", "ReadCarbon", "CheckCarbonBridge", "ResolveFlectone")
+    helpers = (
+        "ResolveCarbon",
+        "ReadCarbon",
+        "CheckCarbonBridge",
+        "ResolveFlectone",
+        "ReadTab",
+    )
     subprocess.run(
         [
             "javac",
@@ -376,6 +394,27 @@ with tempfile.TemporaryDirectory() as directory:
         for status in ("ACCEPTED", "DOWNLOADED", "SUCCESSFULLY_LOADED", "DECLINED")
     ]
     assert accepted < downloaded < loaded < declined
+    for name in ("withLuckPerms", "withoutInvite", "alternateInvite"):
+        templates = fixtures[name]["backends"]["survival"]["templates"]
+        subprocess.run(
+            [
+                "java",
+                "-cp",
+                classpath,
+                "ReadTab",
+                *[
+                    templates[f"{template_dir}/{path}"]["source"]
+                    for path in (
+                        "TAB/config.yml",
+                        "TAB/groups.yml",
+                        "LuckPerms/bootstrap.json.gz",
+                        "FlectonePulse/localizations/en_us.yml",
+                    )
+                ],
+                str(pathlib.Path(fixtures[name]["rankPack"]) / "rank-icons.zip"),
+            ],
+            check=True,
+        )
     subprocess.run(["java", "-cp", classpath, "CheckCarbonBridge"], check=True)
     (root / "libraries").symlink_to(
         artifacts["flectonepulseCache"], target_is_directory=True

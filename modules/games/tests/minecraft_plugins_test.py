@@ -211,6 +211,7 @@ for field, directory, server in (
     configuration = yaml.safe_load(pathlib.Path(template["source"]).read_text())
     assert configuration["server"] == server
     assert configuration["storage-method"] == "postgresql"
+    assert configuration["primary-group-calculation"] == "parents-by-weight"
     assert configuration["messaging-service"] == "pluginmsg"
     assert not configuration["auto-install-translations"]
     assert configuration["data"]["address"] == "127.0.0.1:5432"

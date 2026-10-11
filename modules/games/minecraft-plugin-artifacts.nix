@@ -1,6 +1,13 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-tab = pkgs.fetchurl {
+        # The main 6.2.0 jar adds Bukkit 26.3 support. The separately named
+        # Paper 1.20.5–1.21.4 jar excludes the implementation needed here.
+        name = "tab-6.2.0.jar";
+        url = "https://github.com/NEZNAMY/TAB/releases/download/6.2.0/TAB.v6.2.0.jar";
+        sha256 = "f94331947134242efa478b9b9bf04b29e37861721dee58c32b7ea57779aa735e";
+      };
       games-fawe = pkgs.fetchurl {
         # 2.16.1's FluidState.is(Fluid) call fails on pinned Paper 26.3 build 159;
         # 2.16.0 uses is(Object) and passes the isolated runtime checks.

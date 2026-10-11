@@ -290,6 +290,8 @@
             pluginInventory = (backend id).inventory;
             datapackInventory = cfg.minecraftDatapacks.backends.${id}.inventory;
             mapUrl = "https://map.finnrut.is";
+            discordInviteUrl =
+              if s.minecraft.discord.inviteUrl == "" then null else s.minecraft.discord.inviteUrl;
             public =
               lib.concatMap (hostname: [
                 {

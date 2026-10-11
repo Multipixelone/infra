@@ -9,6 +9,7 @@ import yaml
 
 cases = json.loads(pathlib.Path(sys.argv[1]).read_text())
 with zipfile.ZipFile(sys.argv[2]) as jar:
+    descriptor = yaml.safe_load(jar.read("plugin.yml"))
     discord_defaults = yaml.safe_load(jar.read("config/en.yml"))
     message_defaults = yaml.safe_load(jar.read("messages/en.yml"))
     synchronization_defaults = yaml.safe_load(jar.read("synchronization/en.yml"))
@@ -61,6 +62,8 @@ for case in cases:
         configuration = yaml.safe_load(pathlib.Path(case["configuration"]).read_text())
         messages = yaml.safe_load(pathlib.Path(case["messages"]).read_text())
         assert configuration.keys() <= discord_defaults.keys()
+        assert configuration["DiscordInviteLink"] == case["discord"]["inviteUrl"]
+        assert descriptor["commands"]["discord"]["permission"] == "discordsrv.discord"
         supported(configuration, discord_defaults)
         supported(messages, message_defaults)
         assert configuration["BotToken"] == ""

@@ -6,14 +6,15 @@ there is no redirect from that name to Dawarich and no data migration.
 
 ## Installed set and compatibility
 
-Verified on 2026-10-09. Every release JAR uses an exact URL and SHA-256 in
-`minecraft-plugin-artifacts.nix`; downloads were hashed before pinning. No
+Verified on 2026-10-09; TAB separately on 2026-10-10. Every release JAR uses
+an exact URL and SHA-256 in `minecraft-plugin-artifacts.nix`; downloads were hashed before pinning. No
 plugin JAR is fetched or updated at runtime. Configurations use Nix formats.
 
 | Plugin             | Version / placement            | Evidence                                                                                                                                                                                                                                   |
 | ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | SkinsRestorer      | 15.12.6 / Velocity and Paper   | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml)                          |
 | MiniMOTD           | 2.2.5 / Velocity               | [Release](https://github.com/jpenilla/MiniMOTD/releases/tag/v2.2.5); [source](https://github.com/jpenilla/MiniMOTD/tree/v2.2.5/platform/velocity) ping, command and favicon calls inspected against the pinned Velocity 4.2.0 build 30 API |
+| TAB                | 6.2.0 / Paper                  | [Release explicitly adds Bukkit 26.3](https://github.com/NEZNAMY/TAB/releases/tag/6.2.0); pinned universal JAR descriptor, 26.3 version bound and native Paper implementation inspected                                                    |
 | BlueMap            | 5.28 / Paper                   | [Explicit Paper 26.3 support](https://github.com/BlueMap-Minecraft/BlueMap/releases/tag/v5.28)                                                                                                                                             |
 | LuckPerms          | 5.5.71 / Velocity and Paper    | [Paper 26.3 release](https://modrinth.com/plugin/luckperms/version/v5.5.71-bukkit), [Velocity release](https://modrinth.com/plugin/luckperms/version/v5.5.71-velocity); Finn explicitly approved Velocity compatibility                    |
 | Simple Voice Chat  | bukkit-2.6.24 / Paper          | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24)                                                                                                                                                 |
@@ -66,6 +67,56 @@ skin services; this is separate from downloading plugin code.
 
 Custom `minecraft.plugins` names cannot replace managed JAR names. A Paper
 version change requires a new compatibility review and matching asset pins.
+
+## Player list and community invite
+
+TAB 6.2.0 runs only on Paper, alongside LuckPerms and CarbonChat. The single
+Survival backend needs no proxy copy, bridge or PlaceholderAPI: TAB reads
+LuckPerms, player counts, ping and Paper TPS/MSPT directly. It starts and stops
+with the socket-activated backend; MiniMOTD still handles the sleeping server's
+public server-list entry. TAB is omitted when the LuckPerms credential is absent.
+
+The compact static header repeats MiniMOTD's bold mauve → pink → peach
+`Finn's Survival` gradient, then `mc.finnrut.is` and online/configured maximum
+players with the viewer's ping. The footer shows TPS/MSPT, the existing BlueMap
+URL and `Discord: discord.gg/hHurpHK8RT`. Counts, ping and rank placeholders
+refresh once a second; tick statistics refresh every five seconds. No rotating
+tips, scoreboard, objectives, bossbars, layout, fake players, proxy support or
+database are enabled. Backend bStats remains disabled. The inspected TAB JAR
+has no update checker setting or runtime library downloads.
+
+Names use the shared rank colour table in `minecraft-ranks.nix` and TAB's native
+`%luckperms-prefix%`. The rank icons and translation fallbacks used by CarbonChat
+remain intact through TAB's component transport. Sorting uses
+native primary-group weights descending (admin → mod → builder → default),
+then player names alphabetically ignoring case. LuckPerms calculates primary
+groups with `parents-by-weight` on both platforms. Numeric sorting requires
+TAB teams: they have empty nametag prefixes/suffixes, retain collisions and
+ordinary invisibility, and add no nametag decoration. CarbonChat and the
+configured FlectonePulse features do not manage those teams. Future plugins
+that assign scoreboard teams need a compatibility review.
+
+TAB blocks competing client team membership packets, including AFK Display's
+`afkDis.afk` gray-name effect. Rank sorting/colours take precedence in the Java
+list; the datapack's server-side AFK detection and movement checks still run.
+This is a presentation tradeoff, not a combined AFK/rank display. See TAB's
+[team compatibility limits](https://github.com/NEZNAMY/TAB/wiki/Feature-guide:-Nametags#compatibility-with-other-plugins).
+
+Bedrock gracefully keeps its native player list. The pinned Geyser 2.11.3 build
+1249 does not translate Java list display names, sorting or header/footer;
+the Java formatting cannot be promised there. The Discord invite remains
+available in first-join chat, DiscordSRV's existing `/discord` command when the
+bridge is installed, and the games dashboard's Connect section beside Map.
+No Bedrock-only plugin or backend Floodgate installation is added.
+
+The public invite is declared once as
+`gameServers.servers.survival.minecraft.discord.inviteUrl`, independently of
+DiscordSRV's token and channel readiness. TAB, first-join welcome,
+DiscordSRV `DiscordInviteLink` and dashboard metadata reference that value.
+Other servers default to an empty invite; empty values omit invite lines and
+links. The targeted checks cover that case, replacement invites and capacity,
+absent credentials, additional backends, TAB's pinned YAML/MiniMessage parsers,
+native LuckPerms prefix/weight hooks and dashboard rendering.
 
 ## Pregeneration and borders
 
@@ -357,7 +408,8 @@ apply to Mini Blocks, More Mob Heads and Player Head Drops: placed heads can
 use Geyser's existing rendering, but correct inventory/held/worn textures
 require explicit skull mappings and Geyser's generated Bedrock resource pack.
 Those mappings are not added by this change. AFK membership is server-side;
-verify gray names, tab-list display and scoreboard/team interactions on Java
+TAB's sorting teams replace the gray-name effect on Java. Verify native
+Bedrock names and scoreboard/team interactions on Java
 and Geyser clients after a future authorized deployment. Paper smoke tests
 cannot establish client presentation parity.
 
@@ -561,10 +613,10 @@ Bedrock font pack is installed. Pinned Geyser 2.11.3 build 1249 acknowledges
 required Java packs without downloading them and honors component fallbacks.
 Changing that pin must preserve both behaviors. Hover tooltips are a Java feature.
 
-Chat consumes `<luckperms_prefix>` and `chat_color` metadata. The concurrent
-`mc-tab-menu` implementation consumes the same prefix through
-`%luckperms-prefix%` with MiniMessage enabled; its component transport must retain
-the translation and fallback until delivery. There is no separate tab badge
+Chat consumes `<luckperms_prefix>` and `chat_color` metadata. TAB consumes the
+same prefix through `%luckperms-prefix%` with MiniMessage enabled; the pinned
+renderer round-trip test verifies its translation key, fallback and tooltip,
+including Java pack glyphs and Geyser text fallback. There is no separate tab badge
 palette. Discord webhook chat uses usernames and message bodies only, so rank
 glyphs do not enter Discord-bound formatting.
 

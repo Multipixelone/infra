@@ -248,9 +248,12 @@ let
     ranks = c.infra.games.minecraftRanks;
     proxyJars = lib.attrNames c.infra.games.minecraftPlugins.proxy.jars;
     proxySymlinks = c.services.minecraft-servers.servers.velocity.symlinks or { };
-    servers = lib.mapAttrs (id: _: {
+    servers = lib.mapAttrs (id: s: {
       inherit (c.infra.games.runtime.${id}) available worldPaths;
       configTemplates = c.infra.games.runtime.${id}.configTemplates;
+      inherit (s.minecraft) maxPlayers;
+      inherit (s.minecraft.discord) inviteUrl;
+      inherit (c.infra.games.runtime.${id}) mapUrl discordInviteUrl;
       environment = c.systemd.services."minecraft-server-${id}".environment;
       symlinks = c.services.minecraft-servers.servers.${id}.symlinks;
     }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.servers);
@@ -258,6 +261,35 @@ let
   polishFixtures = {
     missingSecrets = polishFixture (evaluate { } "" "" false { } true);
     withLuckPerms = polishFixture permissions;
+    withoutInvite = polishFixture (
+      evaluate { "games/minecraft/luckperms-db-password" = ./tests/fixture.age; } "" "" true {
+        inviteUrl = "";
+      } true
+    );
+    alternateInvite = polishFixture (
+      (host.extendModules {
+        modules = [
+          {
+            infra.games.secretFiles = lib.mkForce {
+              "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+            };
+            infra.games.servers = lib.mkForce (
+              base
+              // {
+                survival = base.survival // {
+                  minecraft = base.survival.minecraft // {
+                    maxPlayers = 42;
+                    discord = base.survival.minecraft.discord // {
+                      inviteUrl = "https://discord.gg/tabFixture";
+                    };
+                  };
+                };
+              }
+            );
+          }
+        ];
+      }).config
+    );
     withoutAdmin = polishFixture (
       (host.extendModules {
         modules = [
@@ -390,6 +422,7 @@ in
               pkgs.writeText "minecraft-polish-artifacts.json" (
                 builtins.toJSON {
                   openinv = cfg.infra.games.artifacts.games-openinv;
+                  tab = cfg.infra.games.artifacts.games-tab;
                   openinvCache = cfg.infra.games.artifacts.games-openinv-libraries;
                   carbon = cfg.infra.games.artifacts.games-carbon;
                   carbonCache = cfg.infra.games.artifacts.games-carbon-libraries;

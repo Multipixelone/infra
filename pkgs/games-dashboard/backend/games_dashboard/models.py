@@ -60,6 +60,7 @@ class Server(StrictModel):
     plugins: list[Plugin] = Field(default_factory=list)
     datapacks: list[Plugin] = Field(default_factory=list)
     mapUrl: str | None = None
+    discordInviteUrl: str | None = None
 
     @model_validator(mode="after")
     def fixed_commands(self):

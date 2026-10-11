@@ -145,14 +145,34 @@ test("empty shared inventory is supported", () => {
   );
 });
 
+test("Discord invite is optional in older manifests and follows server metadata", () => {
+  const manifest = (overrides: Partial<Server>) =>
+    parseManifest({
+      schemaVersion: 1,
+      host: "link",
+      servers: [server(overrides)],
+      sharedServices: [],
+    }).servers[0];
+  assert.equal(manifest({}).discordInviteUrl, null);
+  assert.equal(manifest({ discordInviteUrl: null }).discordInviteUrl, null);
+  assert.equal(
+    manifest({ discordInviteUrl: "https://discord.gg/fixture" })
+      .discordInviteUrl,
+    "https://discord.gg/fixture",
+  );
+});
+
 test("datapack inventory parses independently and defaults to empty for older manifests", () => {
-  const packs = [{ name: "Coordinates HUD", version: "1.2.19", installed: true }];
-  const manifest = (overrides: Partial<Server>) => parseManifest({
-    schemaVersion: 1,
-    host: "link",
-    servers: [server(overrides)],
-    sharedServices: [],
-  }).servers[0];
+  const packs = [
+    { name: "Coordinates HUD", version: "1.2.19", installed: true },
+  ];
+  const manifest = (overrides: Partial<Server>) =>
+    parseManifest({
+      schemaVersion: 1,
+      host: "link",
+      servers: [server(overrides)],
+      sharedServices: [],
+    }).servers[0];
   assert.deepEqual(manifest({}).datapacks, []);
   assert.deepEqual(manifest({ datapacks: [] }).datapacks, []);
   assert.deepEqual(manifest({ datapacks: packs }).datapacks, packs);
@@ -332,6 +352,27 @@ test("server details render accessible, grouped inventory", async (t) => {
       },
     );
     await t.test(
+      "Discord is a connection link, including without other addresses",
+      () => {
+        const markup = html({
+          public: [],
+          mapUrl: null,
+          discordInviteUrl: "https://discord.gg/fixture",
+        });
+        assert.match(markup, /<tr class="discord-row">/);
+        assert.match(
+          markup,
+          /href="https:\/\/discord\.gg\/fixture" target="_blank" rel="noopener noreferrer"/,
+        );
+        assert.match(markup, /discord\.gg\/fixture/);
+        assert.match(
+          markup,
+          /Survival Discord community \(opens in a new tab\)/,
+        );
+        assert.doesNotMatch(html(), /discord-row/);
+      },
+    );
+    await t.test(
       "missing sections disappear, proxy-only inventory remains visible",
       () => {
         const empty = html({ public: [], mapUrl: null, plugins: [] }, []);
@@ -343,20 +384,28 @@ test("server details render accessible, grouped inventory", async (t) => {
         );
       },
     );
-    await t.test("datapacks have a separate section with versions and declared status", () => {
-      const markup = html({ datapacks: [
-        { name: "Coordinates HUD", version: "1.2.19", installed: true },
-        { name: "Armor Statues", version: "2.8.24", installed: true },
-      ] });
-      assert.match(markup, /aria-labelledby="datapacks-heading"/);
-      assert.match(markup, />Datapacks</);
-      assert.match(markup, />Coordinates HUD</);
-      assert.match(markup, />1\.2\.19</);
-      assert.match(markup, />Installed</);
-      assert.match(markup, />World datapack</);
-      assert.ok(markup.indexOf(">Armor Statues<") < markup.indexOf(">Coordinates HUD<"));
-      assert.doesNotMatch(html({ datapacks: [] }), /datapacks-heading/);
-    });
+    await t.test(
+      "datapacks have a separate section with versions and declared status",
+      () => {
+        const markup = html({
+          datapacks: [
+            { name: "Coordinates HUD", version: "1.2.19", installed: true },
+            { name: "Armor Statues", version: "2.8.24", installed: true },
+          ],
+        });
+        assert.match(markup, /aria-labelledby="datapacks-heading"/);
+        assert.match(markup, />Datapacks</);
+        assert.match(markup, />Coordinates HUD</);
+        assert.match(markup, />1\.2\.19</);
+        assert.match(markup, />Installed</);
+        assert.match(markup, />World datapack</);
+        assert.ok(
+          markup.indexOf(">Armor Statues<") <
+            markup.indexOf(">Coordinates HUD<"),
+        );
+        assert.doesNotMatch(html({ datapacks: [] }), /datapacks-heading/);
+      },
+    );
   } finally {
     await vite.close();
   }

@@ -99,11 +99,22 @@ def test_plugin_inventory_and_static_map_survive_sleep(manifest):
     survival = next(server for server in data["servers"] if server["id"] == "survival")
     assert survival["status"]["state"] == "sleeping"
     assert survival["mapUrl"] == "https://map.finnrut.is"
+    assert survival["discordInviteUrl"] == "https://discord.gg/hHurpHK8RT"
     plugins = {plugin["name"]: plugin for plugin in survival["plugins"]}
     assert plugins["BlueMap"] == {"name": "BlueMap", "version": "5.28", "installed": True}
     assert not plugins["DiscordSRV"]["installed"]
     velocity = next(service for service in data["sharedServices"] if service["id"] == "velocity")
     assert any(plugin["name"] == "MiniMOTD" and plugin["installed"] for plugin in velocity["plugins"])
+
+
+def test_optional_discord_invite(manifest):
+    for invite in (None, "https://discord.gg/fixture"):
+        data = manifest.model_dump()
+        data["servers"][0]["discordInviteUrl"] = invite
+        with TestClient(create_app(MockAdapter(type(manifest).model_validate(data)))) as client:
+            assert client.get("/api/servers").json()["servers"][0]["discordInviteUrl"] == invite
+    data["servers"][0].pop("discordInviteUrl")
+    assert type(manifest).model_validate(data).servers[0].discordInviteUrl is None
 
 
 def test_mock_backup_preserves_stopped_state(manifest):

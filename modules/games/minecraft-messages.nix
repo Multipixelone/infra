@@ -47,12 +47,13 @@
         '') definitions.relocations
       );
       configuration =
+        invite:
         pkgs.runCommand "flectonepulse-1.14.0-event-config"
           {
             nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
           }
           ''
-            python3 ${./flectonepulse-config.py} ${cfg.artifacts.games-flectonepulse} ${cfg.artifacts.games-minecraft-client} "$out"
+            python3 ${./flectonepulse-config.py} ${cfg.artifacts.games-flectonepulse} ${cfg.artifacts.games-minecraft-client} "$out" ${lib.escapeShellArg invite}
           '';
       files = [
         "config"
@@ -66,15 +67,15 @@
     lib.mkIf (servers != { }) {
       infra.games.artifacts = {
         games-flectonepulse-libraries = cache;
-        games-flectonepulse-config = configuration;
+        games-flectonepulse-config = configuration "";
       };
-      infra.games.minecraftPlugins.backends = lib.mapAttrs (id: _: {
+      infra.games.minecraftPlugins.backends = lib.mapAttrs (id: s: {
         jars.flectonepulse = cfg.artifacts.games-flectonepulse;
         templates = lib.listToAttrs (
           map (
             file:
             lib.nameValuePair "/srv/games/minecraft/${id}/plugins/FlectonePulse/${file}.yml" {
-              source = "${configuration}/${file}.yml";
+              source = "${configuration s.minecraft.discord.inviteUrl}/${file}.yml";
             }
           ) files
         );
@@ -91,7 +92,7 @@
         symlinks = {
           "plugins/FlectonePulse/libraries" = cache;
           "plugins/FlectonePulse/minecraft/26.3/lang/en_us.json" =
-            "${configuration}/minecraft/26.3/lang/en_us.json";
+            "${configuration ""}/minecraft/26.3/lang/en_us.json";
         };
       }) servers;
     };

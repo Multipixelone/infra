@@ -130,6 +130,7 @@
                 config = {
                   ConfigVersion = "1.30.5";
                   BotToken = "";
+                  DiscordInviteLink = s.minecraft.discord.inviteUrl;
                   # 1.30.5 routes these events by Channels keys, not messages.yml fields.
                   # global is rendered first and remains the fallback for awards/status.
                   Channels = {

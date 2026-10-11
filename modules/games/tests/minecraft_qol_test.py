@@ -22,12 +22,18 @@ for library in graves_metadata["libraries"]:
 assert fixtures["noPaper"]["backends"] == {}
 for name in ("missingSecrets", "additionalBackend"):
     case = fixtures[name]
-    assert not {"huskhomes", "axgraves", "simplehome", "simpletpa"} & set(case["proxyJars"])
+    assert not {"huskhomes", "axgraves", "simplehome", "simpletpa", "tab"} & set(case["proxyJars"])
     assert set(case["servers"]) == ({"survival", "testing"} if name == "additionalBackend" else {"survival"})
     for server_id, server in case["servers"].items():
         assert not server["available"]
         directory = f"/srv/games/minecraft/{server_id}/plugins"
         plugins = case["backends"][server_id]
+        # Optional TAB must not install without its LuckPerms credential.
+        assert "tab" not in plugins["jars"]
+        assert next(p for p in plugins["inventory"] if p["name"] == "TAB") == {
+            "name": "TAB", "version": "6.2.0", "installed": False,
+        }
+        assert f"{directory}/TAB" not in server["worldPaths"]
         assert {"huskhomes", "axgraves"} <= plugins["jars"].keys()
         assert plugins["jars"]["openinv"] == openinv
         assert f"{directory}/OpenInv" in server["worldPaths"]

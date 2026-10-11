@@ -68,6 +68,11 @@ let
             default = 9225;
           };
           discord = {
+            inviteUrl = mkOption {
+              type = types.strMatching "(https://discord\\.gg/[A-Za-z0-9-]+)?";
+              default = "";
+              description = "Public Discord invite; empty omits player-facing invite links.";
+            };
             roles = lib.genAttrs [ "builder" "mod" "admin" ] (
               rank:
               mkOption {
@@ -231,6 +236,7 @@ in
           minecraft.whitelist.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.operators.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.discord = {
+            inviteUrl = "https://discord.gg/hHurpHK8RT";
             guildId = "1518484285466873997";
             channelId = "1557960229528797265";
             eventsChannelId = "1518484285982769204";

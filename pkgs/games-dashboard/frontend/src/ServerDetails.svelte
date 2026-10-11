@@ -32,7 +32,7 @@
 </script>
 
 <div class="server-details">
-  {#if server.public.length || server.mapUrl}
+  {#if server.public.length || server.mapUrl || server.discordInviteUrl}
     <section class="addresses" aria-labelledby="connect-heading">
       <h3 id="connect-heading" class="eyebrow address-label">Connect</h3>
       <table class="connection-table">
@@ -60,6 +60,17 @@
                   <span class="sr-only"> — {server.displayName} world map (opens in a new tab)</span>
                 </a>
                 <span class="detail-note">Available while {server.displayName} sleeps</span>
+              </td>
+            </tr>
+          {/if}
+          {#if server.discordInviteUrl}
+            <tr class="discord-row">
+              <th scope="row" class="edition">Discord</th>
+              <td colspan="2">
+                <a class="map-link" href={server.discordInviteUrl} target="_blank" rel="noopener noreferrer">
+                  {server.discordInviteUrl.replace(/^https:\/\//, "")}<span aria-hidden="true"> ↗</span>
+                  <span class="sr-only"> — {server.displayName} Discord community (opens in a new tab)</span>
+                </a>
               </td>
             </tr>
           {/if}

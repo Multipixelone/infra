@@ -205,6 +205,10 @@
                   assert plugins["MiniMOTD"] == {"name": "MiniMOTD", "version": "2.2.5", "installed": True}
                   assert not plugins["LuckPerms"]["installed"]
                   backend_plugins = {plugin["name"]: plugin for plugin in servers["survival"]["plugins"]}
+                  assert backend_plugins["TAB"] == {"name": "TAB", "version": "6.2.0", "installed": False}
+                  assert "TAB" not in plugins
+                  assert servers["survival"]["discordInviteUrl"] == "https://discord.gg/hHurpHK8RT"
+                  assert servers["terraria"]["discordInviteUrl"] is None
                   assert backend_plugins["HuskHomes"] == {"name": "HuskHomes", "version": "4.11-9ed80cc", "installed": True}
                   assert backend_plugins["BlueMapFloodgate"] == {"name": "BlueMapFloodgate", "version": "3.6", "installed": True}
                   assert "BlueMapFloodgate" not in plugins

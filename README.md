@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (114)</summary>
+<summary>Packages exposed by this flake (132)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -128,7 +128,11 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
 - `games-backup-run` · `nix run github:Multipixelone/infra#games-backup-run`
 - `games-bluemap` · `nix run github:Multipixelone/infra#games-bluemap`
+- `games-bluemap-floodgate` · `nix run github:Multipixelone/infra#games-bluemap-floodgate`
 - `games-bluemap-offline` · `nix run github:Multipixelone/infra#games-bluemap-offline`
+- `games-bluemap-offline-markers` · `nix run github:Multipixelone/infra#games-bluemap-offline-markers`
+- `games-carbon` · `nix run github:Multipixelone/infra#games-carbon`
+- `games-carbon-libraries` · `nix run github:Multipixelone/infra#games-carbon-libraries`
 - `games-chunky` · `nix run github:Multipixelone/infra#games-chunky`
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
@@ -136,6 +140,10 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`games-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-package.nix) — Private game server dashboard with packaged frontend · `nix run github:Multipixelone/infra#games-dashboard`
 - [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
 - `games-discordsrv` · `nix run github:Multipixelone/infra#games-discordsrv`
+- `games-fawe` · `nix run github:Multipixelone/infra#games-fawe`
+- `games-flectonepulse` · `nix run github:Multipixelone/infra#games-flectonepulse`
+- `games-flectonepulse-config` · `nix run github:Multipixelone/infra#games-flectonepulse-config`
+- `games-flectonepulse-libraries` · `nix run github:Multipixelone/infra#games-flectonepulse-libraries`
 - `games-floodgate` · `nix run github:Multipixelone/infra#games-floodgate`
 - `games-geyser` · `nix run github:Multipixelone/infra#games-geyser`
 - [`games-grafana-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/grafana.nix) · `nix run github:Multipixelone/infra#games-grafana-dashboard`
@@ -150,20 +158,29 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-minecraft-client` · `nix run github:Multipixelone/infra#games-minecraft-client`
 - `games-minecraft-world-policy` · `nix run github:Multipixelone/infra#games-minecraft-world-policy`
 - `games-minimotd` · `nix run github:Multipixelone/infra#games-minimotd`
+- `games-miniplaceholders` · `nix run github:Multipixelone/infra#games-miniplaceholders`
+- `games-miniplaceholders-luckperms` · `nix run github:Multipixelone/infra#games-miniplaceholders-luckperms`
+- `games-openinv` · `nix run github:Multipixelone/infra#games-openinv`
+- `games-openinv-libraries` · `nix run github:Multipixelone/infra#games-openinv-libraries`
 - `games-paper-result` · `nix run github:Multipixelone/infra#games-paper-result`
 - `games-paper-stop` · `nix run github:Multipixelone/infra#games-paper-stop`
 - `games-paper-survival` — A high performance spigot fork · `nix run github:Multipixelone/infra#games-paper-survival`
 - `games-prechange` · `nix run github:Multipixelone/infra#games-prechange`
 - `games-prepare` · `nix run github:Multipixelone/infra#games-prepare`
 - `games-prune` · `nix run github:Multipixelone/infra#games-prune`
+- `games-rank-icons` · `nix run github:Multipixelone/infra#games-rank-icons`
 - `games-shared-status` · `nix run github:Multipixelone/infra#games-shared-status`
 - `games-skinsrestorer` · `nix run github:Multipixelone/infra#games-skinsrestorer`
 - `games-status` · `nix run github:Multipixelone/infra#games-status`
 - `games-survival-lazy` · `nix run github:Multipixelone/infra#games-survival-lazy`
+- `games-tab` · `nix run github:Multipixelone/infra#games-tab`
 - `games-tickscope` · `nix run github:Multipixelone/infra#games-tickscope`
 - `games-tmodloader-runtime` · `nix run github:Multipixelone/infra#games-tmodloader-runtime`
+- `games-vault` · `nix run github:Multipixelone/infra#games-vault`
 - `games-velocity` — A modern, next-generation Minecraft server proxy · `nix run github:Multipixelone/infra#games-velocity`
 - `games-voicechat` · `nix run github:Multipixelone/infra#games-voicechat`
+- `games-voxelsniper` · `nix run github:Multipixelone/infra#games-voxelsniper`
+- `games-worldedit-visualizer` · `nix run github:Multipixelone/infra#games-worldedit-visualizer`
 - [`generate-files`](https://github.com/Multipixelone/infra/blob/main/modules/files.nix) — Generate all automatically generated files for this repository · `nix run github:Multipixelone/infra#generate-files`
 - [`genswitch`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#genswitch`
 - [`gentest`](https://github.com/Multipixelone/infra/blob/main/modules/shell/nh-notify.nix) · `nix run github:Multipixelone/infra#gentest`
@@ -174,6 +191,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`ipod-sync`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync`
 - [`ipod-sync-inner`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync-inner`
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
+- [`life-events`](https://github.com/Multipixelone/infra/blob/main/modules/life-events/default.nix) · `nix run github:Multipixelone/infra#life-events`
 - [`link-argb-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-argb-config`
 - [`link-cooling-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-cooling-config`
 - [`listen`](https://github.com/Multipixelone/infra/blob/main/modules/link/listen.nix) · `nix run github:Multipixelone/infra#listen`

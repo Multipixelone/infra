@@ -99,6 +99,7 @@
           plugins = s.pluginInventory or [ ];
           datapacks = s.datapackInventory or [ ];
           mapUrl = s.mapUrl or null;
+          discordInviteUrl = s.discordInviteUrl or null;
           console = s.console // {
             command = [
               "games-console"

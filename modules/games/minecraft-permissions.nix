@@ -314,6 +314,9 @@
             (pkgs.formats.yaml { }).generate "luckperms-${server}.yml" {
               inherit server;
               storage-method = "postgresql";
+              # TAB's native weight placeholder reads the primary group.
+              # Resolve inherited ranks by the same weights as chat metadata.
+              primary-group-calculation = "parents-by-weight";
               sync-minutes = 1;
               # PostgreSQL is not supported by LuckPerms' SQL message queue.
               messaging-service = "pluginmsg";

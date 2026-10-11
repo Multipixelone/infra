@@ -8,7 +8,8 @@ from pathlib import Path
 
 import yaml
 
-plugin, client, output = map(Path, sys.argv[1:])
+plugin, client, output = map(Path, sys.argv[1:4])
+invite = sys.argv[4] if len(sys.argv) > 4 else ""
 with zipfile.ZipFile(plugin) as outer:
     inner = zipfile.ZipFile(io.BytesIO(outer.read("flectonepulse-bukkit.jarinjar")))
     defaults = {
@@ -84,6 +85,10 @@ local["join"] = {
     "format": "<#cba6f7>+</#cba6f7> <#cba6f7><player></#cba6f7> <#a6adc8>joined Survival</#a6adc8>",
     "format_first_time": "<#cba6f7>+</#cba6f7> <#cba6f7><player></#cba6f7> <#a6adc8>joined Survival for the first time</#a6adc8>",
 }
+if invite:
+    local["join"]["format_first_time"] += (
+        f"\n<#a6adc8>Discord: <#cba6f7>{invite}</#cba6f7></#a6adc8>"
+    )
 local["quit"] = {"format": "<#f5c2e7>−</#f5c2e7> <#cba6f7><player></#cba6f7> <#a6adc8>left Survival</#a6adc8>"}
 local["format"]["names"].update(
     constant=[], display=["<player>"], entity="<name>", unknown="<name>", console="<name>"
