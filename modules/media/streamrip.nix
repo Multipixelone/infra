@@ -119,7 +119,7 @@ let
 in
 {
   flake-file.inputs.streamrip = {
-    url = "github:Multipixelone/streamrip/nix-build";
+    url = "github:Stensel8/streamrip/dev";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   nixpkgs.overlays = [

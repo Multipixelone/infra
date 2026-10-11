@@ -4706,16 +4706,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1791503112,
-        "narHash": "sha256-vt4B3mxnGuisyH/K+YnjOB0huOMbrfJuqCFPL7WZrOA=",
-        "owner": "Multipixelone",
+        "lastModified": 1791733530,
+        "narHash": "sha256-yVP8qRDTaKmCmRruSahthklC6c5dGkrnHprVQDCP2j4=",
+        "owner": "Stensel8",
         "repo": "streamrip",
-        "rev": "83f4fee66d386a72d6efcb97cce04584b14dee22",
+        "rev": "ac1e8a71c4c8a39af901bea09dab855eb1d1b19b",
         "type": "github"
       },
       "original": {
-        "owner": "Multipixelone",
-        "ref": "nix-build",
+        "owner": "Stensel8",
+        "ref": "dev",
         "repo": "streamrip",
         "type": "github"
       }

@@ -294,7 +294,7 @@
       flake = false;
     };
     streamrip = {
-      url = "github:Multipixelone/streamrip/nix-build";
+      url = "github:Stensel8/streamrip/dev";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     stylix = {
