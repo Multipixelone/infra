@@ -116,6 +116,15 @@ class SnapshotTest(unittest.TestCase):
         connection.commit()
         return connection
 
+    def large_writer(self):
+        connection = self.writer()
+        connection.execute("CREATE TABLE payload(value BLOB)")
+        connection.executemany(
+            "INSERT INTO payload VALUES (zeroblob(?))", [(65536,)] * 256
+        )
+        connection.commit()
+        return connection
+
     @contextmanager
     def readonly(self):
         paths = list(self.source.iterdir())
@@ -163,7 +172,8 @@ class SnapshotTest(unittest.TestCase):
             writer.close()
 
     def test_readonly_wal_without_sidecars_uses_protected_fallback(self):
-        self.writer().close()
+        self.large_writer().close()
+        self.assertGreater(self.database.stat().st_size, 16 * 1024 * 1024)
         self.assertEqual(set(self.source.iterdir()), {self.database})
         # Both header versions stay WAL even after clean shutdown.
         self.assertEqual(self.database.read_bytes()[18:20], b"\x02\x02")
@@ -174,10 +184,124 @@ class SnapshotTest(unittest.TestCase):
             self.assertEqual(
                 failure.exception.sqlite_errorcode, sqlite3.SQLITE_READONLY_DIRECTORY
             )
-            self.copy()
+            with patch.object(
+                snapshot, "copy_source", wraps=snapshot.copy_source
+            ) as copy:
+                started = time.monotonic()
+                self.copy()
+                self.assertLess(time.monotonic() - started, 5)
+                copy.assert_called_once()
             self.assertEqual(self.value(), 1)
             self.assertEqual(set(self.source.iterdir()), {self.database})
         self.assertEqual(self.database.read_bytes(), original)
+
+    def test_large_readonly_wal_with_orphaned_empty_sidecars_completes(self):
+        writer = self.large_writer()
+        try:
+            self.assertEqual(
+                writer.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone(), (0, 0, 0)
+            )
+            original = {path: path.read_bytes() for path in self.source.iterdir()}
+        finally:
+            writer.close()
+        # Recreate the sidecars left by a writer that exits without removing
+        # them. No writable connection remains to make the SHM trustworthy.
+        for path, content in original.items():
+            path.write_bytes(content)
+        self.assertEqual(Path(str(self.database) + "-wal").stat().st_size, 0)
+        self.assertGreaterEqual(Path(str(self.database) + "-shm").stat().st_size, 32768)
+        self.assertGreater(self.database.stat().st_size, 16 * 1024 * 1024)
+        with (
+            self.readonly(),
+            patch.object(snapshot, "read_lease", side_effect=AssertionError),
+        ):
+            started = time.monotonic()
+            self.copy()
+            self.assertLess(time.monotonic() - started, 5)
+            self.assertEqual(self.value(), 1)
+            with closing(sqlite3.connect(self.target)) as reader:
+                self.assertEqual(
+                    reader.execute(
+                        "SELECT count(*), sum(length(value)) FROM payload"
+                    ).fetchone(),
+                    (256, 16 * 1024 * 1024),
+                )
+        self.assertEqual(
+            {path: path.read_bytes() for path in self.source.iterdir()}, original
+        )
+
+    def test_wal_writer_can_commit_during_pinned_backup(self):
+        writer = self.large_writer()
+        committed = []
+
+        class Reader(sqlite3.Connection):
+            def backup(self, target, *, progress, **kwargs):
+                def check(status, remaining, total):
+                    if remaining and not committed:
+                        writer.execute("UPDATE fixture SET value=2")
+                        writer.commit()
+                        committed.append(True)
+                    progress(status, remaining, total)
+
+                return super().backup(target, progress=check, **kwargs)
+
+        connect = sqlite3.connect
+        try:
+            with (
+                self.readonly(),
+                patch.object(
+                    snapshot.sqlite3,
+                    "connect",
+                    side_effect=lambda *args, **kwargs: connect(
+                        *args, factory=Reader, **kwargs
+                    ),
+                ),
+            ):
+                self.copy()
+                self.assertEqual(self.value(), 1)
+            self.assertEqual(committed, [True])
+            self.assertEqual(
+                writer.execute("SELECT value FROM fixture").fetchone()[0], 2
+            )
+            # A retained WAL reader would prevent this checkpoint from finishing.
+            self.assertEqual(
+                writer.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone(), (0, 0, 0)
+            )
+        finally:
+            writer.close()
+
+    def test_failed_wal_backup_releases_its_reader(self):
+        writer = self.large_writer()
+
+        class Reader(sqlite3.Connection):
+            def backup(self, target, *, progress, **kwargs):
+                def check(status, remaining, total):
+                    progress(status, remaining, total)
+                    raise snapshot.SnapshotUnavailable("fixture interrupted backup")
+
+                return super().backup(target, progress=check, **kwargs)
+
+        connect = sqlite3.connect
+        try:
+            with (
+                self.readonly(),
+                patch.object(
+                    snapshot.sqlite3,
+                    "connect",
+                    side_effect=lambda *args, **kwargs: connect(
+                        *args, factory=Reader, **kwargs
+                    ),
+                ),
+                self.assertRaisesRegex(
+                    snapshot.SnapshotUnavailable, "fixture interrupted"
+                ),
+            ):
+                self.copy()
+            self.assertEqual(
+                writer.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone(), (0, 0, 0)
+            )
+        finally:
+            writer.close()
 
     def test_readonly_rollback_database_needs_no_lease_or_sidecars(self):
         self.writer(wal=False).close()

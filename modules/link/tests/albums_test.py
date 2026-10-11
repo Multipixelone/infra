@@ -348,6 +348,58 @@ class AlbumGraphHostTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(self.output.read_text()), published)
 
+    def test_export_and_enrichments_run_outside_snapshot_deadline(self):
+        marker = self.root / "snapshot-deadline"
+        snapshot_wrapper = self.root / "snapshot-wrapper"
+        snapshot_wrapper.write_text(
+            f"#!{sys.executable}\n"
+            "import subprocess, sys, time\n"
+            "from pathlib import Path\n"
+            f"marker = Path({str(marker)!r})\n"
+            f"command = [{str(SNAPSHOT)!r}, *sys.argv[1:]]\n"
+            "if sys.argv[1] == 'enrich-first-played':\n"
+            "    assert time.monotonic() > float(marker.read_text())\n"
+            "    time.sleep(0.1)\n"
+            "else:\n"
+            "    deadline = time.monotonic() + 1\n"
+            "    marker.write_text(str(deadline))\n"
+            "    command.extend(['--timeout', '1'])\n"
+            "sys.exit(subprocess.run(command).returncode)\n"
+        )
+        export_wrapper = self.root / "export-wrapper"
+        export_wrapper.write_text(
+            f"#!{sys.executable}\n"
+            "import subprocess, sys, time\n"
+            "from pathlib import Path\n"
+            f"deadline = float(Path({str(marker)!r}).read_text())\n"
+            "time.sleep(max(0, deadline - time.monotonic()) + 0.1)\n"
+            f"sys.exit(subprocess.run([{str(self.launcher)!r}, *sys.argv[1:]]).returncode)\n"
+        )
+        bookmarks_wrapper = self.root / "bookmarks-wrapper"
+        bookmarks_wrapper.write_text(
+            f"#!{sys.executable}\n"
+            "import subprocess, sys, time\n"
+            "from pathlib import Path\n"
+            f"assert time.monotonic() > float(Path({str(marker)!r}).read_text())\n"
+            "time.sleep(0.1)\n"
+            f"sys.exit(subprocess.run([{str(BOOKMARKS)!r}, *sys.argv[1:]]).returncode)\n"
+        )
+        for wrapper in (snapshot_wrapper, export_wrapper, bookmarks_wrapper):
+            wrapper.chmod(0o755)
+        result = self.run_export(
+            BEETS_GRAPH_SNAPSHOT=str(snapshot_wrapper),
+            BEETS_GRAPH_LAUNCHER=str(export_wrapper),
+            BEETS_GRAPH_BOOKMARKS=str(bookmarks_wrapper),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Snapshots completed", result.stdout)
+        exported = json.loads(self.output.read_text())
+        self.assertEqual(exported["albums"][0]["first_played"], "2021-01-01")
+        self.assertEqual(len(exported["bookmarks"]), 9)
+        self.assertEqual(
+            set(self.state.iterdir()), {self.output, self.covers, self.cache}
+        )
+
     def test_export_creates_cache_with_group_traverse_permission(self):
         self.covers.rmdir()
         result = self.run_export()

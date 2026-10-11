@@ -75,11 +75,34 @@ def backup(source, target, deadline):
     check()
     reader = sqlite3.connect(uri, uri=True, timeout=1)
     try:
+        while True:
+            check()
+            try:
+                if reader.execute("PRAGMA journal_mode").fetchone()[0] == "wal":
+                    # An orphaned read-only SHM with an empty WAL invalidates
+                    # SQLite's cache at every new read transaction, restarting
+                    # a stepped backup even without a writer. Pin one WAL
+                    # snapshot; BEGIN alone does not establish a read lock.
+                    reader.execute("BEGIN")
+                    reader.execute(
+                        "SELECT rootpage FROM sqlite_schema LIMIT 1"
+                    ).fetchone()
+                break
+            except sqlite3.OperationalError as exc:
+                reader.rollback()
+                if getattr(exc, "sqlite_errorcode", 0) & 0xFF not in (
+                    sqlite3.SQLITE_BUSY,
+                    sqlite3.SQLITE_LOCKED,
+                ):
+                    raise
+                check()
+                time.sleep(0.1)
+        check()
         writer = sqlite3.connect(target)
         try:
             os.chmod(target, 0o600)
-            # Short backup steps release SQLite read locks between batches.
-            # SQLite restarts changed pages itself; only a complete copy wins.
+            # WAL writers can still commit; checkpointing waits for our reader
+            # to close. Rollback databases retain short read-lock batches.
             reader.backup(writer, pages=256, progress=check, sleep=0.1)
             check()
         finally:
