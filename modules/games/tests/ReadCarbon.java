@@ -3,6 +3,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipFile;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -14,7 +15,9 @@ import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.identity.Identity;
 import net.kyori.adventure.pointer.Pointers;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.renderer.TranslatableComponentRenderer;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.Tag;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -50,7 +53,31 @@ public class ReadCarbon {
     static boolean hasClick(Component c) {
         return c.clickEvent() != null || c.children().stream().anyMatch(ReadCarbon::hasClick);
     }
+    static boolean hasRank(Component c, String key, String fallback, String label) {
+        if (c instanceof TranslatableComponent t && t.key().equals(key)) {
+            require(fallback.equals(t.fallback()), "Missing rank text fallback");
+            require(c.hoverEvent() != null, "Missing staff tooltip");
+            require(c.hoverEvent().value() instanceof Component hover &&
+                PlainTextComponentSerializer.plainText().serialize(hover).equals(label), "Wrong tooltip");
+            return true;
+        }
+        return c.children().stream().anyMatch(child -> hasRank(child, key, fallback, label));
+    }
     public static void main(String[] args) throws Exception {
+        com.google.gson.JsonObject translations;
+        try (var pack = new ZipFile(args[3]); var reader = new InputStreamReader(
+                pack.getInputStream(pack.getEntry("assets/infra/lang/en_us.json")), StandardCharsets.UTF_8)) {
+            translations = JsonParser.parseReader(reader).getAsJsonObject();
+        }
+        var javaRenderer = TranslatableComponentRenderer.usingTranslationSource(new net.kyori.adventure.translation.Translator() {
+            public net.kyori.adventure.key.Key name() { return net.kyori.adventure.key.Key.key("infra:rank-test"); }
+            public java.text.MessageFormat translate(String key, java.util.Locale locale) {
+                return translations.has(key) ? new java.text.MessageFormat(translations.get(key).getAsString(), locale) : null;
+            }
+        });
+        // The pinned Geyser renderer supplies the fallback for unknown Java keys.
+        // No pack translations are registered on the proxy or server.
+        var bedrockRenderer = new org.geysermc.geyser.text.MinecraftTranslationRegistry();
         var primary = HoconConfigurationLoader.builder().path(Path.of(args[0])).build().load();
         require(primary.node("config-version").getInt() == 1, "Missing pinned Carbon schema version");
         net.draycia.carbon.common.config.PrimaryConfig.upgrade(primary);
@@ -125,6 +152,19 @@ public class ReadCarbon {
                     ? net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand().deserialize(prefix)
                     : MiniMessage.miniMessage().deserialize(prefix));
             require(plain.equals(expectedPrefix + ".Bedrock_Friend › " + body), "Unresolved placeholders or unsafe body: " + plain);
+            String group = entry.getKey();
+            String label = group.substring(0, 1).toUpperCase() + group.substring(1);
+            String javaText = PlainTextComponentSerializer.plainText().serialize(javaRenderer.render(rendered, java.util.Locale.US));
+            String bedrockText = PlainTextComponentSerializer.plainText().serialize(bedrockRenderer.render(rendered, "en_us"));
+            String rankKey = "infra.rank." + group;
+            if (!group.equals("default")) {
+                require(hasRank(rendered, rankKey, "[" + label + "]", label), "Lost translatable rank prefix");
+                require(javaText.equals(translations.get(rankKey).getAsString() + " .Bedrock_Friend › " + body), "Java icon was not resolved");
+                require(bedrockText.equals("[" + label + "] .Bedrock_Friend › " + body), "Bedrock rank fallback failed");
+            } else {
+                require(javaText.equals(".Bedrock_Friend › " + body) && javaText.equals(bedrockText), "Default player gained a badge");
+            }
+            require(bedrockText.codePoints().noneMatch(cp -> cp >= 0xe000 && cp <= 0xf8ff), "PUA leaked to Bedrock");
             require(!hasClick(rendered), "Player acquired click event");
             TextColor nameColor = MiniMessage.miniMessage().deserialize(color + "name").color();
             require(checkText(rendered, null, ".Bedrock_Friend", nameColor), "Missing name component");

@@ -250,8 +250,15 @@ for field, directory, server in (
         else:
             assert len(prefixes) == 1
             assert prefixes[0].startswith(f"prefix.{weight}.")
-            assert f"[{rank.title()}]" in prefixes[0]
-            assert prefixes[0].endswith("&r ")
+            color = next(
+                node["key"].removeprefix("meta.chat_color.<").removesuffix(">")
+                for node in nodes
+                if node["key"].startswith("meta.chat_color.")
+            )
+            assert f"<lang_or:infra.rank.{rank}:'[{rank.title()}]'>" in prefixes[0]
+            assert f"<hover:show_text:'{rank.title()}'>" in prefixes[0]
+            assert prefixes[0].endswith(f"</hover></{color}> ")
+            assert "&" not in prefixes[0]
     builder_nodes = {
         node["key"] for node in bootstrap["groups"]["builder"]["nodes"] if node["value"]
     }

@@ -102,24 +102,34 @@
           };
           "${dir}/server.properties" = {
             source = toString (
-              pkgs.writeText "${id}-server.properties" ''
-                server-ip=127.0.0.1
-                server-port=${toString s.minecraft.serverPort}
-                online-mode=false
-                enforce-secure-profile=false
-                white-list=true
-                enforce-whitelist=true
-                enable-rcon=true
-                rcon.port=${toString s.minecraft.rconPort}
-                rcon.password=@RCON@
-                broadcast-rcon-to-ops=false
-                gamemode=survival
-                difficulty=normal
-                level-name=world
-                spawn-protection=0
-                max-players=${toString s.minecraft.maxPlayers}
-                motd=${s.displayName}
-              ''
+              pkgs.runCommand "${id}-server.properties"
+                {
+                  template = pkgs.writeText "${id}-server.properties.in" ''
+                    server-ip=127.0.0.1
+                    server-port=${toString s.minecraft.serverPort}
+                    online-mode=false
+                    enforce-secure-profile=false
+                    white-list=true
+                    enforce-whitelist=true
+                    enable-rcon=true
+                    rcon.port=${toString s.minecraft.rconPort}
+                    rcon.password=@RCON@
+                    broadcast-rcon-to-ops=false
+                    gamemode=survival
+                    difficulty=normal
+                    level-name=world
+                    spawn-protection=0
+                    max-players=${toString s.minecraft.maxPlayers}
+                    motd=${s.displayName}
+                    resource-pack=${cfg.minecraftRankPackUrl}
+                    resource-pack-sha1=@RESOURCE_PACK_SHA1@
+                    require-resource-pack=true
+                    resource-pack-prompt={"text":"This server uses a small resource pack for staff rank icons. Java players must accept it to join."}
+                  '';
+                }
+                ''
+                  ${pkgs.python3}/bin/python3 ${./minecraft-resource-pack.py} properties "$template" ${cfg.artifacts.games-rank-icons} "$out"
+                ''
             );
             replacements."@RCON@" = secretPath "games/minecraft/${id}-rcon";
           };

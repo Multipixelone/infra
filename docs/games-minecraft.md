@@ -541,6 +541,51 @@ not valid. With the default weight calculation, switching the stored value
 also prints a warning that the displayed group is calculated from parents.
 Assign a moderator later with `lp user <uuid> parent add mod`.
 
+## Staff rank icons
+
+Java players must accept a small server resource pack to join. The prompt explains
+that it supplies staff rank icons. Mod has a purple shield, Admin a green crown,
+and Builder a gold hammer; default players have no badge. The original 9px pixel
+grids in `modules/games/rank-icons.json` generate the PNGs and ZIP reproducibly.
+The pinned 26.3 client supplies resource-pack format 97.1. Nix computes the ZIP's
+SHA-1 when building `server.properties`, and nginx serves its versioned URL from
+`https://map.finnrut.is/packs/` even while Paper sleeps. Declining the required
+pack, or failing to download it, prevents a Java player from joining.
+
+LuckPerms prefixes contain MiniMessage translation components with explicit text
+fallbacks and rank-name hover tooltips. The pack translates `infra.rank.mod`,
+`infra.rank.admin`, and `infra.rank.builder` to U+E100, U+E101, and U+E102 in the
+default font. Without those translations, clients display colored `[Mod]`,
+`[Admin]`, or `[Builder]` labels. Bedrock intentionally uses these labels: no
+Bedrock font pack is installed. Pinned Geyser 2.11.3 build 1249 acknowledges
+required Java packs without downloading them and honors component fallbacks.
+Changing that pin must preserve both behaviors. Hover tooltips are a Java feature.
+
+Chat consumes `<luckperms_prefix>` and `chat_color` metadata. The concurrent
+`mc-tab-menu` implementation consumes the same prefix through
+`%luckperms-prefix%` with MiniMessage enabled; its component transport must retain
+the translation and fallback until delivery. There is no separate tab badge
+palette. Discord webhook chat uses usernames and message bodies only, so rank
+glyphs do not enter Discord-bound formatting.
+
+Deploying updated files does not reconcile LuckPerms' PostgreSQL nodes. For the
+declared groups/users, apply the new prefixes with the existing approved
+replacement import after Paper wakes:
+
+```fish
+sudo games-console survival 'lp import bootstrap.json.gz --replace'
+sudo games-console survival 'lp sync'
+sudo games-console velocity 'lpv sync'
+```
+
+**Wait for completion in the Paper log between these commands**, and check the
+proxy log after its sync; RCON replies do not establish asynchronous completion.
+The replacement import also replaces the declared groups/users and staff track,
+as described above. If unrelated interactive grants must be preserved instead,
+use the generated `chat-inventory.commands` repair commands and verify each
+asynchronous result. Existing legacy prefixes remain readable until this update
+is applied. Verify Java badges and Bedrock labels after reconnecting.
+
 ## Homes, requests and graves
 
 HuskHomes uses local SQLite at
@@ -731,8 +776,9 @@ use the existing LuckPerms groups rather than a separate permission store.
 DiscordSRV's existing Discord-to-Minecraft message format uses
 `%toprolecolor%`, so the top Discord role's colour also appears in Minecraft
 chat: purple for Mod and green for Admin when these are the highest roles.
-There is no native LuckPerms prefix/tab-list formatter configured; no chat
-formatter plugin is added.
+LuckPerms rank prefixes are consumed by CarbonChat; see Staff rank icons for
+the shared prefix contract with the tab formatter. Discord role synchronization
+does not change these Minecraft prefixes.
 
 The JDBC account-link backend is explicitly empty, selecting DiscordSRV
 1.30.5's default local `accounts.aof` storage under

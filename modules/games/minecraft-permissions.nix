@@ -7,32 +7,7 @@
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       secret = "games/minecraft/luckperms-db-password";
       ready = cfg.secretFiles ? ${secret} && builtins.pathExists cfg.secretFiles.${secret};
-      # One presentation table shared by prefix and name metadata. Keep the
-      # builder palette until a new palette is chosen; replacing a prefix with
-      # its icon variant is a one-line change (mod ◆, admin ★).
-      ranks = {
-        default = {
-          weight = 0;
-          color = "#cba6f7";
-        };
-        builder = {
-          weight = 10;
-          color = "gold";
-          prefix = "&6[Builder]&r ";
-        };
-        mod = {
-          weight = 20;
-          color = "light_purple";
-          # Icon variant: prefix = "&d◆&r ";
-          prefix = "&d[Mod]&r ";
-        };
-        admin = {
-          weight = 30;
-          color = "green";
-          # Icon variant: prefix = "&a★&r ";
-          prefix = "&a[Admin]&r ";
-        };
-      };
+      ranks = cfg.minecraftRanks;
       grants = map (key: {
         inherit key;
         value = true;

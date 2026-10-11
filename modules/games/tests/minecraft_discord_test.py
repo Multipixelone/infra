@@ -71,6 +71,17 @@ for case in cases:
             configuration["Experiment_WebhookChatMessageUsernameFormat"] == "%username%"
         )
         assert configuration["Experiment_WebhookChatMessageFormat"] == "%message%"
+        # Rank components belong only to Minecraft recipient formatting.
+        for value in [
+            configuration["Experiment_WebhookChatMessageUsernameFormat"],
+            configuration["Experiment_WebhookChatMessageFormat"],
+            *messages.values(),
+        ]:
+            if isinstance(value, str):
+                assert "infra.rank." not in value and "%prefix%" not in value
+                assert not any(
+                    0xE000 <= ord(character) <= 0xF8FF for character in value
+                )
         assert (
             configuration["Experiment_WebhookChatMessageUsernameFromDiscord"] is False
         )

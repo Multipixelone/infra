@@ -121,6 +121,13 @@
             ;
         };
         gamesPublished = config.servicePublication.applications ? games;
+        minecraftRankPack = {
+          url = enabled.infra.games.minecraftRankPackUrl;
+          artifact = toString enabled.infra.games.artifacts.games-rank-icons;
+          properties =
+            enabled.infra.games.runtime.survival.configTemplates."/srv/games/minecraft/survival/server.properties".source;
+          absentWithoutGames = !(without.infra.games.artifacts ? games-rank-icons);
+        };
         productionFixtureSecrets = lib.any (path: path == ./tests/fixture.age) (
           lib.attrValues host.config.infra.games.secretFiles
         );
@@ -173,8 +180,15 @@
             }
             ''
               python3 - ${fixture} <<'PY'
-              import json, re, sys
+              import hashlib, json, pathlib, re, sys
               data = json.load(open(sys.argv[1]))
+              pack = data["minecraftRankPack"]
+              assert pack["absentWithoutGames"]
+              assert pack["url"].startswith("https://map.finnrut.is/packs/")
+              digest = hashlib.sha1((pathlib.Path(pack["artifact"]) / "rank-icons.zip").read_bytes()).hexdigest()
+              properties = pathlib.Path(pack["properties"]).read_text()
+              assert f"resource-pack-sha1={digest}\n" in properties
+              assert "require-resource-pack=true\n" in properties
               units = {"minecraft-server-survival.service", "minecraft-server-velocity.service", "podman-games-terraria.service"}
               for name in ("missing", "enabled"):
                   fixture = data[name]

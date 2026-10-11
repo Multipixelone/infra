@@ -212,7 +212,7 @@ let
   vhost = cfg.services.nginx.virtualHosts.minecraft-map-origin;
   permissions = evaluate {
     "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
-  } "" "" true { };
+  } "" "" true { } true;
   permissionsFixture = {
     proxyInstalled = permissions.infra.games.minecraftPlugins.proxy.jars ? luckperms;
     backendInstalled = permissions.infra.games.minecraftPlugins.backends.survival.jars ? luckperms;
@@ -243,15 +243,20 @@ let
   };
   polishFixture = c: {
     backends = c.infra.games.minecraftPlugins.backends;
+    rankPack = c.infra.games.artifacts.games-rank-icons or null;
+    rankPackUrl = c.infra.games.minecraftRankPackUrl;
+    ranks = c.infra.games.minecraftRanks;
     proxyJars = lib.attrNames c.infra.games.minecraftPlugins.proxy.jars;
+    proxySymlinks = c.services.minecraft-servers.servers.velocity.symlinks or { };
     servers = lib.mapAttrs (id: _: {
       inherit (c.infra.games.runtime.${id}) available worldPaths;
+      configTemplates = c.infra.games.runtime.${id}.configTemplates;
       environment = c.systemd.services."minecraft-server-${id}".environment;
       symlinks = c.services.minecraft-servers.servers.${id}.symlinks;
     }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.servers);
   };
   polishFixtures = {
-    missingSecrets = polishFixture (evaluate { } "" "" false { });
+    missingSecrets = polishFixture (evaluate { } "" "" false { } true);
     withLuckPerms = polishFixture permissions;
     withoutAdmin = polishFixture (
       (host.extendModules {
@@ -269,7 +274,7 @@ let
       evaluate {
         "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
         "games/minecraft/discordsrv-token" = ./tests/fixture.age;
-      } "123456789012345678" "234567890123456789" true { }
+      } "123456789012345678" "234567890123456789" true { } true
     );
     additionalBackend =
       polishFixture
@@ -307,6 +312,43 @@ let
 in
 {
   perSystem = { pkgs, ... }: {
+    checks.games-minecraft-resource-pack =
+      let
+        packPath = lib.removePrefix "https://map.finnrut.is" cfg.infra.games.minecraftRankPackUrl;
+        location = vhost.locations."= ${packPath}";
+      in
+      pkgs.runCommand "games-minecraft-resource-pack-check"
+        {
+          nativeBuildInputs = [
+            pkgs.python3
+            pkgs.nginx
+          ];
+        }
+        ''
+          python3 ${./tests/minecraft_resource_pack_test.py} \
+            ${pkgs.writeText "minecraft-rank-fixtures.json" (builtins.toJSON polishFixtures)} \
+            ${./minecraft-resource-pack.py} ${cfg.infra.games.artifacts.games-minecraft-client} \
+            ${pkgs.writeText "minecraft-rank-nginx.conf" ''
+              pid @ROOT@/nginx.pid;
+              error_log stderr;
+              events {}
+              http {
+                access_log off;
+                client_body_temp_path @ROOT@/body;
+                server {
+                  listen 127.0.0.1:@PORT@;
+                  root @ROOT@/empty-map;
+                  ${vhost.extraConfig}
+                  location = ${packPath} {
+                    alias ${location.alias};
+                    ${location.extraConfig}
+                  }
+                  location / { try_files ${vhost.locations."/".tryFiles}; }
+                }
+              }
+            ''}
+          touch "$out"
+        '';
     checks.games-minecraft-discord =
       pkgs.runCommand "games-minecraft-discord-check"
         {
@@ -321,7 +363,8 @@ in
           python3 ${./tests/minecraft_discord_test.py} \
             ${pkgs.writeText "minecraft-discord-fixtures.json" (builtins.toJSON fixtures)} \
             ${cfg.infra.games.artifacts.games-discordsrv}
-          python3 ${./tests/minecraft_discord_status_test.py} ${./minecraft-discord-status.py} \
+          PYTHONPATH=${pkgs.writeTextDir "minecraft_status.py" (builtins.readFile ./minecraft_status.py)} \
+            python3 ${./tests/minecraft_discord_status_test.py} ${./minecraft-discord-status.py} \
             ${./tests/metrics_exposition.py} ${./metrics.py} ${./log-patterns.json}
           python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
           touch "$out"
@@ -352,6 +395,7 @@ in
                   carbonCache = cfg.infra.games.artifacts.games-carbon-libraries;
                   miniplaceholders = cfg.infra.games.artifacts.games-miniplaceholders;
                   luckpermsExpansion = cfg.infra.games.artifacts.games-miniplaceholders-luckperms;
+                  geyser = cfg.infra.games.artifacts.games-geyser;
                   flectonepulse = cfg.infra.games.artifacts.games-flectonepulse;
                   flectonepulseCache = cfg.infra.games.artifacts.games-flectonepulse-libraries;
                   minecraftClient = cfg.infra.games.artifacts.games-minecraft-client;
