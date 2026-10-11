@@ -32,6 +32,28 @@
       flock = lib.getExe' pkgs.util-linux "flock";
       nc = lib.getExe' pkgs.netcat-openbsd "nc";
       ip = lib.getExe' pkgs.iproute2 "ip";
+      runuser = lib.getExe' pkgs.util-linux "runuser";
+
+      approvalNotifier = pkgs.writeShellApplication {
+        name = "openclaw-nixos-approval-notify";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.nodejs
+        ];
+        text = ''
+          # This event is advisory, never authorization. Activate remains the sole
+          # authority and verifies the root-owned, single-use approval record;
+          # a forged event without that record cannot enable activation.
+          (( EUID != 0 )) && [[ "$(id -un)" == tunnel ]] || exit 1
+          (( $# == 3 )) || exit 1
+          cd /home/tunnel
+          message="openclaw-nixos-approve: APPROVED mode=$2 path=$1 expires=$3. Activate per skills/nixos-deploy."
+          exec /home/tunnel/.npm-global/bin/openclaw system event \
+            --port 18789 \
+            --session-key agent:main:telegram:direct:763701512 \
+            --mode now --timeout 5000 --text "$message"
+        '';
+      };
 
       # nh launches nix and systemd helpers internally. Its PATH is restricted to
       # immutable store directories even though this module invokes every helper
@@ -226,10 +248,20 @@
         if ! IFS= read -r confirmation || [[ "$confirmation" != "approve" ]]; then
           refuse 77 "approval cancelled target=$TARGET mode=$MODE"
         fi
+        if (( $(${coreutils}/date +%s) >= expiry )); then
+          refuse 77 "approval refused reason=approval_expired target=$TARGET mode=$MODE"
+        fi
 
         umask 077
         temp="$(${coreutils}/mktemp ${approvedDir}/.approval.XXXXXXXXXX)"
-        cleanup() { ${coreutils}/rm -f -- "$temp"; }
+        record=""
+        cleanup() {
+          ${coreutils}/rm -f -- "$temp"
+          if [[ -n "$record" ]]; then
+            ${coreutils}/rm -f -- "$record"
+            ${coreutils}/sync -f ${approvedDir} || true
+          fi
+        }
         trap cleanup EXIT
         random_id="''${temp##*.approval.}"
         record_id="approval-$random_id"
@@ -243,10 +275,32 @@
           '{ path: $path, mode: $mode, narHash: $narHash, issuingUid: $issuingUid, issuedAt: $issuedAt, expiresAt: $expiresAt }' \
           > "$temp"
         ${coreutils}/chmod 0600 "$temp"
+        # Atomic rename alone is not durable: flush the completed file before
+        # publication, then the directory's filesystem before any notification.
+        ${coreutils}/sync -f "$temp"
         record="${approvedDir}/$record_id.json"
         ${coreutils}/mv -- "$temp" "$record"
+        ${coreutils}/sync -f ${approvedDir}
+        if (( $(${coreutils}/date +%s) >= expiry )); then
+          refuse 77 "approval refused reason=approval_expired target=$TARGET mode=$MODE"
+        fi
+        expires_iso="$(${coreutils}/date -u --date="@$expiry" +%Y-%m-%dT%H:%M:%SZ)"
         trap - EXIT
         journal "approval issued id=$record_id path=$TARGET mode=$MODE nar_hash=$nar_hash issuing_uid=$issuer expires_at=$expiry"
+
+        # Only immutable helpers run as root. Drop privileges and scrub the
+        # environment BEFORE the mutable CLI reads tunnel's normal credentials.
+        # No credential is read here, passed in argv, or copied into the store.
+        if [[ "''${SUDO_USER:-}" != tunnel ]] \
+          || [[ "$issuer" != "$(${coreutils}/id -u tunnel)" ]] \
+          || ! ${coreutils}/timeout --kill-after=1s 10s \
+            ${runuser} -u tunnel -- \
+            ${coreutils}/env -i HOME=/home/tunnel USER=tunnel LOGNAME=tunnel \
+              OPENCLAW_STATE_DIR=/home/tunnel/.openclaw LANG=C LC_ALL=C \
+              ${lib.getExe approvalNotifier} "$TARGET" "$MODE" "$expires_iso" \
+              </dev/null >/dev/null 2>&1; then
+          ${coreutils}/printf '%s\n' "couldn't notify Kestrel — tell it manually" >&2
+        fi
       '';
 
       activateLogic = pkgs.writeShellScript "openclaw-nixos-activate-logic" ''
@@ -423,7 +477,8 @@
       # The public commands are deliberately tiny. In particular, activate
       # always replaces its inherited environment before entering any logic.
       openclawNixosApprove = pkgs.writeShellScriptBin "openclaw-nixos-approve" ''
-        exec ${coreutils}/env -i PATH=${cleanPath} LANG=C LC_ALL=C SUDO_UID="''${SUDO_UID:-0}" \
+        exec ${coreutils}/env -i PATH=${cleanPath} LANG=C LC_ALL=C \
+          SUDO_UID="''${SUDO_UID:-0}" SUDO_USER="''${SUDO_USER:-}" \
           ${bash} --noprofile --norc ${approveLogic} "$@"
       '';
       openclawNixosActivate = pkgs.writeShellScriptBin "openclaw-nixos-activate" ''
