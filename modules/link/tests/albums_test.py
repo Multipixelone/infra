@@ -54,6 +54,14 @@ class AlbumGraphHostTest(unittest.TestCase):
         with sqlite3.connect(self.library) as database:
             database.execute("CREATE TABLE fixture(value)")
             database.execute("INSERT INTO fixture VALUES (2)")
+            database.execute("CREATE TABLE albums(id INTEGER PRIMARY KEY, added REAL)")
+            database.execute("INSERT INTO albums VALUES (1, 1640995200)")
+            database.execute(
+                "CREATE TABLE album_attributes(entity_id INTEGER, key TEXT, value TEXT)"
+            )
+            database.execute(
+                "INSERT INTO album_attributes VALUES (1, 'lastfm_first_played', '1609459200')"
+            )
         self.config = self.root / "config.yaml"
         self.config.write_text("synthetic config\n")
         self.events = self.root / "life-events.json"
@@ -84,9 +92,11 @@ class AlbumGraphHostTest(unittest.TestCase):
             "phrase_cache = Path(sys.argv[sys.argv.index('--cache-dir') + 1]) / 'phrases-fixture.npz'\n"
             "if not phrase_cache.exists():\n"
             "    phrase_cache.write_bytes(b'synthetic phrase cache')\n"
-            "exported = {'schema_version': 3, 'albums': [{'cover': name, 'cover_large': large}]}\n"
+            "exported = {'schema_version': 3, 'albums': [{'id': 1, 'added': '2022-01-01T00:00:00Z', 'cover': name, 'cover_large': large}]}\n"
             "exported['albums'].extend(json.loads(os.environ.get('TEST_ALBUMS', '[]')))\n"
             "Path(os.environ['TEST_UNENRICHED']).write_text(json.dumps(exported))\n"
+            "if os.environ.get('TEST_BAD_GRAPH'):\n"
+            "    del exported['albums'][0]['id']\n"
             "out.write_text('partial' if os.environ.get('TEST_FAIL') else json.dumps(exported))\n"
             "out.chmod(0o600)\n"
             "if os.environ.get('TEST_FAIL'):\n"
@@ -181,15 +191,26 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.assertEqual(Path(arguments[-1]).parent.parent, self.state)
         exported = json.loads(self.output.read_text())
         self.assertEqual(exported["schema_version"], 3)
-        self.assertEqual(len(exported["bookmarks"]), 8)
+        self.assertEqual(len(exported["bookmarks"]), 9)
         self.assertNotIn("sober-date", {e["id"] for e in exported["bookmarks"]})
-        self.assertNotIn(
-            "beets-library-import", {e["id"] for e in exported["bookmarks"]}
+        derived = next(
+            e for e in exported["bookmarks"] if e["id"] == "beets-library-import"
         )
-        self.assertEqual(
-            {key: value for key, value in exported.items() if key != "bookmarks"},
-            json.loads((self.root / "unenriched.json").read_text()),
-        )
+        self.assertEqual(derived["date"], "2022-01-01")
+        original = json.loads((self.root / "unenriched.json").read_text())
+        stripped = {key: value for key, value in exported.items() if key != "bookmarks"}
+        stripped["albums"] = [
+            {
+                key: value
+                for key, value in album.items()
+                if key not in ("first_played", "first_played_source")
+            }
+            for album in exported["albums"]
+        ]
+        self.assertEqual(stripped, original)
+        self.assertEqual(exported["albums"][0]["added"], "2022-01-01T00:00:00Z")
+        self.assertEqual(exported["albums"][0]["first_played"], "2021-01-01")
+        self.assertEqual(exported["albums"][0]["first_played_source"], "lastfm")
         thumbnail = self.covers / exported["albums"][0]["cover"]
         self.assertTrue(thumbnail.is_file())
         self.assertEqual(thumbnail.stat().st_mode & 0o777, 0o640)
@@ -238,9 +259,9 @@ class AlbumGraphHostTest(unittest.TestCase):
         result = self.run_export(
             TEST_ALBUMS=json.dumps(
                 [
-                    {"added": "2024-03-04T12:00:00Z"},
-                    {"added": "2020-12-31T23:30:00-02:00"},
-                    {"added": None},
+                    {"id": 2, "added": "2024-03-04T12:00:00Z"},
+                    {"id": 3, "added": "2020-12-31T23:30:00-02:00"},
+                    {"id": 4, "added": None},
                 ]
             )
         )
@@ -294,6 +315,38 @@ class AlbumGraphHostTest(unittest.TestCase):
         self.assertEqual(
             set(self.state.iterdir()), {self.output, self.covers, self.cache}
         )
+
+    def test_failed_enrichment_preserves_previous_data_and_cleans_staging(self):
+        self.output.write_text("previous")
+        result = self.run_export(TEST_BAD_GRAPH="1")
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertEqual(self.output.read_text(), "previous")
+        self.assertEqual(
+            set(self.state.iterdir()), {self.output, self.covers, self.cache}
+        )
+
+    def test_enrichments_preserve_each_others_fields(self):
+        self.assertEqual(self.run_export().returncode, 0)
+        published = json.loads(self.output.read_text())
+        self.assertEqual(published["albums"][0]["first_played"], "2021-01-01")
+        self.assertEqual(len(published["bookmarks"]), 9)
+        # Repeating bookmarks after first-played must retain all album fields;
+        # repeating first-played after bookmarks must retain the whole timeline.
+        for command in (
+            [
+                str(BOOKMARKS),
+                "export",
+                str(self.events),
+                str(LIFE_EVENTS_SCHEMA),
+                str(self.output),
+            ],
+            [str(SNAPSHOT), "enrich-first-played", str(self.library), str(self.output)],
+        ):
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(self.output.read_text()), published)
 
     def test_export_creates_cache_with_group_traverse_permission(self):
         self.covers.rmdir()

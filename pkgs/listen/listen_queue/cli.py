@@ -10,6 +10,8 @@ from pathlib import Path
 
 from .discovery import discover
 from .errors import ListenError, invalid
+from .first_played import backfill
+from .first_played import report as first_played_report
 from .graph import Graph
 from .library import Queue, number, retry_busy, shared_lock, state_lock, timeout_setting
 from .plex import seed, sync
@@ -48,6 +50,13 @@ Its default is any album with plays > 0; --listened-only instead includes
 all marked-listened albums, even with zero plays. plays_per_track divides
 by all album tracks. Play counts describe tracks played, not full album listens.
 No command writes media tags. No arbitrary beets query syntax is accepted.
+backfill-first-played scans Tunnelmaker's Last.fm history only before the
+earliest album added date. It defaults to dry-run; --apply writes only the
+album lastfm_first_played attribute. Both modes save private raw pages and
+checkpoints; completed cache replay needs no API requests or credentials.
+--credentials-file reads API_KEY from the existing agenix lastfm assignments
+(default LISTEN_LASTFM_CREDENTIALS). --cache-dir defaults to
+LISTEN_STATE_DIR/lastfm-first-played. No scheduled date sync is installed.
 
 Discovery: pick defaults to one queued album, weighted-random from the top 5;
 --library includes all beets albums. --count samples without replacement from
@@ -133,6 +142,7 @@ def parser():
         "most-played",
         "seed-plex",
         "sync-plex",
+        "backfill-first-played",
     ):
         sub = commands.add_parser(
             command,
@@ -140,7 +150,21 @@ def parser():
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         sub.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
-        if command in ("add", "done", "drop"):
+        if command == "backfill-first-played":
+            mode = sub.add_mutually_exclusive_group()
+            mode.add_argument(
+                "--dry-run",
+                action="store_true",
+                help="cache and report without changing beets (default)",
+            )
+            mode.add_argument(
+                "--apply",
+                action="store_true",
+                help="apply earliest dates after a complete scan",
+            )
+            sub.add_argument("--cache-dir", type=Path)
+            sub.add_argument("--credentials-file", type=Path)
+        elif command in ("add", "done", "drop"):
             sub.add_argument(
                 "text",
                 nargs="?",
@@ -371,6 +395,9 @@ def access_mode(args):
 
 
 def execute(args, config, state, lock, argv):
+    if args.command == "backfill-first-played":
+        # The backfill holds the import lock only during its final DB writes.
+        return backfill(args, config, state, lock)
     writes_beets, writes_state = access_mode(args)
     lock_timeout = timeout_setting("LISTEN_BEETS_LOCK_TIMEOUT", 30)
     read_timeout = timeout_setting("LISTEN_SQLITE_BUSY_TIMEOUT", 10)
@@ -421,7 +448,10 @@ def album_line(album):
 
 
 def human(command, data):
-    if command in ("add", "done", "drop"):
+    if command == "backfill-first-played":
+        first_played_report(data)
+        print("Applied." if data["applied"] else "Dry-run; use --apply to write dates.")
+    elif command in ("add", "done", "drop"):
         print(f"{data['album']['listen_state']}: {album_line(data['album'])}")
     elif command == "pick" and data["mode"] == "choose":
         print("Chosen: " + album_line(data["chosen"]))
@@ -528,6 +558,7 @@ def main(argv=None):
             "most-played",
             "seed-plex",
             "sync-plex",
+            "backfill-first-played",
         )
         else None
     )

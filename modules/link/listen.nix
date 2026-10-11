@@ -40,6 +40,7 @@
             text = ''
               export LISTEN_BEETS_CONFIG=${lib.escapeShellArg "${config.xdg.configHome}/beets/config.yaml"}
               export LISTEN_BEETS_LOCK=${lib.escapeShellArg "${config.xdg.configHome}/beets/.import.lock"}
+              export LISTEN_LASTFM_CREDENTIALS=${lib.escapeShellArg config.age.secrets.lastfm.path}
               # The CLI locks only mutations and supplies bounded timeout
               # defaults; preserve caller-provided timeout overrides here.
               export PLEXAPI_CONFIG_PATH=${lib.escapeShellArg config.age.secrets.plexapi.path}

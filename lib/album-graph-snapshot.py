@@ -3,12 +3,16 @@
 import argparse
 import errno
 import fcntl
+import json
+import math
 import os
 import signal
 import sqlite3
+import sys
 import tempfile
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -150,7 +154,74 @@ def snapshot(source, target, deadline):
         time.sleep(0.1)
 
 
+def valid_epoch(value):
+    if isinstance(value, bool):
+        return None
+    try:
+        value = float(value)
+        if math.isfinite(value) and value > 0:
+            datetime.fromtimestamp(value, timezone.utc)
+            return value
+    except (ValueError, TypeError, OverflowError, OSError):
+        pass
+    return None
+
+
+def first_played(added, lastfm):
+    added, lastfm = valid_epoch(added), valid_epoch(lastfm)
+    if lastfm is not None and (added is None or lastfm <= added):
+        value, source = lastfm, "lastfm"
+    elif added is not None:
+        value, source = added, "added"
+    else:
+        return None, None
+    return datetime.fromtimestamp(value, timezone.utc).date().isoformat(), source
+
+
+def enrich_first_played(library, output):
+    """Add dates from the same private snapshot used by the embed exporter."""
+    data = json.loads(output.read_text())
+    uri = library.resolve().as_uri() + "?mode=ro"
+    reader = sqlite3.connect(uri, uri=True)
+    try:
+        dates = {
+            album_id: first_played(added, lastfm)
+            for album_id, added, lastfm in reader.execute(
+                "SELECT a.id, a.added, f.value FROM albums AS a "
+                "LEFT JOIN album_attributes AS f ON f.entity_id=a.id "
+                "AND f.key='lastfm_first_played'"
+            )
+        }
+    finally:
+        reader.close()
+    for album in data["albums"]:
+        album["first_played"], album["first_played_source"] = dates.get(
+            album["id"], (None, None)
+        )
+    # The launcher publishes only after this succeeds; preserve every other key.
+    fd, temporary = tempfile.mkstemp(prefix=".first-played-", dir=output.parent)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(data, handle, ensure_ascii=False, allow_nan=False)
+            handle.write("\n")
+        os.replace(temporary, output)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
 def main():
+    if sys.argv[1:2] == ["enrich-first-played"]:
+        parser = argparse.ArgumentParser(
+            description="Enrich staged graph JSON with first-played dates"
+        )
+        parser.add_argument("library", type=Path)
+        parser.add_argument("output", type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        try:
+            enrich_first_played(args.library, args.output)
+        except (sqlite3.Error, OSError, ValueError, KeyError, TypeError):
+            parser.exit(75, "Album graph first-played enrichment failed\n")
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("library", type=Path)
     parser.add_argument("store", type=Path)

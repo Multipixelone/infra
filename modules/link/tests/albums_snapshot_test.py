@@ -2,6 +2,7 @@
 
 import errno
 import importlib.util
+import json
 import os
 import sqlite3
 import subprocess
@@ -18,6 +19,82 @@ SOURCE = Path(sys.argv.pop(1))
 spec = importlib.util.spec_from_file_location("snapshot", SOURCE)
 snapshot = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(snapshot)
+
+
+class FirstPlayedTest(unittest.TestCase):
+    def test_minimum_source_missing_invalid_and_utc_dates(self):
+        for added, lastfm, expected in (
+            (1640995200, 1609459200, ("2021-01-01", "lastfm")),
+            (1609459200, 1640995200, ("2021-01-01", "added")),
+            (None, "1609459200", ("2021-01-01", "lastfm")),
+            (1609459200, None, ("2021-01-01", "added")),
+            (1609459200, 1609459200, ("2021-01-01", "lastfm")),
+            (1609459200, 1609459201, ("2021-01-01", "added")),
+            (1609459199, None, ("2020-12-31", "added")),
+        ):
+            with self.subTest(added=added, lastfm=lastfm):
+                self.assertEqual(snapshot.first_played(added, lastfm), expected)
+        for value in (None, "", "invalid", True, False, 0, -1, "nan", "inf", 10**400):
+            with self.subTest(value=value):
+                self.assertEqual(snapshot.first_played(value, value), (None, None))
+                self.assertEqual(
+                    snapshot.first_played(value, 1609459200), ("2021-01-01", "lastfm")
+                )
+
+    def test_enrichment_preserves_existing_schema_fields_and_bookmarks(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            library, output = root / "library.db", root / "albums.json"
+            with sqlite3.connect(library) as conn:
+                conn.execute("CREATE TABLE albums(id INTEGER PRIMARY KEY, added REAL)")
+                conn.executemany(
+                    "INSERT INTO albums VALUES (?, ?)",
+                    [(1, 1640995200), (2, 1609459200), (3, None)],
+                )
+                conn.execute(
+                    "CREATE TABLE album_attributes(entity_id INTEGER, key TEXT, value TEXT)"
+                )
+                conn.executemany(
+                    "INSERT INTO album_attributes VALUES (?, 'lastfm_first_played', ?)",
+                    [(1, "1609459200"), (2, "1640995200")],
+                )
+            original = {
+                "schema_version": 3,
+                "bookmarks": [{"date": "2020-01-01", "title": "fixture"}],
+                "summary": {"exported_albums": 3},
+                "vector_dimension": 2,
+                "albums": [
+                    {
+                        "id": album_id,
+                        "added": "untouched",
+                        "vector": "AQI=",
+                        "custom": [1, 2],
+                    }
+                    for album_id in (1, 2, 3)
+                ],
+            }
+            output.write_text(json.dumps(original))
+            before = library.read_bytes()
+            snapshot.enrich_first_played(library, output)
+            result = json.loads(output.read_text())
+            self.assertEqual(library.read_bytes(), before)
+            expected = [("2021-01-01", "lastfm"), ("2021-01-01", "added"), (None, None)]
+            for album, dates in zip(result["albums"], expected):
+                self.assertEqual(
+                    (album.pop("first_played"), album.pop("first_played_source")), dates
+                )
+            self.assertEqual(result, original)
+            self.assertEqual(set(root.iterdir()), {library, output})
+
+    def test_failed_enrichment_does_not_replace_json(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            output = root / "albums.json"
+            output.write_text("previous invalid graph")
+            with self.assertRaises(ValueError):
+                snapshot.enrich_first_played(root / "missing.db", output)
+            self.assertEqual(output.read_text(), "previous invalid graph")
+            self.assertFalse((root / "missing.db").exists())
 
 
 class SnapshotTest(unittest.TestCase):
