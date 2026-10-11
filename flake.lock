@@ -4031,26 +4031,6 @@
         "url": "https://devimages-cdn.apple.com/design/resources/download/NY.dmg"
       }
     },
-    "opencode": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1791476692,
-        "narHash": "sha256-v+YFRS/lPtrJerNObt7Ykqcgo6bqRWxqiS7BNsnv0gk=",
-        "owner": "anomalyco",
-        "repo": "opencode",
-        "rev": "388406238bd5ca15564a762840a2362c3a45bd9c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "anomalyco",
-        "repo": "opencode",
-        "type": "github"
-      }
-    },
     "playlist-download": {
       "inputs": {
         "flake-utils": "flake-utils_6",
@@ -4348,7 +4328,6 @@
         "nixpkgs-zotero": "nixpkgs-zotero",
         "noctalia": "noctalia",
         "nur": "nur",
-        "opencode": "opencode",
         "playlist-download": "playlist-download",
         "prem-tweet": "prem-tweet",
         "qmd": "qmd",
