@@ -506,6 +506,7 @@ let
           "copyparty/share"
           "forgejo"
           "grafana"
+          "grimoire"
           "romm"
           "romm/collections"
           "romm/config"
@@ -535,6 +536,7 @@ let
           "forgejo"
           "grafana"
           "grafana/api"
+          "grimoire"
           "romm"
           "romm/collections"
           "romm/config"
@@ -715,7 +717,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "homeassistant", "map", "minecraft-map", "romm", "saves", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "grimoire", "homeassistant", "map", "minecraft-map", "romm", "saves", "seerr"]) and
               (.cloudflare.dnsRecords.map.hostname == "dawarich.finnrut.is") and
               (.cloudflare.dnsRecords["minecraft-map"].hostname == "map.finnrut.is") and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
