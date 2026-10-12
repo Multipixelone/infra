@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import re
 import sys
 import zipfile
 
@@ -20,6 +21,9 @@ assert discord_defaults["ConfigVersion"] == "1.30.5"
 def supported(value, defaults, path=""):
     if path == "DiscordGameStatus":
         assert isinstance(value, (str, list))
+    elif path == "Require linked account to play.Must be in Discord server":
+        # The pinned resource documents bool, guild ID string and guild ID list.
+        assert isinstance(value, (bool, str, list)), path
     elif isinstance(value, dict):
         assert isinstance(defaults, dict), path
         if path in ("Channels", "GroupRoleSynchronizationGroupsAndRolesToSync"):
@@ -34,6 +38,40 @@ def supported(value, defaults, path=""):
 
 for case in cases:
     assert case["installed"] == case["expected"]
+    access_expected = (
+        case["expected"]
+        and case["discord"]["requireLinkedAccount"]
+        and case["ownerExpected"]
+    )
+    assert case["accessEnabled"] == access_expected
+    assert case["ownerAssertion"] == (
+        not (case["expected"] and case["discord"]["requireLinkedAccount"])
+        or case["ownerExpected"]
+    )
+    properties = dict(
+        line.split("=", 1)
+        for line in pathlib.Path(case["properties"]).read_text().splitlines()
+        if "=" in line
+    )
+    for key in ("white-list", "enforce-whitelist"):
+        assert properties[key] == ("false" if access_expected else "true")
+    whitelist = json.loads(pathlib.Path(case["whitelist"]).read_text())
+    if access_expected:
+        assert whitelist == [
+            {"name": "Tunnelmaker", "uuid": "3f771d00-3456-4007-8d66-13fe158488fa"}
+        ]
+        assert whitelist[0]["uuid"] == case["ownerUuid"]
+    else:
+        assert {entry["name"]: entry["uuid"] for entry in whitelist} == case[
+            "configuredWhitelist"
+        ]
+    floodgate = yaml.safe_load(pathlib.Path(case["floodgateConfiguration"]).read_text())
+    assert floodgate["player-link"]["enabled"] is True
+    assert floodgate["player-link"]["enable-global-linking"] is True
+    assert floodgate["player-link"]["require-link"] is False
+    assert floodgate["player-link"]["enable-own-linking"] is False
+    assert floodgate["username-prefix"] == "."
+    assert floodgate["send-floodgate-data"] is False
     mappings = {group: role for group, role in case["discord"]["roles"].items() if role}
     assert case["vaultInstalled"] == (case["expected"] and bool(mappings))
     assert not case[
@@ -137,7 +175,40 @@ for case in cases:
         assert synchronization["NicknameSynchronizationEnabled"] is False
         assert synchronization["BanSynchronizationDiscordToMinecraft"] is False
         assert synchronization["BanSynchronizationMinecraftToDiscord"] is False
-        assert linking["Require linked account to play"]["Enabled"] is False
+        gate = linking["Require linked account to play"]
+        assert gate["Enabled"] == access_expected
+        assert gate["Listener event"] == "AsyncPlayerPreLoginEvent"
+        assert gate["Listener priority"] == "LOWEST"
+        assert gate["Must be in Discord server"] == case["discord"]["guildId"]
+        assert isinstance(gate["Must be in Discord server"], str)
+        assert gate["Bypass names"] == []
+        assert gate["Whitelisted players bypass check"] == access_expected
+        assert gate["Check banned players"] is False
+        assert gate["Only check banned players"] is False
+        assert gate["Subscriber role"]["Require subscriber role to join"] is False
+        assert gate["Subscriber role"]["Subscriber roles"] == []
+        kick = gate["Not linked message"]
+        expected_placeholders = {"BOT", "CODE"}
+        if case["discord"]["inviteUrl"]:
+            expected_placeholders.add("INVITE")
+        assert set(re.findall(r"\{([A-Z]+)\}", kick)) == expected_placeholders
+        assert "DM &b{BOT} &7with just: &b{CODE}" in kick
+        assert kick.index("link.geysermc.org") < kick.index("{CODE}")
+        assert "Java and Bedrock" in kick and "FIRST" in kick
+        assert f"Wait for confirmation, then rejoin &b{case['hostname']}" in kick
+        failures = gate["Messages"]
+        assert "minute" in failures["DiscordSRV still starting"]
+        assert "new code to DM the bot" in failures["Kicked for unlinking"]
+        if case["discord"]["inviteUrl"]:
+            assert "{INVITE}" in failures["Not in server"]
+            assert case["discord"]["inviteUrl"] in failures["Failed for unknown reason"]
+        else:
+            assert "Ask Finn for the Discord invite." in kick
+            assert "Ask Finn for the Discord invite." in failures["Not in server"]
+        for key, value in failures.items():
+            assert set(re.findall(r"\{([A-Z]+)\}", value)) <= (
+                {"INVITE"} if key == "Not in server" else set()
+            )
         assert configuration["DiscordChatChannelRequireLinkedAccount"] is False
         assert configuration["MinecraftDiscordAccountLinkedUsePM"] is True
         assert (
@@ -225,5 +296,6 @@ for case in cases:
 
 
 print(
-    "PASS: pinned DiscordSRV schema, styling, presence, linking, credentials and notifier gating"
+    "PASS: pinned DiscordSRV schema, mandatory linking, guild, owner whitelist, "
+    "kick placeholders, Floodgate, styling, credentials and notifier gating"
 )

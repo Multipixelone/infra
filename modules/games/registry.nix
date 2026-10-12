@@ -68,6 +68,11 @@ let
             default = 9225;
           };
           discord = {
+            requireLinkedAccount = mkOption {
+              type = types.bool;
+              default = false;
+              description = "Require DiscordSRV linking and configured-guild membership instead of the manual whitelist when the bridge is configured.";
+            };
             inviteUrl = mkOption {
               type = types.strMatching "(https://discord\\.gg/[A-Za-z0-9-]+)?";
               default = "";
@@ -236,6 +241,7 @@ in
           minecraft.whitelist.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.operators.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.discord = {
+            requireLinkedAccount = true;
             inviteUrl = "https://discord.gg/hHurpHK8RT";
             guildId = "1518484285466873997";
             channelId = "1557960229528797265";

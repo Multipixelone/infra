@@ -2,7 +2,7 @@
 let
   host = config.flake.nixosConfigurations.link;
   base = host.config.infra.games.servers;
-  evaluate =
+  evaluateHost =
     secrets: guild: channel: enabled: overrides: telemetry:
     (host.extendModules {
       modules = [
@@ -14,6 +14,10 @@ let
             // {
               survival = base.survival // {
                 minecraft = base.survival.minecraft // {
+                  # A former manual/staff entry must not become a Discord bypass.
+                  whitelist = base.survival.minecraft.whitelist // {
+                    FixtureStaff = "11111111-1111-4111-8111-111111111111";
+                  };
                   discord =
                     base.survival.minecraft.discord
                     // {
@@ -28,22 +32,61 @@ let
           );
         }
       ];
-    }).config;
+    });
+  evaluate =
+    secrets: guild: channel: enabled: overrides: telemetry:
+    (evaluateHost secrets guild channel enabled overrides telemetry).config;
   fixtures =
     map
       (
         case:
         let
-          cfg = evaluate (lib.optionalAttrs case.token {
-            "games/minecraft/discordsrv-token" = ./tests/fixture.age;
+          evaluated = evaluateHost (lib.optionalAttrs case.token {
+            "games/minecraft/discordsrv-token" =
+              if case.missingTokenFile or false then ./tests/absent-discord-token.age else ./tests/fixture.age;
           }) case.guild case.channel case.enable (case.overrides or { }) (case.telemetry or true);
+          cfg =
+            (
+              if case ? ownerUuid then
+                evaluated.extendModules {
+                  modules = [ { infra.games.minecraftAdminUuid = lib.mkForce case.ownerUuid; } ];
+                }
+              else
+                evaluated
+            ).config;
           plugins = cfg.infra.games.minecraftPlugins.backends.survival;
           runtime = cfg.infra.games.runtime.survival;
         in
         {
-          expected = case.token && case.guild != "" && case.channel != "" && case.enable;
+          expected =
+            case.token
+            && !(case.missingTokenFile or false)
+            && case.guild != ""
+            && case.channel != ""
+            && case.enable;
           notifierExpected =
-            case.token && case.guild != "" && case.channel != "" && case.enable && (case.telemetry or true);
+            case.token
+            && !(case.missingTokenFile or false)
+            && case.guild != ""
+            && case.channel != ""
+            && case.enable
+            && (case.telemetry or true);
+          ownerExpected = !(case ? ownerUuid);
+          ownerUuid = cfg.infra.games.minecraftAdminUuid;
+          ownerAssertion = lib.all (
+            a:
+            a.assertion
+            ||
+              a.message
+              != "mandatory Discord linking requires exactly one whitelist entry matching Finn's declared Minecraft UUID"
+          ) cfg.assertions;
+          accessEnabled = plugins.discordAccessEnabled;
+          configuredWhitelist = cfg.infra.games.servers.survival.minecraft.whitelist;
+          whitelist = cfg.services.minecraft-servers.servers.survival.files."whitelist.json";
+          properties = runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source;
+          floodgateConfiguration =
+            cfg.infra.games.proxy.configTemplates."/srv/games/minecraft/velocity/plugins/floodgate/config.yml".source;
+          hostname = lib.head cfg.infra.games.servers.survival.hostnames;
           installed = plugins.jars ? discordsrv;
           vaultInstalled = plugins.jars ? vault;
           vaultConfiguration =
@@ -82,6 +125,13 @@ let
         }
         {
           token = true;
+          missingTokenFile = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+        }
+        {
+          token = true;
           guild = "";
           channel = "";
           enable = true;
@@ -109,6 +159,34 @@ let
           guild = "123456789012345678";
           channel = "234567890123456789";
           enable = true;
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.requireLinkedAccount = false;
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          ownerUuid = null;
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.inviteUrl = "";
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.inviteUrl = "https://discord.gg/mandatoryFixture";
         }
         {
           token = true;

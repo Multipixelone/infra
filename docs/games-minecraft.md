@@ -757,16 +757,17 @@ options for Finn's existing bot:
 | `roles.mod`        | `1558172717218533468` | LuckPerms `mod` → Discord Mod (purple)           |
 | `roles.admin`      | `1558173111931904092` | LuckPerms `admin` → Discord Admin (green)        |
 
-The defaults for other servers are empty. Either missing guild/chat ID, missing token or `enable = false`
-means no DiscordSRV JAR is installed; Minecraft itself remains independently
-gated by its existing mandatory credentials. The guild ID documents the guild
-owning the selected channel; DiscordSRV resolves that guild from the channel.
+The defaults for other servers are empty. Either missing guild/chat ID, missing
+encrypted token source or `enable = false` means no DiscordSRV JAR is installed;
+Minecraft retains vanilla whitelist enforcement and its existing mandatory
+credential checks. DiscordSRV resolves its main guild from the chat channel;
+the login requirement separately names the configured `guildId` explicitly.
 Use Discord Developer Mode to copy the IDs and ensure the bot is in that guild.
 An empty events ID keeps join/leave messages in chat; an empty console ID
 disables console forwarding without disabling the bridge.
 
-The pinned 1.30.5 JAR's `config/en.yml`, `messages/en.yml` and
-`synchronization/en.yml` were inspected.
+The pinned stock 1.30.5 JAR's `config/en.yml`, `messages/en.yml`,
+`synchronization/en.yml` and `linking/en.yml` were inspected.
 Routing uses `Channels.global`, `Channels.join` and `Channels.leave`; the message
 templates have no channel selector. Deaths and advancements use distinct
 `deaths`/`awards` routes and fall back to the first channel, `global`, here.
@@ -778,9 +779,9 @@ in the chat and events channels. Make the events channel read-only to ordinary
 members so it remains a bot event feed. Grant the bot **Manage Roles** for rank
 synchronization; its invite permission bit is `268435456` (OR it with the
 existing permission integer when updating an invite). No Administrator
-permission is needed. Presence is disabled. Webhooks, chat-channel console
-commands, topic edits, nickname/ban synchronization and mandatory account
-linking remain disabled. Join/leave, first join,
+permission is needed. Presence, chat-channel console commands, topic edits and
+nickname/ban synchronization remain disabled. Mandatory account linking is
+enabled for Survival as described below. Join/leave, first join,
 death, advancement and bidirectional chat messages are enabled. Test them after
 the first configured wake. Confirm token permissions remain private and neither
 configuration nor logs expose it.
@@ -796,17 +797,119 @@ IDs are mapped; with neither set, linking remains available but rank sync is
 inert and Vault is not installed. Missing token/guild/chat IDs or a disabled
 bridge still prevent DiscordSRV and Vault installation.
 
-Players link voluntarily: run **`/discord link` in Minecraft**, then **DM the
-displayed code to the bot** from the Discord account they want to link. Paper
-must be awake for the bot to receive it. `/discord linked` checks the result.
-Names are never used to auto-link accounts. Redeeming a new code cannot
-automatically replace an existing link. Linking executes no console commands
-and grants no separate "Linked" role. Unlinked players may still play and chat;
-they simply do not receive synced roles. Mandatory linking is a separate,
-future change.
+### Mandatory Discord onboarding
 
-Unlinking requires operator permission by default (`discordsrv.unlink`);
-players should ask an operator to unlink their account before changing it.
+Survival sets `minecraft.discord.requireLinkedAccount = true`; other servers
+default to false. When the bridge is configured (enabled, encrypted token source
+present, guild/chat IDs set, and the owner exemption valid), a shared Nix value
+enables the stock login check and generates `white-list=false` and
+`enforce-whitelist=false`. Missing prerequisites retain both whitelist settings
+as true. This is configuration readiness, not proof that the token, bot or
+Discord connection works at runtime.
+
+For a new player:
+
+1. If you have **both Java and Bedrock**, complete global linking at
+   **[link.geysermc.org](https://link.geysermc.org/)** first, before redeeming any
+   Discord code. Bedrock-only players can skip this step.
+2. Join `mc.finnrut.is`. An unlinked player is disconnected with a friendly
+   message containing the bot's name, a generated code and
+   **[the Discord invite](https://discord.gg/hHurpHK8RT)**. A cold Paper wake can
+   require another connection attempt before the bot is ready.
+3. Join that Discord server and **DM the bot with just the displayed code** from
+   the Discord account you want linked. Paper must still be awake to redeem it.
+   If it has slept, join Minecraft again to wake it and obtain another code.
+4. Wait for the bot's confirmation, then rejoin Minecraft. `/discord linked`
+   checks the association once you are in game. Finn can also use `/discord link`
+   from his exempt account.
+
+The pinned `RequireLinkModule` looks up the Discord association by the Minecraft
+UUID and generates the code during `AsyncPlayerPreLoginEvent` at `LOWEST`.
+`Not linked message` substitutes `{BOT}`, `{CODE}` and `{INVITE}`;
+`Messages.Not in server` substitutes only `{INVITE}`. The generic verification
+error message gets its invite rendered by Nix because upstream does not perform
+that substitution there. There is no Bedrock-specific kick template in this
+setup, so the Java/Bedrock ordering warning is included for everyone.
+
+**Owner exemption:** Finn is `Tunnelmaker`, UUID
+`3f771d00-3456-4007-8d66-13fe158488fa`, already declared as
+`gameServers.minecraft.adminUuid`. While the Discord gate is enabled, the
+generated `whitelist.json` contains exactly that entry. Stock
+`Whitelisted players bypass check` compares UUIDs even when vanilla whitelist
+enforcement is off, allowing Finn through before DiscordSRV is ready or without
+a Discord link. Name bypasses are empty; no staff group, wildcard permission or
+other former manual whitelist entry receives this exemption. Nix rejects a
+configured gate without exactly one whitelist entry matching the owner UUID.
+The list is configuration; Discord's account-link records are left untouched.
+
+`Must be in Discord server` is the string guild ID `1518484285466873997`, rather
+than boolean `true` (which accepts any mutual guild). Subscriber-role checks are
+disabled: friends do not need a staff role. With the configured guild available,
+stock DiscordSRV checks the linked Discord member and denies outsiders. A guild
+departure retains the account association and is checked on the next login;
+there is no continuous membership check or promise of an immediate kick for an
+already connected player.
+
+**Accepted upstream failure behavior:** before initialization finishes, an active
+login listener denies non-exempt players with the retry message. Later Discord
+or bot outages can prevent code redemption or verification; linked players are
+not guaranteed admission. Member retrieval can use JDA's cached members. In
+1.30.5 an unresolved required guild only logs and continues for linked players,
+and certain initialization/token/intent failures disable DiscordSRV and remove
+its login listener. If that happens with vanilla whitelist enforcement off,
+Paper can admit players without this check. Finn accepts this stock behavior;
+no plugin patch, runtime whitelist safeguard or outage bypass was added.
+The pinned [guild-check source](https://github.com/DiscordSRV/DiscordSRV/blob/da9e027f7acd76e0f91d53a11e5b53832ac36e92/src/main/java/github/scarsz/discordsrv/modules/requirelink/RequireLinkModule.java)
+and [plugin lifecycle](https://github.com/DiscordSRV/DiscordSRV/blob/da9e027f7acd76e0f91d53a11e5b53832ac36e92/src/main/java/github/scarsz/discordsrv/DiscordSRV.java)
+describe these limits.
+
+### Java, Bedrock and changing links
+
+Floodgate **2.2.5 build 141** on Velocity now declares `player-link.enabled=true`
+and `enable-global-linking=true`. `require-link=false` keeps Bedrock-only players
+supported; `enable-own-linking=false` avoids a local linking database. Its pinned
+`VelocityListener` uses `FloodgatePlayerImpl.getCorrectUniqueId()` and
+`getCorrectUsername()` for the forwarded profile: a global link selects the
+Java account's UUID/name; a standalone account uses its XUID-derived Floodgate
+UUID and dot-prefixed name. Velocity's online authentication and modern Paper
+forwarding retain those identities; Paper's backend `online-mode=false` is
+unchanged. No backend Floodgate plugin is needed for this login identity.
+
+| Order | Identity and progress |
+| ----- | --------------------- |
+| Java first, global Bedrock/Java link before Bedrock joins | Discord binds to the Java UUID; both editions use the same Java identity and progress. |
+| Bedrock only | Discord binds to the standalone Floodgate UUID; no Java account is required. |
+| Bedrock first, Java linked later | The global link selects the Java UUID. Standalone inventories, homes and other UUID-bound data remain stored under the original Floodgate identity; they are not migrated to Java. The original Discord association may need operator-assisted unlinking before the new identity's code can be redeemed. |
+
+Enabling global linking also selects the Java identity for accounts already
+linked at Geyser. It does not merge inventories, rewrite UUIDs in saved data or
+move Discord associations. Floodgate's pinned lookup-error path logs the error
+and falls back to a standalone identity; if you expected your Java identity,
+retry when the service works instead of redeeming a standalone Discord code.
+
+The verified [Geyser global-link procedure](https://geysermc.org/wiki/floodgate/linking/)
+is to connect both editions to `link.geysermc.org` (Java TCP 25565, Bedrock UDP
+19132), run `/linkaccount` on one account, then `/linkaccount <code>` on the
+other. Successful linking disconnects both accounts. To undo that global link,
+join its linking server with either account and run `/unlinkaccount`; relink
+with the same two-account procedure. These commands belong on the global
+linking server, not Survival. Global unlinking does not unlink Discord and can
+make the original standalone Bedrock data accessible again.
+
+For a Discord association change, ask Finn to inspect
+`/discordsrv linked <verified Minecraft UUID or Discord ID>`, then use
+`/discordsrv unlink <same verified identifier>` deliberately. Unlinking requires
+operator permissions; using an identifier avoids uncertain display names.
+Non-exempt online players are kicked on unlink. Rejoin Survival to get a new
+code and DM it after settling the Java/Bedrock identity. Redeeming a new code
+cannot automatically replace an existing association. Linking executes no
+console commands and grants no separate "Linked" role.
+
+These are operator/player instructions, not automatic database edits or inventory
+migrations. Config and pinned implementation checks do not constitute a live
+integration test. Java/Bedrock onboarding, guild departure/rejoin and outage
+behavior remain **live-unverified** until separately authorized deployment and
+testing; no service restart or Discord/account changes are part of this change.
 
 LuckPerms group membership is authoritative. Both
 `GroupRoleSynchronizationMinecraftIsAuthoritative = true` and

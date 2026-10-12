@@ -13,6 +13,20 @@
         && secretReady
         && s.minecraft.discord.guildId != ""
         && s.minecraft.discord.channelId != "";
+      ownerReady =
+        s:
+        cfg.minecraftAdminUuid != null
+        &&
+          lib.length (
+            lib.attrNames (lib.filterAttrs (_: uuid: uuid == cfg.minecraftAdminUuid) s.minecraft.whitelist)
+          ) == 1;
+      accessEnabled = s: ready s && s.minecraft.discord.requireLinkedAccount && ownerReady s;
+      inviteInstruction =
+        s:
+        if s.minecraft.discord.inviteUrl == "" then
+          "Ask Finn for the Discord invite."
+        else
+          "Join our Discord: ${s.minecraft.discord.inviteUrl}";
       roles = s: lib.filterAttrs (_: role: role != "") s.minecraft.discord.roles;
       syncEnabled = s: roles s != { };
       palette = {
@@ -75,9 +89,18 @@
       '';
     in
     lib.mkIf (servers != { }) {
+      assertions = [
+        {
+          assertion = lib.all (s: !(s.minecraft.discord.requireLinkedAccount && ready s) || ownerReady s) (
+            lib.attrValues servers
+          );
+          message = "mandatory Discord linking requires exactly one whitelist entry matching Finn's declared Minecraft UUID";
+        }
+      ];
       infra.games.minecraftPlugins.backends = lib.mapAttrs (
         id: s:
         {
+          discordAccessEnabled = accessEnabled s;
           inventory = [
             {
               name = "DiscordSRV";
@@ -213,7 +236,52 @@
                   BanSynchronizationDiscordToMinecraft = false;
                   BanSynchronizationMinecraftToDiscord = false;
                 };
-                linking."Require linked account to play".Enabled = false;
+                linking."Require linked account to play" = {
+                  Enabled = accessEnabled s;
+                  "Listener event" = "AsyncPlayerPreLoginEvent";
+                  "Listener priority" = "LOWEST";
+                  "Bypass names" = [ ];
+                  # The generated whitelist contains only Finn while this gate is enabled.
+                  # 1.30.5 compares these UUIDs even when white-list=false.
+                  "Whitelisted players bypass check" = accessEnabled s;
+                  "Check banned players" = false;
+                  "Only check banned players" = false;
+                  "Must be in Discord server" = s.minecraft.discord.guildId;
+                  "Subscriber role" = {
+                    "Require subscriber role to join" = false;
+                    "Subscriber roles" = [ ];
+                    "Require all of the listed roles" = false;
+                  };
+                  "Not linked message" = lib.concatStringsSep "\n" [
+                    "&dWelcome to Finn's Survival!"
+                    "&7If you play Java and Bedrock, link them at &blink.geysermc.org &7FIRST."
+                    (
+                      if s.minecraft.discord.inviteUrl == "" then
+                        "&7Ask Finn for the Discord invite."
+                      else
+                        "&7Join our Discord: &b{INVITE}"
+                    )
+                    "&7DM &b{BOT} &7with just: &b{CODE}"
+                    "&7Wait for confirmation, then rejoin &b${lib.head s.hostnames}&7."
+                  ];
+                  Messages = {
+                    "DiscordSRV still starting" =
+                      "&7Survival is connecting to Discord. Please try joining again in a minute.";
+                    "Not in server" =
+                      "&7Your linked Discord account must be in our Discord server.\n"
+                      + (
+                        if s.minecraft.discord.inviteUrl == "" then
+                          "&7Ask Finn for the Discord invite."
+                        else
+                          "&7Join at &b{INVITE}&7, then rejoin Minecraft."
+                      );
+                    # These paths do not substitute {INVITE}; render it in Nix instead.
+                    "Failed for unknown reason" =
+                      "&7We couldn't verify your Discord access.\n&7${inviteInstruction s}\n&7Try joining again shortly; ask Finn if it keeps happening.";
+                    "Kicked for unlinking" =
+                      "&7Your Minecraft and Discord accounts were unlinked.\n&7Rejoin Minecraft to get a new code to DM the bot.";
+                  };
+                };
                 voice.Enabled = false;
               }
             // lib.optionalAttrs (syncEnabled s) {

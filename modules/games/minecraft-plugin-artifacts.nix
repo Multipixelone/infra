@@ -134,6 +134,12 @@
       let
         pluginSet = lib.types.submodule {
           options = {
+            discordAccessEnabled = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              internal = true;
+              description = "The configured DiscordSRV login gate replaces vanilla whitelist enforcement.";
+            };
             jars = lib.mkOption {
               type = lib.types.attrsOf lib.types.package;
               default = { };

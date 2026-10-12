@@ -109,8 +109,8 @@
                     server-port=${toString s.minecraft.serverPort}
                     online-mode=false
                     enforce-secure-profile=false
-                    white-list=true
-                    enforce-whitelist=true
+                    white-list=${lib.boolToString (!(backend id).discordAccessEnabled)}
+                    enforce-whitelist=${lib.boolToString (!(backend id).discordAccessEnabled)}
                     enable-rcon=true
                     rcon.port=${toString s.minecraft.rconPort}
                     rcon.password=@RCON@
@@ -239,13 +239,13 @@
                       invalid-arguments-length = "Expected {} arguments, got {}. Is Geyser up-to-date?";
                     };
                     player-link = {
-                      enabled = false;
+                      enabled = true;
                       require-link = false;
                       enable-own-linking = false;
                       allowed = true;
                       link-code-timeout = 300;
                       type = "sqlite";
-                      enable-global-linking = false;
+                      enable-global-linking = true;
                     };
                     metrics.enabled = false;
                   }
@@ -379,7 +379,14 @@
             files = {
               # Paths deliberately bypass upstream's omission of empty values.
               "whitelist.json" = pkgs.writeText "${id}-whitelist.json" (
-                builtins.toJSON (lib.mapAttrsToList (name: uuid: { inherit name uuid; }) s.minecraft.whitelist)
+                builtins.toJSON (
+                  lib.mapAttrsToList (name: uuid: { inherit name uuid; }) (
+                    if (backend id).discordAccessEnabled then
+                      lib.filterAttrs (_: uuid: uuid == cfg.minecraftAdminUuid) s.minecraft.whitelist
+                    else
+                      s.minecraft.whitelist
+                  )
+                )
               );
               "ops.json" = pkgs.writeText "${id}-ops.json" (
                 builtins.toJSON (
