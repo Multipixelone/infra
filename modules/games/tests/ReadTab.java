@@ -147,7 +147,7 @@ public class ReadTab {
             set(ServerPlaceholderImpl.class, value, "lastReturnedValue", Integer.toString(hook.getWeight(player)));
             keys.add(Map.entry(rank, numeric.getChars(player)));
             String name = ".Bedrock_Friend";
-            String format = groups.getProperty(rank, "customtabname", null, null)[0].replace("%player%", name);
+            String format = groups.getProperty(rank, "customtabname", null, null)[0].replace("%displayname%", name);
             TextColor expected = MiniMessage.miniMessage().deserialize(color + "name").color();
             ReadCarbon.require(hook.getPrefix(player).equals(prefix), "LuckPerms hook changed the prefix");
             // Exercise the real MiniMessage -> TAB component -> Adventure path,
@@ -167,6 +167,14 @@ public class ReadTab {
             }
             ReadCarbon.require(bedrockText.codePoints().noneMatch(cp -> cp >= 0xe000 && cp <= 0xf8ff), "TAB PUA leaked to Bedrock");
             ReadCarbon.require(ReadCarbon.checkText(transported, null, name, expected), "TAB transport lost rank name color");
+            // A coloured Bukkit display name overrides the rank colour; the
+            // reset after it keeps the rest of TAB's presentation independent.
+            String nickname = "§x§5§5§a§a§f§fFinn";
+            String nickFormat = groups.getProperty(rank, "customtabname", null, null)[0]
+                .replace("%displayname%", nickname);
+            var nickRendered = render(hook.getPrefix(player) + nickFormat);
+            ReadCarbon.require(plain(nickRendered).endsWith("Finn"), "TAB did not render the nickname");
+            ReadCarbon.require(ReadCarbon.checkText(nickRendered, null, "Finn", TextColor.fromHexString("#55aaff")), "TAB lost nickname colour");
             for (String testPrefix : new String[]{prefix, "&d◆&r ", "<green>★</green> "}) {
                 livePrefix[0] = testPrefix;
                 var rendered = render(hook.getPrefix(player) + format);

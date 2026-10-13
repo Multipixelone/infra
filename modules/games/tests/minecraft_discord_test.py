@@ -15,6 +15,15 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
     message_defaults = yaml.safe_load(jar.read("messages/en.yml"))
     synchronization_defaults = yaml.safe_load(jar.read("synchronization/en.yml"))
     linking_defaults = yaml.safe_load(jar.read("linking/en.yml"))
+    nickname_updater = jar.read(
+        "github/scarsz/discordsrv/objects/threads/NicknameUpdater.class"
+    )
+    assert (
+        b"%displayname%" in nickname_updater and b"getDisplayName" in nickname_updater
+    )
+    assert (
+        b"strip" in nickname_updater and b"discordsrv.nicknamesync" in nickname_updater
+    )
 assert discord_defaults["ConfigVersion"] == "1.30.5"
 
 
@@ -172,7 +181,9 @@ for case in cases:
         assert synchronization["GroupRoleSynchronizationOnLink"] == bool(mappings)
         assert synchronization["GroupRoleSynchronizationCycleTime"] == 5
         assert synchronization["GroupRoleSynchronizationCycleCompletely"] is False
-        assert synchronization["NicknameSynchronizationEnabled"] is False
+        assert synchronization["NicknameSynchronizationEnabled"] is True
+        assert synchronization["NicknameSynchronizationCycleTime"] == 3
+        assert synchronization["NicknameSynchronizationFormat"] == "%displayname%"
         assert synchronization["BanSynchronizationDiscordToMinecraft"] is False
         assert synchronization["BanSynchronizationMinecraftToDiscord"] is False
         gate = linking["Require linked account to play"]

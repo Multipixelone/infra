@@ -32,14 +32,14 @@
                 {
                   _DEFAULT_ = {
                     tabprefix = "%luckperms-prefix%";
-                    customtabname = "<${ranks.default.color}>%player%<reset>";
+                    customtabname = "<${ranks.default.color}>%displayname%<reset>";
                     tabsuffix = "";
                     tagprefix = "";
                     tagsuffix = "";
                   };
                 }
                 // lib.mapAttrs (_: rank: {
-                  customtabname = "<${rank.color}>%player%<reset>";
+                  customtabname = "<${rank.color}>%displayname%<reset>";
                 }) ranks
               )
             );
@@ -112,6 +112,7 @@
                   default-refresh-interval = 1000;
                   "%online%" = 1000;
                   "%ping%" = 1000;
+                  "%displayname%" = 1000;
                   "%tps%" = 5000;
                   "%mspt%" = 5000;
                   "%luckperms-prefix%" = 1000;

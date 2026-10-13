@@ -31,6 +31,11 @@
           "carbon.channel.global"
           "carbon.channel.global.see"
           "carbon.channel.global.speak"
+          "carbon.nickname"
+          "carbon.nickname.set"
+          "carbon.nickname.tags.color"
+          "carbon.nickname.tags.reset"
+          "discordsrv.nicknamesync"
         ];
         mod = [
           "openinv.inventory.open.other"
@@ -40,6 +45,18 @@
           "openinv.access.level.1"
         ];
       };
+      # A specific colour/reset grant overrides the tag wildcard denial.
+      # Apply to admin too: the existing * grant must not allow unsafe nicknames.
+      nicknameRestrictions =
+        map
+          (key: {
+            inherit key;
+            value = false;
+          })
+          [
+            "carbon.nickname.tags.*"
+            "carbon.nickname.filter"
+          ];
       builderPermissions = [
         "group.default"
         "minecraft.command.gamemode"
@@ -151,6 +168,13 @@
                 "axgraves.allowgraves"
               ]
             ++ grants polishPermissions.default
+            ++ nicknameRestrictions
+            ++ [
+              {
+                key = "carbon.nickname.others.set";
+                value = false;
+              }
+            ]
             ++ rankNodes "default"
             # These visualizer permissions default to true upstream.
             ++
@@ -198,6 +222,12 @@
             }
           ]
           ++ rankNodes "admin"
+          ++ nicknameRestrictions
+          ++ grants [
+            "carbon.nickname.others.set"
+            "carbon.nickname.tags.color"
+            "carbon.nickname.tags.reset"
+          ]
           ++ grants [ "wesv.lock" ];
         };
         tracks.staff.groups = [

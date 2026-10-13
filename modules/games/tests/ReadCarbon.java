@@ -85,9 +85,11 @@ public class ReadCarbon {
         require(primary.node("storage-type").getString().equals("JSON"), "Unexpected storage");
         require(primary.node("default-channel").getString().equals("carbon:global"), "Wrong default channel");
         for (String[] path : new String[][]{{"update-checker"}, {"messaging-settings","enabled"},
-                {"nickname-settings","use-carbon-nicknames"}, {"nickname-settings","update-tab-list"},
+                {"nickname-settings","update-tab-list"},
                 {"party-chat","enabled"}})
             require(primary.node((Object[]) path).getBoolean() == false, "Enabled competing feature: " + java.util.Arrays.toString(path));
+        require(primary.node("nickname-settings","use-carbon-nicknames").getBoolean(), "Nicknames disabled");
+        require(primary.node("nickname-settings","format").getString().equals("<nickname>"), "Nickname gained decoration");
         require(primary.node("integrations","discordsrv","enabled").getBoolean(), "Native bridge disabled");
         require(!primary.node("integrations","miniplaceholders","relational-placeholders").getBoolean(), "Wrong placeholder audience");
         require(channel.node("key").getString().equals("carbon:global"), "Wrong key");
@@ -144,7 +146,7 @@ public class ReadCarbon {
             String body = "<click:run_command:'/op me'><red>hello</red></click>";
             var rendered = MiniMessage.miniMessage().deserialize(format, audience,
                 expansion.audiencePlaceholders(),
-                TagResolver.resolver("username", Tag.preProcessParsed(".Bedrock_Friend")),
+                TagResolver.resolver("display_name", Tag.selfClosingInserting(Component.text(".Bedrock_Friend"))),
                 TagResolver.resolver("message", Tag.selfClosingInserting(Component.text(body))));
             String plain = PlainTextComponentSerializer.plainText().serialize(rendered);
             String expectedPrefix = PlainTextComponentSerializer.plainText().serialize(

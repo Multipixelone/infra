@@ -214,7 +214,11 @@
                   DiscordChatChannelServerShutdownMessage = "";
                 };
                 synchronization = {
-                  NicknameSynchronizationEnabled = false;
+                  # 1.30.5 strips display-name colours and clamps polling to >= 3 minutes.
+                  # Without a Carbon nickname, this sets the MC account name on Discord.
+                  NicknameSynchronizationEnabled = true;
+                  NicknameSynchronizationCycleTime = 3;
+                  NicknameSynchronizationFormat = "%displayname%";
                   GroupRoleSynchronizationGroupsAndRolesToSync = roles s;
                   # Both keys are required: authoritative alone still permits reverse sync events.
                   GroupRoleSynchronizationMinecraftIsAuthoritative = true;

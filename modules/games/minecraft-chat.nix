@@ -8,12 +8,16 @@
       secret = "games/minecraft/luckperms-db-password";
       ready = cfg.secretFiles ? ${secret} && builtins.pathExists cfg.secretFiles.${secret};
       definitions = builtins.fromJSON (builtins.readFile ./carbon-libraries.json);
-      libraries = map (d: d // {
-        source = pkgs.fetchurl {
-          name = builtins.baseNameOf d.path;
-          inherit (d) url sha256;
-        };
-      }) definitions;
+      libraries = map (
+        d:
+        d
+        // {
+          source = pkgs.fetchurl {
+            name = builtins.baseNameOf d.path;
+            inherit (d) url sha256;
+          };
+        }
+      ) definitions;
       # Gremlin uses fixed jar checksums and does not resolve Maven POMs or
       # relocations for this release. Preserve the exact embedded manifest paths.
       cache = pkgs.runCommand "carbon-3.0.0-beta.39-libraries" { } (
@@ -29,8 +33,14 @@
         update-checker=false
         messaging-settings { enabled=false }
         nickname-settings {
-          use-carbon-nicknames=false
+          use-carbon-nicknames=true
+          # TAB reads the Bukkit display name and owns player-list rendering.
           update-tab-list=false
+          min-length=3
+          max-length=16
+          filter="^[a-zA-Z0-9_]+$"
+          black-list=["notch", "admin", "owner", "moderator"]
+          format="<nickname>"
         }
         party-chat { enabled=false }
         integrations {
@@ -50,7 +60,7 @@
         cross-server=false
         format {
           basic {
-            default_format="<luckperms_prefix><luckperms_meta:chat_color:s><username><reset> <#a6adc8>›</#a6adc8> <#cdd6f4><message></#cdd6f4>"
+            default_format="<luckperms_prefix><luckperms_meta:chat_color:s><display_name><reset> <#a6adc8>›</#a6adc8> <#cdd6f4><message></#cdd6f4>"
             console="[global] <username>: <message>"
             discord="<message>"
           }
@@ -74,21 +84,31 @@
           "/srv/games/minecraft/${id}/plugins/MiniPlaceholders"
         ];
         inventory = map (d: d // { installed = ready; }) [
-          { name = "CarbonChat"; version = "3.0.0-beta.39"; }
-          { name = "MiniPlaceholders"; version = "3.2.0"; }
-          { name = "MiniPlaceholders LuckPerms Expansion"; version = "2.1.0"; }
+          {
+            name = "CarbonChat";
+            version = "3.0.0-beta.39";
+          }
+          {
+            name = "MiniPlaceholders";
+            version = "3.2.0";
+          }
+          {
+            name = "MiniPlaceholders LuckPerms Expansion";
+            version = "2.1.0";
+          }
         ];
       }) servers;
       services.minecraft-servers.servers = lib.mapAttrs (_: _: {
         symlinks = lib.optionalAttrs ready (
           {
-            "plugins/MiniPlaceholders/expansions/LuckPerms-Expansion.jar" = cfg.artifacts.games-miniplaceholders-luckperms;
+            "plugins/MiniPlaceholders/expansions/LuckPerms-Expansion.jar" =
+              cfg.artifacts.games-miniplaceholders-luckperms;
           }
           # Gremlin writes .last-used.txt siblings on every startup. Keep the
           # parent directories writable; linking the whole cache would fail.
-          // lib.listToAttrs (map (d:
-            lib.nameValuePair "plugins/CarbonChat/libraries/${d.path}" "${cache}/${d.path}"
-          ) definitions)
+          // lib.listToAttrs (
+            map (d: lib.nameValuePair "plugins/CarbonChat/libraries/${d.path}" "${cache}/${d.path}") definitions
+          )
         );
       }) servers;
     };

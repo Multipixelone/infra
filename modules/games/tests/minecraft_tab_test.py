@@ -93,7 +93,12 @@ def check_tab(fixtures, artifacts):
             assert not read("bStats/config.yml")["enabled"]
             assert not read("FlectonePulse/message.yml")["scoreboard"]["enable"]
             intervals = config["placeholder-refresh-intervals"]
-            assert intervals["%online%"] == intervals["%ping%"] == 1000
+            assert (
+                intervals["%online%"]
+                == intervals["%ping%"]
+                == intervals["%displayname%"]
+                == 1000
+            )
             assert intervals["%tps%"] == intervals["%mspt%"] == 5000
             design = config["header-footer"]["designs"]
             assert set(design) == {"default"}
@@ -146,7 +151,7 @@ def check_tab(fixtures, artifacts):
                     if "prefix" in ranks[rank]
                     else set()
                 )
-                assert groups[rank] == {"customtabname": color + "%player%<reset>"}
+                assert groups[rank] == {"customtabname": color + "%displayname%<reset>"}
             assert (
                 read("LuckPerms/config.yml")["primary-group-calculation"]
                 == "parents-by-weight"

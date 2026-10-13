@@ -178,6 +178,7 @@ for name, fixture in fixtures.items():
             'quick-prefix=""' in global_channel
             and "cross-server=false" in global_channel
         )
+        assert "<display_name>" in global_channel
         assert "<luckperms_prefix>" in global_channel
         assert "<luckperms_meta:chat_color:s>" in global_channel
         bootstrap_path = f"{directory}/LuckPerms/bootstrap.json.gz"
@@ -265,6 +266,33 @@ for name, fixture in fixtures.items():
             default | mod
         )
         assert "*" in permission_nodes(bootstrap, "admin")
+        assert {
+            "carbon.nickname",
+            "carbon.nickname.set",
+            "carbon.nickname.tags.color",
+            "carbon.nickname.tags.reset",
+            "discordsrv.nicknamesync",
+        } <= default
+        for group in ("default", "admin"):
+            denied = {
+                node["key"]
+                for node in bootstrap["groups"][group]["nodes"]
+                if not node["value"]
+            }
+            assert {"carbon.nickname.tags.*", "carbon.nickname.filter"} <= denied
+        assert {
+            node["key"]: node["value"]
+            for node in bootstrap["groups"]["default"]["nodes"]
+        }["carbon.nickname.others.set"] is False
+        assert "carbon.nickname.others.set" in permission_nodes(bootstrap, "admin")
+        assert "group.default" in permission_nodes(bootstrap, "builder")
+        assert "group.builder" in mod
+        assert not {
+            "carbon.nickname.others.set",
+            "carbon.nickname.filter",
+            "carbon.nickname.tags.*",
+            "*",
+        } & (default | mod | permission_nodes(bootstrap, "builder"))
         for group, weight in (
             ("default", 0),
             ("builder", 10),
@@ -328,6 +356,7 @@ with tempfile.TemporaryDirectory() as directory:
         "ResolveCarbon",
         "ReadCarbon",
         "CheckCarbonBridge",
+        "CheckNicknames",
         "ResolveFlectone",
         "ReadTab",
     )
@@ -370,6 +399,16 @@ with tempfile.TemporaryDirectory() as directory:
                 )
             ],
             str(pathlib.Path(fixtures["withLuckPerms"]["rankPack"]) / "rank-icons.zip"),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "java",
+            "-cp",
+            classpath,
+            "CheckNicknames",
+            templates[f"{template_dir}/CarbonChat/config.conf"]["source"],
         ],
         check=True,
     )
