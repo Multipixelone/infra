@@ -340,11 +340,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1791687903,
-        "narHash": "sha256-oPPhE9INyqZC1UOuyT6McNekAixPp/VKgsfTVO+VYqM=",
+        "lastModified": 1791876522,
+        "narHash": "sha256-bVl0WXyGg1Ze8AiqNpMR6ftCKPeq9b3Is79TtekzzSw=",
         "owner": "Multipixelone",
         "repo": "beets-plugins",
-        "rev": "7e0e78dee9d986cd448f9fafd8e0221eb52f7018",
+        "rev": "b730d0bc876b1d7eb281ecfbbef37236178611b9",
         "type": "github"
       },
       "original": {
