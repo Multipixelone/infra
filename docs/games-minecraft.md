@@ -445,8 +445,16 @@ through the existing Cloudflare tunnel/service-publication framework at
 `https://map.finnrut.is`; its origin is loopback nginx port 8766. Access bypass
 is justified by the intentionally public, read-only map. nginx permits GET and
 HEAD, rejects private dotfiles and directory indexes, and has read access to
-only the web subtree. BlueMap's embedded webserver and live markers are off.
-The map contains world terrain/builds and is public.
+only the web subtree. Finn approved public online player names and locations
+alongside the terrain/builds. BlueMap writes `maps/<map>/live/players.json`
+every three seconds while Paper is awake; the bundled browser polls it through
+the same static nginx route. Player JSON has `Cache-Control: no-store`.
+The embedded webserver stays disabled; `live-player-markers=false` controls
+that server's live supplier, independently of the static player writer.
+Spectators, vanished and invisible players, and players hidden through BlueMap
+are excluded. BlueMap clears online data on a clean stop; the existing
+toggleable Offline Players layer retains logout markers and its banned,
+spectator and hidden-player exclusions. No map request wakes Paper.
 
 BlueMap renders to `plugins/BlueMap/web/maps` using file storage and client-side
 compression handling. A single low-priority render thread runs while Paper is
@@ -460,7 +468,7 @@ The exact vanilla 26.3 client asset JAR is preseeded through Nix with downloads
 disabled. BlueMap may still request Mojang version metadata; cached assets let
 it recover if that metadata request fails. Its flow-math library is pinned and
 bundled at build time, removing Paper's runtime library download declaration.
-Skin downloads and BlueMap telemetry are disabled.
+Skin downloads remain enabled for player heads; BlueMap telemetry is disabled.
 
 Paper retains `-Xms1G -Xmx4G` and MemoryMax 6G; Velocity retains a 512M maximum
 heap and MemoryMax 1G. With vane deferred, these are conservative initial
@@ -653,12 +661,12 @@ The BlueMap hook publishes **public** homes and warps as marker sets.
 `/edithome <name> privacy public` publishes a home; `privacy private` hides it.
 The home delimiter is `:` instead of `.` because Floodgate names start with
 `.`: e.g. `/phome .BedrockFriend:base`. Private homes stay private. Publishing
-exposes the name/location on the public map at `map.finnrut.is`; live player
-markers stay disabled. BlueMap writes marker sets every 30 seconds while Paper
-is awake. HuskHomes clears its marker sets when disabled, so home/warp markers
-can disappear during lazymc sleep; they repopulate on wake. The static terrain
-map remains viewable throughout. Admins create warps with `/setwarp <name>`;
-regular friends can list/use them.
+exposes the name/location on the public map at `map.finnrut.is`. BlueMap writes
+home/warp marker sets every 30 seconds while Paper is awake, independently of
+the three-second online player feed. HuskHomes clears its marker sets when
+disabled, so home/warp markers can disappear during lazymc sleep; they
+repopulate on wake. The static terrain map remains viewable throughout.
+Admins create warps with `/setwarp <name>`; regular friends can list/use them.
 
 HuskHomes' six declared driver/Redis dependencies load unconditionally, even
 with SQLite-only settings. `huskhomes-libraries.json` pins the full closure

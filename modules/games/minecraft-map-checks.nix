@@ -32,6 +32,7 @@ let
       modules = [ { infra.games.servers = lib.mkForce { }; } ];
     }).config;
   vhost = cfg.services.nginx.virtualHosts.minecraft-map-origin;
+  playersLocation = "~ ^/maps/[^/]+/live/players\\.json$";
 in
 {
   perSystem =
@@ -76,6 +77,10 @@ in
                     ${vhost.extraConfig}
                     location / { try_files ${vhost.locations."/".tryFiles}; }
                     location ~ /\. { deny all; }
+                    location ${playersLocation} {
+                      try_files ${vhost.locations.${playersLocation}.tryFiles};
+                      ${vhost.locations.${playersLocation}.extraConfig}
+                    }
                   }
                 }
               ''} \
@@ -87,7 +92,9 @@ in
                   url = "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar";
                   sha256 = "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f";
                 }
-              }
+              } \
+              ${./tests/CheckBlueMapPlayers.java} \
+              ${./tests/BlueMapFixture.java}
             touch "$out"
           '';
     };

@@ -6,7 +6,7 @@
     publicHostname = "map.finnrut.is";
     access = {
       bypassAccess = true;
-      bypassJustification = "Finn approved a public read-only Minecraft world map; viewing static map tiles requires no Access identity.";
+      bypassJustification = "Finn approved a public read-only Minecraft world map, including normally visible players' names and locations; viewing requires no Access identity.";
     };
     homepage = {
       name = "Survival Map";
@@ -38,6 +38,10 @@
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       dir = id: "/srv/games/minecraft/${id}/plugins/BlueMap";
       format = pkgs.formats.hocon { };
+      securityHeaders = ''
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy no-referrer always;
+      '';
       # Compose only shared tokens and BlueMap chrome, never Homepage layout.
       theme = pkgs.writeText "bluemap-homepage-theme.css" (
         builtins.readFile ../link/homepage-theme-tokens.css + "\n" + builtins.readFile ./bluemap-theme.css
@@ -91,11 +95,15 @@
               };
               webserver.enabled = false;
               plugin = {
+                # This switch controls the embedded server's live supplier.
+                # Static nginx uses the independently scheduled player writer.
                 live-player-markers = false;
-                # HuskHomes publishes public home/warp marker sets. Keep those
-                # responsive on the static webroot without publishing players.
+                hidden-game-modes = [ "spectator" ];
+                hide-vanished = true;
+                hide-invisible = true;
+                # Keep public homes/warps and player JSON current while awake.
                 write-markers-interval = 30;
-                write-players-interval = 0;
+                write-players-interval = 3;
                 skin-download = true;
                 player-render-limit = 1;
               };
@@ -147,11 +155,18 @@
           autoindex off;
           client_max_body_size 1k;
           if ($request_method !~ ^(GET|HEAD)$) { return 405; }
-          add_header X-Content-Type-Options nosniff always;
-          add_header Referrer-Policy no-referrer always;
+          ${securityHeaders}
         '';
         locations."/".tryFiles = "$uri $uri/ =404";
         locations."~ /\\.".extraConfig = "deny all;";
+        locations."~ ^/maps/[^/]+/live/players\\.json$" = {
+          tryFiles = "$uri =404";
+          extraConfig = ''
+            add_header Cache-Control no-store always;
+            # Location headers replace inherited ones in nginx.
+            ${securityHeaders}
+          '';
+        };
       };
     };
 }

@@ -61,7 +61,7 @@ for name in ("missingSecrets", "additionalBackend"):
         assert server["symlinks"]["plugins/huskhomes.jar"] == husk
         assert server["symlinks"]["plugins/axgraves.jar"] == graves
         map_config = pathlib.Path(plugins["templates"][f"{directory}/BlueMap/plugin.conf"]["source"]).read_text()
-        for key, value in (("write-markers-interval", "30"), ("write-players-interval", "0"), ("live-player-markers", "false")):
+        for key, value in (("write-markers-interval", "30"), ("write-players-interval", "3"), ("live-player-markers", "false")):
             assert re.search(rf'"?{key}"?\s*=\s*{value}\b', map_config)
         home_config = pathlib.Path(plugins["templates"][f"{directory}/HuskHomes/config.yml"]["source"])
         settings = yaml.safe_load(home_config.read_text())
