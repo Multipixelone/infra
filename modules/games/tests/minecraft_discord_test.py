@@ -189,20 +189,22 @@ for case in cases:
         assert gate["Subscriber role"]["Subscriber roles"] == []
         kick = gate["Not linked message"]
         assert set(re.findall(r"\{([A-Z]+)\}", kick)) == {"BOT", "CODE"}
-        assert "DM &b{BOT} &7with just: &b{CODE}" in kick
-        assert kick.index("link.geysermc.org") < kick.index("{CODE}")
-        assert "Java and Bedrock" in kick and "FIRST" in kick
-        assert f"Wait for confirmation, then rejoin &b{case['hostname']}" in kick
+        assert kick == "&7DM &b{BOT} &7the code &b{CODE} &7to join."
         failures = gate["Messages"]
         assert "minute" in failures["DiscordSRV still starting"]
         assert "new code to DM the bot" in failures["Kicked for unlinking"]
-        instruction = "&7You must already be in Finn's Discord server to link."
+        assert failures["Not in server"] == (
+            "&7Your linked Discord account must be in Finn's Discord server."
+        )
+        assert failures["Failed for unknown reason"] == (
+            "&7Couldn't verify Discord access. Try again or ask Finn."
+        )
         for value in (
             kick,
             failures["Not in server"],
             failures["Failed for unknown reason"],
         ):
-            assert instruction in value
+            assert "\n" not in value
         for value in (kick, *failures.values()):
             assert "{INVITE}" not in value
             assert "discord.gg/" not in value and "discord.com/invite/" not in value
