@@ -236,8 +236,6 @@ for case in cases:
         channels = {"global": case["discord"]["channelId"]}
         if case["discord"]["eventsChannelId"]:
             channels.update(
-                join=case["discord"]["eventsChannelId"],
-                leave=case["discord"]["eventsChannelId"],
                 death=case["discord"]["eventsChannelId"],
             )
         assert configuration["Channels"] == channels

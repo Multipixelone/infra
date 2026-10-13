@@ -149,13 +149,11 @@
                   BotToken = "";
                   DiscordInviteLink = s.minecraft.discord.inviteUrl;
                   # 1.30.5 routes these events by Channels keys, not messages.yml fields.
-                  # global is rendered first and remains the fallback for awards/status.
+                  # global is rendered first and remains the fallback for joins/leaves/awards/status.
                   Channels = {
                     global = s.minecraft.discord.channelId;
                   }
                   // lib.optionalAttrs (s.minecraft.discord.eventsChannelId != "") {
-                    join = s.minecraft.discord.eventsChannelId;
-                    leave = s.minecraft.discord.eventsChannelId;
                     death = s.minecraft.discord.eventsChannelId;
                   };
                   DiscordConsoleChannelId = s.minecraft.discord.consoleChannelId;

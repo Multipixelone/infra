@@ -101,7 +101,7 @@ let
             eventsChannelId = mkOption {
               type = types.strMatching "([0-9]{17,20})?";
               default = "";
-              description = "Join/leave channel; empty uses the main chat channel.";
+              description = "Death messages channel; empty uses the main chat channel.";
             };
             consoleChannelId = mkOption {
               type = types.strMatching "([0-9]{17,20})?";
