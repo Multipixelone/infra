@@ -57,6 +57,19 @@
             "carbon.nickname.tags.*"
             "carbon.nickname.filter"
           ];
+      # Deny each rank explicitly so op defaults and admin's * cannot grant
+      # grave teleporting. Leave normal HuskHomes /back permissions alone.
+      deathReturnRestrictions =
+        map
+          (key: {
+            inherit key;
+            value = false;
+          })
+          [
+            "huskhomes.command.back.death"
+            "axgraves.tp"
+            "axgraves.tp.bypass"
+          ];
       builderPermissions = [
         "group.default"
         "minecraft.command.gamemode"
@@ -169,6 +182,7 @@
               ]
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
+            ++ deathReturnRestrictions
             ++ [
               {
                 key = "carbon.nickname.others.set";
@@ -188,7 +202,7 @@
                   "wesv.toggle"
                   "wesv.lock"
                 ];
-          builder.nodes = grants builderPermissions ++ rankNodes "builder";
+          builder.nodes = grants builderPermissions ++ rankNodes "builder" ++ deathReturnRestrictions;
           mod.nodes =
 
             map
@@ -210,7 +224,8 @@
                 "axgraves.admin"
               ]
             ++ grants polishPermissions.mod
-            ++ rankNodes "mod";
+            ++ rankNodes "mod"
+            ++ deathReturnRestrictions;
           admin.nodes = [
             {
               key = "group.mod";
@@ -223,6 +238,7 @@
           ]
           ++ rankNodes "admin"
           ++ nicknameRestrictions
+          ++ deathReturnRestrictions
           ++ grants [
             "carbon.nickname.others.set"
             "carbon.nickname.tags.color"

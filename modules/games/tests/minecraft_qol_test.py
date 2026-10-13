@@ -20,7 +20,7 @@ for library in graves_metadata["libraries"]:
     expected_classifier = None if library["artifact-id"] in {"caffeine", "commons-math3"} else "all" if library["artifact-id"] == "axapi" else ""
     assert library["classifier"] == expected_classifier
 assert fixtures["noPaper"]["backends"] == {}
-for name in ("missingSecrets", "additionalBackend"):
+for name in ("missingSecrets", "additionalBackend", "withLuckPerms"):
     case = fixtures[name]
     assert not {"huskhomes", "axgraves", "simplehome", "simpletpa", "tab"} & set(case["proxyJars"])
     assert set(case["servers"]) == ({"survival", "testing"} if name == "additionalBackend" else {"survival"})
@@ -29,11 +29,12 @@ for name in ("missingSecrets", "additionalBackend"):
         directory = f"/srv/games/minecraft/{server_id}/plugins"
         plugins = case["backends"][server_id]
         # Optional TAB must not install without its LuckPerms credential.
-        assert "tab" not in plugins["jars"]
+        tab_installed = name == "withLuckPerms"
+        assert ("tab" in plugins["jars"]) == tab_installed
         assert next(p for p in plugins["inventory"] if p["name"] == "TAB") == {
-            "name": "TAB", "version": "6.2.0", "installed": False,
+            "name": "TAB", "version": "6.2.0", "installed": tab_installed,
         }
-        assert f"{directory}/TAB" not in server["worldPaths"]
+        assert (f"{directory}/TAB" in server["worldPaths"]) == tab_installed
         assert {"huskhomes", "axgraves"} <= plugins["jars"].keys()
         assert plugins["jars"]["openinv"] == openinv
         assert f"{directory}/OpenInv" in server["worldPaths"]
@@ -70,6 +71,16 @@ for name in ("missingSecrets", "additionalBackend"):
         assert not settings["economy"]["enabled"] and not settings["check_for_updates"]
         assert settings["map_hook"] == {"enabled": True, "show_public_homes": True, "show_warps": True}
         assert settings["general"]["home_delimiter"] == ":"
+        assert settings["general"]["back_command"] == {"return_by_death": False}
+        home_messages = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/HuskHomes/messages-en-gb.yml"]["source"]).read_text())
+        with zipfile.ZipFile(husk) as jar:
+            upstream_messages = yaml.safe_load(jar.read("locales/en-gb.yml"))
+        assert home_messages["locales"]["return_by_death_notification"] == ""
+        assert home_messages["locales"]["back_command_description"] == "Return to your previous position"
+        # All other messages, including normal travel and map labels, survive.
+        for key in ("return_by_death_notification", "back_command_description"):
+            upstream_messages["locales"][key] = home_messages["locales"][key]
+        assert home_messages == upstream_messages
         offline = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/BlueMapOfflinePlayerMarkers/config.yml"]["source"]).read_text())
         with zipfile.ZipFile(plugins["jars"]["bluemap-offline-markers"]) as jar:
             assert offline.keys() == yaml.safe_load(jar.read("config.yml")).keys()
@@ -83,6 +94,16 @@ for name in ("missingSecrets", "additionalBackend"):
             descriptor = yaml.safe_load(jar.read("plugin.yml"))
             assert descriptor["version"] == "1.32.1"
             assert {"axgraves.help", "axgraves.list", "axgraves.allowgraves", "axgraves.list.other"} <= descriptor["permissions"].keys()
+            assert {"axgraves.tp", "axgraves.tp.bypass"} <= descriptor["permissions"].keys()
+            upstream_messages = yaml.safe_load(jar.read("messages.yml"))
+        grave_messages = yaml.safe_load(pathlib.Path(plugins["templates"][f"{directory}/AxGraves/messages.yml"]["source"]).read_text())
+        assert not any("teleport" in line.lower() or "/axgraves tp" in line for line in grave_messages["help"])
+        assert "[TP]" not in grave_messages["grave-list"]["grave"]
+        assert all(token in grave_messages["grave-list"]["grave"] for token in ("%world%", "%x%", "%y%", "%z%"))
+        assert not grave_messages["death-message"]["enabled"]
+        for key in ("help", "grave-list"):
+            upstream_messages[key] = grave_messages[key]
+        assert grave_messages == upstream_messages
         assert grave_config["despawn-time-seconds"] == grave_config["grave-limit"] == -1
         assert grave_config["interact-only-own"] and grave_config["instant-pickup-only-own"]
         assert grave_config["xp-keep-percentage"] == 1.0 and grave_config["store-xp"] and grave_config["store-items"]

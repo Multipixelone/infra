@@ -12,6 +12,17 @@ let
     }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.servers);
   };
   fixtures = {
+    withLuckPerms =
+      fixture
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.secretFiles = lib.mkForce {
+                "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+              };
+            }
+          ];
+        }).config;
     # Optional QoL plugins do not bypass the mandatory credential gate.
     missingSecrets =
       fixture

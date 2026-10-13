@@ -256,6 +256,12 @@ for field, directory, server in (
     }
     for rank, weight in zip(("default", "builder", "mod", "admin"), (0, 10, 20, 30)):
         nodes = bootstrap["groups"][rank]["nodes"]
+        for permission in ("huskhomes.command.back.death", "axgraves.tp", "axgraves.tp.bypass"):
+            assert [node["value"] for node in nodes if node["key"] == permission] == [False]
+        assert not any(
+            node["key"] in {"huskhomes.command.back", "huskhomes.command.back.previous"}
+            and not node["value"] for node in nodes
+        )
         assert {"key": f"weight.{weight}", "value": True} in nodes
         prefixes = [node["key"] for node in nodes if node["key"].startswith("prefix.")]
         if rank == "default":

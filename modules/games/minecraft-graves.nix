@@ -159,6 +159,20 @@
         debug = false;
         version = 19;
       };
+      messages =
+        pkgs.runCommand "axgraves-1.32.1-messages.yml"
+          { nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ]; }
+          ''
+            python3 - ${cfg.artifacts.games-axgraves} "$out" <<'PY'
+            import pathlib, sys, zipfile
+            import yaml
+            with zipfile.ZipFile(sys.argv[1]) as jar:
+                messages = yaml.safe_load(jar.read("messages.yml"))
+            messages["help"] = [line for line in messages["help"] if "/axgraves tp " not in line]
+            messages["grave-list"]["grave"] = messages["grave-list"]["grave"].replace("[TP] ", "")
+            pathlib.Path(sys.argv[2]).write_text(yaml.safe_dump(messages, allow_unicode=True, sort_keys=False))
+            PY
+          '';
     in
     lib.mkIf (servers != { }) {
       infra.games.artifacts.games-axgraves-libraries = cache;
@@ -166,6 +180,7 @@
         jars.axgraves = cfg.artifacts.games-axgraves;
         templates = {
           "/srv/games/minecraft/${id}/plugins/AxGraves/config.yml".source = toString configuration;
+          "/srv/games/minecraft/${id}/plugins/AxGraves/messages.yml".source = toString messages;
           "/srv/games/minecraft/${id}/plugins/AxAPI/libraries/AxGraves/cache.yml".source = toString metadata;
         };
         statePaths = [ "/srv/games/minecraft/${id}/plugins/AxGraves" ];

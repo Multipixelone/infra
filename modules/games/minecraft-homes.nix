@@ -52,14 +52,34 @@
           teleport_warmup_cancel_on_move = true;
           teleport_request_expiry_time = 60;
           strict_tpa_here_requests = true;
+          # Stop recording death points and sending the clickable /back prompt.
+          # Ordinary teleport return points still use the upstream defaults.
+          back_command.return_by_death = false;
         };
       };
+      messages =
+        pkgs.runCommand "huskhomes-4.11-9ed80cc-messages-en-gb.yml"
+          { nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ]; }
+          ''
+            python3 - ${cfg.artifacts.games-huskhomes} "$out" <<'PY'
+            import pathlib, sys, zipfile
+            import yaml
+            with zipfile.ZipFile(sys.argv[1]) as jar:
+                messages = yaml.safe_load(jar.read("locales/en-gb.yml"))
+            messages["locales"]["return_by_death_notification"] = ""
+            messages["locales"]["back_command_description"] = "Return to your previous position"
+            pathlib.Path(sys.argv[2]).write_text(yaml.safe_dump(messages, allow_unicode=True, sort_keys=False))
+            PY
+          '';
     in
     lib.mkIf (servers != { }) {
       infra.games.artifacts.games-huskhomes-libraries = cache;
       infra.games.minecraftPlugins.backends = lib.mapAttrs (id: _: {
         jars.huskhomes = cfg.artifacts.games-huskhomes;
-        templates."/srv/games/minecraft/${id}/plugins/HuskHomes/config.yml".source = toString configuration;
+        templates = {
+          "/srv/games/minecraft/${id}/plugins/HuskHomes/config.yml".source = toString configuration;
+          "/srv/games/minecraft/${id}/plugins/HuskHomes/messages-en-gb.yml".source = toString messages;
+        };
         statePaths = [ "/srv/games/minecraft/${id}/plugins/HuskHomes" ];
         inventory = [
           {

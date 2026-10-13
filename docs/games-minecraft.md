@@ -525,8 +525,11 @@ Mod can kick, teleport themselves to a player, switch gamemode (including
 creative/adventure as Finn requested), list others' graves and open them to
 recover items. It gets no wildcard, ban, reload, warp creation or teleport-other
 node. `axgraves.admin` is AxGraves' owner-protection bypass; this does not grant
-its separate reload command. Bukkit/Velocity op accounts retain upstream op
-permissions independently of the LuckPerms groups.
+its separate reload command. Every declared rank explicitly denies
+`huskhomes.command.back.death`, `axgraves.tp` and `axgraves.tp.bypass`, including
+admin so its `*` grant cannot enable grave teleporting. Ordinary `/back` grants
+are unchanged. Bukkit/Velocity op accounts retain other upstream op permissions
+independently of the LuckPerms groups.
 
 The pinned Paper and Velocity **5.5.71** jars have identical import classes
 (their SHA-256 hashes match `minecraft-plugin-artifacts.nix`).
@@ -537,6 +540,11 @@ Files must be readable directly inside the plugin directory; subdirectories and
 file does not exist and its name contains no dot. Use the full
 `bootstrap.json.gz` name; `bootstrap.json` is not an alias. Template preparation
 copies the gzip bytes atomically as the Minecraft owner with mode `0600`.
+
+Reapply the updated bootstrap during the death-return policy rollout using the
+import and synchronization commands below. Generating the new bootstrap alone
+does not update existing LuckPerms permissions. Confirm the three denials for
+each declared rank, including admin, after the import finishes.
 
 [`Importer`](https://github.com/LuckPerms/LuckPerms/blob/master/common/src/main/java/me/lucko/luckperms/common/backup/Importer.java)
 merges group/user nodes by default. With `--replace`, it replaces the normal
@@ -657,6 +665,14 @@ and `/delhome <name>` work across Overworld/Nether/End. Teleports have a
 five-second warmup cancelled by movement/damage; requests expire after 60 seconds.
 Use `/tpa <friend>`, `/tpahere <friend>`, `/tpaccept` and `/tpdeny`.
 
+HuskHomes' `general.back_command.return_by_death` is explicitly false: deaths
+no longer record a return point or send the clickable death-return notification.
+Its help describes `/back` only as returning to the previous position. Ordinary
+`/back` after a normal teleport retains its existing settings and permissions.
+Previously saved return points are deliberately preserved; an old death point
+can remain usable until a normal teleport replaces it. No database reset is
+performed.
+
 The BlueMap hook publishes **public** homes and warps as marker sets.
 `/edithome <name> privacy public` publishes a home; `privacy private` hides it.
 The home delimiter is `:` instead of `.` because Floodgate names start with
@@ -680,6 +696,11 @@ count eviction. Empty graves disappear. Only the owner can open or instantly
 loot their grave, with the documented mod/admin recovery bypass for opening.
 `/graves list` lists one's graves. State is `plugins/AxGraves/data.json`, saved
 on shutdown and every 30 seconds; backups include the whole plugin directory.
+Players must travel back to recover a grave. Grave teleport commands are denied
+for every declared rank. Help omits `/axgraves tp`, and grave listings retain
+their world/coordinates without the `[TP]` advertisement. The pinned AxGraves
+still attaches a click command to list entries, but the `axgraves.tp` denial
+prevents it from teleporting the player.
 The ordinary grave interaction and inventory GUI use the Java Player UUID
 provided by Floodgate; no Java client mod or resource pack is required for
 Bedrock. Both normal and sneak instant-pickup ownership protections are enabled.
@@ -695,8 +716,12 @@ the existing mandatory-credential startup gate.
 
 After deployment, verify with a non-op Java friend and a Bedrock friend: set
 10 homes and reject an 11th; travel between dimensions; accept/deny both request
-directions; publish/hide a BlueMap home and test a warp. For graves, die with
-items/XP, deny another friend's access, recover as owner/mod, then cleanly stop
+directions; publish/hide a BlueMap home and test a warp. Verify ordinary `/back`
+after a normal teleport, then die and check that no death-return button appears
+and `/back` does not return to the new death point. Check `/graves tp`,
+`/axgraves tp` and clicking a grave listing are denied, including as admin after
+reapplying the bootstrap. For graves, die with items/XP, deny another friend's
+access, walk back and recover as owner/mod, then cleanly stop
 and wake Paper and recover a still-filled grave. These are operator smoke tests;
 the Nix checks do not claim a live client integration test.
 
