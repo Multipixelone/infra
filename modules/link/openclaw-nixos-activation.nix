@@ -32,26 +32,81 @@
       flock = lib.getExe' pkgs.util-linux "flock";
       nc = lib.getExe' pkgs.netcat-openbsd "nc";
       ip = lib.getExe' pkgs.iproute2 "ip";
-      runuser = lib.getExe' pkgs.util-linux "runuser";
 
       approvalNotifier = pkgs.writeShellApplication {
         name = "openclaw-nixos-approval-notify";
         runtimeInputs = [
           pkgs.coreutils
           pkgs.nodejs
+          pkgs.python3
         ];
         text = ''
-          # This event is advisory, never authorization. Activate remains the sole
+          # This user turn is advisory, never authorization. Activate remains the sole
           # authority and verifies the root-owned, single-use approval record;
-          # a forged event without that record cannot enable activation.
+          # a forged message without that record cannot enable activation.
           (( EUID != 0 )) && [[ "$(id -un)" == tunnel ]] || exit 1
           (( $# == 3 )) || exit 1
           cd /home/tunnel
-          message="openclaw-nixos-approve: APPROVED mode=$2 path=$1 expires=$3. Activate per skills/nixos-deploy."
-          exec /home/tunnel/.npm-global/bin/openclaw system event \
-            --port 18789 \
-            --session-key agent:main:telegram:direct:763701512 \
-            --mode now --timeout 5000 --text "$message"
+          message="Local approval notification: openclaw-nixos-approve: APPROVED mode=$2 path=$1 expires=$3. Read skills/nixos-deploy/SKILL.md again. Continue only the matching pending deployment once through the root-owned approval gate, and report the result or blocker. If pending state is missing, mismatched, expired, or already handled, report the blocker and do not deploy."
+          # Agent timeout is in seconds. Allow completion/delivery headroom before
+          # terminating the client; never retry an ambiguously accepted turn.
+          # Gateway JSON promotes result.deliveryStatus to deliveryStatus. Suppressed
+          # can have succeeded=true, including no_visible_payload: it is NOT proof
+          # of a visible reply (message tools may also already have sent one).
+          # Keep at most 1 MiB in memory, drain excess, and never persist raw output.
+          result="$(
+            cli_status=0
+            timeout --kill-after=5s 650s \
+            /home/tunnel/.npm-global/bin/openclaw agent \
+              --session-key agent:main:telegram:direct:763701512 \
+              --message "$message" --timeout 600 \
+              --deliver --reply-channel telegram --reply-to 763701512 \
+              --reply-account default --json 2>/dev/null |
+              python3 -c '
+          import json, sys
+          limit = 1024 * 1024
+          raw = sys.stdin.buffer.read(limit + 1)
+          outcome = "unknown"
+          if len(raw) > limit:
+              while sys.stdin.buffer.read(65536):
+                  pass
+          else:
+              try:
+                  response = json.loads(raw)
+                  delivery = response.get("deliveryStatus")
+                  if "deliveryStatus" not in response:
+                      nested = response.get("result")
+                      delivery = nested.get("deliveryStatus") if isinstance(nested, dict) else None
+                  if isinstance(delivery, dict):
+                      status = delivery.get("status")
+                      if status in ("suppressed", "failed", "partial_failed"):
+                          outcome = status
+                      elif status == "sent" and all(delivery.get(k) is True for k in ("requested", "attempted", "succeeded")):
+                          count = delivery.get("resultCount")
+                          if type(count) is int and count > 0:
+                              outcome = "sent"
+              except Exception:
+                  pass
+          print(outcome)
+          ' 2>/dev/null || cli_status="''${PIPESTATUS[0]}"
+            printf '%s' "$cli_status"
+          )"
+          outcome="''${result%$'\n'*}"
+          status="''${result##*$'\n'}"
+          case "$outcome" in
+            sent|suppressed|failed|partial_failed|unknown) ;;
+            *) outcome=unknown ;;
+          esac
+          [[ "$status" =~ ^[0-9]{1,3}$ ]] || status=255
+          # Only bounded, allowlisted metadata reaches the journal, never CLI JSON.
+          printf '%s\n' "cli_exit=$status delivery_outcome=$outcome" >&2
+          if (( status != 0 )) || [[ "$outcome" != sent ]]; then
+            printf '%s\n' "couldn't notify Kestrel — tell it manually; Telegram delivery is not confirmed. Notification outcome unknown; approval may already be consumed or expired. Check deployment/pending state before continuing. No automatic retry." >&2
+            (( status != 0 )) || status=1
+          else
+            printf '%s\n' "Telegram delivery confirmed by CLI metadata; deployment result must still be checked." >&2
+          fi
+          exit "$status"
         '';
       };
 
@@ -288,18 +343,25 @@
         trap - EXIT
         journal "approval issued id=$record_id path=$TARGET mode=$MODE nar_hash=$nar_hash issuing_uid=$issuer expires_at=$expiry"
 
-        # Only immutable helpers run as root. Drop privileges and scrub the
-        # environment BEFORE the mutable CLI reads tunnel's normal credentials.
+        # Only immutable helpers run as root. The service manager drops privileges
+        # and we scrub the environment BEFORE the mutable CLI reads credentials.
         # No credential is read here, passed in argv, or copied into the store.
+        # A transient service survives the caller exiting, without holding the
+        # approval command or activation lock while the agent completes its turn.
         if [[ "''${SUDO_USER:-}" != tunnel ]] \
           || [[ "$issuer" != "$(${coreutils}/id -u tunnel)" ]] \
-          || ! ${coreutils}/timeout --kill-after=1s 10s \
-            ${runuser} -u tunnel -- \
+          || ! ${systemdRun} --quiet --collect --service-type=exec \
+            --unit="openclaw-nixos-approval-notify-$record_id" \
+            --property=User=tunnel --property=RuntimeMaxSec=660 \
+            --property=TimeoutStopSec=5 --property=KillMode=control-group \
+            --property=StandardOutput=null --property=StandardError=journal \
             ${coreutils}/env -i HOME=/home/tunnel USER=tunnel LOGNAME=tunnel \
               OPENCLAW_STATE_DIR=/home/tunnel/.openclaw LANG=C LC_ALL=C \
               ${lib.getExe approvalNotifier} "$TARGET" "$MODE" "$expires_iso" \
               </dev/null >/dev/null 2>&1; then
-          ${coreutils}/printf '%s\n' "couldn't notify Kestrel — tell it manually" >&2
+          ${coreutils}/printf '%s\n' "couldn't notify Kestrel — tell it manually; notification failure does not revoke approval. Notification outcome unknown; approval may already be consumed or expired. Check deployment/pending state before continuing. No automatic retry." >&2
+        else
+          ${coreutils}/printf '%s\n' "Notification worker started; Telegram delivery is not yet confirmed. Check journalctl -u openclaw-nixos-approval-notify-$record_id if no result arrives — tell it manually after checking deployment/pending state; do not replay approval."
         fi
       '';
 
