@@ -19,6 +19,18 @@ cases = json.loads(pathlib.Path(sys.argv[1]).read_text())
 for case in cases:
     assert any(path.endswith("plugins/BlueMap") for path in case["statePaths"])
     assert any(path.endswith("plugins/SkinsRestorer") for path in case["statePaths"])
+    pre_join = [pathlib.Path(source).read_text() for source in case["preJoinSources"]]
+    pre_join.append(json.dumps(case["homepageTiles"]))
+    if case["installed"]:
+        gate = yaml.safe_load(pathlib.Path(case["linking"]).read_text())[
+            "Require linked account to play"
+        ]
+        pre_join.extend([gate["Not linked message"], *gate["Messages"].values()])
+    for text in pre_join:
+        assert "{INVITE}" not in text
+        assert "discord.gg/" not in text and "discord.com/invite/" not in text
+        if case["discord"]["inviteUrl"]:
+            assert case["discord"]["inviteUrl"] not in text
 
 with zipfile.ZipFile(sys.argv[3]) as jar:
     assert "libraries:" not in jar.read("plugin.yml").decode()

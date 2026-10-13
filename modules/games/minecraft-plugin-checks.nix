@@ -84,6 +84,15 @@ let
           configuredWhitelist = cfg.infra.games.servers.survival.minecraft.whitelist;
           whitelist = cfg.services.minecraft-servers.servers.survival.files."whitelist.json";
           properties = runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source;
+          preJoinSources = [
+            runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source
+            runtime.configTemplates."/srv/games/minecraft/survival/lazymc.toml".source
+            cfg.services.minecraft-servers.servers.velocity.files."velocity.toml"
+            cfg.infra.games.minecraftPlugins.proxy.templates."/srv/games/minecraft/velocity/plugins/minimotd-velocity/main.conf".source
+          ];
+          homepageTiles = (import ../../lib/games-homepage.nix { inherit lib; }).tiles {
+            survival = cfg.infra.games.servers.survival;
+          } "https://games.nyc.finnrut.is";
           floodgateConfiguration =
             cfg.infra.games.proxy.configTemplates."/srv/games/minecraft/velocity/plugins/floodgate/config.yml".source;
           hostname = lib.head cfg.infra.games.servers.survival.hostnames;

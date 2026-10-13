@@ -188,10 +188,7 @@ for case in cases:
         assert gate["Subscriber role"]["Require subscriber role to join"] is False
         assert gate["Subscriber role"]["Subscriber roles"] == []
         kick = gate["Not linked message"]
-        expected_placeholders = {"BOT", "CODE"}
-        if case["discord"]["inviteUrl"]:
-            expected_placeholders.add("INVITE")
-        assert set(re.findall(r"\{([A-Z]+)\}", kick)) == expected_placeholders
+        assert set(re.findall(r"\{([A-Z]+)\}", kick)) == {"BOT", "CODE"}
         assert "DM &b{BOT} &7with just: &b{CODE}" in kick
         assert kick.index("link.geysermc.org") < kick.index("{CODE}")
         assert "Java and Bedrock" in kick and "FIRST" in kick
@@ -199,16 +196,20 @@ for case in cases:
         failures = gate["Messages"]
         assert "minute" in failures["DiscordSRV still starting"]
         assert "new code to DM the bot" in failures["Kicked for unlinking"]
-        if case["discord"]["inviteUrl"]:
-            assert "{INVITE}" in failures["Not in server"]
-            assert case["discord"]["inviteUrl"] in failures["Failed for unknown reason"]
-        else:
-            assert "Ask Finn for the Discord invite." in kick
-            assert "Ask Finn for the Discord invite." in failures["Not in server"]
-        for key, value in failures.items():
-            assert set(re.findall(r"\{([A-Z]+)\}", value)) <= (
-                {"INVITE"} if key == "Not in server" else set()
-            )
+        instruction = "&7You must already be in Finn's Discord server to link."
+        for value in (
+            kick,
+            failures["Not in server"],
+            failures["Failed for unknown reason"],
+        ):
+            assert instruction in value
+        for value in (kick, *failures.values()):
+            assert "{INVITE}" not in value
+            assert "discord.gg/" not in value and "discord.com/invite/" not in value
+            if case["discord"]["inviteUrl"]:
+                assert case["discord"]["inviteUrl"] not in value
+        for value in failures.values():
+            assert not re.findall(r"\{([A-Z]+)\}", value)
         assert configuration["DiscordChatChannelRequireLinkedAccount"] is False
         assert configuration["MinecraftDiscordAccountLinkedUsePM"] is True
         assert (
