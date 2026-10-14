@@ -39,6 +39,9 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
         "github/scarsz/discordsrv/listeners/PlayerJoinLeaveListener.class"
     )
     assert b"runTaskLaterAsynchronously" in join_listener
+    for permission in ("discordsrv.silentjoin", "discordsrv.silentquit"):
+        assert descriptor["permissions"][permission]["default"] is False
+        assert permission.encode() in join_listener
 assert discord_defaults["ConfigVersion"] == "1.30.5"
 
 

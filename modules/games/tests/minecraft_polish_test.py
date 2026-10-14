@@ -247,6 +247,16 @@ for name, fixture in fixtures.items():
         # Exact command coverage also excludes imports, clearing, removals and
         # track writes that could discard unrelated interactive state.
         assert sorted(commands) == sorted(expected)
+        for group in ("default", "builder", "mod", "admin"):
+            for permission in ("discordsrv.silentjoin", "discordsrv.silentquit"):
+                assert [
+                    node["value"]
+                    for node in bootstrap["groups"][group]["nodes"]
+                    if node["key"] == permission
+                ] == [False]
+                assert commands.count(
+                    ["lp", "group", group, "permission", "set", permission, "false"]
+                ) == 1
         default = permission_nodes(bootstrap, "default")
         mod = permission_nodes(bootstrap, "mod")
         assert {

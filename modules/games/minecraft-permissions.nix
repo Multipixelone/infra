@@ -70,6 +70,17 @@
             "axgraves.tp"
             "axgraves.tp.bypass"
           ];
+      # Announce every rank on Discord, including admins with the * grant.
+      joinLeaveRestrictions =
+        map
+          (key: {
+            inherit key;
+            value = false;
+          })
+          [
+            "discordsrv.silentjoin"
+            "discordsrv.silentquit"
+          ];
       builderPermissions = [
         "group.default"
         "minecraft.command.gamemode"
@@ -184,6 +195,7 @@
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
             ++ deathReturnRestrictions
+            ++ joinLeaveRestrictions
             ++ [
               {
                 key = "carbon.nickname.others.set";
@@ -209,7 +221,11 @@
                   "veinminer.settings"
                   "veinminer.reload"
                 ];
-          builder.nodes = grants builderPermissions ++ rankNodes "builder" ++ deathReturnRestrictions;
+          builder.nodes =
+            grants builderPermissions
+            ++ rankNodes "builder"
+            ++ deathReturnRestrictions
+            ++ joinLeaveRestrictions;
           mod.nodes =
 
             map
@@ -232,7 +248,8 @@
               ]
             ++ grants polishPermissions.mod
             ++ rankNodes "mod"
-            ++ deathReturnRestrictions;
+            ++ deathReturnRestrictions
+            ++ joinLeaveRestrictions;
           admin.nodes = [
             {
               key = "group.mod";
@@ -246,6 +263,7 @@
           ++ rankNodes "admin"
           ++ nicknameRestrictions
           ++ deathReturnRestrictions
+          ++ joinLeaveRestrictions
           ++ grants [
             "carbon.nickname.others.set"
             "carbon.nickname.tags.color"

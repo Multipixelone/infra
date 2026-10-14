@@ -574,6 +574,43 @@ admin so its `*` grant cannot enable grave teleporting. Ordinary `/back` grants
 are unchanged. Bukkit/Velocity op accounts retain other upstream op permissions
 independently of the LuckPerms groups.
 
+Every rank also explicitly denies `discordsrv.silentjoin` and
+`discordsrv.silentquit`. DiscordSRV 1.30.5 checks these permissions before
+relaying joins (including first joins) and leaves; admin's `*` otherwise grants
+them. FlectonePulse's in-game message configuration is unchanged.
+
+Generating the bootstrap does not update existing LuckPerms groups. After the
+separately approved activation and with Paper awake, apply just these two
+denials to the live database, preserving other grants, memberships and tracks:
+
+```fish
+sudo games-console survival 'lp group default permission set discordsrv.silentjoin false'
+sudo games-console survival 'lp group default permission set discordsrv.silentquit false'
+sudo games-console survival 'lp group builder permission set discordsrv.silentjoin false'
+sudo games-console survival 'lp group builder permission set discordsrv.silentquit false'
+sudo games-console survival 'lp group mod permission set discordsrv.silentjoin false'
+sudo games-console survival 'lp group mod permission set discordsrv.silentquit false'
+sudo games-console survival 'lp group admin permission set discordsrv.silentjoin false'
+sudo games-console survival 'lp group admin permission set discordsrv.silentquit false'
+```
+
+Run the permission commands individually, checking each asynchronous result in
+`games-logs survival` before the next command. Then synchronize both platforms,
+again waiting for each result before continuing:
+
+```fish
+sudo games-console survival 'lp sync'
+sudo games-console velocity 'lpv sync'
+```
+
+Check each asynchronous result in `games-logs survival` and `games-logs velocity`;
+an empty RCON response does not establish success. Query both nodes for each
+rank with `lp group <rank> permission check <node>` and verify Finn's effective
+permissions with `lp user 3f771d00-3456-4007-8d66-13fe158488fa permission check <node>`.
+Both checks must report false. Confirm a subsequent admin join and leave appear
+in the configured Discord events channel. These live permission updates and
+syncs require no Paper, Velocity or DiscordSRV restart.
+
 The pinned Paper and Velocity **5.5.71** jars have identical import classes
 (their SHA-256 hashes match `minecraft-plugin-artifacts.nix`).
 [`ImportCommand`](https://github.com/LuckPerms/LuckPerms/blob/master/common/src/main/java/me/lucko/luckperms/common/commands/misc/ImportCommand.java)
