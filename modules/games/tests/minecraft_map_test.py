@@ -13,8 +13,15 @@ import urllib.request
 import zipfile
 
 (
-    fixtures_file, plugin, java_source, tokens_file, nginx_template, paper, gson,
-    players_source, helper_source,
+    fixtures_file,
+    plugin,
+    java_source,
+    tokens_file,
+    nginx_template,
+    paper,
+    gson,
+    players_source,
+    helper_source,
 ) = sys.argv[1:]
 data = json.loads(pathlib.Path(fixtures_file).read_text())
 tokens = pathlib.Path(tokens_file).read_text()
@@ -120,6 +127,8 @@ with tempfile.TemporaryDirectory() as directory:
                     server["templates"][destination + "/webapp.conf"]["source"],
                     str(webroot),
                     destination + "/web",
+                    server["templates"][destination + "/plugin.conf"]["source"],
+                    server["templates"][destination + "/core.conf"]["source"],
                 ],
                 check=True,
             )
@@ -133,10 +142,16 @@ with tempfile.TemporaryDirectory() as directory:
             )
             player_fixture = root / f"{scenario}-{identifier}"
             for name in ("plugin.conf", "webserver.conf"):
-                assert server["templates"][destination + "/" + name] == server["runtimeTemplates"][destination + "/" + name]
+                assert (
+                    server["templates"][destination + "/" + name]
+                    == server["runtimeTemplates"][destination + "/" + name]
+                )
             subprocess.run(
                 [
-                    "java", "-cp", classpath, "CheckBlueMapPlayers",
+                    "java",
+                    "-cp",
+                    classpath,
+                    "CheckBlueMapPlayers",
                     server["templates"][destination + "/plugin.conf"]["source"],
                     server["templates"][destination + "/webserver.conf"]["source"],
                     str(player_fixture),

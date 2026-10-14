@@ -105,7 +105,8 @@
                 write-markers-interval = 30;
                 write-players-interval = 3;
                 skin-download = true;
-                player-render-limit = 1;
+                # BlueMap 5.28: -1 disables the player-count pause.
+                player-render-limit = -1;
               };
               "storages/file" = {
                 storage-type = "file";

@@ -219,8 +219,8 @@ has four workers, six concurrent requests per IP and a 30-second stalled-write
 timeout. Monitor disk, tick time and outbound traffic before expanding an area.
 
 BlueMap reads the saved Minecraft chunks afterwards; no Chunksmith addon is
-needed for normal saved-chunk pregeneration. It renders while survival is empty
-and continues across idle periods, using one low-priority thread. LOD-only no-save horizons
+needed for normal saved-chunk pregeneration. It renders with players online and
+continues while the server is idle, using one low-priority thread. LOD-only no-save horizons
 are not a source for BlueMap. Map configuration and existing resource budgets
 remain as declared.
 
@@ -695,8 +695,8 @@ spectator and hidden-player exclusions. No map request wakes Paper.
 
 BlueMap renders to `plugins/BlueMap/web/maps` using file storage and client-side
 compression handling. A single render thread at Java priority 1 runs while Paper is
-running and empty (`player-render-limit=1` pauses it while players are online).
-The update cooldown remains 60 seconds. The
+running, including with players online (`player-render-limit=-1`, verified
+against BlueMap 5.28). The update cooldown remains 60 seconds. The
 `full-update-interval=1440` fallback checks for missed changes daily without
 re-rendering every unchanged chunk. Allow the initial render to finish before
 expecting a complete public map; existing tiles remain viewable during stops.
