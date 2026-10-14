@@ -1,0 +1,232 @@
+[
+  {
+    "path": "de/miraculixx/kpaper/1.2.1/kpaper-1.2.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/de/miraculixx/kpaper/1.2.1/kpaper-1.2.1.jar",
+    "sha256": "2862fdec4c64892fb7a1983017b7135e86189673a1e85d3db12f0ae91e337cc7"
+  },
+  {
+    "path": "de/miraculixx/kpaper/1.2.1/kpaper-1.2.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/de/miraculixx/kpaper/1.2.1/kpaper-1.2.1.pom",
+    "sha256": "f398da569e473c663a129e3b3ce4f9cdab8149797a2b4c352d2c01c05df2424f"
+  },
+  {
+    "path": "org/jetbrains/annotations/13.0/annotations-13.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar",
+    "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478"
+  },
+  {
+    "path": "org/jetbrains/annotations/13.0/annotations-13.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.pom",
+    "sha256": "965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397"
+  },
+  {
+    "path": "org/jetbrains/annotations/23.0.0/annotations-23.0.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.pom",
+    "sha256": "c9490f655132328df2cfbcfdf743f53fc3916d6c1d10437175a6ca6e3a67771c"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-reflect/2.4.20/kotlin-reflect-2.4.20.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.20/kotlin-reflect-2.4.20.jar",
+    "sha256": "b4aac2a4686ffdc110602ce153e4a90ffd7f37fa86fcca9d3b3aa39c08f8c2fc"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-reflect/2.4.20/kotlin-reflect-2.4.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.20/kotlin-reflect-2.4.20.pom",
+    "sha256": "0c822b42aa0211b6b17911cf4a06c8feb296093099c57c35cbd35931e26d2858"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-common/1.8.20/kotlin-stdlib-common-1.8.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.8.20/kotlin-stdlib-common-1.8.20.pom",
+    "sha256": "605591b89b372127e6b29c69325fa2f6a8c46f468c45d09410e78eb59fc80a17"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-common/1.8.21/kotlin-stdlib-common-1.8.21.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.8.21/kotlin-stdlib-common-1.8.21.pom",
+    "sha256": "e19a5577cbcea89728970db5333c8264c8c69ae722eeb79cbf41d5f0b0c9ae65"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-common/1.8.22/kotlin-stdlib-common-1.8.22.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.8.22/kotlin-stdlib-common-1.8.22.pom",
+    "sha256": "a72b11df08b5322d7a5e8e620789ee3e4cfef38e86c430e7d113bfa9e54c581e"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.20/kotlin-stdlib-jdk7-1.8.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.20/kotlin-stdlib-jdk7-1.8.20.pom",
+    "sha256": "3622d106578cddcc0a9ec20f8ce815f7f49ff542f640228d2141fcaf80616b06"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.22/kotlin-stdlib-jdk7-1.8.22.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.22/kotlin-stdlib-jdk7-1.8.22.jar",
+    "sha256": "055f5cb24287fa106100995a7b47ab92126b81e832e875f5fa2cf0bd55693d0b"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.22/kotlin-stdlib-jdk7-1.8.22.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.8.22/kotlin-stdlib-jdk7-1.8.22.pom",
+    "sha256": "4f958aa993d5984f8f5ebed4146562a5f3a9f695b6049c9f287381379cadab33"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.20/kotlin-stdlib-jdk8-1.8.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.20/kotlin-stdlib-jdk8-1.8.20.pom",
+    "sha256": "3a462214a336e995687769531b1e37b0c81d8e10c9949cd5ea7ae1d7803a0232"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.22/kotlin-stdlib-jdk8-1.8.22.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.22/kotlin-stdlib-jdk8-1.8.22.jar",
+    "sha256": "4198b0eaf090a4f25b6f7e5a59581f4314ba8c9f6cd1d13ee9d348e65ed8f707"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.22/kotlin-stdlib-jdk8-1.8.22.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.8.22/kotlin-stdlib-jdk8-1.8.22.pom",
+    "sha256": "928f2187217476313cb816d48070bc7654aa3b9a5ae81d3fc5f8c279cc8f8d9e"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/1.8.20/kotlin-stdlib-1.8.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.8.20/kotlin-stdlib-1.8.20.pom",
+    "sha256": "c9c1efc4ba4b46c632e2a21e693258a3eced07ebeaa00af4d3c346d3990b201e"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/1.8.21/kotlin-stdlib-1.8.21.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.8.21/kotlin-stdlib-1.8.21.pom",
+    "sha256": "fe0cd9e32193e453333fd2b1f577e662fb5abc6907102bb967817bc131280fd7"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/1.8.22/kotlin-stdlib-1.8.22.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.8.22/kotlin-stdlib-1.8.22.pom",
+    "sha256": "596f4a62f3086ad98f0e78b3e257ba5b247cd313bffa9818e509696210e83a37"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/2.2.20/kotlin-stdlib-2.2.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.2.20/kotlin-stdlib-2.2.20.pom",
+    "sha256": "4a8b086e6431bcf623637f52b2ff192e1adb913838742e5c0eea70a8dee429c4"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.10/kotlin-stdlib-2.4.10.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.10/kotlin-stdlib-2.4.10.pom",
+    "sha256": "9f81f25e96b919153392ded53bd33216e76624909cfd080a3edb278d44fc34f0"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20.jar",
+    "sha256": "2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f"
+  },
+  {
+    "path": "org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20.pom",
+    "sha256": "bd69b382dba8e2b7ae3846375eb2f1389017eb908987277051ae4e3acec8c938"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.11.0/kotlinx-coroutines-bom-1.11.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.11.0/kotlinx-coroutines-bom-1.11.0.pom",
+    "sha256": "f65860bce58a2bfadf05fdc516d38333421f0e387fef87e24449c0394c80d254"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.7.1/kotlinx-coroutines-bom-1.7.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.7.1/kotlinx-coroutines-bom-1.7.1.pom",
+    "sha256": "b925aa988c40a5c7aa0c77b21373feb18c39414926bd51c76ef44434f5bae9c2"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+    "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.pom",
+    "sha256": "dd54b97aa3fab91fc24f5df2916c22be9429a339d2f45b7ff092332f6c19dc39"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.7.1/kotlinx-coroutines-core-jvm-1.7.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.7.1/kotlinx-coroutines-core-jvm-1.7.1.pom",
+    "sha256": "85c19db10dbc448a04663cdfb478243eda0a8d6b127f108f19955b16d489b35d"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.jar",
+    "sha256": "04e7737fb15cf5f3aed83a91141a5303a0b2acd886f5bbc35cdbe791ad63dfee"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.pom",
+    "sha256": "41b6e78c1b0d11bc99de795390df9e4ece64dc113f482d6e308f1b7a421c1d30"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-jdk8/1.7.1/kotlinx-coroutines-jdk8-1.7.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-jdk8/1.7.1/kotlinx-coroutines-jdk8-1.7.1.jar",
+    "sha256": "b96f7145ba69b48f4940534cb8e19c7e159c45443e27c36821626148ba1710f2"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-coroutines-jdk8/1.7.1/kotlinx-coroutines-jdk8-1.7.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-jdk8/1.7.1/kotlinx-coroutines-jdk8-1.7.1.pom",
+    "sha256": "c7791653694ea5a54b9cdd4708082dbfb8bd6a978a5f42184b1141cfb4a30e75"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-bom/1.12.0-RC/kotlinx-serialization-bom-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-bom/1.12.0-RC/kotlinx-serialization-bom-1.12.0-RC.pom",
+    "sha256": "0a9f36b8baf4808df1134446c1021f259e837291b05e79728f78bad21b4a6f8a"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-bom/1.5.1/kotlinx-serialization-bom-1.5.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-bom/1.5.1/kotlinx-serialization-bom-1.5.1.pom",
+    "sha256": "88b3d7507935ad932aa1aa3db15174349d76883a06cc2c24b619d99b8ab07b02"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-cbor-jvm/1.12.0-RC/kotlinx-serialization-cbor-jvm-1.12.0-RC.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-cbor-jvm/1.12.0-RC/kotlinx-serialization-cbor-jvm-1.12.0-RC.jar",
+    "sha256": "b0ebe8726e0303f172d2a3a3076758f1cb85479870ff1ad23c1fe13b99386bd9"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-cbor-jvm/1.12.0-RC/kotlinx-serialization-cbor-jvm-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-cbor-jvm/1.12.0-RC/kotlinx-serialization-cbor-jvm-1.12.0-RC.pom",
+    "sha256": "a2aeab480c5fea3e03157781a121dc221da7762dc1881e91c437c4c2e22ee779"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-cbor/1.12.0-RC/kotlinx-serialization-cbor-1.12.0-RC.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-cbor/1.12.0-RC/kotlinx-serialization-cbor-1.12.0-RC.jar",
+    "sha256": "300d07ec048182f8c5a6ab46dc43347c261d7fff2769e3ac92f348a1d71cf440"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-cbor/1.12.0-RC/kotlinx-serialization-cbor-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-cbor/1.12.0-RC/kotlinx-serialization-cbor-1.12.0-RC.pom",
+    "sha256": "c6412283131b91d1087d7abfc75979dc2db0e0640576a2f8fc287341f850cc44"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0-RC/kotlinx-serialization-core-jvm-1.12.0-RC.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0-RC/kotlinx-serialization-core-jvm-1.12.0-RC.jar",
+    "sha256": "06e73b4bdad243e8d85d8e4b0118367d79445eb5f9db8ad9ea41d1995adba862"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0-RC/kotlinx-serialization-core-jvm-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0-RC/kotlinx-serialization-core-jvm-1.12.0-RC.pom",
+    "sha256": "92fca772798f507602c801ae5dc1fc1f3ca8f8545e99ca33ed7a87bfc0c7ab93"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.5.1/kotlinx-serialization-core-jvm-1.5.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.5.1/kotlinx-serialization-core-jvm-1.5.1.pom",
+    "sha256": "5d0ddda5c4774ed51542433334a96e36cf217798777808c2a58d7f08b1d428e4"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0-RC/kotlinx-serialization-json-jvm-1.12.0-RC.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0-RC/kotlinx-serialization-json-jvm-1.12.0-RC.jar",
+    "sha256": "bf1363464627dd16f229b8b2d094a992749ab4f83e537bad97b0392ef96232a9"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0-RC/kotlinx-serialization-json-jvm-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0-RC/kotlinx-serialization-json-jvm-1.12.0-RC.pom",
+    "sha256": "495214cfe772507d5ebd7399114d73802f026655e069ac3cd31524c875f738bf"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.5.1/kotlinx-serialization-json-jvm-1.5.1.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.5.1/kotlinx-serialization-json-jvm-1.5.1.pom",
+    "sha256": "f74987ff569db6163b61ddc62d55e38e7f09161f9e8f15f28db452196b732d32"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0-RC/kotlinx-serialization-json-1.12.0-RC.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0-RC/kotlinx-serialization-json-1.12.0-RC.jar",
+    "sha256": "8ba4a911b74e9e73b1af1bdc8bb98432d8ce421f378db535616e2efac4c9dcae"
+  },
+  {
+    "path": "org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0-RC/kotlinx-serialization-json-1.12.0-RC.pom",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0-RC/kotlinx-serialization-json-1.12.0-RC.pom",
+    "sha256": "f45d2a0aef3c7e9e0fbd1be1eff1ac8bf0479b99204fb18f4463623369b21010"
+  }
+]

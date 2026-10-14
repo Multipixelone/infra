@@ -1,6 +1,11 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-veinminer = pkgs.fetchurl {
+        name = "veinminer-paper-2.12.3.jar";
+        url = "https://cdn.modrinth.com/data/OhduvhIc/versions/O12m3jOR/veinminer-paper-2.12.3.jar";
+        sha256 = "aec0911a8b201b9f4746bbffdde8b336149c265c46d52f6498f2cfc1f48ce1aa";
+      };
       games-tab = pkgs.fetchurl {
         # The main 6.2.0 jar adds Bukkit 26.3 support. The separately named
         # Paper 1.20.5–1.21.4 jar excludes the implementation needed here.

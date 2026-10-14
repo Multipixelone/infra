@@ -179,6 +179,7 @@
                 "axgraves.help"
                 "axgraves.list"
                 "axgraves.allowgraves"
+                "veinminer.use"
               ]
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
@@ -190,7 +191,8 @@
               }
             ]
             ++ rankNodes "default"
-            # These visualizer permissions default to true upstream.
+            # Visualizer use defaults to true upstream; Veinminer configuration
+            # commands must also remain unavailable to ordinary players.
             ++
               map
                 (key: {
@@ -201,6 +203,11 @@
                   "wesv.use"
                   "wesv.toggle"
                   "wesv.lock"
+                  "veinminer.toggle"
+                  "veinminer.blocks"
+                  "veinminer.groups"
+                  "veinminer.settings"
+                  "veinminer.reload"
                 ];
           builder.nodes = grants builderPermissions ++ rankNodes "builder" ++ deathReturnRestrictions;
           mod.nodes =

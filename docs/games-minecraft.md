@@ -8,7 +8,9 @@ there is no redirect from that name to Dawarich and no data migration.
 
 Verified on 2026-10-09; TAB separately on 2026-10-10. Every release JAR uses
 an exact URL and SHA-256 in `minecraft-plugin-artifacts.nix`; downloads were hashed before pinning. No
-plugin JAR is fetched or updated at runtime. Configurations use Nix formats.
+installed plugin JAR is updated at runtime. Configurations use Nix formats.
+[Veinminer 2.12.3](games-veinminer.md) is an accepted exception for network
+checks: it downloads updates into its data folder without installing them.
 
 | Plugin             | Version / placement            | Evidence                                                                                                                                                                                                                                   |
 | ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
