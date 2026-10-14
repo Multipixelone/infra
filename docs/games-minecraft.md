@@ -1044,14 +1044,16 @@ for binary secrets such as Floodgate's key.
 Survival declares the following `gameServers.servers.survival.minecraft.discord`
 options for Finn's existing bot:
 
-| Option             | Discord ID            | Purpose                                          |
-| ------------------ | --------------------- | ------------------------------------------------ |
-| `guildId`          | `1518484285466873997` | Guild owning the channels                        |
-| `channelId`        | `1557960229528797265` | Main bidirectional chat, deaths and advancements |
-| `eventsChannelId`  | `1518484285982769204` | Join, first join and leave messages              |
-| `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands       |
-| `roles.mod`        | `1558172717218533468` | LuckPerms `mod` → Discord Mod (purple)           |
-| `roles.admin`      | `1558173111931904092` | LuckPerms `admin` → Discord Admin (green)        |
+| Option             | Discord ID            | Purpose                                           |
+| ------------------ | --------------------- | ------------------------------------------------- |
+| `guildId`          | `1518484285466873997` | Guild owning the channels                         |
+| `channelId`        | `1557960229528797265` | Main bidirectional chat, deaths and advancements  |
+| `linkChannelId`    | `1559824382208253973` | `#mc-link`, accepting account-link codes          |
+| `linkedRoleName`   | `linked` (role name)  | Discord channel access on link; removed on unlink |
+| `eventsChannelId`  | `1518484285982769204` | Join, first join and leave messages               |
+| `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands        |
+| `roles.mod`        | `1558172717218533468` | LuckPerms `mod` → Discord Mod (purple)            |
+| `roles.admin`      | `1558173111931904092` | LuckPerms `admin` → Discord Admin (green)         |
 
 The defaults for other servers are empty. Either missing guild/chat ID, missing
 encrypted token source or `enable = false` means no DiscordSRV JAR is installed;
@@ -1093,6 +1095,76 @@ IDs are mapped; with neither set, linking remains available but rank sync is
 inert and Vault is not installed. Missing token/guild/chat IDs or a disabled
 bridge still prevent DiscordSRV and Vault installation.
 
+### Linking channel and visibility
+
+The pinned 1.30.5 JAR's `DiscordAccountLinkListener` accepts codes in
+`Channels.link`, independently of `MinecraftDiscordAccountLinkedUsePM = true`,
+which also permits DMs. Survival maps `Channels.link` to `1559824382208253973`;
+this channel is excluded from the Minecraft chat bridge by `DiscordChatListener`.
+Both routes use the same account-link manager. Codes are four digits; the
+file backend strips non-digits before lookup and consumes a successful code.
+Send just the displayed code, without a command prefix.
+
+`MinecraftDiscordAccountLinkedRoleNameToAddUserTo` uses the declared
+`minecraft.discord.linkedRoleName`, set to **linked** for Survival. Keep this
+name unique among all guild roles visible to the bot, since `resolveRole` uses
+the first matching name or ID. Other servers default to an empty role name and
+link channel ID. The role is independent of LuckPerms staff mappings:
+`AbstractAccountLinkManager` grants/removes it directly when group sync is off,
+and `GroupSynchronizationManager` handles it alongside staff roles when sync is
+on. Linking therefore grants Minecraft-channel visibility without a Minecraft
+rank or console command.
+
+Neither `minecraft-discord-token.py` (private token preparation) nor
+`minecraft-discord-status.py` (status-message delivery) manages guild roles or
+channel permissions. Finn must apply these settings in Discord:
+
+1. In **Server Settings → Roles**, create or keep exactly one **linked** role.
+   Grant the bot **Manage Roles** and drag its role above **linked**, Mod and
+   Admin. Retain the existing Message Content and Server Members intents.
+2. Open **Edit Channel → Permissions → Advanced permissions** for the Minecraft
+   channels and set the following overrides. If using a category for chat,
+   events or voice, synchronize only channels that should share its settings;
+   `#mc-link` needs its own overrides.
+
+   | Channel                     | `@everyone`                                             | `linked`                                                | Bot                                                                                            |
+   | --------------------------- | ------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+   | `#mc-link`                  | Allow View Channel, Send Messages, Read Message History | Deny View Channel                                       | Allow View Channel, Send Messages, Read Message History, Manage Messages                       |
+   | Minecraft chat              | Deny View Channel                                       | Allow View Channel, Send Messages, Read Message History | Explicitly allow View Channel; retain existing sending, history, embed and webhook permissions |
+   | Minecraft events            | Deny View Channel and Send Messages                     | Allow View Channel and Read Message History             | Explicitly allow View Channel; retain existing sending, history and embed permissions          |
+   | Minecraft voice, if present | Deny View Channel                                       | Allow View Channel, Connect and Speak                   | Retain existing permissions                                                                    |
+
+3. Keep the console channel operator-only. Leave non-Minecraft channels alone.
+   Remove other ordinary-role or member-specific View Channel allows that
+   bypass the gate or prevent **linked** from hiding `#mc-link`. Administrator
+   and server-owner accounts bypass channel restrictions; verify with ordinary
+   unlinked and linked members. See [Discord's permission rules](https://docs.discord.com/developers/topics/permissions).
+4. Before enforcing visibility, inspect existing associations with
+   `/discordsrv linked <verified Minecraft UUID or Discord ID>` and manually
+   grant **linked** to verified existing members missing it. Do not unlink
+   existing accounts merely to populate the role.
+
+`MinecraftDiscordAccountLinkedMessageDeleteSeconds = 1` enables native cleanup.
+In this exact JAR, channel replies are delayed one second, then both the reply
+and the submitted message are deleted after the reply sends. **Manage Messages**
+is needed to delete another member's code. Failed or unknown codes receive the
+same channel cleanup. Successful codes are consumed before the delayed reply;
+the success/error text does not repeat the code. DMs receive their reply directly
+and are not subject to channel cleanup. Discord deletion remains best-effort
+when permissions or connectivity fail.
+
+The success reply is `Linked to %name%. Rejoin Minecraft.` A successful channel
+link grants the role before replying, so `#mc-link` may disappear before the
+member sees a reply. The appearance of the Minecraft channels is the signal to
+rejoin; use DMs when a readable confirmation is preferred. Pin an instruction
+in `#mc-link`: join `mc.finnrut.is`, post just the displayed code here or DM the
+bot, then rejoin once the Minecraft channels appear.
+
+After separately approved activation, restart `minecraft-server-survival` to
+prepare and load the generated DiscordSRV configuration. Discord permission
+edits themselves need no Minecraft restart. Verify both linking routes, code
+cleanup, role assignment and removal, and visibility with an ordinary member.
+
 ### Mandatory Discord onboarding
 
 Survival sets `minecraft.discord.requireLinkedAccount = true`; other servers
@@ -1109,13 +1181,15 @@ For a new player:
    **[link.geysermc.org](https://link.geysermc.org/)** first, before redeeming any
    Discord code. Bedrock-only players can skip this step.
 2. Join `mc.finnrut.is`. An unlinked player is disconnected with a friendly
-   message containing the bot's name, a generated code and
-   **[the Discord invite](https://discord.gg/hHurpHK8RT)**. A cold Paper wake can
+   short message: **Post CODE in #mc-link or DM BOT to join.** Join
+   **[Finn's Discord](https://discord.gg/hHurpHK8RT)** if needed; the short kick
+   prompt contains no invite URL. A cold Paper wake can
    require another connection attempt before the bot is ready.
-3. Join that Discord server and **DM the bot with just the displayed code** from
-   the Discord account you want linked. Paper must still be awake to redeem it.
+3. **Post just the displayed code in #mc-link or DM the bot** from the Discord
+   account you want linked. Paper must still be awake to redeem it.
    If it has slept, join Minecraft again to wake it and obtain another code.
-4. Wait for the bot's confirmation, then rejoin Minecraft. `/discord linked`
+4. In DMs, wait for the bot's confirmation. In `#mc-link`, wait for the Minecraft
+   channels to appear and the linking channel to disappear, then rejoin Minecraft. `/discord linked`
    checks the association once you are in game. Finn can also use `/discord link`
    from his exempt account.
 
@@ -1197,9 +1271,9 @@ For a Discord association change, ask Finn to inspect
 `/discordsrv unlink <same verified identifier>` deliberately. Unlinking requires
 operator permissions; using an identifier avoids uncertain display names.
 Non-exempt online players are kicked on unlink. Rejoin Survival to get a new
-code and DM it after settling the Java/Bedrock identity. Redeeming a new code
+code and post it in `#mc-link` or DM it after settling the Java/Bedrock identity. Redeeming a new code
 cannot automatically replace an existing association. Linking executes no
-console commands and grants no separate "Linked" role.
+console commands; the separate **linked** Discord role controls channel visibility.
 
 These are operator/player instructions, not automatic database edits or inventory
 migrations. Config and pinned implementation checks do not constitute a live

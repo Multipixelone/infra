@@ -106,6 +106,9 @@ let
           baseAvailable = runtime.available;
           statePaths = runtime.worldPaths;
           discord = cfg.infra.games.servers.survival.minecraft.discord;
+          linkingDefaults = {
+            inherit (base.terraria.minecraft.discord) linkChannelId linkedRoleName;
+          };
           notifier =
             if cfg.systemd.services ? minecraft-discord-survival then
               {
@@ -175,6 +178,22 @@ let
           channel = "234567890123456789";
           enable = true;
           overrides.requireLinkedAccount = false;
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.linkChannelId = "";
+          overrides.linkedRoleName = "";
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
+          overrides.linkChannelId = "678901234567890123";
+          overrides.linkedRoleName = "fixture-linked";
         }
         {
           token = true;

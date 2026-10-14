@@ -98,6 +98,16 @@ let
               type = types.strMatching "([0-9]{17,20})?";
               default = "";
             };
+            linkChannelId = mkOption {
+              type = types.strMatching "([0-9]{17,20})?";
+              default = "";
+              description = "Discord channel accepting account-link codes; empty leaves only bot DMs.";
+            };
+            linkedRoleName = mkOption {
+              type = types.str;
+              default = "";
+              description = "Unique Discord role name granted on account linking and removed on unlinking; empty disables it.";
+            };
             eventsChannelId = mkOption {
               type = types.strMatching "([0-9]{17,20})?";
               default = "";
@@ -245,6 +255,8 @@ in
             inviteUrl = "https://discord.gg/hHurpHK8RT";
             guildId = "1518484285466873997";
             channelId = "1557960229528797265";
+            linkChannelId = "1559824382208253973";
+            linkedRoleName = "linked";
             eventsChannelId = "1518484285982769204";
             consoleChannelId = "1557960243101831168";
             roles = {

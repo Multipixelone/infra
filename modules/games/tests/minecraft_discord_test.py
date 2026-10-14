@@ -42,7 +42,47 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
     for permission in ("discordsrv.silentjoin", "discordsrv.silentquit"):
         assert descriptor["permissions"][permission]["default"] is False
         assert permission.encode() in join_listener
+    link_listener = jar.read(
+        "github/scarsz/discordsrv/listeners/DiscordAccountLinkListener.class"
+    )
+    for symbol in (
+        b"onPrivateMessageReceived",
+        b"MinecraftDiscordAccountLinkedUsePM",
+        b"onGuildMessageReceived",
+        b"getDestinationTextChannelForGameChannelName",
+        b"link",
+        b"process",
+        b"reply",
+        b"MinecraftDiscordAccountLinkedMessageDeleteSeconds",
+        b"delay",
+        b"delete",
+    ):
+        assert symbol in link_listener
+    chat_listener = jar.read(
+        "github/scarsz/discordsrv/listeners/DiscordChatListener.class"
+    )
+    assert b"link" in chat_listener and b"equalsIgnoreCase" in chat_listener
+    account_manager = jar.read(
+        "github/scarsz/discordsrv/objects/managers/link/AbstractAccountLinkManager.class"
+    )
+    group_manager = jar.read(
+        "github/scarsz/discordsrv/objects/managers/GroupSynchronizationManager.class"
+    )
+    linked_role_key = b"MinecraftDiscordAccountLinkedRoleNameToAddUserTo"
+    assert linked_role_key in account_manager and linked_role_key in group_manager
+    assert b"afterLink" in account_manager and b"addRoleToMember" in account_manager
+    assert (
+        b"beforeUnlink" in account_manager
+        and b"removeRoleFromMember" in account_manager
+    )
+    assert (
+        b"removeSynchronizedRoles" in group_manager
+        and b"modifyMemberRoles" in group_manager
+    )
 assert discord_defaults["ConfigVersion"] == "1.30.5"
+assert cases[0]["linkingDefaults"] == {"linkChannelId": "", "linkedRoleName": ""}
+assert cases[0]["discord"]["linkChannelId"] == "1559824382208253973"
+assert cases[0]["discord"]["linkedRoleName"] == "linked"
 
 
 def supported(value, defaults, path=""):
@@ -241,10 +281,31 @@ for case in cases:
         assert gate["Subscriber role"]["Subscriber roles"] == []
         kick = gate["Not linked message"]
         assert set(re.findall(r"\{([A-Z]+)\}", kick)) == {"BOT", "CODE"}
-        assert kick == "&7DM &b{BOT} &7the code &b{CODE} &7to join."
+        channel_linking = bool(case["discord"]["linkChannelId"])
+        assert kick == (
+            "&7Post &b{CODE} &7in &b#mc-link &7or DM &b{BOT} &7to join."
+            if channel_linking
+            else "&7DM &b{BOT} &7the code &b{CODE} &7to join."
+        )
+        assert messages["CodeGenerated"] == (
+            "&7Post &b%code% &7in &b#mc-link &7or DM &b%botname% &7to link."
+            if channel_linking
+            else "&7DM &b%botname% &7the code &b%code% &7to link."
+        )
+        assert messages["DiscordAccountLinked"] == "Linked to %name%. Rejoin Minecraft."
+        assert "%code%" not in messages["DiscordAccountLinked"]
+        for key in ("UnknownCode", "InvalidCode", "DiscordAccountAlreadyLinked"):
+            assert "%code%" not in messages.get(key, message_defaults[key])
         failures = gate["Messages"]
         assert "minute" in failures["DiscordSRV still starting"]
-        assert "new code to DM the bot" in failures["Kicked for unlinking"]
+        assert failures["Kicked for unlinking"] == (
+            "&7Your Minecraft and Discord accounts were unlinked.\n"
+            + (
+                "&7Rejoin Minecraft for a new code to post in #mc-link or DM the bot."
+                if channel_linking
+                else "&7Rejoin Minecraft to get a new code to DM the bot."
+            )
+        )
         assert failures["Not in server"] == (
             "&7Your linked Discord account must be in Finn's Discord server."
         )
@@ -266,13 +327,17 @@ for case in cases:
             assert not re.findall(r"\{([A-Z]+)\}", value)
         assert configuration["DiscordChatChannelRequireLinkedAccount"] is False
         assert configuration["MinecraftDiscordAccountLinkedUsePM"] is True
+        assert configuration["MinecraftDiscordAccountLinkedMessageDeleteSeconds"] == 1
         assert (
             configuration["MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode"]
             is False
         )
         assert configuration["MinecraftDiscordAccountLinkedConsoleCommands"] == []
         assert configuration["MinecraftDiscordAccountUnlinkedConsoleCommands"] == []
-        assert configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"] == ""
+        assert (
+            configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"]
+            == case["discord"]["linkedRoleName"]
+        )
         assert configuration["Experiment_JdbcAccountLinkBackend"] == ""
         # Existing in-game Discord chat uses the Discord role's configured colour.
         assert (
@@ -286,6 +351,8 @@ for case in cases:
         else:
             assert case["vaultConfiguration"] is None
         channels = {"global": case["discord"]["channelId"]}
+        if channel_linking:
+            channels["link"] = case["discord"]["linkChannelId"]
         if case["discord"]["eventsChannelId"]:
             channels.update(
                 death=case["discord"]["eventsChannelId"],
@@ -357,5 +424,6 @@ for case in cases:
 
 print(
     "PASS: pinned DiscordSRV schema, mandatory linking, guild, owner whitelist, "
-    "kick placeholders, Floodgate, styling, credentials and notifier gating"
+    "channel/DM linking, linked role, code cleanup, kick placeholders, Floodgate, "
+    "styling, credentials and notifier gating"
 )

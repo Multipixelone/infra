@@ -21,6 +21,7 @@
             lib.attrNames (lib.filterAttrs (_: uuid: uuid == cfg.minecraftAdminUuid) s.minecraft.whitelist)
           ) == 1;
       accessEnabled = s: ready s && s.minecraft.discord.requireLinkedAccount && ownerReady s;
+      channelLinking = s: s.minecraft.discord.linkChannelId != "";
       roles = s: lib.filterAttrs (_: role: role != "") s.minecraft.discord.roles;
       syncEnabled = s: roles s != { };
       palette = {
@@ -153,6 +154,9 @@
                   Channels = {
                     global = s.minecraft.discord.channelId;
                   }
+                  // lib.optionalAttrs (channelLinking s) {
+                    link = s.minecraft.discord.linkChannelId;
+                  }
                   // lib.optionalAttrs (s.minecraft.discord.eventsChannelId != "") {
                     death = s.minecraft.discord.eventsChannelId;
                   };
@@ -177,12 +181,14 @@
                   DiscordChatChannelBlockBots = true;
                   DiscordChatChannelBlockWebhooks = true;
                   DiscordCannedResponses = { };
-                  # Code redemption proves account ownership; linking grants no permissions.
+                  # Linking grants Discord visibility, independently of LuckPerms staff ranks.
                   MinecraftDiscordAccountLinkedUsePM = true;
+                  # 1.30.5 delays the channel reply, then deletes it and the user's code.
+                  MinecraftDiscordAccountLinkedMessageDeleteSeconds = 1;
                   MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode = false;
                   MinecraftDiscordAccountLinkedConsoleCommands = [ ];
                   MinecraftDiscordAccountUnlinkedConsoleCommands = [ ];
-                  MinecraftDiscordAccountLinkedRoleNameToAddUserTo = "";
+                  MinecraftDiscordAccountLinkedRoleNameToAddUserTo = s.minecraft.discord.linkedRoleName;
                   # The default file backend keeps accounts.aof in the backed-up plugin directory.
                   Experiment_JdbcAccountLinkBackend = "";
                   UseModernPaperChatEvent = true;
@@ -199,6 +205,12 @@
                   ChannelTopicUpdaterChannelTopicsAtShutdownEnabled = false;
                 };
                 messages = {
+                  DiscordAccountLinked = "Linked to %name%. Rejoin Minecraft.";
+                  CodeGenerated =
+                    if channelLinking s then
+                      "&7Post &b%code% &7in &b#mc-link &7or DM &b%botname% &7to link."
+                    else
+                      "&7DM &b%botname% &7the code &b%code% &7to link.";
                   # %name% is the Discord server nickname, including the Carbon
                   # name maintained by nickname synchronization for linked users.
                   # Keep Discord roles in hover text rather than staff rank badges.
@@ -260,14 +272,24 @@
                     "Subscriber roles" = [ ];
                     "Require all of the listed roles" = false;
                   };
-                  "Not linked message" = "&7DM &b{BOT} &7the code &b{CODE} &7to join.";
+                  "Not linked message" =
+                    if channelLinking s then
+                      "&7Post &b{CODE} &7in &b#mc-link &7or DM &b{BOT} &7to join."
+                    else
+                      "&7DM &b{BOT} &7the code &b{CODE} &7to join.";
                   Messages = {
                     "DiscordSRV still starting" =
                       "&7Survival is connecting to Discord. Please try joining again in a minute.";
                     "Not in server" = "&7Your linked Discord account must be in Finn's Discord server.";
                     "Failed for unknown reason" = "&7Couldn't verify Discord access. Try again or ask Finn.";
                     "Kicked for unlinking" =
-                      "&7Your Minecraft and Discord accounts were unlinked.\n&7Rejoin Minecraft to get a new code to DM the bot.";
+                      "&7Your Minecraft and Discord accounts were unlinked.\n"
+                      + (
+                        if channelLinking s then
+                          "&7Rejoin Minecraft for a new code to post in #mc-link or DM the bot."
+                        else
+                          "&7Rejoin Minecraft to get a new code to DM the bot."
+                      );
                   };
                 };
                 voice.Enabled = false;
