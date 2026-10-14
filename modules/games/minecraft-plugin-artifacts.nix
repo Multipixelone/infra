@@ -60,10 +60,11 @@
         url = "https://github.com/Flectone/FlectonePulse/releases/download/v1.14.0/FlectonePulse-Bukkit-1.14.0.jar";
         sha256 = "96e4d2f5848db107ba200f50e1d233e580e79b0ed44835b88ebbc1daccf6f692";
       };
-      games-chunky = pkgs.fetchurl {
-        name = "chunky-bukkit-1.5.3.jar";
-        url = "https://cdn.modrinth.com/data/fALzjamp/versions/MdY6JATr/Chunky-Bukkit-1.5.3.jar";
-        sha256 = "530d2c7430a96a39957391b7088be144daa3108f7665896d1c23aa8dd4af32f3";
+      games-chunksmith = pkgs.fetchurl {
+        # Modrinth MsSa6z1v explicitly supports Paper 26.3 (2026-10-13).
+        name = "chunksmith-4.6.0+26.x-plugin.jar";
+        url = "https://cdn.modrinth.com/data/4BeAEBIb/versions/MsSa6z1v/chunksmith-4.6.0%2B26.x-plugin.jar";
+        hash = "sha256-bc3MtDgRuzOZKUwsvuvEDC0WjgbosTRcvyJvlMr5uuo=";
       };
       games-huskhomes = pkgs.fetchurl {
         name = "huskhomes-paper-4.11-9ed80cc.jar";
@@ -161,6 +162,16 @@
             statePaths = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ ];
+            };
+            publicTCPPorts = lib.mkOption {
+              type = lib.types.listOf lib.types.port;
+              default = [ ];
+              description = "Plugin TCP listeners included in the games firewall and port collision checks.";
+            };
+            publicEndpoints = lib.mkOption {
+              type = lib.types.listOf lib.types.attrs;
+              default = [ ];
+              description = "Plugin endpoints advertised in the games manifest.";
             };
             secretNames = lib.mkOption {
               type = lib.types.listOf lib.types.str;

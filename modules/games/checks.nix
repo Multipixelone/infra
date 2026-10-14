@@ -220,7 +220,7 @@
                   assert backend_plugins["BlueMapOfflinePlayerMarkers"] == {"name": "BlueMapOfflinePlayerMarkers", "version": "3.3", "installed": True}
                   assert "BlueMapOfflinePlayerMarkers" not in plugins
                   assert servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
-                  assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 24454, 7777}
+                  assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 24454, 25568, 7777}
                   assert all(server["console"]["command"] == ["games-console", server["id"]] for server in servers.values())
                   expected = name == "enabled"
                   assert all(server["available"] == expected for server in servers.values())
@@ -263,7 +263,8 @@
               assert "games-container-result" in post[0] and "post-stop" in post[1]
               assert not data["containerAutoRemove"]
               assert "--rm" not in data["enabled"]["units"]["podman-games-terraria"]["startScript"]
-              assert set(data["missing"]["tcp"]) - set(data["baselineTCP"]) == {7777}  # ATM10 already opens 25565.
+              assert set(data["missing"]["tcp"]) - set(data["baselineTCP"]) == {25568, 7777}  # ATM10 already opens 25565.
+              assert 25568 not in data["missing"]["udp"]
               assert set(data["missing"]["udp"]) - set(data["baselineUDP"]) == {19132, 24454}
               assert {25565, 7777} <= set(data["missing"]["tcp"])
               assert not ({25566, 25567, 25575} & (set(data["missing"]["tcp"]) | set(data["missing"]["udp"])))

@@ -133,7 +133,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-bluemap-offline-markers` · `nix run github:Multipixelone/infra#games-bluemap-offline-markers`
 - `games-carbon` · `nix run github:Multipixelone/infra#games-carbon`
 - `games-carbon-libraries` · `nix run github:Multipixelone/infra#games-carbon-libraries`
-- `games-chunky` · `nix run github:Multipixelone/infra#games-chunky`
+- `games-chunksmith` · `nix run github:Multipixelone/infra#games-chunksmith`
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
 - `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`

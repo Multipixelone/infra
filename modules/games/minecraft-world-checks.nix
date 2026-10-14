@@ -9,7 +9,7 @@ let
       modules = [
         {
           infra.games.minecraftDatapacks.backends.survival.packs.world-policy = lib.mkForce (
-            cfg.infra.games.artifacts.games-chunky
+            cfg.infra.games.artifacts.games-chunksmith
           );
         }
       ];
@@ -21,7 +21,7 @@ let
     preStart = cfg.systemd.services.minecraft-server-survival.serviceConfig.ExecStartPre;
     user = cfg.systemd.services.minecraft-server-survival.serviceConfig.User;
     manifest = builtins.fromJSON cfg.environment.etc."games/manifest.json".text;
-    chunky = cfg.infra.games.minecraftPlugins.backends.survival;
+    chunksmith = cfg.infra.games.minecraftPlugins.backends.survival;
     sources = builtins.fromJSON (builtins.readFile ./datapacks/sources.json);
     retainedInputs = map toString cfg.system.extraDependencies;
     metadataFiles = builtins.attrNames (builtins.readDir ./datapacks);
@@ -53,7 +53,7 @@ in
           python3 ${./tests/minecraft_datapacks_test.py} ${./minecraft-datapacks.py}
           python3 ${./tests/minecraft_world_test.py} \
             ${pkgs.writeText "minecraft-world-fixture.json" (builtins.toJSON fixture)} \
-            ${cfg.infra.games.artifacts.games-chunky}
+            ${cfg.infra.games.artifacts.games-chunksmith}
           python3 ${./tests/minecraft_grave_compass_test.py} \
             ${packs.packs.grave-compass} \
             ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \

@@ -314,14 +314,15 @@
                   protocol = "udp";
                   edition = "voice chat";
                 }
-              ];
+              ]
+              ++ (backend id).publicEndpoints;
             internalPorts = [
               s.minecraft.proxyPort
               s.minecraft.serverPort
               s.minecraft.rconPort
               s.minecraft.metricsPort
             ];
-            publicTCPPorts = [ ];
+            publicTCPPorts = (backend id).publicTCPPorts;
             publicUDPPorts = [ s.minecraft.voicechatPort ];
             wakeOnJoin = true;
             serverPort = s.minecraft.serverPort;

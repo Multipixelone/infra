@@ -142,12 +142,47 @@ native LuckPerms prefix/weight hooks and dashboard rendering.
 
 ## Pregeneration and borders
 
-[Chunky 1.5.3](https://hangar.papermc.io/pop4959/Chunky/versions/1.5.3) is
-installed on Paper, with its configuration and saved task state in
-`plugins/Chunky`, included in clean-stop backups. The pinned JAR bundles its
-dependencies and has no runtime downloader/updater. Backend bStats is disabled.
-No task starts automatically; `continue-on-restart=false` means a saved task
-also requires an explicit `chunky continue` after a wake/restart.
+[Chunksmith 4.6.0+26.x-plugin](https://modrinth.com/plugin/chunksmith/version/MsSa6z1v)
+replaces Chunky on Paper 26.3. Kishku7's open-source Chunky fork credits pop4959
+and contributors; Modrinth lists GPL-3.0-only, while the
+[source headers](https://github.com/Kishku7/Chunksmith/blob/6c4f57d324f449a6c32329ab9382af9b3028b2e5/Plugin/shared_plugin/bukkit/src/main/java/com/kishku7/chunksmith/ChunksmithBukkit.java)
+say GPL-3.0-or-later. The immutable October 13, 2026 release is pinned with
+SHA-256 `sha256-bc3MtDgRuzOZKUwsvuvEDC0WjgbosTRcvyJvlMr5uuo=`.
+Its configuration and saved tasks use `plugins/Chunksmith`. The old
+`plugins/Chunky` directory remains untouched and included in pre-change and
+scheduled clean-stop backups. CSLOD files under each world's
+`chunksmith/lod/<dimension>/` are covered by the existing world backups.
+The pinned JAR has no runtime downloader/updater. Backend bStats stays disabled.
+
+**Installation does not start generation.** Finn chose to reuse Chunky's
+existing saved area, with possible expansion later. The agent could not read
+the live `plugins/Chunky` directory as `tunnel`, so its actual bounds and whether
+a selection exists still require operator verification. No selection is set
+or imported, and no task, refresh or resume runs automatically. Both
+`continue-on-restart=false` and
+`lod-from-explored-chunks=false` are declared; the latter prevents the new 4.6
+exploration hook from filling the store outside the saved area. Existing
+terrain is retained, but installing the plugin alone does not create far LODs.
+
+The old managed `plugins/chunky.jar` is removed by nix-minecraft's managed-file
+cleanup at the next approved service start, and only `plugins/chunksmith.jar`
+is declared. This avoids their shared `chunky`/`cy` aliases. Before that future
+change, pause any old Chunky task, cleanly stop/save Paper, and ensure a verified
+backup containing `plugins/Chunky` exists. The fingerprint change invokes the
+existing pre-change snapshot guard when backups are enabled; if backups are
+disabled or unavailable, take and verify an operator backup before proceeding.
+No running server, state directory or backup is modified by building this change.
+
+Do not rely on automatic migration: this release's startup migration code
+checks `Chunksmith` as both the old and new directory name. Preserve the entire
+legacy directory, including `tasks/*.properties` and any CSV selection input.
+Before a future manual run, inspect those records read-only for `world`,
+`center-x`, `center-z`, `radius`, optional `radius-z`, `shape`, `pattern` and
+`csv`. Re-enter the approved selection using `cs` commands and inspect
+`cs selection` before starting a fresh pass. Do not copy the old `config.yml`,
+overwrite new task files, or resume old completed-chunk counters for LOD
+backfill: they would skip terrain that has never had a CSLOD record. If there
+is no saved selection, keep generation stopped until Finn supplies one.
 
 **ChunkyBorder is deferred:** its published
 [Paper 1.2.23 release](https://modrinth.com/plugin/chunkyborder/version/asaBBItO)
@@ -157,34 +192,133 @@ set, resized or enforced. Pregeneration alone does not limit exploration.
 
 Wake Paper by joining first. Keep someone connected throughout a long task:
 the existing wake-once marker only starts Paper, and neither console commands
-nor Chunky activity prevent lazymc's 15-minute empty-server sleep. There is no
+nor Chunksmith activity prevent lazymc's 15-minute empty-server sleep. There is no
 declarative maintenance keep-awake control in the current runtime. Do not
 disable the clean-stop guard or rely on a status ping to hold Paper awake.
 
-For example, Finn can run these in the Survival dashboard console, choosing
-the radius deliberately (1000 below is only an example, not configuration):
+After verifying the saved area, Finn can enter its world, shape, center and radius
+in the Survival dashboard console, verify `cs selection`, then use `cs start`
+and `cs progress`. Do not run these generation commands until the saved bounds
+are verified. A task selection bounds that pass; it does not enforce a world border
+or stop ordinary player exploration. There is no automatic schedule or LOD
+horizon beyond the selection.
+
+Use `cs pause` before leaving or a maintenance stop; use `cs continue` only
+after joining again and verifying the approved task. Choose other dimensions
+explicitly rather than starting parallel tasks. Do not run `cs trim`: it deletes
+terrain outside the selection. Finn's existing operator permissions cover
+Chunksmith; friends do not receive generation/admin commands.
+
+The declared generation controls use two concurrent dispatches, a 54 ms tick
+target, a 5 ms generation budget, 30 ms player reserve and 60 ms ceiling;
+queued writes are capped at 100, the LOD queue at 64, heap pressure at 75%, and
+overload auto-pause uses a 30-second grace period. These are cooperative
+controls, not a CPU quota or per-chunk deadline. Paper retains its 4 GiB maximum
+heap and 6 GiB service limit. The 256 MiB `lod-index-budget-mb` limits one index
+response's advertised data budget, not total disk usage or bytes per second.
+There is no configurable global bandwidth or store-size cap; the HTTP server
+has four workers, six concurrent requests per IP and a 30-second stalled-write
+timeout. Monitor disk, tick time and outbound traffic before expanding an area.
+
+BlueMap reads the saved Minecraft chunks afterwards; no Chunksmith addon is
+needed for normal saved-chunk pregeneration. Its player-present pause means it
+renders when the connected player leaves, during the empty-but-awake window,
+and can need several wake windows for a large area. LOD-only no-save horizons
+are not a source for BlueMap. Map configuration and existing resource budgets
+remain as declared.
+
+### Multiplayer LOD and player setup
+
+Java players on 26.3 install **Distant Horizons 3.3.4** and the matching
+**Chunksmith 4.6.0 client mod** for their loader:
+[DH release](https://modrinth.com/mod/distanthorizons/version/TGgEbP9A),
+[Fabric release Sun3j32A](https://modrinth.com/plugin/chunksmith/version/Sun3j32A),
+[NeoForge release 7WsBTgKP](https://modrinth.com/plugin/chunksmith/version/7WsBTgKP).
+These are player-side dependencies, not additional Paper or Velocity JARs.
+Chunksmith server/client use CSLOD protocol 4 and the client feeds DH through
+its API; this is not the native DH server protocol. Fabric also requires
+Fabric Loader 0.18.1 or later and Fabric API; the 26.3 build requires Java 25.
+Enable DH rendering, choose its desired LOD distance, and join the usual
+`mc.finnrut.is` Minecraft address. Chunksmith detects DH automatically, requests
+server LODs within that renderer distance and feeds them into DH. Use
+`/csclient status` to inspect the detected renderer and download state.
+Bedrock/Geyser players do not install these mods and continue using the normal
+gameplay connection.
+
+Survival advertises the direct **HTTP endpoint `mc.finnrut.is:25568`**, bound
+to `0.0.0.0:25568`; the NixOS firewall opens TCP only. Port 25566 belongs to
+loopback lazymc, and 25567 to loopback Paper. There is no `lod.finnrut.is`,
+reverse proxy or HTTPS endpoint. The actual file path is
+`/lod/<dimension>/r.<region-x>.<region-z>.cslod`, for example
+`/lod/minecraft_overworld/r.0.0.cslod`. There is no unauthenticated directory
+listing or root health endpoint. The client gets the index and its
+`X-Chunksmith-Token` over the `chunksmith:lod` game plugin channel.
+
+[The token implementation](https://github.com/Kishku7/Chunksmith/blob/6c4f57d324f449a6c32329ab9382af9b3028b2e5/shared_common/src/main/java/com/kishku7/chunksmith/lod/net/CsLodTokens.java)
+binds each token to the online player, their Paper-visible IP and a ten-minute
+expiry, and revokes it on disconnect. HTTP checks the socket peer IP and
+ignores `X-Forwarded-For`; an HTTP proxy or different IPv4/IPv6 egress address
+can therefore fail authentication. The existing DNS record is unproxied IPv4.
+Velocity's modern forwarding should provide the real player IP; no additional
+Velocity plugin is declared. **The token/IP binding and plugin-channel path
+through Velocity and lazymc still require a live client test after deployment.**
+After a future manual backfill has produced at least one LOD region, test an
+authenticated download through the usual game address, wrong/missing
+token rejection, disconnect/reconnect, and sleep/wake. While Paper sleeps,
+the HTTP listener is absent and HTTP requests do not wake it: join Minecraft
+first. Test unmodified Java and Geyser joins too. Do not forward UDP 25568.
+
+### Refreshing cached terrain
+
+Chunksmith can rebuild stored LODs, but it does not automatically invalidate
+them after edits. In 4.6.0,
+[`ExploredLod.shouldTake`](https://github.com/Kishku7/Chunksmith/blob/6c4f57d324f449a6c32329ab9382af9b3028b2e5/shared_common/src/main/java/com/kishku7/chunksmith/lod/ExploredLod.java)
+deliberately skips chunks already present in the store to keep the common
+save/unload path cheap. There is no block-place/break invalidation hook, so
+automatic cached-edit refresh remains a missing feature. The
+[explored-terrain issue #46](https://github.com/Kishku7/mod_support/issues/46)
+explains the 4.6 new-chunk capture feature; it does not resolve stale cached
+terrain, and no supported automatic invalidation roadmap was found.
+
+**Once the saved area is verified**, keep a player connected, select and inspect the
+approved world/area, and use this operator procedure for initial backfill or
+a maintenance refresh of an already-stored area:
 
 ```text
-chunky world world
-chunky shape square
-chunky center 0 0
-chunky radius 1000
-chunky selection
-chunky start
-chunky progress
+cs selection
+cs set forceLoadExistingChunks true
+cs start
+cs progress
 ```
 
-Use `chunky pause` before leaving or a maintenance stop; use `chunky continue`
-after joining again. Choose other dimensions explicitly rather than starting
-parallel tasks by default. Do not run `chunky trim` for ordinary pregeneration:
-it deletes terrain outside the selection. Finn's existing administrator
-permissions cover Chunky; friends do not receive generation/admin commands.
+This must be a fresh pass, not a continuation of old completed progress.
+[GenerationTask](https://github.com/Kishku7/Chunksmith/blob/6c4f57d324f449a6c32329ab9382af9b3028b2e5/shared_common/src/main/java/com/kishku7/chunksmith/GenerationTask.java)
+uses the force flag to bypass both existing-chunk and existing-LOD skips, and
+the store replaces each chunk's record with a new capture. The pass can
+generate holes inside the selected area; it is not a strict "existing chunks
+only" mode. Restrict the selection to Finn's approved pregenerated area.
+Pause before anyone leaves. After completion, run
+`cs set forceLoadExistingChunks false`; on an interrupted pass, restore false
+while paused and set true again before explicitly continuing that refresh.
+The declarative false value is restored at the next managed service start.
+No scheduled refresh is installed, because console activity cannot keep
+lazymc awake and installation leaves all tasks stopped.
 
-BlueMap will discover and render the newly generated chunks afterwards. Its
-existing player-present pause means it renders when the connected player
-leaves, during the empty-but-awake window, and can need several wake windows
-for a large area. Pregeneration does not force a full map render or change the
-existing CPU, memory or idle-sleep budgets.
+Edits may stay stale indefinitely before this procedure. After a region is
+rewritten, the server can notify connected, synchronized clients at roughly
+one-minute intervals; the client also polls every five minutes by default.
+Allow download and DH processing time beyond that, and verify the result on
+a live client rather than promising an exact refresh delay. The region file's
+freshness changes so the matching client can re-inject it. If it remains stale,
+use `/csclient inject_dh` after the server rebuild: this supported 4.6 client
+command resets its injection bookkeeping, requests the current index and
+replays LODs into DH without reconnecting. Monitor `/csclient status`. It does
+not recapture server terrain itself. Alternatively, use
+`/csclient set reinject-on-join true`, reconnect, and restore it to false.
+Do not delete the player's DH database. Store rewrites
+append payloads and replace header entries without compacting old payloads;
+repeated area rebuilds increase disk use. Take a clean backup and inspect disk
+headroom before a substantial refresh.
 
 ## World datapacks and game rules
 
@@ -1037,11 +1171,11 @@ UUID and dot-prefixed name. Velocity's online authentication and modern Paper
 forwarding retain those identities; Paper's backend `online-mode=false` is
 unchanged. No backend Floodgate plugin is needed for this login identity.
 
-| Order | Identity and progress |
-| ----- | --------------------- |
-| Java first, global Bedrock/Java link before Bedrock joins | Discord binds to the Java UUID; both editions use the same Java identity and progress. |
-| Bedrock only | Discord binds to the standalone Floodgate UUID; no Java account is required. |
-| Bedrock first, Java linked later | The global link selects the Java UUID. Standalone inventories, homes and other UUID-bound data remain stored under the original Floodgate identity; they are not migrated to Java. The original Discord association may need operator-assisted unlinking before the new identity's code can be redeemed. |
+| Order                                                     | Identity and progress                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Java first, global Bedrock/Java link before Bedrock joins | Discord binds to the Java UUID; both editions use the same Java identity and progress.                                                                                                                                                                                                                   |
+| Bedrock only                                              | Discord binds to the standalone Floodgate UUID; no Java account is required.                                                                                                                                                                                                                             |
+| Bedrock first, Java linked later                          | The global link selects the Java UUID. Standalone inventories, homes and other UUID-bound data remain stored under the original Floodgate identity; they are not migrated to Java. The original Discord association may need operator-assisted unlinking before the new identity's code can be redeemed. |
 
 Enabling global linking also selects the Java identity for accounts already
 linked at Geyser. It does not merge inventories, rewrite UUIDs in saved data or
