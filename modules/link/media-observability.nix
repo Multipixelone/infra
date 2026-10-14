@@ -87,6 +87,7 @@ let
   mediaSecretSource = "${inputs.secrets}/grafana/media.age";
   mediaSecretAvailable = builtins.pathExists mediaSecretSource;
   mediaEnvironment = "/run/agenix/media-observability";
+  openclawMediaEnvironment = "/run/agenix/openclaw-media";
   exporterPorts = {
     scraparr = 7100;
     tautulli = 8000;
@@ -1715,6 +1716,24 @@ in
         mode = "0400";
       };
 
+      # The assistant can read the whole bundle, including Homepage's Plex token.
+      # Reuse the encrypted source without changing the root-owned consumers.
+      age.secrets.openclaw-media = lib.mkIf mediaSecretAvailable {
+        file = mediaSecretSource;
+        path = openclawMediaEnvironment;
+        owner = "tunnel";
+        group = "users";
+        mode = "0400";
+      };
+
+      home-manager.users.tunnel = hm: {
+        # OpenClaw's native dotenv loader reads this companion after its existing
+        # ~/.openclaw/.env. Keep plaintext outside both that file and the store.
+        xdg.configFile."openclaw/gateway.env" = lib.mkIf mediaSecretAvailable {
+          source = hm.config.lib.file.mkOutOfStoreSymlink config.age.secrets.openclaw-media.path;
+        };
+      };
+
       virtualisation.oci-containers.containers = {
         scraparr = {
           autoStart = true;
@@ -1857,6 +1876,38 @@ in
       ];
 
       assertions = [
+        {
+          assertion =
+            !mediaSecretAvailable
+            || (
+              let
+                secret = config.age.secrets.media-observability or null;
+              in
+              secret != null
+              && toString secret.file == mediaSecretSource
+              && secret.path == mediaEnvironment
+              && secret.owner == "root"
+              && secret.group == "root"
+              && secret.mode == "0400"
+            );
+          message = "the original media observability secret must remain root:root 0400 at its existing path";
+        }
+        {
+          assertion =
+            !mediaSecretAvailable
+            || (
+              let
+                secret = config.age.secrets.openclaw-media or null;
+              in
+              secret != null
+              && secret.file == config.age.secrets.media-observability.file
+              && secret.path == openclawMediaEnvironment
+              && secret.owner == "tunnel"
+              && secret.group == "users"
+              && secret.mode == "0400"
+            );
+          message = "OpenClaw must receive a tunnel:users 0400 copy of the existing media credential bundle";
+        }
         {
           assertion = routeContract;
           message = "media observability route derivation contract regressed";
