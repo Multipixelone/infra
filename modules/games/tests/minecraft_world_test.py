@@ -25,11 +25,12 @@ assert not hooks[index("minecraft-datapacks-prepare")].startswith("+")
 survival = next(s for s in fixture["manifest"]["servers"] if s["id"] == "survival")
 assert survival["datapacks"] == fixture["packs"]["inventory"]
 assert not any(pack["name"] == "Anti Enderman Grief" for pack in survival["datapacks"])
-assert len(survival["datapacks"]) == 9
+assert not any(pack["name"] == "AFK Display" for pack in survival["datapacks"])
+assert len(survival["datapacks"]) == 8
 assert all(pack["installed"] for pack in survival["datapacks"])
 assert set(fixture["packs"]["packs"]) == {
     "confetti-creepers", "player-head-drops", "mini-blocks", "more-mob-heads",
-    "custom-nether-portals", "double-shulker-shells", "afk-display", "world-policy", "grave-compass",
+    "custom-nether-portals", "double-shulker-shells", "world-policy", "grave-compass",
 }
 sources = fixture["sources"]
 assert set(fixture["metadataFiles"]) == {"sources.json", "credits.txt", "grave-compass"}
@@ -38,8 +39,10 @@ assert sources["upstream"] == "https://vanillatweaks.net/picker/datapacks/"
 assert sources["bundle"]["id"] == "d326112"
 assert sources["bundle"]["retrieved"] == "2026-10-09"
 assert sources["bundle"]["sha256"] == "05f9f2a4256b4bf3a40e10b1a250959e6850e9ecf6ff55e68f6aebe0a0f53ce4"
-assert "mirror" not in sources and len(sources["packs"]) == 7
+assert "mirror" not in sources and len(sources["packs"]) == 6
 assert {"name": "Grave Compass", "version": "26.3 / 1", "installed": True} in survival["datapacks"]
+assert "afk-display" not in {pack["id"] for pack in sources["packs"]}
+assert not any("afk-display" in path for path in fixture["retainedInputs"])
 for pack in sources["packs"]:
     assert "mirrorEntry" not in pack
     assert pack["bundleEntry"].endswith(f"v{pack['version']} (MC 26.3).zip")

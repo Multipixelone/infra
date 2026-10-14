@@ -73,9 +73,12 @@ version change requires a new compatibility review and matching asset pins.
 ## Player list and community invite
 
 TAB 6.2.0 runs only on Paper, alongside LuckPerms and CarbonChat. The single
-Survival backend needs no proxy copy, bridge or PlaceholderAPI: TAB reads
-LuckPerms, player counts, ping and Paper TPS/MSPT directly. It starts and stops
-with the socket-activated backend; MiniMOTD still handles the sleeping server's
+Survival backend needs no proxy copy or bridge. TAB reads LuckPerms, player
+counts, ping and Paper TPS/MSPT directly; PlaceholderAPI 2.12.3 exposes
+FlectonePulse AFK state. Both TAB and PlaceholderAPI share the LuckPerms
+readiness gate. PlaceholderAPI update checks and eCloud are disabled;
+FlectonePulse registers its own expansion without downloading another JAR.
+TAB starts and stops with the socket-activated backend; MiniMOTD still handles the sleeping server's
 public server-list entry. TAB is omitted when the LuckPerms credential is absent.
 
 The compact static header repeats MiniMOTD's bold mauve → pink → peach
@@ -93,23 +96,40 @@ remain intact through TAB's component transport. Sorting uses
 native primary-group weights descending (admin → mod → builder → default),
 then player names alphabetically ignoring case. LuckPerms calculates primary
 groups with `parents-by-weight` on both platforms. Numeric sorting requires
-TAB teams: they have empty nametag prefixes/suffixes, retain collisions and
-ordinary invisibility, and add no nametag decoration. CarbonChat and the
+TAB teams: they have empty nametag prefixes and an AFK-only suffix, retaining
+collisions and ordinary invisibility. CarbonChat and the
 configured FlectonePulse features do not manage those teams. Future plugins
 that assign scoreboard teams need a compatibility review.
 
-TAB blocks competing client team membership packets, including AFK Display's
-`afkDis.afk` gray-name effect. Rank sorting/colours take precedence in the Java
-list; the datapack's server-side AFK detection and movement checks still run.
-This is a presentation tradeoff, not a combined AFK/rank display. See TAB's
-[team compatibility limits](https://github.com/NEZNAMY/TAB/wiki/Feature-guide:-Nametags#compatibility-with-other-plugins).
+FlectonePulse 1.14.0 is the sole AFK system. Everyone can toggle `/afk`; five
+minutes (6000 ticks) of positional inactivity automatically marks a player AFK.
+That delay tolerates brief reading/inventory pauses. Position changes clear
+AFK on the next one-second poll (`radius: 0.0`); chat and other commands also
+clear AFK. Native detection does not treat looking around or inventory activity
+as movement, and stationary chatting before AFK does not reset its idle timer.
+There is no kick, sleep exemption, or change to lazymc's player count/playtime.
+
+TAB's `%condition:afk%` checks `%flectonepulse_setting_afk_suffix%=AFK` every
+second. An unavailable expansion gives an empty marker. AFK players keep their
+rank/name colours and gain a muted ` AFK` suffix in the Java player list and
+overhead nametags. Chat announces `· Finn is now AFK` / `· Finn is no longer AFK`
+with mauve names and muted text; the player sees the corresponding `You` message.
+FlectonePulse's own chat, tab rendering and scoreboard remain disabled.
+
+Carbon keeps its MiniPlaceholders/LuckPerms formats. Managed ranks explicitly
+deny `carbon.chatplaceholders`, including wildcard admins, so adding
+PlaceholderAPI does not reinterpret literal player chat. The backend needs a
+restart after deployment to load the new plugin and reconcile datapacks.
 
 Bedrock gracefully keeps its native player list. The pinned Geyser 2.11.3 build
 1249 does not translate Java list display names, sorting or header/footer;
 the Java formatting cannot be promised there. The Discord invite remains
 available in first-join chat, DiscordSRV's existing `/discord` command when the
 bridge is installed, and the games dashboard's Connect section beside Map.
-No Bedrock-only plugin or backend Floodgate installation is added.
+Bedrock players use the same UUID-based AFK state and receive the chat
+announcements. Geyser translates the team suffix for overhead nametags; confirm
+client appearance during the approved activation gate. No Bedrock-only plugin
+or backend Floodgate installation is added.
 
 The public invite is declared once as
 `gameServers.servers.survival.minecraft.discord.inviteUrl`, independently of
@@ -169,8 +189,9 @@ existing CPU, memory or idle-sleep budgets.
 ## World datapacks and game rules
 
 The separate dashboard **Datapacks** list shows the following installed set,
-plus the generated Survival World Policy pack. Installation status describes
-the declaration; it does not assert that Paper is awake or a player's HUD is on.
+plus the generated Survival World Policy and Grave Compass packs. Installation
+status describes the declaration; it does not assert that Paper is awake or a
+player's HUD is on.
 
 | Vanilla Tweaks pack   | Pinned version | Minecraft / format |
 | --------------------- | -------------- | ------------------ |
@@ -180,10 +201,13 @@ the declaration; it does not assert that Paper is awake or a player's HUD is on.
 | More Mob Heads        | 2.20.1         | 26.3 / 121.0       |
 | Custom Nether Portals | 2.3.21         | 26.3 / 121.0       |
 | Double Shulker Shells | 1.3.18         | 26.3 / 121.0       |
-| AFK Display           | 1.1.18         | 26.3 / 121.0       |
+
+AFK Display is retired in favor of FlectonePulse. Its owned
+`infra-afk-display.zip` and ledger entry are removed on the next stopped-server
+reconcile; the old AFK team requires the operator cleanup described below.
 
 Coordinates HUD, Silence Mobs, Durability Ping and Armor Statues are no longer
-managed. The next stopped-server reconcile removes their four previously
+managed. The stopped-server reconcile also removes their four previously
 managed ZIPs and ledger entries, preserving unrelated datapacks and world data.
 It does not run the removed packs' uninstall functions or erase persistent
 scoreboards/items they created. Anti Enderman Grief remains absent: endermen
@@ -195,8 +219,8 @@ retain vanilla behavior. No second sleep/graves/home datapack is included.
 `05f9f2a4256b4bf3a40e10b1a250959e6850e9ecf6ff55e68f6aebe0a0f53ce4`.
 `modules/games/datapacks/sources.json` records that provenance and each inner
 ZIP's original filename, canonical import filename, version and SHA-256.
-All seven declare `[121,0]` as both minimum and maximum format. Their bytes
-and metadata are unchanged; the outer bundle is unwrapped before importing.
+All six retained packs declare `[121,0]` as both minimum and maximum format.
+Their bytes and metadata are unchanged; the outer bundle is unwrapped before importing.
 
 This public repository contains metadata and attribution only, with no
 Vanilla Tweaks archive bytes. Each `pkgs.requireFile` input has a flat
@@ -207,18 +231,21 @@ and reviewing new official files and hashes. Vanilla Tweaks attribution stays
 in `credits.txt`. The packs remain subject to the
 [Vanilla Tweaks terms](https://vanillatweaks.net/terms/); obtain them separately
 from the official picker. Archives must not be committed here or added to
-nix-secrets. The repository's unfree allowance covers only these seven manual
+nix-secrets. The repository's unfree allowance covers only these six manual
 inputs.
 
 ### PaperTweaks evaluation (2026-10-10)
 
-**Keep all seven official Vanilla Tweaks packs and the local Survival World
-Policy pack.** PaperTweaks is maintained and now publishes 26.3 metadata, but
-does not cover this installed set. No PaperTweaks JAR or permissions are added,
+**The original evaluation retained seven official Vanilla Tweaks packs and the
+local Survival World Policy pack.** AFK Display has since been retired in favor
+of FlectonePulse; the six remaining packs and World Policy are retained.
+PaperTweaks is maintained and now publishes 26.3 metadata, but does not cover
+this installed set. No PaperTweaks JAR or permissions are added,
 and no datapacks or world state are removed by this evaluation. The inventory
-above is the repository's declaration; this audit did not inspect the live
-server or enumerate unmanaged packs there. All seven official ZIPs in the local
-Nix store were inspected and matched the SHA-256 values in `sources.json`.
+above is the current repository declaration; this audit did not inspect the live
+server or enumerate unmanaged packs there. At evaluation time, all seven
+official ZIPs in the local Nix store were inspected and matched the then-current
+SHA-256 values in `sources.json`.
 
 The latest release in the
 [Modrinth API](https://api.modrinth.com/v2/project/papertweaks/version) is
@@ -243,25 +270,26 @@ artifact pin in inventory tests. The JAR contains the four matching modules
 below and the MoreMobHeads deprecation warning, with no Mini Blocks or Double
 Shulker Shells module classes.
 
-| Current pack / behavior                                                                     | PaperTweaks module and enablement key                    | Coverage                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Confetti Creepers: default 100% confetti; sets explosion radius to zero                     | `ConfettiCreepers` / `experimental.confetti-creepers`    | Similar outcome; plugin cancels the explosion and replaces the creeper with a firework. Firework damage and charged-creeper settings need comparison.                                   |
-| Player Head Drops: head drops on PvP kills                                                  | `PlayerHeadDrops` / `items.player-head-drops`            | Supports player-kill requirement and drop chance.                                                                                                                                       |
-| Mini Blocks: 209 stonecutter recipes producing textured heads                               | None                                                     | `WanderingTrades` / `hermitcraft.wandering-trades` adds trader offers, not these recipes or their acquisition mechanics.                                                                |
-| More Mob Heads: mob-specific head loot and conditions                                       | `MoreMobHeads` / `mobs.more-mob-heads`                   | Deprecated; the module explicitly recommends the official datapack for improved functionality without a performance hit.                                                                |
-| Custom Nether Portals: nonrectangular/crying-obsidian frames; 10–84 frame blocks            | `CustomNetherPortals` / `survival.custom-nether-portals` | Supports custom shapes/materials, but config limits portal interior size, width and height rather than the pack's frame-block count.                                                    |
-| Double Shulker Shells: two shells per shulker, alongside head loot                          | None                                                     | Retain the loot-table datapack; an old wiki module listing does not establish current support.                                                                                          |
-| AFK Display: 150-second position samples; gray team; movement checks every second while AFK | `AFKDisplay` / `survival.afk-display`                    | Plugin defaults to 300 seconds, checks block-position inactivity each second, colors display/tab names directly, and clears AFK on a player-move event. Timing and presentation differ. |
-| Survival World Policy: reapplies 50% sleeping on world load                                 | Local pack                                               | Retain; do not enable a second sleep implementation.                                                                                                                                    |
+| Current pack / behavior                                                          | PaperTweaks module and enablement key                    | Coverage                                                                                                                                                                                |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Confetti Creepers: default 100% confetti; sets explosion radius to zero          | `ConfettiCreepers` / `experimental.confetti-creepers`    | Similar outcome; plugin cancels the explosion and replaces the creeper with a firework. Firework damage and charged-creeper settings need comparison.                                   |
+| Player Head Drops: head drops on PvP kills                                       | `PlayerHeadDrops` / `items.player-head-drops`            | Supports player-kill requirement and drop chance.                                                                                                                                       |
+| Mini Blocks: 209 stonecutter recipes producing textured heads                    | None                                                     | `WanderingTrades` / `hermitcraft.wandering-trades` adds trader offers, not these recipes or their acquisition mechanics.                                                                |
+| More Mob Heads: mob-specific head loot and conditions                            | `MoreMobHeads` / `mobs.more-mob-heads`                   | Deprecated; the module explicitly recommends the official datapack for improved functionality without a performance hit.                                                                |
+| Custom Nether Portals: nonrectangular/crying-obsidian frames; 10–84 frame blocks | `CustomNetherPortals` / `survival.custom-nether-portals` | Supports custom shapes/materials, but config limits portal interior size, width and height rather than the pack's frame-block count.                                                    |
+| Double Shulker Shells: two shells per shulker, alongside head loot               | None                                                     | Retain the loot-table datapack; an old wiki module listing does not establish current support.                                                                                          |
+| Retired AFK Display: superseded by FlectonePulse                                 | `AFKDisplay` / `survival.afk-display`                    | Plugin defaults to 300 seconds, checks block-position inactivity each second, colors display/tab names directly, and clears AFK on a player-move event. Timing and presentation differ. |
+| Survival World Policy: reapplies 50% sleeping on world load                      | Local pack                                               | Retain; do not enable a second sleep implementation.                                                                                                                                    |
 
 Module names, configuration keys and behavior above are from the
 [reviewed source tree](https://github.com/MC-Machinations/PaperTweaks/tree/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules).
 In particular,
 [MoreMobHeads' lifecycle](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules/mobs/moremobheads/Lifecycle.java)
 asks operators to disable that module in favor of Vanilla Tweaks. Thus even
-a verified 26.3 release cannot replace all seven packs. Keeping the current
-set preserves recipes, drops and gameplay without adding another plugin.
-A partial switch of the four matching modules is a possible future task,
+a verified 26.3 release cannot replace all six retained packs. Keeping the
+current set preserves recipes, drops and gameplay. The AFKDisplay module must
+remain disabled because FlectonePulse owns AFK.
+A partial switch of the three matching retained modules is a possible future task,
 requiring explicit behavior choices and client/startup validation; this audit
 does not perform that switch.
 
@@ -278,9 +306,9 @@ by the next declarative preparation. See the source
 and [config binding](https://github.com/MC-Machinations/PaperTweaks/blob/b6e68bd1c3009d136ec0fc460486af567550bf90/src/main/java/me/machinemaker/papertweaks/modules/ConfigModule.java).
 
 Permissions retain the `vanillatweaks.*` prefix. A future partial integration
-must grant default players the behavior nodes `vanillatweaks.playerheaddrops`
-and `vanillatweaks.afkdisplay`, plus public information commands only where
-needed; the four matching modules have no equivalent player-toggle commands
+must grant default players `vanillatweaks.playerheaddrops`, plus public
+information commands only where needed; the three matching retained modules
+have no equivalent player-toggle commands
 to add. Confetti and portal mechanics themselves have no player permission
 gate. Restrict `vanillatweaks.main.enable`, `.disable`, `.reload`, and module
 `*.admin.config` permissions to the LuckPerms admin group, including denying
@@ -294,11 +322,12 @@ and `minecraft-permissions.nix` are the sources for a future permissions change.
 
 ### State left by a future datapack removal
 
-Keeping this set requires no cleanup. Removing its ZIPs alone would stop
+Removing the retained packs' ZIPs alone would stop
 loading their functions, recipes and loot tables but would not uninstall the
 state they created. The current reconciler only removes ledger-owned archive
 bytes; it never edits scoreboards, entities, items, advancements or world NBT.
-The following inventory comes from the exact pinned official ZIPs:
+The following inventory comes from the exact pinned official ZIPs, including
+the retired AFK Display pack:
 
 | Pack                  | State that can survive removal                                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -331,6 +360,36 @@ persisting gray names. Preserve existing items, heads and portals. Restart
 normally after reconciling, using the existing pregeneration/datapack pipeline;
 do not add live `/reload` migration hooks or bypass the prechange snapshot.
 
+### AFK Display retirement at the approved activation gate
+
+Source removal stops the old pack from loading on the next Paper start. The
+installer removes only its ledger-owned, unmodified archive before startup;
+it neither edits world NBT nor removes scoreboard state. A modified archive
+fails preparation for operator review and is not silently discarded.
+
+Before removing the old pack, the operator must take a verified clean-stop
+snapshot and use an isolated maintenance session with the old pack still
+installed and enabled. Run these exact console commands:
+
+```console
+function afk_display:uninstall
+datapack disable "file/infra-afk-display.zip"
+```
+
+The inspected uninstall clears only `afk_display:second`, removes the seven
+`afkDis` objectives listed above and removes team `afkDis.afk`. Disabling the
+pack prevents its load function from recreating those objects. Confirm that
+team and schedule are gone, then stop cleanly and activate the new configuration
+through the existing prechange snapshot and datapack preparation pipeline.
+Other packs stay enabled; do not remove shared objectives, region/player files
+or other world state. Previous team memberships cannot be reconstructed.
+
+Restart the Paper backend normally after deployment; do not use a live reload
+as a migration hook. Confirm `/afk`, five-minute positional auto-AFK, movement
+and chat clearing, Java list/overhead markers, and Bedrock chat/overhead names.
+Bedrock's native player list has no AFK marker on the pinned Geyser build.
+This repository change does not execute the cleanup, activation or deployment.
+
 ### Provisioning a builder
 
 On each fresh machine or CI builder, obtain the exact official bundle and
@@ -345,14 +404,12 @@ mv 'mini blocks v1.1.8 (MC 26.3).zip' mini-blocks-1.1.8-mc26.3.zip
 mv 'more mob heads v2.20.1 (MC 26.3).zip' more-mob-heads-2.20.1-mc26.3.zip
 mv 'custom nether portals v2.3.21 (MC 26.3).zip' custom-nether-portals-2.3.21-mc26.3.zip
 mv 'double shulker shells v1.3.18 (MC 26.3).zip' double-shulker-shells-1.3.18-mc26.3.zip
-mv 'afk display v1.1.18 (MC 26.3).zip' afk-display-1.1.18-mc26.3.zip
 nix-store --add-fixed sha256 ./confetti-creepers-2.2.19-mc26.3.zip
 nix-store --add-fixed sha256 ./player-head-drops-1.1.18-mc26.3.zip
 nix-store --add-fixed sha256 ./mini-blocks-1.1.8-mc26.3.zip
 nix-store --add-fixed sha256 ./more-mob-heads-2.20.1-mc26.3.zip
 nix-store --add-fixed sha256 ./custom-nether-portals-2.3.21-mc26.3.zip
 nix-store --add-fixed sha256 ./double-shulker-shells-1.3.18-mc26.3.zip
-nix-store --add-fixed sha256 ./afk-display-1.1.18-mc26.3.zip
 ```
 
 `nix-store --add-fixed sha256` uses flat hashing without `--recursive` and
@@ -369,10 +426,10 @@ mkdir -p .gcroots/vanillatweaks
 nix-store --realise --add-root "$PWD/.gcroots/vanillatweaks/confetti-creepers" /nix/store/<returned-path>-confetti-creepers-2.2.19-mc26.3.zip
 ```
 
-Repeat for all seven, keeping that root directory at its original path. This
-worktree's `.gcroots/` is ignored by git; deleting the worktree removes those
-local roots. On link, `system.extraDependencies` retains all seven ZIPs in the
-installed system closure, rooted by the system profile and its retained
+Repeat for all six retained packs, keeping that root directory at its original
+path. This worktree's `.gcroots/` is ignored by git; deleting the worktree removes those
+local roots. On link, `system.extraDependencies` retains all six selected ZIPs
+in the installed system closure, rooted by the system profile and its retained
 generations, even while Paper sleeps. Merely evaluating or building with
 `--no-link` does not create that installed-profile root. A store that has lost
 its roots and been garbage-collected needs the import step again. Provision
@@ -394,25 +451,17 @@ trader trades. Custom Nether Portals changes vanilla portal mechanics by
 enabling nonrectangular frames and crying obsidian by default (10–84 frame
 blocks). The official archives and their upstream defaults are preserved.
 
-AFK Display samples position every 150 seconds, places stationary players in
-the gray `afkDis.afk` scoreboard team and checks movement every second while
-AFK. It does not detect chat, looking around or inventory activity. Joining
-that team replaces previous team membership; leaving AFK clears it rather
-than restoring the previous team. Other plugins/datapacks that assign teams,
-name colors, tab-list formatting or scoreboard presentation can conflict.
-This display does not exempt players from sleeping or lazymc's online count.
-
-None of the seven requires an additional Java resource pack: mini blocks and
-heads use vanilla player-head profiles, and confetti uses vanilla fireworks.
+None of the six retained packs requires an additional Java resource pack:
+mini blocks and heads use vanilla player-head profiles, and confetti uses
+vanilla fireworks.
 Normal client skin-texture requests are separate from downloading pack code.
 [Bedrock/Geyser custom-head limitations](https://geysermc.org/wiki/geyser/custom-skulls/)
 apply to Mini Blocks, More Mob Heads and Player Head Drops: placed heads can
 use Geyser's existing rendering, but correct inventory/held/worn textures
 require explicit skull mappings and Geyser's generated Bedrock resource pack.
-Those mappings are not added by this change. AFK membership is server-side;
-TAB's sorting teams replace the gray-name effect on Java. Verify native
-Bedrock names and scoreboard/team interactions on Java
-and Geyser clients after a future authorized deployment. Paper smoke tests
+Those mappings are not added by this change. Verify native Bedrock names and
+scoreboard/team interactions on Java and Geyser clients after the authorized
+deployment. Paper smoke tests
 cannot establish client presentation parity.
 
 The installer writes stable `infra-*.zip` names into `world/datapacks/` as the

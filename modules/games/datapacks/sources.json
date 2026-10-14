@@ -60,14 +60,6 @@
       "archive": "double-shulker-shells-1.3.18-mc26.3.zip",
       "sha256": "b3b93593b38a5e340098197217c28be0560c3e1698448fec9186624dacf0d332",
       "bundleEntry": "double shulker shells v1.3.18 (MC 26.3).zip"
-    },
-    {
-      "id": "afk-display",
-      "name": "AFK Display",
-      "version": "1.1.18",
-      "archive": "afk-display-1.1.18-mc26.3.zip",
-      "sha256": "2a5571359bba93cd463b8ccebd06490470ddf77618bf1643c4c23dae041052bd",
-      "bundleEntry": "afk display v1.1.18 (MC 26.3).zip"
     }
   ]
 }

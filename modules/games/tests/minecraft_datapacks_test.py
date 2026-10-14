@@ -82,7 +82,7 @@ class DatapacksTest(unittest.TestCase):
         # any retired third-party bytes in the repository or test closure.
         retained = {"player-head-drops", "more-mob-heads", "double-shulker-shells", "world-policy"}
         dropped = {"coordinates-hud", "silence-mobs", "durability-ping", "armor-statues"}
-        added = {"confetti-creepers", "mini-blocks", "custom-nether-portals", "afk-display"}
+        added = {"confetti-creepers", "mini-blocks", "custom-nether-portals"}
         old = {key: str(self.source) for key in retained | dropped}
         datapacks.install({**self.configuration, "packs": old})
         retained_times = {key: (self.directory / f"infra-{key}.zip").stat().st_mtime_ns for key in retained}
@@ -101,6 +101,51 @@ class DatapacksTest(unittest.TestCase):
             self.assertEqual(world.read_bytes(), b"existing world")
             for key, original in retained_times.items():
                 self.assertEqual((self.directory / f"infra-{key}.zip").stat().st_mtime_ns, original)
+
+    def test_afk_retirement_preserves_retained_and_new_packs(self):
+        # Keep the installed Grave Compass while retiring AFK, and also add an
+        # independent pack to exercise future additive selections.
+        retained = {"world-policy", "custom-nether-portals", "player-head-drops", "grave-compass"}
+        old = {key: str(self.source) for key in retained | {"afk-display"}}
+        datapacks.install({**self.configuration, "packs": old})
+        originals = {
+            key: ((self.directory / f"infra-{key}.zip").read_bytes(),
+                  (self.directory / f"infra-{key}.zip").stat().st_mtime_ns)
+            for key in retained
+        }
+        manual = self.directory / "friends.zip"
+        manual.write_bytes(b"unmanaged pack")
+        world = self.directory.parent / "level.dat"
+        world.write_bytes(b"existing world")
+        new = {key: str(self.source) for key in retained | {"another-pack"}}
+        for _ in range(2):
+            datapacks.install({**self.configuration, "packs": new})
+            self.assertFalse((self.directory / "infra-afk-display.zip").exists())
+            self.assertEqual({p.name for p in self.directory.glob("infra-*.zip")},
+                             {f"infra-{key}.zip" for key in new})
+            self.assertEqual(json.loads((self.directory / datapacks.LEDGER).read_text()),
+                             {f"infra-{key}.zip": [datapacks.digest(self.source)] for key in new})
+            self.assertEqual(manual.read_bytes(), b"unmanaged pack")
+            self.assertEqual(world.read_bytes(), b"existing world")
+            for key, (content, modified) in originals.items():
+                path = self.directory / f"infra-{key}.zip"
+                self.assertEqual(path.read_bytes(), content)
+                self.assertEqual(path.stat().st_mtime_ns, modified)
+
+    def test_modified_afk_retirement_fails_before_touching_other_packs(self):
+        datapacks.install({**self.configuration, "packs": {
+            "world-policy": str(self.source), "afk-display": str(self.source),
+        }})
+        afk = self.directory / "infra-afk-display.zip"
+        afk.write_bytes(b"modified by operator")
+        ledger = (self.directory / datapacks.LEDGER).read_bytes()
+        retained = self.directory / "infra-world-policy.zip"
+        modified = retained.stat().st_mtime_ns
+        with self.assertRaisesRegex(ValueError, "unowned or modified"):
+            datapacks.install(self.configuration)
+        self.assertEqual(afk.read_bytes(), b"modified by operator")
+        self.assertEqual((self.directory / datapacks.LEDGER).read_bytes(), ledger)
+        self.assertEqual(retained.stat().st_mtime_ns, modified)
 
     def test_interrupted_first_install_and_upgrade_can_resume(self):
         write = datapacks.atomic_write
