@@ -24,6 +24,21 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
     assert (
         b"strip" in nickname_updater and b"discordsrv.nicknamesync" in nickname_updater
     )
+    # Verify every configured name placeholder against the pinned implementation,
+    # including the native Carbon chat entrypoint and webhook username renderer.
+    for path in (
+        "DiscordSRV",
+        "listeners/PlayerAdvancementDoneListener",
+        "listeners/PlayerDeathListener",
+    ):
+        bytecode = jar.read(f"github/scarsz/discordsrv/{path}.class")
+        assert b"%displayname%" in bytecode and b"getDisplayName" in bytecode
+    webhook = jar.read("github/scarsz/discordsrv/util/WebhookUtil.class")
+    assert b"%displayname%" in webhook and b"getDisplayName" in webhook
+    join_listener = jar.read(
+        "github/scarsz/discordsrv/listeners/PlayerJoinLeaveListener.class"
+    )
+    assert b"runTaskLaterAsynchronously" in join_listener
 assert discord_defaults["ConfigVersion"] == "1.30.5"
 
 
@@ -118,7 +133,8 @@ for case in cases:
         assert configuration["EnablePresenceInformation"] is False
         assert configuration["Experiment_WebhookChatMessageDelivery"] is True
         assert (
-            configuration["Experiment_WebhookChatMessageUsernameFormat"] == "%username%"
+            configuration["Experiment_WebhookChatMessageUsernameFormat"]
+            == "%displayname%"
         )
         assert configuration["Experiment_WebhookChatMessageFormat"] == "%message%"
         # Rank components belong only to Minecraft recipient formatting.
@@ -255,7 +271,14 @@ for case in cases:
             "MinecraftChatToDiscordMessageFormat",
             "MinecraftChatToDiscordMessageFormatNoPrimaryGroup",
         ):
-            assert messages[key] == "%username% › %message%"
+            assert messages[key] == "%displayname% › %message%"
+        expected_authors = {
+            "Join": "%displayname% joined Survival",
+            "FirstJoin": "%displayname% joined Survival for the first time",
+            "Leave": "%displayname% left Survival",
+            "Achievement": "%displayname% earned %achievement%",
+            "Death": "%deathmessage%",
+        }
         assert (
             configuration["DiscordConsoleChannelId"]
             == case["discord"]["consoleChannelId"]
@@ -286,7 +309,7 @@ for case in cases:
             assert embed["Enabled"] is True
             assert embed["Color"] == color
             assert embed["Author"]["ImageUrl"] == "%embedavatarurl%"
-            assert embed["Author"]["Name"]
+            assert embed["Author"]["Name"] == expected_authors[event]
             assert embed["Author"]["Url"] == ""
             assert embed["Title"] == {"Text": "", "Url": ""}
             assert embed["Footer"] == {"Text": "", "IconUrl": ""}

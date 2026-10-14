@@ -189,7 +189,7 @@
                   EnablePresenceInformation = false;
                   DiscordGameStatus = "playing mc.finnrut.is";
                   Experiment_WebhookChatMessageDelivery = true;
-                  Experiment_WebhookChatMessageUsernameFormat = "%username%";
+                  Experiment_WebhookChatMessageUsernameFormat = "%displayname%";
                   Experiment_WebhookChatMessageFormat = "%message%";
                   Experiment_WebhookChatMessageUsernameFromDiscord = false;
                   Experiment_WebhookChatMessageAvatarFromDiscord = false;
@@ -201,13 +201,17 @@
                 messages = {
                   # Rank prefixes are MiniMessage on Minecraft. Do not pass them
                   # through Vault's legacy string path into Discord messages.
-                  MinecraftChatToDiscordMessageFormat = "%username% › %message%";
-                  MinecraftChatToDiscordMessageFormatNoPrimaryGroup = "%username% › %message%";
-                  MinecraftPlayerJoinMessage = message palette.join "%username% joined ${s.displayName}";
-                  MinecraftPlayerFirstJoinMessage = message palette.firstJoin "%username% joined ${s.displayName} for the first time";
-                  MinecraftPlayerLeaveMessage = message palette.leave "%username% left ${s.displayName}";
+                  # Carbon beta.39 writes its nickname to the Bukkit display name
+                  # and passes the Bukkit player to DiscordSRV's native chat path.
+                  # DiscordSRV also reads it for events (joins wait 20 ticks).
+                  MinecraftChatToDiscordMessageFormat = "%displayname% › %message%";
+                  MinecraftChatToDiscordMessageFormatNoPrimaryGroup = "%displayname% › %message%";
+                  MinecraftPlayerJoinMessage = message palette.join "%displayname% joined ${s.displayName}";
+                  MinecraftPlayerFirstJoinMessage = message palette.firstJoin "%displayname% joined ${s.displayName} for the first time";
+                  MinecraftPlayerLeaveMessage = message palette.leave "%displayname% left ${s.displayName}";
+                  # The death narrative retains account names and the full cause.
                   MinecraftPlayerDeathMessage = message palette.death "%deathmessage%";
-                  MinecraftPlayerAchievementMessage = message palette.advancement "%username% earned %achievement%";
+                  MinecraftPlayerAchievementMessage = message palette.advancement "%displayname% earned %achievement%";
                   # These are plain strings in 1.30.5 and fire for every Paper cycle.
                   # The independent notifier owns the coalesced status embed instead.
                   DiscordChatChannelServerStartupMessage = "";
