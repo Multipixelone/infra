@@ -82,6 +82,9 @@ for name in ("production", "additional"):
         assert symlinks["plugins/chunksmith.jar"] == plugin
         assert "plugins/chunky.jar" not in symlinks
         runtime = fixture["runtime"][server_id]
+        assert not runtime[
+            "wakeOnJoin"
+        ]  # Always-on backends keep LOD HTTP running while idle.
         assert {
             f"{root}/plugins/Chunky",
             f"{root}/plugins/Chunksmith",

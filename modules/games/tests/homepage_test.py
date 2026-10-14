@@ -18,29 +18,57 @@ def games(groups):
 
 def contract(data):
     services = data["services"]
-    ready = games(services["enabled"])
+    owned = {"Survival Map", "Survival", "Creative", "Terraria", "Games dashboard"}
+    existing = {
+        name: tile
+        for name, tile in games(services["empty"]).items()
+        if name not in owned
+    }
+
+    def game_tiles(groups):
+        tiles = games(groups)
+        assert {
+            name: tile for name, tile in tiles.items() if name not in owned
+        } == existing
+        return {name: tile for name, tile in tiles.items() if name in owned}
+
+    ready = game_tiles(services["enabled"])
     assert list(ready) == ["Survival Map", "Survival", "Terraria", "Games dashboard"]
     assert ready["Survival Map"]["href"] == "https://map.finnrut.is"
     assert ready["Survival Map"]["siteMonitor"] == "http://127.0.0.1:8766/index.html"
     assert ready["Survival"]["widget"] == {
         "type": "minecraft",
-        "url": "udp://127.0.0.1:25566",
+        "url": "udp://127.0.0.1:25567",
         "fields": ["players", "version", "status"],
     }
     assert "mc.finnrut.is" in ready["Survival"]["description"]
-    assert "Up includes sleeping" in ready["Survival"]["description"]
+    assert "always on" in ready["Survival"]["description"]
     assert "terraria.finnrut.is:7777" in ready["Terraria"]["description"]
     assert ready["Terraria"]["widget"]["type"] == "customapi"
     assert ready["Terraria"]["widget"]["url"].endswith("/servers/terraria")
     assert ready["Games dashboard"]["href"] == "https://games.nyc.finnrut.is"
     for scenario in ("missing", "empty"):
-        assert list(games(services[scenario])) == ["Survival Map", "Games dashboard"]
-        assert games(services[scenario])["Survival Map"] == ready["Survival Map"]
+        assert list(game_tiles(services[scenario])) == [
+            "Survival Map",
+            "Games dashboard",
+        ]
+        assert game_tiles(services[scenario])["Survival Map"] == ready["Survival Map"]
     for scenario in ("disabled", "stopped"):
-        assert list(games(services[scenario])) == ["Survival Map", "Terraria", "Games dashboard"]
-    discovered = games(services["discovered"])
-    assert list(discovered) == ["Survival Map", "Creative", "Survival", "Terraria", "Games dashboard"]
+        assert list(game_tiles(services[scenario])) == [
+            "Survival Map",
+            "Terraria",
+            "Games dashboard",
+        ]
+    discovered = game_tiles(services["discovered"])
+    assert list(discovered) == [
+        "Survival Map",
+        "Creative",
+        "Survival",
+        "Terraria",
+        "Games dashboard",
+    ]
     assert discovered["Creative"]["widget"]["url"] == "udp://127.0.0.1:25576"
+    assert "Up includes sleeping" in discovered["Creative"]["description"]
     original = [group for group in services["empty"] if "Games" not in group]
     assert original and original == [
         group for group in services["enabled"] if "Games" not in group

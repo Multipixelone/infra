@@ -86,10 +86,12 @@ let
           properties = runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source;
           preJoinSources = [
             runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source
-            runtime.configTemplates."/srv/games/minecraft/survival/lazymc.toml".source
             cfg.services.minecraft-servers.servers.velocity.files."velocity.toml"
             cfg.infra.games.minecraftPlugins.proxy.templates."/srv/games/minecraft/velocity/plugins/minimotd-velocity/main.conf".source
-          ];
+          ]
+          ++
+            lib.optional runtime.wakeOnJoin
+              runtime.configTemplates."/srv/games/minecraft/survival/lazymc.toml".source;
           homepageTiles = (import ../../lib/games-homepage.nix { inherit lib; }).tiles {
             survival = cfg.infra.games.servers.survival;
           } "https://games.nyc.finnrut.is";

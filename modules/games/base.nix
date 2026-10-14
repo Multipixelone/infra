@@ -36,6 +36,11 @@
           default = "survival";
         };
         backup = {
+          btrfsSource = lib.mkOption {
+            type = lib.types.str;
+            default = "/srv";
+            description = "Existing Btrfs subvolume containing game state; online backups refuse roots outside it.";
+          };
           enable = lib.mkOption {
             type = lib.types.bool;
             default = false;

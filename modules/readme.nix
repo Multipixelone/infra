@@ -55,9 +55,9 @@
       parts.minecraft = ''
         ## Minecraft survival
 
-        Link hosts Finn's sleeping Paper survival server behind Velocity, with
+        Link hosts Finn's always-on Paper survival server behind Velocity, with
         pinned skins, MOTD, static BlueMap, shared PostgreSQL permissions, optional
-        Discord bridging, voice chat and sleep-aware telemetry. See
+        Discord bridging, voice chat and lifecycle telemetry. See
         [Minecraft operator notes](docs/games-minecraft.md) for setup, backups,
         limits and deferred vane/rollback work. The public map is
         [map.finnrut.is](https://map.finnrut.is); Dawarich now uses

@@ -436,7 +436,7 @@
                 </div>
                 <span class="fact-note"
                   >{selected.backup.enabled
-                    ? "Stops server for snapshot"
+                    ? selected.backup.online ? "Backs up while players stay connected" : "Stops server for snapshot"
                     : "Manual backups disabled"}</span
                 >
               </div>
@@ -658,7 +658,9 @@
     </h2>
     <p id="confirm-description">
       {confirmation.action === "backup"
-        ? "Disconnects players, stops the server, takes a snapshot, then restores its previous state."
+        ? confirmation.server.backup.online
+          ? "Backs up while players stay connected. A recovery failure can restart or stop the server to restore world saving."
+          : "Disconnects players, stops the server, takes a snapshot, then restores its previous state."
         : confirmation.action === "stop"
           ? `Disconnects players.${confirmation.server.wakeOnJoin ? " Disables wake-on-join until the server is started again." : ""}`
           : `Disconnects players and restarts the server.${confirmation.server.wakeOnJoin ? " The server may sleep until a player joins." : ""}`}

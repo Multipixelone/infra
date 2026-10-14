@@ -19,6 +19,8 @@
             repository = cfg.backup.repository;
             passwordFile = "/run/agenix/${secret}";
             source = "192.168.6.9:/volume1/homes/tunnel";
+            btrfsSource = cfg.backup.btrfsSource;
+            snapshotDir = "${cfg.backup.btrfsSource}/.games-backup-snapshots";
           };
           stateDir = "/srv/games/.state";
           runDir = "/run/games";
@@ -29,6 +31,11 @@
             restic = lib.getExe pkgs.restic;
             podman = lib.getExe pkgs.podman;
             findmnt = "${pkgs.util-linux}/bin/findmnt";
+            btrfs = "${pkgs.btrfs-progs}/bin/btrfs";
+            unshare = "${pkgs.util-linux}/bin/unshare";
+            mount = "${pkgs.util-linux}/bin/mount";
+            python = "${pkgs.python3}/bin/python3";
+            onlineRestic = "${./online-restic.py}";
           };
         }
       );
@@ -50,6 +57,7 @@
         container-result = helper "games-container-result" "container-result";
         backup-run = helper "games-backup-run" "backup-run";
         recover = helper "games-backup-recover" "recover";
+        recover-all = helper "games-backup-recover-all" "recover-all";
         prune = helper "games-prune" "prune";
         status = helper "games-status" "status";
         shared-status = pkgs.writeShellApplication {
@@ -107,6 +115,7 @@
             ];
           };
           backup = {
+            online = s.game == "minecraft-paper" && !s.wakeOnJoin;
             enabled = backupEnabled && s.backup && s.available;
             unit = "restic-backups-games-${id}.service";
             command = [

@@ -22,9 +22,9 @@ let
         w = 4;
         h = 5;
         unit = viz.units.none;
-        noValue = "Asleep / no data";
+        noValue = "No data";
         options.graphMode = "none";
-        description = "Current successful scrape only. Asleep / no data can also mean unavailable telemetry.";
+        description = "Current successful scrape only. No data means unavailable telemetry, including sleep for lazymc backends.";
       } args
     );
   tickSeries =
@@ -32,7 +32,7 @@ let
     viz.panel (
       lib.recursiveUpdate {
         interval = "60s";
-        description = "TickScope is unavailable while Paper sleeps under lazymc. Gaps also indicate unavailable telemetry.";
+        description = "Survival runs continuously. Gaps indicate unavailable telemetry; opted-in lazymc backends also have gaps during sleep.";
       } args
     );
   tickTarget = expr: legend: { inherit expr legend; };
@@ -142,7 +142,7 @@ let
         title = "GC time rate";
         unit = viz.units.seconds;
         targets = [ (tickTarget (tickRate "mc_jvm_gc_seconds_total") "{{server}} {{gc}}") ];
-        description = "Seconds spent collecting per second, by GC collector. Gaps while Paper sleeps.";
+        description = "Seconds spent collecting per second, by GC collector. Gaps indicate unavailable telemetry or a sleeping lazymc backend.";
       })
       (tickSeries {
         title = "GC collection rate";
@@ -188,7 +188,7 @@ let
         targets = [
           (tickTarget ''rate(mc_events_total{${tickSelector},event=~"login|chat|death"}[$__rate_interval]) ${tickAwake}'' "{{server}} {{event}}")
         ];
-        description = "Login, chat and death events per second. Joins/leaves are already shown by passive telemetry above. Gaps while Paper sleeps.";
+        description = "Login, chat and death events per second. Joins/leaves are already shown by passive telemetry above. Gaps indicate unavailable telemetry or a sleeping lazymc backend.";
       })
       (tickSeries {
         title = "Collection failure rate";
@@ -217,7 +217,7 @@ let
         w = 24;
         h = 5;
         unit = viz.units.none;
-        noValue = "Asleep / no data";
+        noValue = "No data";
         options = {
           graphMode = "none";
           textMode = "value_and_name";
@@ -229,7 +229,7 @@ let
           falseText = "Never succeeded";
           trueText = "Succeeded";
           falseColor = "yellow";
-          nullText = "Asleep / no data";
+          nullText = "No data";
         };
       })
     ]
@@ -442,6 +442,7 @@ let
         })
         (viz.panel {
           title = "Sleep and wake events";
+          description = "Only applies to backends with lazymc enabled. Always-on Survival emits no sleep/wake events.";
           unit = viz.units.short;
           targets =
             map

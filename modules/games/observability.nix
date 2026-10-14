@@ -38,7 +38,7 @@ in
                   "podman-games-${id}.service"
               );
             container = runtime.container or null;
-            wakeOnJoin = runtime.wakeOnJoin or (s.game == "minecraft-paper");
+            wakeOnJoin = runtime.wakeOnJoin or (s.game == "minecraft-paper" && s.minecraft.lazymc.enable);
             serverPort =
               runtime.serverPort
                 or (if s.game == "minecraft-paper" then s.minecraft.serverPort else s.terraria.port);

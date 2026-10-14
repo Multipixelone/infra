@@ -72,7 +72,7 @@ for panel in tick_panels:
         )
     if panel["type"] == "stat":
         assert all(target["instant"] for target in panel["targets"])
-        assert panel["fieldConfig"]["defaults"]["noValue"] == "Asleep / no data"
+        assert panel["fieldConfig"]["defaults"]["noValue"] == "No data"
         assert panel["options"]["graphMode"] == "none"
     else:
         assert panel["fieldConfig"]["defaults"]["custom"]["spanNulls"] is False

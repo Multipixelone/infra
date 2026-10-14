@@ -350,10 +350,20 @@ def paper_stop(cfg, identifier, pid):
     root()
     item = server(cfg, identifier)
     record_stop(cfg, identifier, False, new=True)
-    children = process_children(pid)
+    lazy = item["wakeOnJoin"]
+    children = (
+        process_children(pid)
+        if lazy
+        else (
+            [str(int(pid))]
+            if int(pid) > 0 and Path(f"/proc/{int(pid)}").exists()
+            else []
+        )
+    )
     if not children:
-        wait_for_paper_exit(item)
-        record_stop(cfg, identifier, True)
+        if lazy:
+            wait_for_paper_exit(item)
+            record_stop(cfg, identifier, True)
         return
     if listening(item["console"]["port"]):
         response = rcon(item, "save-all flush")
@@ -369,7 +379,8 @@ def paper_stop(cfg, identifier, pid):
         if time.monotonic() >= deadline:
             raise TimeoutError("Paper did not exit gracefully; do not snapshot")
         time.sleep(0.2)
-    wait_for_paper_exit(item)
+    if lazy:
+        wait_for_paper_exit(item)
     record_stop(cfg, identifier, True)
 
 
@@ -402,7 +413,14 @@ def paper_result(cfg, identifier):
     confirmed = result.exists() and json.loads(result.read_text()).get(
         "graceful", False
     )
-    record_stop(cfg, identifier, confirmed and paper_exit_clean(item))
+    clean = (
+        paper_exit_clean(item)
+        if item["wakeOnJoin"]
+        else os.environ.get("SERVICE_RESULT") == "success"
+        and os.environ.get("EXIT_CODE") == "exited"
+        and os.environ.get("EXIT_STATUS") == "0"
+    )
+    record_stop(cfg, identifier, confirmed and clean)
 
 
 def validate_repository(cfg):
@@ -421,29 +439,55 @@ def validate_repository(cfg):
     run(cfg, "restic", "-r", path, "-p", backup["passwordFile"], "snapshots", "--json")
 
 
-def snapshot(cfg, identifier, *, unclean=False):
+def snapshot(cfg, identifier, *, unclean=False, online_view=None):
     item = server(cfg, identifier)
     if not item["backup"]:
         raise RuntimeError("world backups are disabled for this server")
     validate_repository(cfg)
     for path in item["worldPaths"]:
         reject_symlinks(path)
-    paths = [path for path in item["worldPaths"] if Path(path).exists()]
+
+    def exists(path):
+        if online_view is not None:
+            path = Path(online_view) / Path(path).relative_to(
+                cfg["backup"]["btrfsSource"]
+            )
+        return Path(path).exists()
+
+    paths = [path for path in item["worldPaths"] if exists(path)]
     if not paths:
         raise RuntimeError("no world exists to back up")
     metadata = Path(cfg["stateDir"]) / (identifier + ".json")
-    if metadata.exists():
+    if exists(metadata):
         paths.append(str(metadata))
     proof = stop_result_path(cfg, identifier)
-    if proof.exists():
+    if exists(proof):
         paths.append(str(proof))
     tags = ["--tag", "games:" + identifier]
     if unclean:
         paths.append(str(acknowledgement_path(cfg, identifier)))
         tags += ["--tag", "games:unclean", "--tag", "games:unverified"]
+    if online_view is not None:
+        tags += ["--tag", "games:online"]
+    tool, prefix = "restic", []
+    if online_view is not None:
+        tool = "unshare"
+        prefix = [
+            "--mount",
+            "--propagation",
+            "private",
+            "--",
+            cfg["commands"]["python"],
+            cfg["commands"]["onlineRestic"],
+            cfg["commands"]["mount"],
+            str(online_view),
+            cfg["backup"]["btrfsSource"],
+            cfg["commands"]["restic"],
+        ]
     output = run(
         cfg,
-        "restic",
+        tool,
+        *prefix,
         "-r",
         cfg["backup"]["repository"],
         "-p",
@@ -739,8 +783,184 @@ def recovery_path(cfg, identifier):
     return Path(cfg["runDir"]) / identifier / "backup-recovery.json"
 
 
+def online_recovery_path(cfg, identifier):
+    # Unlike /run/games/<id>, this directory is owned by root, not Minecraft.
+    return Path(cfg["stateDir"]) / (identifier + "-online-backup.json")
+
+
+def online_snapshot_path(cfg, identifier):
+    server(cfg, identifier)  # Never allow an arbitrary path or subvolume name.
+    return Path(cfg["backup"]["snapshotDir"]) / identifier
+
+
+def saving_response(response, enabled):
+    text = response.lower()
+    word = "on" if enabled else "off"
+    return (
+        f"saving is now turned {word}" in text
+        or f"saving is already turned {word}" in text
+    )
+
+
+def resume_online_saving(cfg, identifier, previous):
+    if not previous["paused"]:
+        return
+    item = server(cfg, identifier)
+    state = unit_state(cfg, item)
+    active = state.get("ActiveState") in (
+        "active",
+        "activating",
+        "reloading",
+        "deactivating",
+    )
+    if active and state.get("InvocationID") == previous["invocation"]:
+        # Record the intent before save-off. Even a lost command response must
+        # go through this recovery, and an already-enabled reply is success.
+        error = None
+        for attempt in range(3):
+            try:
+                if not saving_response(rcon(item, "save-on"), True):
+                    raise RuntimeError("Paper did not acknowledge save-on")
+                break
+            except (OSError, ValueError, RuntimeError) as failure:
+                error = failure
+                if attempt == 2:
+                    raise RuntimeError("cannot restore Paper saving") from error
+                time.sleep(1)
+    elif active and not state.get("InvocationID"):
+        raise RuntimeError("cannot verify Paper invocation for saving recovery")
+    # A stopped or different invocation cannot retain this process's save-off.
+    previous["paused"] = False
+    atomic_json(online_recovery_path(cfg, identifier), previous)
+
+
+def recover_online(cfg, identifier):
+    path = online_recovery_path(cfg, identifier)
+    if not path.exists():
+        return
+    restart = False
+    with lock(cfg, identifier):
+        previous = json.loads(path.read_text())
+        if (
+            not isinstance(previous, dict)
+            or type(previous.get("paused")) is not bool
+            or not previous.get("invocation")
+        ):
+            raise ValueError("invalid online backup recovery record")
+        try:
+            resume_online_saving(cfg, identifier, previous)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            restart = True
+    if restart:
+        # Release the game lock: ExecStartPre takes it. Keep the caller's
+        # separate backup lock throughout recovery to exclude another backup.
+        item = server(cfg, identifier)
+        try:
+            run(cfg, "systemctl", "restart", item["unit"], timeout=330)
+            state = unit_state(cfg, item)
+            if state.get("InvocationID") == previous["invocation"] and state.get(
+                "ActiveState"
+            ) not in ("inactive", "failed"):
+                raise RuntimeError("Paper restart did not replace the paused process")
+        except (OSError, RuntimeError, subprocess.SubprocessError):
+            # Availability yields to data safety if saving cannot be restored.
+            # Do not leave the old process alive with saving disabled.
+            run(cfg, "systemctl", "stop", item["unit"], timeout=190)
+            state = unit_state(cfg, item)
+            if (
+                state.get("ActiveState") not in ("inactive", "failed")
+                or state.get("MainPID", "0") != "0"
+            ):
+                raise RuntimeError("Paper still needs saving recovery")
+        previous["paused"] = False
+        atomic_json(path, previous)
+    with lock(cfg, identifier):
+        view = online_snapshot_path(cfg, identifier)
+        reject_symlinks(view)
+        if view.exists():
+            run(cfg, "btrfs", "subvolume", "delete", view)
+        path.unlink()
+    if restart:
+        raise RuntimeError(
+            "save-on recovery required a Paper restart or stop; backup failed"
+        )
+
+
+def validate_online_source(cfg, identifier):
+    item = server(cfg, identifier)
+    source = Path(cfg["backup"]["btrfsSource"])
+    reject_symlinks(source)
+    run(cfg, "btrfs", "subvolume", "show", source)
+    root_id = run(cfg, "btrfs", "inspect-internal", "rootid", source).strip()
+    for value in [*item["worldPaths"], cfg["stateDir"]]:
+        path = Path(value)
+        path.relative_to(source)
+        reject_symlinks(path)
+        if not path.exists():
+            continue
+        if run(cfg, "btrfs", "inspect-internal", "rootid", path).strip() != root_id:
+            raise RuntimeError("online backup root is in another subvolume")
+        # A snapshot does not include nested subvolumes. Checking device IDs
+        # also catches separately mounted data beneath a declared root.
+        for directory, children, _ in os.walk(path, followlinks=False):
+            for name in children:
+                child = Path(directory) / name
+                if (
+                    not child.is_symlink()
+                    and child.stat().st_dev != source.stat().st_dev
+                ):
+                    raise RuntimeError(
+                        "online backup root contains a nested filesystem or subvolume"
+                    )
+    directory = Path(cfg["backup"]["snapshotDir"])
+    directory.relative_to(source)
+    reject_symlinks(directory)
+    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
+    info = directory.stat()
+    if info.st_uid != 0 or info.st_mode & 0o077:
+        raise PermissionError(
+            "online snapshot directory must be root-owned and private"
+        )
+
+
+def backup_online(cfg, identifier, state):
+    item = server(cfg, identifier)
+    if not state.get("InvocationID") or not passive_listening(item["serverPort"]):
+        raise RuntimeError("Paper is not ready for an online snapshot")
+    validate_online_source(cfg, identifier)
+    path = online_recovery_path(cfg, identifier)
+    previous = {"paused": True, "invocation": state["InvocationID"]}
+    view = online_snapshot_path(cfg, identifier)
+    if view.exists():
+        raise RuntimeError("stale online snapshot needs recovery")
+    atomic_json(path, previous)
+    try:
+        if not saving_response(rcon(item, "save-off"), False):
+            raise RuntimeError("Paper did not acknowledge save-off")
+        response = rcon(item, "save-all flush")
+        if "saved" not in response.lower():
+            raise RuntimeError("Paper did not confirm its flushed save")
+        if unit_state(cfg, item).get("InvocationID") != previous["invocation"]:
+            raise RuntimeError("Paper changed invocation during snapshot preparation")
+        run(
+            cfg,
+            "btrfs",
+            "subvolume",
+            "snapshot",
+            "-r",
+            cfg["backup"]["btrfsSource"],
+            view,
+        )
+    finally:
+        # Upload never starts with saving paused. Recovery runs again outside
+        # this lock in backup_run_inner's finally, and in ExecStopPost/timer.
+        resume_online_saving(cfg, identifier, previous)
+    snapshot(cfg, identifier, online_view=view)
+
+
 def recover(cfg, identifier):
     root()
+    recover_online(cfg, identifier)
     path = recovery_path(cfg, identifier)
     if not path.exists():
         return
@@ -764,6 +984,9 @@ def backup_run_inner(cfg, identifier):
         with lock(cfg, identifier):
             state = unit_state(cfg, item)
             active = state.get("ActiveState") in ("active", "activating", "reloading")
+            if active and item["game"] == "minecraft-paper" and not item["wakeOnJoin"]:
+                backup_online(cfg, identifier, state)
+                return
             atomic_json(
                 path,
                 {"active": active, "running": active and listening(item["serverPort"])},
@@ -789,7 +1012,9 @@ def backup_run(cfg, identifier):
     started = time.monotonic()
     success = False
     try:
-        backup_run_inner(cfg, identifier)
+        with lock(cfg, identifier + "-backup"):
+            recover(cfg, identifier)
+            backup_run_inner(cfg, identifier)
         success = True
     finally:
         path = Path(cfg["stateDir"]) / (identifier + "-backup.json")
@@ -798,6 +1023,28 @@ def backup_run(cfg, identifier):
         if success:
             previous["lastDuration"] = time.monotonic() - started
         atomic_json(path, previous)
+
+
+def recover_all(cfg):
+    root()
+    failures = []
+    for identifier in cfg["servers"]:
+        if online_recovery_path(cfg, identifier).exists():
+            try:
+                with lock(cfg, identifier + "-backup"):
+                    recover_online(cfg, identifier)
+            except (
+                OSError,
+                ValueError,
+                RuntimeError,
+                subprocess.SubprocessError,
+            ) as error:
+                metrics = Path(cfg["stateDir"]) / (identifier + "-backup.json")
+                previous = json.loads(metrics.read_text()) if metrics.exists() else {}
+                atomic_json(metrics, previous | {"failed": True})
+                failures.append(str(error))
+    if failures:
+        raise RuntimeError("; ".join(failures))
 
 
 def prune(cfg):
@@ -969,8 +1216,10 @@ def main(argv):
         )
     elif action == "prune" and not args:
         prune(cfg)
-    elif action == "paper-stop" and len(args) == 2:
-        paper_stop(cfg, *args)
+    elif action == "paper-stop" and len(args) in (1, 2):
+        paper_stop(cfg, args[0], args[1] if len(args) == 2 else "0")
+    elif action == "recover-all" and not args:
+        recover_all(cfg)
     elif (
         action
         in (

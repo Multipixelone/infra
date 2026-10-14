@@ -21,6 +21,7 @@ for mode in ("missing", "disabled", "enabled"):
         )
         assert not servers["velocity"]["backupEnabled"]
     assert servers["survival"]["serverPort"] == 25567  # never lazymc or RCON
+    assert not servers["survival"]["wakeOnJoin"]
     assert servers["survival"]["memoryBytes"] == 6 * 1024**3
     assert servers["terraria"]["capacity"] == 16
 assert "creative" in data["discovered"]["servers"]

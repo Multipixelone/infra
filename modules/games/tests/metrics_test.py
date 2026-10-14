@@ -37,6 +37,19 @@ def sample(output, name, **labels):
 
 
 class ExporterTests(unittest.TestCase):
+    def test_direct_paper_ignores_legacy_exit_proof_and_emits_no_sleep_events(self):
+        self.item["wakeOnJoin"] = False
+        self.proof.write_text("false")
+        self.status = [
+            {"id": "survival", "state": "running", "ready": True, "playersOnline": 2}
+        ]
+        with patch.object(metrics, "command", side_effect=self.runner):
+            output = metrics.collect(self.inventory, {}, 100)
+        self.assertEqual(sample(output, "games_server_state", state="running"), 1)
+        self.assertEqual(sample(output, "games_server_state", state="sleeping"), 0)
+        self.assertEqual(sample(output, "games_server_failed"), 0)
+        self.assertNotIn("games_lazymc_events_total{", output)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

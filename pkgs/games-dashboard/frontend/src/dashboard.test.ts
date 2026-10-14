@@ -345,7 +345,7 @@ test("server details render accessible, grouped inventory", async (t) => {
         assert.match(markup, /Survival world map \(opens in a new tab\)/);
         assert.match(
           markup,
-          /class="detail-note">Available while Survival sleeps/,
+          /class="detail-note">Available while Survival is stopped/,
         );
         assert.ok(markup.indexOf("map-link") < markup.indexOf("</table>"));
         assert.match(html({ public: [] }), /<tr class="map-row">/);

@@ -7,12 +7,19 @@
         if server.game == "minecraft-paper" then
           {
             icon = "minecraft";
-            description = "${lib.concatStringsSep ", " server.hostnames} · sleeps when idle; Up includes sleeping";
+            description = "${lib.concatStringsSep ", " server.hostnames} · ${
+              if server.minecraft.lazymc.enable then "sleeps when idle; Up includes sleeping" else "always on"
+            }";
             widget = {
               type = "minecraft";
               # Homepage's URL convention says udp, but its Minecraft handler
-              # sends Java status requests over TCP. Never query Paper here.
-              url = "udp://127.0.0.1:${toString server.minecraft.proxyPort}";
+              # sends Java status requests over TCP. Only lazy backends need an
+              # isolated proxy listener to avoid waking on a status request.
+              url = "udp://127.0.0.1:${
+                toString (
+                  if server.minecraft.lazymc.enable then server.minecraft.proxyPort else server.minecraft.serverPort
+                )
+              }";
               fields = [
                 "players"
                 "version"

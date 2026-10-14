@@ -129,6 +129,8 @@ def scenario(
 tests = [
     scenario("confirmed crash", failed=1, expected="GameServerFailed"),
     scenario("normal sleep", ready=0, expected=None),
+    scenario("always-on healthy without any sleep metrics", expected=None),
+    scenario("always-on starting without sleep metrics", ready=0, expected=None),
     scenario("intentional clean stop", ready=0, expected=None),
     scenario(
         "disabled and missing secret", enabled=0, failed=1, ready=0, expected=None

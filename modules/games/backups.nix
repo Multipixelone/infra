@@ -22,6 +22,13 @@
     in
     {
       config = lib.mkIf enabled {
+        systemd.timers.games-backup-recovery = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnBootSec = "30s";
+            OnUnitInactiveSec = "30s";
+          };
+        };
         # Reuses the same export and automount as the existing desktop module;
         # this declaration also makes the backend movable to a server-role host.
         boot.supportedFilesystems = [ "nfs" ];
@@ -65,6 +72,14 @@
             }
           ) servers
           // {
+            games-backup-recovery = {
+              description = "Recover interrupted online game backups";
+              serviceConfig = {
+                Type = "oneshot";
+                ExecStart = lib.getExe cfg.packages.recover-all;
+                TimeoutStartSec = "40min";
+              };
+            };
             games-restic-prune = {
               description = "Retain seven daily and four weekly game snapshots";
               after = map (id: "restic-backups-games-${id}.service") (lib.attrNames servers);

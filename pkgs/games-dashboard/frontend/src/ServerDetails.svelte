@@ -59,7 +59,7 @@
                   {mapAddress(server.mapUrl)}<span aria-hidden="true"> ↗</span>
                   <span class="sr-only"> — {server.displayName} world map (opens in a new tab)</span>
                 </a>
-                <span class="detail-note">Available while {server.displayName} sleeps</span>
+                <span class="detail-note">Available while {server.displayName} is stopped</span>
               </td>
             </tr>
           {/if}

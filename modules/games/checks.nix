@@ -34,6 +34,24 @@
         (host.extendModules {
           modules = [ { infra.games.servers = lib.mkForce { }; } ];
         }).config;
+      lazy =
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.secretFiles = lib.mkForce (lib.genAttrs secretNames (_: ./tests/fixture.age));
+              infra.games.servers = lib.mkForce (
+                host.config.infra.games.servers
+                // {
+                  survival = host.config.infra.games.servers.survival // {
+                    minecraft = host.config.infra.games.servers.survival.minecraft // {
+                      lazymc.enable = true;
+                    };
+                  };
+                }
+              );
+            }
+          ];
+        }).config;
       discovered =
         (host.extendModules {
           modules = [
@@ -45,6 +63,7 @@
                     displayName = "Creative";
                     hostnames = [ "creative.mc.finnrut.is" ];
                     minecraft = host.config.infra.games.servers.survival.minecraft // {
+                      lazymc.enable = true;
                       proxyPort = 25576;
                       serverPort = 25577;
                       rconPort = 25585;
@@ -59,9 +78,14 @@
           ];
         }).config;
       project = cfg: {
+        routing = toString cfg.services.minecraft-servers.servers.velocity.files."velocity.toml";
+        templateNames = lib.attrNames cfg.infra.games.runtime.survival.configTemplates;
         manifest = builtins.fromJSON cfg.environment.etc."games/manifest.json".text;
         units = lib.genAttrs gameUnitNames (name: {
           inherit (cfg.systemd.services.${name}) enable;
+          start = cfg.systemd.services.${name}.serviceConfig.ExecStart or null;
+          restart = cfg.systemd.services.${name}.serviceConfig.Restart or null;
+          wantedBy = cfg.systemd.services.${name}.wantedBy;
           preStart = cfg.systemd.services.${name}.serviceConfig.ExecStartPre or [ ];
           stop = cfg.systemd.services.${name}.serviceConfig.ExecStop or [ ];
           stopPost = cfg.systemd.services.${name}.serviceConfig.ExecStopPost or [ ];
@@ -94,6 +118,7 @@
         batch = cfg.systemd.slices.batch-beets.sliceConfig;
       };
       fixtureData = {
+        lazy = project lazy;
         missing = project missing;
         enabled = project enabled;
         discovery = builtins.fromJSON discovered.environment.etc."games/manifest.json".text;
@@ -219,7 +244,8 @@
                   assert "BlueMapFloodgate" not in plugins
                   assert backend_plugins["BlueMapOfflinePlayerMarkers"] == {"name": "BlueMapOfflinePlayerMarkers", "version": "3.3", "installed": True}
                   assert "BlueMapOfflinePlayerMarkers" not in plugins
-                  assert servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
+                  assert not servers["survival"]["wakeOnJoin"] and not servers["terraria"]["wakeOnJoin"]
+                  assert servers["survival"]["backup"]["online"] and not servers["terraria"]["backup"]["online"]
                   assert {endpoint["port"] for server in servers.values() for endpoint in server["public"]} == {25565, 19132, 24454, 25568, 7777}
                   assert all(server["console"]["command"] == ["games-console", server["id"]] for server in servers.values())
                   expected = name == "enabled"
@@ -252,6 +278,18 @@
                   assert fixture["acknowledgement"]["executable"].endswith("/bin/games-acknowledge-unclean")
                   assert fixture["acknowledgement"]["executable"] not in fixture["acknowledgement"]["sudoCommands"]
               assert data["missing"]["gameSecrets"] == []
+              for case, port, lazy in (("enabled", 25567, False), ("lazy", 25566, True)):
+                  fixture = data[case]
+                  backend = {server["id"]: server for server in fixture["manifest"]["servers"]}["survival"]
+                  assert backend["wakeOnJoin"] == lazy
+                  assert backend["backup"]["online"] != lazy
+                  start = fixture["units"]["minecraft-server-survival"]["start"]
+                  assert ("paper-survival-lazy" in start) == lazy
+                  assert ("-Xms1G -Xmx4G" in start) != lazy
+                  assert fixture["units"]["minecraft-server-survival"]["restart"] == ("always" if lazy else "on-failure")
+                  assert "multi-user.target" in fixture["units"]["minecraft-server-survival"]["wantedBy"]
+                  assert ("/srv/games/minecraft/survival/lazymc.toml" in fixture["templateNames"]) == lazy
+                  assert re.search(r'survival\s*=\s*"127.0.0.1:' + str(port) + r'"', pathlib.Path(fixture["routing"]).read_text())
               assert len(data["enabled"]["gameSecrets"]) == 5
               pre = data["enabled"]["units"]["minecraft-server-survival"]["preStart"]
               assert len(pre) == 4 and "games-prechange" in pre[0] and "survival-start-pre" in pre[1] and "games-prepare" in pre[2] and "minecraft-datapacks-prepare" in pre[3]

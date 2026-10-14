@@ -33,7 +33,7 @@ export type Server = {
   worldPaths: string[];
   wakeOnJoin: boolean;
   available: boolean;
-  backup: { enabled: boolean; unit: string; command: string[] };
+  backup: { online?: boolean; enabled: boolean; unit: string; command: string[] };
   status: ServerStatus;
 };
 
@@ -320,6 +320,7 @@ function parseServer(value: unknown): Server {
     available: boolean(server.available, "server.available"),
     backup: {
       enabled: boolean(backup.enabled, "backup.enabled"),
+      online: boolean(backup.online ?? false, "backup.online"),
       unit: string(backup.unit, "backup.unit"),
       command: strings(backup.command, "backup.command"),
     },

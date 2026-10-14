@@ -32,6 +32,7 @@ class ContainerConsole(StrictModel):
 
 class Backup(StrictModel):
     enabled: bool
+    online: bool = False
     unit: str
     command: list[str]
 

@@ -43,6 +43,7 @@
             displayName = "Creative";
             hostnames = [ "creative.mc.finnrut.is" ];
             minecraft = host.config.infra.games.servers.survival.minecraft // {
+              lazymc.enable = true;
               proxyPort = 25576;
               serverPort = 25577;
               rconPort = 25585;

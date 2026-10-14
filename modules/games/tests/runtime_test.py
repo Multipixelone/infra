@@ -832,6 +832,138 @@ class RuntimeTest(unittest.TestCase):
             self.assertEqual(result["playersOnline"], 0)
             run.assert_not_called()
 
+    def test_direct_paper_never_infers_sleep_from_missing_children(self):
+        self.item["wakeOnJoin"] = False
+        with (
+            patch.object(
+                runtime,
+                "unit_state",
+                return_value={"ActiveState": "active", "MainPID": "77"},
+            ),
+            patch.object(runtime, "passive_listening", return_value=False),
+            patch.object(runtime, "process_children") as children,
+        ):
+            self.assertEqual(runtime.status(self.cfg, "survival")["state"], "running")
+        children.assert_not_called()
+
+    def test_direct_paper_stop_flushes_and_waits_for_the_main_process(self):
+        self.item["wakeOnJoin"] = False
+        self.item["console"]["port"] = 25575
+        original = Path.exists
+        observations = iter([True, False])
+
+        def exists(path):
+            return next(observations) if str(path) == "/proc/77" else original(path)
+
+        with (
+            patch.object(Path, "exists", new=exists),
+            patch.object(runtime, "listening", return_value=True),
+            patch.object(runtime, "process_children") as children,
+            patch.object(
+                runtime, "rcon", side_effect=["Saved the game", "Stopping server"]
+            ) as rcon,
+            patch.object(runtime, "wait_for_paper_exit") as child_proof,
+        ):
+            runtime.paper_stop(self.cfg, "survival", "77")
+        self.assertEqual(
+            [call.args[1] for call in rcon.call_args_list], ["save-all flush", "stop"]
+        )
+        children.assert_not_called()
+        child_proof.assert_not_called()
+        self.assertTrue(runtime.stop_proof(self.cfg, "survival")["graceful"])
+
+    def test_direct_shutdown_proof_requires_confirmation_and_normal_exit(self):
+        self.item["wakeOnJoin"] = False
+        for confirmed, result, code, exit_status, expected in (
+            (True, "success", "exited", "0", True),
+            (False, "success", "exited", "0", False),
+            (True, "success", "exited", "1", False),
+            (True, "timeout", "killed", "TERM", False),
+            (True, "oom-kill", "killed", "KILL", False),
+        ):
+            runtime.record_stop(self.cfg, "survival", confirmed)
+            with patch.dict(
+                os.environ,
+                SERVICE_RESULT=result,
+                EXIT_CODE=code,
+                EXIT_STATUS=exit_status,
+            ):
+                runtime.paper_result(self.cfg, "survival")
+            self.assertEqual(
+                runtime.stop_proof(self.cfg, "survival")["graceful"], expected
+            )
+
+    def test_save_on_recovery_fails_safe_without_holding_prestart_lock(self):
+        self.item["wakeOnJoin"] = False
+        self.cfg["backup"]["snapshotDir"] = str(self.directory / "snapshots")
+        for restart_fails in (False, True):
+            runtime.atomic_json(
+                runtime.online_recovery_path(self.cfg, "survival"),
+                {"paused": True, "invocation": "old"},
+            )
+            state = {"ActiveState": "active", "InvocationID": "old", "MainPID": "77"}
+            operations = []
+
+            def control(_cfg, tool, *args, **kwargs):
+                self.assertEqual(tool, "systemctl")
+                operations.append(args[0])
+                # Restart invokes prechange; it must be able to acquire this lock.
+                import fcntl
+
+                with (Path(self.cfg["runDir"]) / "locks/survival.lock").open(
+                    "a"
+                ) as stream:
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if args[0] == "restart":
+                    if restart_fails:
+                        raise subprocess.CalledProcessError(1, "systemctl")
+                    state["InvocationID"] = "new"
+                elif args[0] == "stop":
+                    state.update(ActiveState="inactive", MainPID="0")
+
+            with (
+                patch.object(
+                    runtime, "unit_state", side_effect=lambda *_: state.copy()
+                ),
+                patch.object(
+                    runtime, "rcon", side_effect=ConnectionError("unreachable")
+                ) as rcon,
+                patch.object(runtime.time, "sleep"),
+                patch.object(runtime, "run", side_effect=control),
+                self.assertRaisesRegex(RuntimeError, "restart or stop"),
+            ):
+                runtime.recover_online(self.cfg, "survival")
+            self.assertEqual(rcon.call_count, 3)
+            self.assertEqual(
+                operations, ["restart", "stop"] if restart_fails else ["restart"]
+            )
+            self.assertFalse(
+                runtime.online_recovery_path(self.cfg, "survival").exists()
+            )
+
+    def test_save_on_recovery_accepts_already_on_and_new_invocation(self):
+        self.cfg["backup"]["snapshotDir"] = str(self.directory / "snapshots")
+        for invocation in ("old", "new"):
+            runtime.atomic_json(
+                runtime.online_recovery_path(self.cfg, "survival"),
+                {"paused": True, "invocation": "old"},
+            )
+            with (
+                patch.object(
+                    runtime,
+                    "unit_state",
+                    return_value={"ActiveState": "active", "InvocationID": invocation},
+                ),
+                patch.object(
+                    runtime, "rcon", return_value="Saving is already turned on"
+                ) as rcon,
+            ):
+                runtime.recover_online(self.cfg, "survival")
+            self.assertEqual(rcon.call_count, int(invocation == "old"))
+            self.assertFalse(
+                runtime.online_recovery_path(self.cfg, "survival").exists()
+            )
+
     def test_no_query_status_never_connects_or_reads_rcon(self):
         with (
             patch.object(

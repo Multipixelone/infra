@@ -63,6 +63,41 @@
             );
             replacements."@FORWARDING@" = forwardingPath;
           };
+          "${dir}/server.properties" = {
+            source = toString (
+              pkgs.runCommand "${id}-server.properties"
+                {
+                  template = pkgs.writeText "${id}-server.properties.in" ''
+                    server-ip=127.0.0.1
+                    server-port=${toString s.minecraft.serverPort}
+                    online-mode=false
+                    enforce-secure-profile=false
+                    white-list=${lib.boolToString (!(backend id).discordAccessEnabled)}
+                    enforce-whitelist=${lib.boolToString (!(backend id).discordAccessEnabled)}
+                    enable-rcon=true
+                    rcon.port=${toString s.minecraft.rconPort}
+                    rcon.password=@RCON@
+                    broadcast-rcon-to-ops=false
+                    gamemode=survival
+                    difficulty=normal
+                    level-name=world
+                    spawn-protection=0
+                    max-players=${toString s.minecraft.maxPlayers}
+                    motd=${s.displayName}
+                    resource-pack=${cfg.minecraftRankPackUrl}
+                    resource-pack-sha1=@RESOURCE_PACK_SHA1@
+                    require-resource-pack=true
+                    resource-pack-prompt={"text":"This server uses a small resource pack for staff rank and Discord chat icons. Java players must accept it to join."}
+                  '';
+                }
+                ''
+                  ${pkgs.python3}/bin/python3 ${./minecraft-resource-pack.py} properties "$template" ${cfg.artifacts.games-rank-icons} "$out"
+                ''
+            );
+            replacements."@RCON@" = secretPath "games/minecraft/${id}-rcon";
+          };
+        }
+        // lib.optionalAttrs s.minecraft.lazymc.enable {
           "${dir}/lazymc.toml" = {
             source = toString (
               (pkgs.formats.toml { }).generate "${id}-lazymc.toml" {
@@ -100,39 +135,6 @@
             );
             replacements."@RCON@" = secretPath "games/minecraft/${id}-rcon";
           };
-          "${dir}/server.properties" = {
-            source = toString (
-              pkgs.runCommand "${id}-server.properties"
-                {
-                  template = pkgs.writeText "${id}-server.properties.in" ''
-                    server-ip=127.0.0.1
-                    server-port=${toString s.minecraft.serverPort}
-                    online-mode=false
-                    enforce-secure-profile=false
-                    white-list=${lib.boolToString (!(backend id).discordAccessEnabled)}
-                    enforce-whitelist=${lib.boolToString (!(backend id).discordAccessEnabled)}
-                    enable-rcon=true
-                    rcon.port=${toString s.minecraft.rconPort}
-                    rcon.password=@RCON@
-                    broadcast-rcon-to-ops=false
-                    gamemode=survival
-                    difficulty=normal
-                    level-name=world
-                    spawn-protection=0
-                    max-players=${toString s.minecraft.maxPlayers}
-                    motd=${s.displayName}
-                    resource-pack=${cfg.minecraftRankPackUrl}
-                    resource-pack-sha1=@RESOURCE_PACK_SHA1@
-                    require-resource-pack=true
-                    resource-pack-prompt={"text":"This server uses a small resource pack for staff rank and Discord chat icons. Java players must accept it to join."}
-                  '';
-                }
-                ''
-                  ${pkgs.python3}/bin/python3 ${./minecraft-resource-pack.py} properties "$template" ${cfg.artifacts.games-rank-icons} "$out"
-                ''
-            );
-            replacements."@RCON@" = secretPath "games/minecraft/${id}-rcon";
-          };
         };
       lazyPackage =
         id:
@@ -150,9 +152,16 @@
         force-key-authentication = true;
         player-info-forwarding-mode = "modern";
         forwarding-secret-file = forwardingPath;
-        servers = (lib.mapAttrs (_: s: "127.0.0.1:${toString s.minecraft.proxyPort}") servers) // {
-          try = [ cfg.defaultServer ];
-        };
+        servers =
+          (lib.mapAttrs (
+            _: s:
+            "127.0.0.1:${
+              toString (if s.minecraft.lazymc.enable then s.minecraft.proxyPort else s.minecraft.serverPort)
+            }"
+          ) servers)
+          // {
+            try = [ cfg.defaultServer ];
+          };
         forced-hosts = lib.listToAttrs (
           lib.concatLists (
             lib.mapAttrsToList (
@@ -324,9 +333,9 @@
             ];
             publicTCPPorts = (backend id).publicTCPPorts;
             publicUDPPorts = [ s.minecraft.voicechatPort ];
-            wakeOnJoin = true;
+            wakeOnJoin = s.minecraft.lazymc.enable;
             serverPort = s.minecraft.serverPort;
-            childExitFile = "/run/games/${id}/paper-exit.json";
+            childExitFile = if s.minecraft.lazymc.enable then "/run/games/${id}/paper-exit.json" else null;
             secretNames = proxySecrets ++ [ "games/minecraft/${id}-rcon" ] ++ (backend id).secretNames;
             available = ready (proxySecrets ++ [ "games/minecraft/${id}-rcon" ]);
             console = {
@@ -337,6 +346,7 @@
             };
             fingerprint = builtins.hashString "sha256" (
               builtins.toJSON {
+                lazymc = s.minecraft.lazymc.enable;
                 package = toString (paper s);
                 plugins = s.minecraft.plugins // (backend id).jars;
                 datapacks = cfg.minecraftDatapacks.backends.${id}.packs;
@@ -374,8 +384,10 @@
           }
           // lib.mapAttrs (id: s: {
             enable = cfg.runtime.${id}.available;
-            package = lazyPackage id;
-            jvmOpts = "";
+            package = if s.minecraft.lazymc.enable then lazyPackage id else paper s;
+            jvmOpts = if s.minecraft.lazymc.enable then "" else s.minecraft.jvmOpts;
+            autoStart = true;
+            restart = if s.minecraft.lazymc.enable then "always" else "on-failure";
             stopCommand = null;
             files = {
               # Paths deliberately bypass upstream's omission of empty values.
@@ -422,7 +434,9 @@
           id: s:
           lib.nameValuePair "minecraft-server-${id}" {
             enable = cfg.runtime.${id}.available;
-            environment.GAMES_PAPER_EXIT_FILE = cfg.runtime.${id}.childExitFile;
+            environment = lib.optionalAttrs s.minecraft.lazymc.enable {
+              GAMES_PAPER_EXIT_FILE = cfg.runtime.${id}.childExitFile;
+            };
             serviceConfig = {
               Slice = "games.slice";
               MemoryMax = s.memoryMax;
@@ -431,7 +445,12 @@
               IOAccounting = true;
               TimeoutStartSec = "40min";
               TimeoutStopSec = lib.mkForce 180;
-              ExecStart = lib.mkForce (lib.getExe (lazyPackage id));
+              ExecStart = lib.mkForce (
+                if s.minecraft.lazymc.enable then
+                  lib.getExe (lazyPackage id)
+                else
+                  "${lib.getExe (paper s)} ${s.minecraft.jvmOpts}"
+              );
               ExecStartPre = lib.mkMerge [
                 (lib.mkBefore [ "+${lib.getExe cfg.packages.prechange} ${id}" ])
                 (lib.mkAfter [ "+${lib.getExe cfg.packages.prepare} ${id}" ])

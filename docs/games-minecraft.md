@@ -58,7 +58,7 @@ nearest-neighbour enlargement to a 64×64 PNG24. The deliberately crunchy
 result is built rather than committed, with no dependency on the blog checkout.
 Velocity symlinks the same output to MiniMOTD's `icons/survival.png` and its
 native `server-icon.png`; MiniMOTD enables icons and selects `survival`.
-Both the MOTD and icon remain available while Paper sleeps because Velocity
+Both the MOTD and icon remain available while Paper is stopped because Velocity
 answers server-list pings. The native icon remains the fallback if MiniMOTD
 is removed.
 
@@ -78,8 +78,8 @@ counts, ping and Paper TPS/MSPT directly; PlaceholderAPI 2.12.3 exposes
 FlectonePulse AFK state. Both TAB and PlaceholderAPI share the LuckPerms
 readiness gate. PlaceholderAPI update checks and eCloud are disabled;
 FlectonePulse registers its own expansion without downloading another JAR.
-TAB starts and stops with the socket-activated backend; MiniMOTD still handles the sleeping server's
-public server-list entry. TAB is omitted when the LuckPerms credential is absent.
+TAB starts and stops with the always-on backend; MiniMOTD handles its public
+server-list entry through Velocity. TAB is omitted when the LuckPerms credential is absent.
 
 The compact static header repeats MiniMOTD's bold mauve → pink → peach
 `Finn's Survival` gradient, then `mc.finnrut.is` and online/configured maximum
@@ -107,7 +107,7 @@ That delay tolerates brief reading/inventory pauses. Position changes clear
 AFK on the next one-second poll (`radius: 0.0`); chat and other commands also
 clear AFK. Native detection does not treat looking around or inventory activity
 as movement, and stationary chatting before AFK does not reset its idle timer.
-There is no kick, sleep exemption, or change to lazymc's player count/playtime.
+There is no kick or exemption from Minecraft's sleeping/player-count rules.
 
 TAB's `%condition:afk%` checks `%flectonepulse_setting_afk_suffix%=AFK` every
 second. An unavailable expansion gives an empty marker. AFK players keep their
@@ -190,11 +190,9 @@ declares support through 26.2, with no verified 26.3 release on 2026-10-09.
 Finn chose to wait for verified compatibility. No custom border is installed,
 set, resized or enforced. Pregeneration alone does not limit exploration.
 
-Wake Paper by joining first. Keep someone connected throughout a long task:
-the existing wake-once marker only starts Paper, and neither console commands
-nor Chunksmith activity prevent lazymc's 15-minute empty-server sleep. There is no
-declarative maintenance keep-awake control in the current runtime. Do not
-disable the clean-stop guard or rely on a status ping to hold Paper awake.
+Survival runs continuously, including with no players connected. Chunksmith
+tasks can continue through idle periods; no player or status ping is needed to
+keep Paper running. Keep the clean-stop guard enabled for maintenance changes.
 
 After verifying the saved area, Finn can enter its world, shape, center and radius
 in the Survival dashboard console, verify `cs selection`, then use `cs start`
@@ -203,8 +201,8 @@ are verified. A task selection bounds that pass; it does not enforce a world bor
 or stop ordinary player exploration. There is no automatic schedule or LOD
 horizon beyond the selection.
 
-Use `cs pause` before leaving or a maintenance stop; use `cs continue` only
-after joining again and verifying the approved task. Choose other dimensions
+Use `cs pause` before a maintenance stop; use `cs continue` only after verifying
+the approved task. Leaving the game no longer stops Paper. Choose other dimensions
 explicitly rather than starting parallel tasks. Do not run `cs trim`: it deletes
 terrain outside the selection. Finn's existing operator permissions cover
 Chunksmith; friends do not receive generation/admin commands.
@@ -221,9 +219,8 @@ has four workers, six concurrent requests per IP and a 30-second stalled-write
 timeout. Monitor disk, tick time and outbound traffic before expanding an area.
 
 BlueMap reads the saved Minecraft chunks afterwards; no Chunksmith addon is
-needed for normal saved-chunk pregeneration. Its player-present pause means it
-renders when the connected player leaves, during the empty-but-awake window,
-and can need several wake windows for a large area. LOD-only no-save horizons
+needed for normal saved-chunk pregeneration. It renders while survival is empty
+and continues across idle periods, using one low-priority thread. LOD-only no-save horizons
 are not a source for BlueMap. Map configuration and existing resource budgets
 remain as declared.
 
@@ -246,8 +243,8 @@ Bedrock/Geyser players do not install these mods and continue using the normal
 gameplay connection.
 
 Survival advertises the direct **HTTP endpoint `mc.finnrut.is:25568`**, bound
-to `0.0.0.0:25568`; the NixOS firewall opens TCP only. Port 25566 belongs to
-loopback lazymc, and 25567 to loopback Paper. There is no `lod.finnrut.is`,
+to `0.0.0.0:25568`; the NixOS firewall opens TCP only. Velocity connects directly
+to loopback Paper on 25567; survival has no lazymc listener on 25566. There is no `lod.finnrut.is`,
 reverse proxy or HTTPS endpoint. The actual file path is
 `/lod/<dimension>/r.<region-x>.<region-z>.cslod`, for example
 `/lod/minecraft_overworld/r.0.0.cslod`. There is no unauthenticated directory
@@ -261,12 +258,12 @@ ignores `X-Forwarded-For`; an HTTP proxy or different IPv4/IPv6 egress address
 can therefore fail authentication. The existing DNS record is unproxied IPv4.
 Velocity's modern forwarding should provide the real player IP; no additional
 Velocity plugin is declared. **The token/IP binding and plugin-channel path
-through Velocity and lazymc still require a live client test after deployment.**
+through Velocity still require a live client test after deployment.**
 After a future manual backfill has produced at least one LOD region, test an
 authenticated download through the usual game address, wrong/missing
-token rejection, disconnect/reconnect, and sleep/wake. While Paper sleeps,
-the HTTP listener is absent and HTTP requests do not wake it: join Minecraft
-first. Test unmodified Java and Geyser joins too. Do not forward UDP 25568.
+token rejection, disconnect/reconnect, and a clean service restart. The HTTP
+listener remains present while survival is idle, but valid download tokens
+still require an online authenticated player. Test unmodified Java and Geyser joins too. Do not forward UDP 25568.
 
 ### Refreshing cached terrain
 
@@ -302,7 +299,7 @@ Pause before anyone leaves. After completion, run
 while paused and set true again before explicitly continuing that refresh.
 The declarative false value is restored at the next managed service start.
 No scheduled refresh is installed, because console activity cannot keep
-lazymc awake and installation leaves all tasks stopped.
+Paper running and installation leaves all tasks stopped.
 
 Edits may stay stale indefinitely before this procedure. After a region is
 rewritten, the server can notify connected, synchronized clients at roughly
@@ -564,7 +561,7 @@ Repeat for all six retained packs, keeping that root directory at its original
 path. This worktree's `.gcroots/` is ignored by git; deleting the worktree removes those
 local roots. On link, `system.extraDependencies` retains all six selected ZIPs
 in the installed system closure, rooted by the system profile and its retained
-generations, even while Paper sleeps. Merely evaluating or building with
+generations, even while Paper is stopped. Merely evaluating or building with
 `--no-link` does not create that installed-profile root. A store that has lost
 its roots and been garbage-collected needs the import step again. Provision
 remote builders' stores too, or explicitly transfer the required closure to
@@ -600,7 +597,7 @@ cannot establish client presentation parity.
 
 The installer writes stable `infra-*.zip` names into `world/datapacks/` as the
 Minecraft unit user, after `games-prechange`, upstream server preparation and
-`games-prepare`, before lazymc can start Paper. It copies archive bytes, so world
+`games-prepare`, before Paper starts. It copies archive bytes, so world
 backups contain usable packs rather than symlinks into a particular Nix store.
 The `.infra-managed.json` ledger also lives in that backed-up directory.
 Reconciliation is idempotent and journals both old/new hashes so interrupted
@@ -618,7 +615,7 @@ next start; a different declaration reconciles after its prechange snapshot.
 `spawn-protection=0` is generated in `server.properties`. The policy pack's
 `minecraft:load` function executes
 `gamerule minecraft:players_sleeping_percentage 50` (the current name for
-`playersSleepingPercentage`) after the world loads on every Paper wake and
+`playersSleepingPercentage`) after the world loads on every Paper start and
 `/reload`. Minecraft owns the resulting `level.dat` persistence; Nix never
 patches NBT directly. A manual gamerule change is overridden on the next load.
 The policy pack runs without a polling unit, extra wake or RCON credential.
@@ -629,7 +626,7 @@ The in-repo Grave Compass pack gives a vanilla recovery compass after a new
 death and respawn. It waits until the player is alive and their
 `minecraft.custom:minecraft.time_since_death` statistic has advanced at least
 one tick. A separate pending death counter prevents grants for historical
-deaths on first installation, and survives reconnects, wakes and `/reload`.
+deaths on first installation, and survives reconnects, restarts and `/reload`.
 The compass is named **Grave Compass**, with the lore “Points to your last
 death.” Its `minecraft:custom_data` contains `{infra_grave_compass:1b}`. An
 existing tagged recovery compass in inventory or offhand suppresses another
@@ -664,16 +661,30 @@ the archive before Paper loads it. `/reload` alone cannot install it. No
 deployment or client test is performed by the build checks, which use a
 temporary Paper world to validate functions and instantiated macros.
 
-## Sleep, map and resource budgets
+## Always-on service, map and resource budgets
 
-Velocity answers pings while Paper sleeps. BlueMap serves only static files
+Survival sets `minecraft.lazymc.enable=false`: Paper starts at boot, restarts on
+failure, and stays running when empty. New backends default to lazymc enabled;
+the wrapper, exit-proof patch and sleep/wake checks remain available. Velocity
+is the public game entry and connects to Paper at `127.0.0.1:25567`. The
+`minecraft-server-survival.socket` is a stdin console FIFO, not a TCP listener;
+it remains required by upstream console management. Shutdown/deploy uses
+`save-all flush`, `stop`, a 150-second graceful wait and a 180-second systemd
+timeout. Config templates, plugin preparation and datapack installation run
+only before Paper starts, with the existing pre-change clean-stop protection.
+
+The JVM retains `-Xms1G -Xmx4G` and the service retains `MemoryMax=6G`.
+Before this change, awake cgroup RAM over 24 hours was median 3.06 GiB and
+peak 5.23 GiB; recheck steady-state RAM after approved activation.
+
+Velocity answers pings even while Paper is stopped. BlueMap serves only static files
 through the existing Cloudflare tunnel/service-publication framework at
 `https://map.finnrut.is`; its origin is loopback nginx port 8766. Access bypass
 is justified by the intentionally public, read-only map. nginx permits GET and
 HEAD, rejects private dotfiles and directory indexes, and has read access to
 only the web subtree. Finn approved public online player names and locations
 alongside the terrain/builds. BlueMap writes `maps/<map>/live/players.json`
-every three seconds while Paper is awake; the bundled browser polls it through
+every three seconds while Paper is running; the bundled browser polls it through
 the same static nginx route. Player JSON has `Cache-Control: no-store`.
 The embedded webserver stays disabled; `live-player-markers=false` controls
 that server's live supplier, independently of the static player writer.
@@ -683,12 +694,12 @@ toggleable Offline Players layer retains logout markers and its banned,
 spectator and hidden-player exclusions. No map request wakes Paper.
 
 BlueMap renders to `plugins/BlueMap/web/maps` using file storage and client-side
-compression handling. A single low-priority render thread runs while Paper is
-awake and empty, with a 60-second update cooldown. Rendering pauses with any
-player online and stops when lazymc sleeps after its existing 15-minute idle
-period. No timer wakes Paper to render; large new areas can take several idle
-windows. Wake the server once and allow its initial render before expecting a
-working public map. Previously rendered tiles remain viewable during sleep.
+compression handling. A single render thread at Java priority 1 runs while Paper is
+running and empty (`player-render-limit=1` pauses it while players are online).
+The update cooldown remains 60 seconds. The
+`full-update-interval=1440` fallback checks for missed changes daily without
+re-rendering every unchanged chunk. Allow the initial render to finish before
+expecting a complete public map; existing tiles remain viewable during stops.
 
 The exact vanilla 26.3 client asset JAR is preseeded through Nix with downloads
 disabled. BlueMap may still request Mojang version metadata; cached assets let
@@ -699,17 +710,18 @@ Skin downloads remain enabled for player heads; BlueMap telemetry is disabled.
 Paper retains `-Xms1G -Xmx4G` and MemoryMax 6G; Velocity retains a 512M maximum
 heap and MemoryMax 1G. With vane deferred, these are conservative initial
 budgets, not measured capacity guarantees. Monitor the existing games memory
-panels, wake duration and BlueMap queue after deployment before increasing
+panels, startup duration and BlueMap queue after deployment before increasing
 concurrency or memory. Rendering can still consume one CPU core and write many
-tiles; low thread priority and pausing while occupied protect gameplay. The
+tiles; one render thread and low thread priority limit its resource use. The
 existing games slice CPU/IO accounting and weights remain in effect. Avoid a
 whole-Paper CPU quota that would throttle its tick thread.
 
-The 300-second Paper startup timeout, 25-second held join and existing clean
-stop limits remain unchanged. A cold first wake can require a client retry;
+Optional lazymc backends retain their 300-second startup timeout and 25-second
+held join. Direct survival keeps the 40-minute pre-start preparation budget
+and existing clean-stop limits; it has no held-join wrapper. A cold first start can require a client retry;
 there are no new network dependency downloads on that path. Use Paper's
 [bundled spark](https://docs.papermc.io/paper/profiling/) when investigating slow
-wakes or ticks; no duplicate profiler is installed.
+starts or ticks; no duplicate profiler is installed.
 
 ## Permissions setup and backups
 
@@ -729,7 +741,7 @@ are hash-pinned; relocation happens during the Nix build and both platforms use
 an immutable preseeded cache. Automatic translation downloads are disabled.
 LuckPerms' SQL messaging queue supports MySQL/MariaDB, not PostgreSQL: this
 single-proxy arrangement uses `pluginmsg` plus a one-minute database sync.
-Permissions load from the shared database when Paper wakes.
+Permissions load from the shared database when Paper starts.
 
 A deterministic gzip export, `bootstrap.json.gz`, declares the `staff` track in
 order `default → builder → mod → admin`. `builder` inherits `default`; `mod`
@@ -880,7 +892,7 @@ and Builder a gold hammer; default players have no badge. The original 9px pixel
 grids in `modules/games/rank-icons.json` generate the PNGs and ZIP reproducibly.
 The pinned 26.3 client supplies resource-pack format 97.1. Nix computes the ZIP's
 SHA-1 when building `server.properties`, and nginx serves its versioned URL from
-`https://map.finnrut.is/packs/` even while Paper sleeps. Declining the required
+`https://map.finnrut.is/packs/` even while Paper is stopped. Declining the required
 pack, or failing to download it, prevents a Java player from joining.
 
 LuckPerms prefixes contain MiniMessage translation components with explicit text
@@ -901,7 +913,7 @@ glyphs do not enter Discord-bound formatting.
 
 Deploying updated files does not reconcile LuckPerms' PostgreSQL nodes. For the
 declared groups/users, apply the new prefixes with the existing approved
-replacement import after Paper wakes:
+replacement import after Paper starts:
 
 ```fish
 sudo games-console survival 'lp import bootstrap.json.gz --replace'
@@ -941,10 +953,10 @@ The BlueMap hook publishes **public** homes and warps as marker sets.
 The home delimiter is `:` instead of `.` because Floodgate names start with
 `.`: e.g. `/phome .BedrockFriend:base`. Private homes stay private. Publishing
 exposes the name/location on the public map at `map.finnrut.is`. BlueMap writes
-home/warp marker sets every 30 seconds while Paper is awake, independently of
+home/warp marker sets every 30 seconds while Paper is running, independently of
 the three-second online player feed. HuskHomes clears its marker sets when
-disabled, so home/warp markers can disappear during lazymc sleep; they
-repopulate on wake. The static terrain map remains viewable throughout.
+disabled, so home/warp markers can disappear during maintenance; they
+repopulate after Paper starts. The static terrain map remains viewable throughout.
 Admins create warps with `/setwarp <name>`; regular friends can list/use them.
 
 HuskHomes' six declared driver/Redis dependencies load unconditionally, even
@@ -985,20 +997,43 @@ and `/back` does not return to the new death point. Check `/graves tp`,
 `/axgraves tp` and clicking a grave listing are denied, including as admin after
 reapplying the bootstrap. For graves, die with items/XP, deny another friend's
 access, walk back and recover as owner/mod, then cleanly stop
-and wake Paper and recover a still-filled grave. These are operator smoke tests;
+and start Paper and recover a still-filled grave. These are operator smoke tests;
 the Nix checks do not claim a live client integration test.
 
-Mutable backend plugin directories are included with world snapshot roots in
-the existing clean-stop backup. JAR/cache symlinks do not replace the pinned
-Nix artifacts. Initial plugin/asset directories can make the existing guard
-conservatively require a verified Paper shutdown before a snapshot: wake and
-cleanly stop Paper once rather than bypassing that guard. Neither `runtime.py`
-nor `tmodloader.nix` is changed by this feature.
+Mutable backend plugin directories remain included with world snapshot roots.
+For active always-on Paper, game backups briefly issue `save-off`, confirm
+`save-all flush`, take a read-only snapshot of the existing `/srv` Btrfs
+subvolume, then issue `save-on` **before** restic uploads. A private mount
+namespace exposes the frozen view at the original paths, preserving restores.
+Snapshots live temporarily under root-owned `/srv/.games-backup-snapshots` and
+are removed after success or failure. Backups refuse roots in other/nested
+subvolumes rather than silently omit data. No filesystem migration is required.
+
+An intent record is persisted before `save-off`. Errors, lost replies and
+cancellation retry `save-on`; ExecStopPost and a boot/30-second recovery timer
+also recover interrupted attempts. If saving cannot be acknowledged, recovery
+restarts Paper, or stops it if restart fails, so it cannot keep running with
+saving disabled. That exceptional recovery interrupts players and reports a
+failed backup. Healthy online backups preserve connections and the invocation.
+
+SQLite databases and their WAL/journal files share the frozen disk view.
+Plugin state has its existing persistence interval (AxGraves saves every 30
+seconds); this is a persisted-state snapshot, not a transaction across every
+plugin. Stopped servers, optional lazymc backends and Terraria keep clean-stop
+backups. Configuration/datapack changes still require the pre-change verified
+clean-stop snapshot. JAR/cache symlinks do not replace pinned Nix artifacts.
+
+Backup enablement is unchanged: initialize the NAS repository and configure
+`gameServers.backup.enable` before using `sudo games-backup survival`. After
+approved deployment, run the first configured online backup manually and
+verify its completion, saving-enabled response, cleanup and a restore into a
+separate directory before relying on the schedule. Builds never run a real
+world backup; the Btrfs/Restic restore check uses a disposable VM filesystem.
 
 The existing server backup additionally covers proxy SkinsRestorer/LuckPerms
 state and an atomic PostgreSQL custom-format dump under
 `/var/backup/games-luckperms`. That shared/proxy backup is separate from the
-world's clean-stop snapshot; there is no cross-service point-in-time guarantee.
+world's snapshot; there is no cross-service point-in-time guarantee.
 Restore permissions deliberately alongside a world restore. Plugin snapshots
 can contain private configuration and must stay in encrypted backups; supply
 current agenix credentials again rather than relying on restored credentials.
@@ -1016,7 +1051,7 @@ allows a directly exposed backend with `voice_host` when no proxy plugin is
 used. This is the selected arrangement for the single backend. Do not install
 the unverified proxy alpha merely for this topology. Java clients need the
 matching Simple Voice Chat client mod. Voice chat is optional, and Bedrock
-clients cannot use that Java mod. Joining Minecraft wakes Paper; UDP voice
+clients cannot use that Java mod. Survival runs continuously; UDP voice
 packets alone do not.
 
 ## Discord operator steps
@@ -1025,9 +1060,11 @@ Classic DiscordSRV is chosen over [Ascension](https://github.com/DiscordSRV/Asce
 classic has a released 26.3 build, while no suitable published Ascension release
 was verified. Ascension's proxy architecture could keep a bot connected during
 sleep, but death/advancement events would still need a backend integration.
-Classic disconnects while Paper sleeps, announces that Survival is resting, and
-reconnects after a Minecraft join wakes it. Discord messages during sleep are
-not queued and do not wake Paper. This is the accepted tradeoff.
+Classic remains connected while always-on survival is idle. Its status card and
+channel topic reflect running, starting, stopped, disabled or failed states;
+normal idle time is not announced as resting. Optional lazymc backends retain
+the resting/wake behavior. Maintenance stops disconnect the bot, and Discord
+messages sent during that outage are not queued.
 
 Finn already has a bot. Configure its token separately as
 `games/minecraft/discordsrv-token.age` in the secrets repository, with the
@@ -1081,7 +1118,7 @@ permission is needed. Presence, chat-channel console commands, topic edits and
 nickname/ban synchronization remain disabled. Mandatory account linking is
 enabled for Survival as described below. Join/leave, first join,
 death, advancement and bidirectional chat messages are enabled. Test them after
-the first configured wake. Confirm token permissions remain private and neither
+the first configured start. Confirm token permissions remain private and neither
 configuration nor logs expose it.
 
 Create Discord roles **Mod (purple)** and **Admin (green)**. Colours are set in
@@ -1183,11 +1220,11 @@ For a new player:
 2. Join `mc.finnrut.is`. An unlinked player is disconnected with a friendly
    short message: **Post CODE in #mc-link or DM BOT to join.** Join
    **[Finn's Discord](https://discord.gg/hHurpHK8RT)** if needed; the short kick
-   prompt contains no invite URL. A cold Paper wake can
+   prompt contains no invite URL. A Paper restart can
    require another connection attempt before the bot is ready.
 3. **Post just the displayed code in #mc-link or DM the bot** from the Discord
-   account you want linked. Paper must still be awake to redeem it.
-   If it has slept, join Minecraft again to wake it and obtain another code.
+   account you want linked. Paper must be running to redeem it.
+   After a maintenance restart, join Minecraft again to obtain another code.
 4. In DMs, wait for the bot's confirmation. In `#mc-link`, wait for the Minecraft
    channels to appear and the linking channel to disappear, then rejoin Minecraft. `/discord linked`
    checks the association once you are in game. Finn can also use `/discord link`
@@ -1327,8 +1364,8 @@ The whitelist is exactly `list` and `tps`, with
 `DiscordConsoleChannelBlacklistActsAsWhitelist = true`; no other command names
 are allowed. Bot commands and command execution from the chat channel are
 disabled. INFO/WARN/ERROR Paper logs are forwarded every five seconds. Treat
-these logs as private. Forwarding and diagnostics stop while Paper sleeps, and
-Discord commands cannot wake Paper.
+these logs as private. Forwarding and diagnostics stop during maintenance; Discord commands do not
+start a stopped Paper service.
 
 ## Metrics
 

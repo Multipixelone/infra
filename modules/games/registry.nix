@@ -35,6 +35,11 @@ let
           default = true;
         };
         minecraft = {
+          lazymc.enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Run this backend through lazymc and sleep when idle; false runs Paper continuously.";
+          };
           version = mkOption {
             type = types.str;
             default = "26.3";
@@ -248,6 +253,7 @@ in
         survival = {
           game = "minecraft-paper";
           displayName = "Survival";
+          minecraft.lazymc.enable = false;
           minecraft.whitelist.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.operators.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.discord = {
