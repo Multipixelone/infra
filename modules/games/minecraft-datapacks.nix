@@ -4,6 +4,10 @@ let
 in
 {
   gitignore = [ "/modules/games/datapacks/*.zip" ];
+  perSystem.treefmt.settings.global.excludes = [
+    "modules/games/datapacks/grave-compass/**/*.mcfunction"
+    "modules/games/datapacks/grave-compass/pack.mcmeta"
+  ];
   # requireFile marks manual inputs unfree; allow only this declared selection.
   nixpkgs.config.allowUnfreePackages = map (pack: pack.id) sources.packs;
   flake.modules.nixos.games-minecraft =
@@ -59,6 +63,20 @@ in
         ${pkgs.python3}/bin/python3 ${./minecraft-datapacks.py} build \
           ${pkgs.writeText "survival-world-policy-files.json" (builtins.toJSON policyFiles)} "$out"
       '';
+      packFiles =
+        directory:
+        lib.listToAttrs (
+          map (
+            path:
+            lib.nameValuePair (lib.removePrefix "${toString directory}/" (toString path)) (
+              builtins.readFile path
+            )
+          ) (lib.filesystem.listFilesRecursive directory)
+        );
+      graveCompass = pkgs.runCommand "grave-compass-26.3.zip" { } ''
+        ${pkgs.python3}/bin/python3 ${./minecraft-datapacks.py} build \
+          ${pkgs.writeText "grave-compass-files.json" (builtins.toJSON (packFiles ./datapacks/grave-compass))} "$out"
+      '';
       installer = pkgs.writeScript "minecraft-datapacks-prepare" ''
         #!${pkgs.python3}/bin/python3
         import runpy
@@ -89,9 +107,11 @@ in
         # The installed system profile roots the inputs even when Paper is asleep.
         system.extraDependencies = lib.attrValues vanillaTweaks;
         infra.games.artifacts.games-minecraft-world-policy = policy;
+        infra.games.artifacts.games-minecraft-grave-compass = graveCompass;
         infra.games.minecraftDatapacks.backends = lib.mapAttrs (_: _: {
           packs = vanillaTweaks // {
             world-policy = policy;
+            grave-compass = graveCompass;
           };
           inventory =
             map (pack: {
@@ -101,6 +121,11 @@ in
             ++ [
               {
                 name = "Survival World Policy";
+                version = "26.3 / 1";
+                installed = true;
+              }
+              {
+                name = "Grave Compass";
                 version = "26.3 / 1";
                 installed = true;
               }

@@ -438,6 +438,47 @@ next start; a different declaration reconciles after its prechange snapshot.
 patches NBT directly. A manual gamerule change is overridden on the next load.
 The policy pack runs without a polling unit, extra wake or RCON credential.
 
+### Grave compass
+
+The in-repo Grave Compass pack gives a vanilla recovery compass after a new
+death and respawn. It waits until the player is alive and their
+`minecraft.custom:minecraft.time_since_death` statistic has advanced at least
+one tick. A separate pending death counter prevents grants for historical
+deaths on first installation, and survives reconnects, wakes and `/reload`.
+The compass is named **Grave Compass**, with the lore “Points to your last
+death.” Its `minecraft:custom_data` contains `{infra_grave_compass:1b}`. An
+existing tagged recovery compass in inventory or offhand suppresses another
+grant; a crafted recovery compass does not. The native item always follows
+the holder's latest `LastDeathLocation`.
+
+The pack clears only tagged recovery compasses when their holder comes within
+three blocks of their recorded death coordinates, in the same dimension.
+Graves never expire (`despawn-time-seconds=-1`, `grave-limit=-1`), so there is
+no timeout-based removal. LastDeathLocation is the source of truth: if
+AxGraves relocates a grave to a safe spot after a lava or void death, the
+compass points to the death spot instead. It spins normally in another
+dimension. Storing or discarding it does not trigger a replacement until
+another death and respawn.
+
+Death-time cleanup is intentionally omitted. AxGraves 1.32.1 copies and clears
+the drops synchronously inside `PlayerDeathEvent`, before a datapack tick can
+reliably clear the old item. An old compass can therefore remain in a grave;
+the next respawn still receives a fresh one. The datapack never edits grave
+contents or removes nearby dropped items.
+
+Pinned Geyser 2.11.3 build 1249 maps `minecraft:recovery_compass` directly to
+Bedrock's native item and translates the Java respawn packet's last-death
+position, dimension and has-died metadata. This supports the ordinary
+Bedrock recovery compass without extra mappings or resource packs. Grant and
+cleanup run on Paper for both clients; client rendering still needs a Java
+and Bedrock smoke test after an authorized deployment.
+
+Deploying this pack requires restarting `minecraft-server-survival` through
+the normal approved activation gate: the stopped-server installer must copy
+the archive before Paper loads it. `/reload` alone cannot install it. No
+deployment or client test is performed by the build checks, which use a
+temporary Paper world to validate functions and instantiated macros.
+
 ## Sleep, map and resource budgets
 
 Velocity answers pings while Paper sleeps. BlueMap serves only static files

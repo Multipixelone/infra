@@ -25,15 +25,28 @@ let
     sources = builtins.fromJSON (builtins.readFile ./datapacks/sources.json);
     retainedInputs = map toString cfg.system.extraDependencies;
     metadataFiles = builtins.attrNames (builtins.readDir ./datapacks);
+    serverVersion = cfg.infra.games.servers.survival.minecraft.version;
     inherit packs;
   };
 in
 {
   perSystem = { pkgs, ... }: {
     checks.games-minecraft-world =
+      let
+        # Paper's META-INF/download-context pins these exact bootstrap bytes.
+        # Preseed its cache so the temporary parser check needs no network.
+        vanillaServer = pkgs.fetchurl {
+          name = "minecraft-server-26.3.jar";
+          url = "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar";
+          sha256 = "d052f14d7a173734fba553711e5b570162e2f2a313267ee31a21b975a679be64";
+        };
+      in
       pkgs.runCommand "games-minecraft-world-check"
         {
-          nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
+          nativeBuildInputs = [
+            (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
+            pkgs.jdk25_headless
+          ];
         }
         ''
           export PYTHONDONTWRITEBYTECODE=1
@@ -41,6 +54,10 @@ in
           python3 ${./tests/minecraft_world_test.py} \
             ${pkgs.writeText "minecraft-world-fixture.json" (builtins.toJSON fixture)} \
             ${cfg.infra.games.artifacts.games-chunky}
+          python3 ${./tests/minecraft_grave_compass_test.py} \
+            ${packs.packs.grave-compass} \
+            ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \
+            ${vanillaServer}
           touch "$out"
         '';
   };
