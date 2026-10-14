@@ -1108,14 +1108,41 @@ templates have no channel selector. Deaths and advancements use distinct
 `deaths`/`awards` routes and fall back to the first channel, `global`, here.
 Server startup/shutdown messages also remain in chat.
 
+The bot displays **Playing mc.finnrut.is · N online**, keeping the address and
+live Minecraft count in one activity. `DiscordGameStatus` is
+`playing mc.finnrut.is · %online% online`; `StatusUpdateRateInMinutes = 1`
+refreshes it once a minute. The pinned JAR's `PresenceUpdater` expands `%online%`
+from visible online Minecraft players, excluding players hidden by supported
+vanish hooks. It supports playing, watching, listening to, competing, custom
+statuses without a prefix, and lists that rotate, but this server uses one
+playing activity. No PlaceholderAPI expansion is needed for this count.
+
+`EnablePresenceInformation = false` remains deliberate. In the pinned JAR
+(manifest revision `da9e027f7acd76e0f91d53a11e5b53832ac36e92`),
+[startup requests `GUILD_PRESENCES` and activity/client-status caches only when
+that option is enabled](https://github.com/DiscordSRV/DiscordSRV/blob/da9e027f7acd76e0f91d53a11e5b53832ac36e92/src/main/java/github/scarsz/discordsrv/DiscordSRV.java#L808).
+Those support DiscordSRV placeholders about Discord members' status and games;
+neither native `%online%` nor normal PlaceholderAPI substitution needs them.
+PlaceholderAPI status expansion runs without a player context, so any future
+placeholder must have an installed expansion that supports that context.
+Enabling presence information also requires the **Presence Intent** enabled
+and authorized in the Developer Portal: otherwise Discord closes the gateway
+with [code 4014](https://docs.discord.com/developers/events/gateway#privileged-intents)
+and the pinned `DiscordDisconnectListener` disables DiscordSRV.
+
+A Minecraft game icon cannot be configured for this activity. Discord allows
+bots to set only activity name, state, type and URL, excluding application IDs
+and Rich Presence assets; the playing text does not supply a game icon.
+See [Discord's activity contract](https://docs.discord.com/developers/events/gateway-events#activity-object).
+
 Enable **Message Content** and **Server Members** privileged intents. Grant
 **View Channel**, **Send Messages**, **Read Message History** and **Embed Links**
 in the chat and events channels. Make the events channel read-only to ordinary
 members so it remains a bot event feed. Grant the bot **Manage Roles** for rank
 synchronization; its invite permission bit is `268435456` (OR it with the
 existing permission integer when updating an invite). No Administrator
-permission is needed. Presence, chat-channel console commands, topic edits and
-nickname/ban synchronization remain disabled. Mandatory account linking is
+permission is needed. Member presence information, chat-channel console commands,
+topic edits and ban synchronization remain disabled. Mandatory account linking is
 enabled for Survival as described below. Join/leave, first join,
 death, advancement and bidirectional chat messages are enabled. Test them after
 the first configured start. Confirm token permissions remain private and neither

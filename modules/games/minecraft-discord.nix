@@ -193,7 +193,9 @@
                   Experiment_JdbcAccountLinkBackend = "";
                   UseModernPaperChatEvent = true;
                   EnablePresenceInformation = false;
-                  DiscordGameStatus = "playing mc.finnrut.is";
+                  # Native %online% counts visible Minecraft players without a presence intent.
+                  DiscordGameStatus = "playing mc.finnrut.is · %online% online";
+                  StatusUpdateRateInMinutes = 1;
                   Experiment_WebhookChatMessageDelivery = true;
                   Experiment_WebhookChatMessageUsernameFormat = "%displayname%";
                   Experiment_WebhookChatMessageFormat = "%message%";

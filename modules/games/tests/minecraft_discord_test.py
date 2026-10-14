@@ -15,6 +15,21 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
     message_defaults = yaml.safe_load(jar.read("messages/en.yml"))
     synchronization_defaults = yaml.safe_load(jar.read("synchronization/en.yml"))
     linking_defaults = yaml.safe_load(jar.read("linking/en.yml"))
+    presence_updater = jar.read(
+        "github/scarsz/discordsrv/objects/threads/PresenceUpdater.class"
+    )
+    # The pinned updater expands native Minecraft counts and PAPI independently
+    # of the gateway intent used to receive Discord members' presence data.
+    for symbol in (
+        b"%online%",
+        b"getOnlinePlayers",
+        b"replacePlaceholders",
+        b"playing",
+        b"StatusUpdateRateInMinutes",
+    ):
+        assert symbol in presence_updater
+    assert b"EnablePresenceInformation" not in presence_updater
+    assert b"GUILD_PRESENCES" not in presence_updater
     nickname_updater = jar.read(
         "github/scarsz/discordsrv/objects/threads/NicknameUpdater.class"
     )
@@ -172,7 +187,10 @@ for case in cases:
         supported(configuration, discord_defaults)
         supported(messages, message_defaults)
         assert configuration["BotToken"] == ""
-        assert configuration["DiscordGameStatus"] == "playing mc.finnrut.is"
+        assert configuration["DiscordGameStatus"] == (
+            "playing mc.finnrut.is · %online% online"
+        )
+        assert configuration["StatusUpdateRateInMinutes"] == 1
         assert configuration["EnablePresenceInformation"] is False
         assert configuration["Experiment_WebhookChatMessageDelivery"] is True
         assert (
