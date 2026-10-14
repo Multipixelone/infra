@@ -344,6 +344,7 @@ with tempfile.TemporaryDirectory() as directory:
                     "luckperms",
                     "flectonepulse",
                     "log4jApi",
+                    "log4jCore",
                     "discordsrv",
                     "geyser",
                     "tab",
@@ -356,6 +357,7 @@ with tempfile.TemporaryDirectory() as directory:
         "ResolveCarbon",
         "ReadCarbon",
         "CheckCarbonBridge",
+        "CheckDiscordFormats",
         "CheckNicknames",
         "ResolveFlectone",
         "ReadTab",
@@ -455,6 +457,19 @@ with tempfile.TemporaryDirectory() as directory:
             check=True,
         )
     subprocess.run(["java", "-cp", classpath, "CheckCarbonBridge"], check=True)
+    discord_templates = fixtures["withDiscord"]["backends"]["survival"]["templates"]
+    subprocess.run(
+        [
+            "java",
+            "-cp",
+            classpath,
+            "CheckDiscordFormats",
+            artifacts["discordsrv"],
+            discord_templates[f"{template_dir}/DiscordSRV/config.yml"]["source"],
+            discord_templates[f"{template_dir}/DiscordSRV/messages.yml"]["source"],
+        ],
+        check=True,
+    )
     (root / "libraries").symlink_to(
         artifacts["flectonepulseCache"], target_is_directory=True
     )

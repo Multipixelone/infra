@@ -153,6 +153,28 @@ for case in cases:
         )
         assert configuration["Experiment_WebhookChatMessageAvatarFromDiscord"] is False
         assert configuration["AvatarUrl"] == ""
+        for key in (
+            "DiscordToMinecraftChatMessageFormat",
+            "DiscordToMinecraftChatMessageFormatNoRole",
+        ):
+            incoming = messages[key]
+            assert (
+                "<white><hover:show_text:'Discord'>[Discord]</hover></white>"
+                in incoming
+            )
+            assert "%name%" in incoming and "%reply%" in incoming
+            assert "<#cba6f7>" in incoming
+            assert "<#a6adc8>›</#a6adc8>" in incoming
+            assert "<#cdd6f4>%message%</#cdd6f4>" in incoming
+            assert "%username%" not in incoming and "%toprolecolor%" not in incoming
+        assert (
+            "<hover:show_text:'Discord role: %toprole%'>"
+            in messages["DiscordToMinecraftChatMessageFormat"]
+        )
+        assert "%toprole%" not in messages["DiscordToMinecraftChatMessageFormatNoRole"]
+        assert messages["DiscordToMinecraftMessageReplyFormat"] == (
+            " <#a6adc8>(replying to %name%)</#a6adc8>"
+        )
         assert configuration["DiscordChatChannelAllowedMentions"] == []
         assert configuration["DiscordChatChannelBlockBots"] is True
         assert configuration["DiscordChatChannelBlockWebhooks"] is True
