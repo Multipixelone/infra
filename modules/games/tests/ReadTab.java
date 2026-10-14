@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,9 +28,14 @@ import me.neznamy.tab.shared.features.sorting.SortingConfiguration;
 import me.neznamy.tab.shared.features.sorting.types.PlaceholderHighToLow;
 import me.neznamy.tab.shared.features.sorting.types.SortingType;
 import me.neznamy.tab.shared.hook.LuckPermsHook;
+import me.neznamy.tab.shared.features.PlaceholderManagerImpl;
+import me.neznamy.tab.shared.platform.TabPlayer;
+import me.neznamy.tab.shared.placeholders.conditions.ConditionsSection;
+import me.neznamy.tab.shared.placeholders.conditions.ConditionalExpression;
 import me.neznamy.tab.shared.placeholders.PlaceholderReference;
 import me.neznamy.tab.shared.placeholders.PlaceholderReplacementPattern;
 import me.neznamy.tab.shared.placeholders.types.ServerPlaceholderImpl;
+import me.neznamy.tab.shared.placeholders.types.PlayerPlaceholderImpl;
 import me.neznamy.tab.shared.placeholders.types.TabPlaceholder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -95,6 +101,23 @@ public class ReadTab {
         var configs = empty(Configs.class); set(Configs.class, configs, "config", config);
         var tab = empty(TAB.class); set(TAB.class, tab, "configuration", configs);
         set(TAB.class, null, "instance", tab);
+        set(TAB.class, tab, "platform", ReadCarbon.stub(me.neznamy.tab.shared.platform.Platform.class,
+            (method, values) -> method.equals("detectAdditionalPlaceholders") ? List.of() : null));
+        set(TAB.class, tab, "onlinePlayers", new TabPlayer[0]);
+        String afkIdentifier = "%flectonepulse_setting_afk_suffix%";
+        var afkValue = empty(PlayerPlaceholderImpl.class);
+        set(TabPlaceholder.class, afkValue, "identifier", afkIdentifier);
+        set(TabPlaceholder.class, afkValue, "replacements", PlaceholderReplacementPattern.EMPTY);
+        var afkReference = new PlaceholderReference(afkIdentifier, afkValue);
+        afkValue.setReference(afkReference);
+        var placeholders = empty(PlaceholderManagerImpl.class);
+        set(PlaceholderManagerImpl.class, placeholders, "registeredPlaceholders",
+            new HashMap<>(Map.of(afkIdentifier, afkReference)));
+        set(TAB.class, tab, "placeholderManager", placeholders);
+        var afkDefinition = ConditionsSection.fromSection(yaml.getConfigurationSection("conditions")).getConditions().get("afk");
+        var afkExpression = ConditionalExpression.compile(afkDefinition.getConditions().getFirst());
+        var viewer = empty(BukkitTabPlayer.class);
+        set(TabPlayer.class, viewer, "lastPlaceholderReturnedValues", new HashMap<>(Map.of(afkValue, "AFK")));
         var header = HeaderFooterConfiguration.fromSection(yaml.getConfigurationSection("header-footer"));
         ReadCarbon.require(header.getDesigns().size() == 1, "Unexpected header design");
         var sorting = SortingConfiguration.fromSection(yaml.getConfigurationSection("scoreboard-teams"));
@@ -142,6 +165,9 @@ public class ReadTab {
             var lp = ReadCarbon.stub(LuckPerms.class, (method, a) -> method.equals("getGroupManager") ? manager : context);
             set(LuckPermsProvider.class, null, "instance", lp);
             var player = empty(BukkitTabPlayer.class); player.luckPermsUser = user;
+            var returned = new HashMap<me.neznamy.tab.api.placeholder.PlayerPlaceholder, String>();
+            set(TabPlayer.class, player, "lastPlaceholderReturnedValues", returned);
+            set(TabPlayer.class, player, "lastPlaceholderEvaluatedValues", returned);
             var hook = LuckPermsHook.getInstance();
             ReadCarbon.require(hook.getWeight(player) == weight, "LuckPerms weight hook mismatch");
             set(ServerPlaceholderImpl.class, value, "lastReturnedValue", Integer.toString(hook.getWeight(player)));
@@ -167,6 +193,30 @@ public class ReadTab {
             }
             ReadCarbon.require(bedrockText.codePoints().noneMatch(cp -> cp >= 0xe000 && cp <= 0xf8ff), "TAB PUA leaked to Bedrock");
             ReadCarbon.require(ReadCarbon.checkText(transported, null, name, expected), "TAB transport lost rank name color");
+            for (String state : new String[]{"", "AFK", afkIdentifier, "<ERROR>"}) {
+                returned.put(afkValue, state);
+                boolean isAfk = state.equals("AFK");
+                ReadCarbon.require(afkExpression.isMet(viewer, player) == isAfk, "AFK condition used viewer state or an unresolved expansion");
+                String suffix = isAfk ? afkDefinition.getYes() : afkDefinition.getNo();
+                String suffixFormat = groups.getProperty(rank, "tabsuffix", null, null)[0];
+                ReadCarbon.require(suffixFormat.equals("%condition:afk%"), "Rank lost TAB suffix inheritance");
+                var afkRendered = render(hook.getPrefix(player) + format + suffixFormat.replace("%condition:afk%", suffix));
+                ReadCarbon.require(plain(afkRendered).endsWith(name + (isAfk ? " AFK" : "")), "AFK list suffix failed to render");
+                ReadCarbon.require(ReadCarbon.checkText(afkRendered, null, name, expected), "AFK changed rank name color");
+                if (isAfk) ReadCarbon.require(ReadCarbon.checkText(afkRendered, null, "AFK", TextColor.fromHexString("#a6adc8")), "AFK suffix is not muted");
+                String tagFormat = groups.getProperty(rank, "tagsuffix", null, null)[0];
+                var nametag = render(name + tagFormat.replace("%condition:afk%", suffix));
+                ReadCarbon.require(plain(nametag).equals(name + (isAfk ? " AFK" : "")), "AFK nametag suffix failed to render");
+                // Geyser formats overhead names through Team.displayName, even
+                // though this build ignores Java list display-name updates.
+                var bedrockTeam = empty(org.geysermc.geyser.scoreboard.Team.class);
+                set(org.geysermc.geyser.scoreboard.Team.class, bedrockTeam, "prefix", "");
+                set(org.geysermc.geyser.scoreboard.Team.class, bedrockTeam, "suffix",
+                    net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection().serialize(render(suffix)));
+                String bedrockTag = bedrockTeam.displayName(name);
+                ReadCarbon.require(plain(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection().deserialize(bedrockTag))
+                    .equals(name + (isAfk ? " AFK" : "")), "Geyser overhead AFK suffix failed");
+            }
             // A coloured Bukkit display name overrides the rank colour; the
             // reset after it keeps the rest of TAB's presentation independent.
             String nickname = "§x§5§5§a§a§f§fFinn";
@@ -175,6 +225,9 @@ public class ReadTab {
             var nickRendered = render(hook.getPrefix(player) + nickFormat);
             ReadCarbon.require(plain(nickRendered).endsWith("Finn"), "TAB did not render the nickname");
             ReadCarbon.require(ReadCarbon.checkText(nickRendered, null, "Finn", TextColor.fromHexString("#55aaff")), "TAB lost nickname colour");
+            var afkNick = render(hook.getPrefix(player) + nickFormat + afkDefinition.getYes());
+            ReadCarbon.require(plain(afkNick).endsWith("Finn AFK"), "Nickname lost AFK suffix");
+            ReadCarbon.require(ReadCarbon.checkText(afkNick, null, "Finn", TextColor.fromHexString("#55aaff")), "AFK changed nickname colour");
             for (String testPrefix : new String[]{prefix, "&d◆&r ", "<green>★</green> "}) {
                 livePrefix[0] = testPrefix;
                 var rendered = render(hook.getPrefix(player) + format);

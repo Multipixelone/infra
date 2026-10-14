@@ -57,6 +57,14 @@
             "carbon.nickname.tags.*"
             "carbon.nickname.filter"
           ];
+      # Installing PlaceholderAPI must not turn literal Carbon chat into
+      # placeholder input, including for admins with the existing * grant.
+      chatPlaceholderRestrictions = [
+        {
+          key = "carbon.chatplaceholders";
+          value = false;
+        }
+      ];
       # Deny each rank explicitly so op defaults and admin's * cannot grant
       # grave teleporting. Leave normal HuskHomes /back permissions alone.
       deathReturnRestrictions =
@@ -194,6 +202,7 @@
               ]
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
+            ++ chatPlaceholderRestrictions
             ++ deathReturnRestrictions
             ++ joinLeaveRestrictions
             ++ [
@@ -224,6 +233,7 @@
           builder.nodes =
             grants builderPermissions
             ++ rankNodes "builder"
+            ++ chatPlaceholderRestrictions
             ++ deathReturnRestrictions
             ++ joinLeaveRestrictions;
           mod.nodes =
@@ -248,6 +258,7 @@
               ]
             ++ grants polishPermissions.mod
             ++ rankNodes "mod"
+            ++ chatPlaceholderRestrictions
             ++ deathReturnRestrictions
             ++ joinLeaveRestrictions;
           admin.nodes = [
@@ -262,6 +273,7 @@
           ]
           ++ rankNodes "admin"
           ++ nicknameRestrictions
+          ++ chatPlaceholderRestrictions
           ++ deathReturnRestrictions
           ++ joinLeaveRestrictions
           ++ grants [

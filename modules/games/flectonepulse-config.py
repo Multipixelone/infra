@@ -1,4 +1,4 @@
-"""Generate event-only configuration from the pinned plugin's complete schema."""
+"""Generate event and AFK configuration from the pinned plugin's complete schema."""
 import io
 import json
 import re
@@ -56,6 +56,21 @@ for event in ("join", "quit"):
 message["join"]["first"] = True
 message["vanilla"].update(enable=True, cancel_default_death_screen=False)
 
+# FlectonePulse owns AFK state; TAB reads its bundled PlaceholderAPI expansion.
+# Five minutes tolerates brief pauses. Exact positional movement clears AFK on
+# the next one-second poll; chat and commands use the native activity listener.
+defaults["command"]["enable"] = True
+defaults["command"]["afk"].update(enable=True, aliases=["afk"])
+message["afk"].update(
+    enable=True, delay=6000, radius=0.0, range="SERVER", ignore=[], track_playtime=True
+)
+message["afk"]["destination"] = {"type": "CHAT"}
+message["afk"]["ticker"].update(enable=True, period=20)
+defaults["permission"]["command"]["afk"]["type"] = "TRUE"
+defaults["permission"]["message"]["afk"]["type"] = "TRUE"
+defaults["integration"]["enable"] = True
+defaults["integration"]["placeholderapi"]["enable"] = True
+
 deaths = {}
 for key, text in sorted(language.items()):
     if not key.startswith("death.") or not re.search(r"%(?:1\$)?s", text):
@@ -90,6 +105,18 @@ if invite:
         f"\n<#a6adc8>Discord: <#cba6f7>{invite}</#cba6f7></#a6adc8>"
     )
 local["quit"] = {"format": "<#f5c2e7>−</#f5c2e7> <#cba6f7><player></#cba6f7> <#a6adc8>left Survival</#a6adc8>"}
+local["afk"] = {
+    # A plain state token avoids color conversion in TAB's condition evaluator.
+    "suffix": "AFK",
+    "format_true": {
+        "global": "<#a6adc8>·</#a6adc8> <#cba6f7><player></#cba6f7> <#a6adc8>is now AFK</#a6adc8>",
+        "local": "<#a6adc8>· You are now AFK</#a6adc8>",
+    },
+    "format_false": {
+        "global": "<#a6adc8>·</#a6adc8> <#cba6f7><player></#cba6f7> <#a6adc8>is no longer AFK</#a6adc8>",
+        "local": "<#a6adc8>· You are no longer AFK</#a6adc8>",
+    },
+}
 local["format"]["names"].update(
     constant=[], display=["<player>"], entity="<name>", unknown="<name>", console="<name>"
 )

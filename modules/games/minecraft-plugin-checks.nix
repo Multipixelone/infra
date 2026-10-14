@@ -510,6 +510,7 @@ in
                 builtins.toJSON {
                   openinv = cfg.infra.games.artifacts.games-openinv;
                   tab = cfg.infra.games.artifacts.games-tab;
+                  placeholderapi = cfg.infra.games.artifacts.games-placeholderapi;
                   openinvCache = cfg.infra.games.artifacts.games-openinv-libraries;
                   carbon = cfg.infra.games.artifacts.games-carbon;
                   carbonCache = cfg.infra.games.artifacts.games-carbon-libraries;

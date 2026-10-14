@@ -143,7 +143,7 @@ public class ReadCarbon {
             };
             // Carbon inserts the chat message as a self-closing component. Text
             // that looks like MiniMessage must remain literal, including clicks.
-            String body = "<click:run_command:'/op me'><red>hello</red></click>";
+            String body = "<click:run_command:'/op me'><red>hello</red></click> %flectonepulse_setting_afk_suffix%";
             var rendered = MiniMessage.miniMessage().deserialize(format, audience,
                 expansion.audiencePlaceholders(),
                 TagResolver.resolver("display_name", Tag.selfClosingInserting(Component.text(".Bedrock_Friend"))),
@@ -171,6 +171,22 @@ public class ReadCarbon {
             TextColor nameColor = MiniMessage.miniMessage().deserialize(color + "name").color();
             require(checkText(rendered, null, ".Bedrock_Friend", nameColor), "Missing name component");
             require(checkText(rendered, null, body, TextColor.fromHexString("#cdd6f4")), "Missing literal body component");
+            // Exercise Carbon's PAPI-aware format parser with the existing
+            // MiniPlaceholders expansion. Body components are inserted after
+            // placeholder parsing and must remain literal with PAPI installed.
+            var papiParser = net.draycia.carbon.paper.messages.PlaceholderAPIMiniMessageParser.create(MiniMessage.miniMessage());
+            var parse = papiParser.getClass().getDeclaredMethod("parse", Audience.class, Audience.class,
+                java.util.regex.Pattern.class, java.util.function.UnaryOperator.class, String.class,
+                TagResolver.class, net.draycia.carbon.common.integration.miniplaceholders.MiniPlaceholdersIntegration.Config.class);
+            parse.setAccessible(true);
+            var tags = TagResolver.builder().resolver(expansion.audiencePlaceholders())
+                .resolver(TagResolver.resolver("display_name", Tag.selfClosingInserting(Component.text(".Bedrock_Friend"))))
+                .resolver(TagResolver.resolver("message", Tag.selfClosingInserting(Component.text(body)))).build();
+            var withPapi = (Component) parse.invoke(papiParser, null, audience,
+                java.util.regex.Pattern.compile("%[^%]+%"), (java.util.function.UnaryOperator<String>) placeholder -> {
+                    throw new AssertionError("PAPI interpreted existing Carbon format/body: " + placeholder);
+                }, format, tags, null);
+            require(withPapi.equals(rendered), "Installing PAPI changed Carbon/MiniPlaceholders rendering");
             // Existing PostgreSQL prefixes may still use ampersand formatting
             // before additive rank commands are applied. The expansion handles it.
             rankPrefix[0] = "&d[Mod] ";

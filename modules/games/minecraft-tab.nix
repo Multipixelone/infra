@@ -16,6 +16,11 @@
         {
           inventory = [
             {
+              name = "PlaceholderAPI";
+              version = "2.12.3";
+              installed = ready;
+            }
+            {
               name = "TAB";
               version = "6.2.0";
               installed = ready;
@@ -24,8 +29,27 @@
         }
         // lib.optionalAttrs ready {
           jars.tab = cfg.artifacts.games-tab;
-          statePaths = [ "/srv/games/minecraft/${id}/plugins/TAB" ];
+          jars.placeholderapi = cfg.artifacts.games-placeholderapi;
+          statePaths = [
+            "/srv/games/minecraft/${id}/plugins/TAB"
+            "/srv/games/minecraft/${id}/plugins/PlaceholderAPI"
+          ];
           templates = {
+            "/srv/games/minecraft/${id}/plugins/PlaceholderAPI/config.yml".source = toString (
+              format.generate "placeholderapi.yml" {
+                check_updates = false;
+                cloud_enabled = false;
+                cloud_sorting = "name";
+                boolean = {
+                  "true" = "yes";
+                  "false" = "no";
+                };
+                date_format = "MM/dd/yy HH:mm:ss";
+                detect_malicious_expansions = true;
+                use_adventure_provided_replacer = false;
+                debug = false;
+              }
+            );
             # Share chat's rank colors; keep translatable prefixes live in LP.
             "/srv/games/minecraft/${id}/plugins/TAB/groups.yml".source = toString (
               format.generate "tab-groups.yml" (
@@ -33,9 +57,9 @@
                   _DEFAULT_ = {
                     tabprefix = "%luckperms-prefix%";
                     customtabname = "<${ranks.default.color}>%displayname%<reset>";
-                    tabsuffix = "";
+                    tabsuffix = "%condition:afk%";
                     tagprefix = "";
-                    tagsuffix = "";
+                    tagsuffix = "%condition:afk%";
                   };
                 }
                 // lib.mapAttrs (_: rank: {
@@ -71,10 +95,8 @@
                   enabled = true;
                   disable-condition = "";
                 };
-                # Sorting requires teams or layout. Plain teams keep nametag
-                # decoration off; Carbon/FlectonePulse do not manage teams.
-                # Client team ownership replaces AFK Display's gray-name effect;
-                # it does not alter the datapack's server-side team/detection.
+                # Sorting and the AFK nametag suffix share TAB's client teams;
+                # Carbon/FlectonePulse do not manage competing teams.
                 scoreboard-teams = {
                   enabled = true;
                   enable-collision = true;
@@ -117,9 +139,16 @@
                   "%mspt%" = 5000;
                   "%luckperms-prefix%" = 1000;
                   "%luckperms-weight%" = 1000;
+                  "%flectonepulse_setting_afk_suffix%" = 1000;
                 };
                 placeholder-output-replacements = { };
-                conditions = { };
+                # Match a known state rather than nonempty output: a missing
+                # expansion must not mark everyone AFK or leak placeholder text.
+                conditions.afk = {
+                  conditions = [ "%flectonepulse_setting_afk_suffix%=AFK" ];
+                  "true" = " <#a6adc8>AFK</#a6adc8>";
+                  "false" = "";
+                };
                 components = {
                   minimessage-support = true;
                   disable-shadow-for-heads = true;
