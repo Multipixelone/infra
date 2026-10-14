@@ -16,7 +16,7 @@ import zipfile
 import zlib
 
 fixtures = json.loads(pathlib.Path(sys.argv[1]).read_text())
-generator, client, nginx_template = sys.argv[2:]
+generator, client, discord_asset, nginx_template = sys.argv[2:]
 fixture = fixtures["withLuckPerms"]
 pack = pathlib.Path(fixture["rankPack"])
 data = (pack / "rank-icons.zip").read_bytes()
@@ -33,6 +33,8 @@ with zipfile.ZipFile(pack / "rank-icons.zip") as archive:
         "pack.mcmeta",
         "assets/minecraft/font/default.json",
         "assets/infra/font/ranks.json",
+        "assets/infra/font/chat.json",
+        "assets/infra/textures/font/discord.png",
         "assets/infra/lang/en_us.json",
         *[f"assets/infra/textures/font/{rank}.png" for rank in ranks],
     }
@@ -51,27 +53,41 @@ with zipfile.ZipFile(pack / "rank-icons.zip") as archive:
     )
     assert "supported_formats" not in metadata
     assert json.loads(archive.read("assets/minecraft/font/default.json")) == {
-        "providers": [{"type": "reference", "id": "infra:ranks"}]
+        "providers": [
+            {"type": "reference", "id": "infra:ranks"},
+            {"type": "reference", "id": "infra:chat"},
+        ]
     }
     providers = json.loads(archive.read("assets/infra/font/ranks.json"))["providers"]
     translations = json.loads(archive.read("assets/infra/lang/en_us.json"))
-    assert len(providers) == len(ranks) == len(translations) == 3
+    assert len(providers) == len(ranks) == 3
+    assert len(translations) == 4
     assert {p["chars"][0] for p in providers} == {"\ue100", "\ue101", "\ue102"}
-    for rank, style in ranks.items():
-        assert translations[f"infra.rank.{rank}"] == style["glyph"]
-        assert f"<lang_or:infra.rank.{rank}:'[{style['label']}]'>" in style["prefix"]
-        assert f"<hover:show_text:'{style['label']}'>" in style["prefix"]
-        provider = next(p for p in providers if p["chars"] == [style["glyph"]])
-        assert provider == {
+    chat_providers = json.loads(archive.read("assets/infra/font/chat.json"))[
+        "providers"
+    ]
+    assert chat_providers == [
+        {
             "type": "bitmap",
-            "file": f"infra:font/{rank}.png",
+            "file": "infra:font/discord.png",
             "height": 9,
             "ascent": 8,
-            "chars": [style["glyph"]],
+            "chars": ["\ue103"],
         }
-        image = archive.read(f"assets/infra/textures/font/{rank}.png")
+    ]
+    assert translations["infra.source.discord"] == "\ue103"
+    glyphs = [provider["chars"][0] for provider in providers + chat_providers]
+    assert len(glyphs) == len(set(glyphs)) == 4
+    assert all(0xE000 <= ord(glyph) <= 0xF8FF for glyph in glyphs)
+    discord = archive.read("assets/infra/textures/font/discord.png")
+    assert discord == pathlib.Path(discord_asset).read_bytes()
+    assert hashlib.sha256(discord).hexdigest() == (
+        "faabe947d72a45358b27ee03ed87024b52be50da418b3033b0c5e78490103a89"
+    )
+
+    def pixels(image, width):
         assert image[:8] == b"\x89PNG\r\n\x1a\n"
-        assert struct.unpack(">IIBBBBB", image[16:29]) == (9, 9, 8, 6, 0, 0, 0)
+        assert struct.unpack(">IIBBBBB", image[16:29]) == (width, 9, 8, 6, 0, 0, 0)
         offset, compressed = 8, b""
         while offset < len(image):
             length = struct.unpack(">I", image[offset : offset + 4])[0]
@@ -85,13 +101,38 @@ with zipfile.ZipFile(pack / "rank-icons.zip") as archive:
                     ">I", image[offset + 8 + length : offset + 12 + length]
                 )[0]
             )
+            assert kind in (b"IHDR", b"IDAT", b"IEND")
             if kind == b"IDAT":
                 compressed += contents
             offset += length + 12
         raw = zlib.decompress(compressed)
-        assert len(raw) == 9 * 37
-        assert all(raw[row * 37] == 0 for row in range(9))
-        alphas = [raw[row * 37 + 4 + col * 4] for row in range(9) for col in range(9)]
+        stride = 1 + width * 4
+        assert len(raw) == 9 * stride
+        assert all(raw[row * stride] == 0 for row in range(9))
+        return [
+            raw[row * stride + 1 + col * 4 : row * stride + 5 + col * 4]
+            for row in range(9)
+            for col in range(width)
+        ]
+
+    logo_pixels = pixels(discord, 12)
+    assert all(pixel[:3] == b"\xff\xff\xff" for pixel in logo_pixels if pixel[3])
+    assert 0 in {pixel[3] for pixel in logo_pixels}
+    assert any(pixel[3] > 0 for pixel in logo_pixels)
+    for rank, style in ranks.items():
+        assert translations[f"infra.rank.{rank}"] == style["glyph"]
+        assert f"<lang_or:infra.rank.{rank}:'[{style['label']}]'>" in style["prefix"]
+        assert f"<hover:show_text:'{style['label']}'>" in style["prefix"]
+        provider = next(p for p in providers if p["chars"] == [style["glyph"]])
+        assert provider == {
+            "type": "bitmap",
+            "file": f"infra:font/{rank}.png",
+            "height": 9,
+            "ascent": 8,
+            "chars": [style["glyph"]],
+        }
+        image = archive.read(f"assets/infra/textures/font/{rank}.png")
+        alphas = [pixel[3] for pixel in pixels(image, 9)]
         assert set(alphas) == {0, 255}
     assert "prefix" not in fixture["ranks"]["default"]
 
@@ -116,7 +157,8 @@ for name, case in fixtures.items():
         assert properties["resource-pack-sha1"] == digest
         assert properties["require-resource-pack"] == "true"
         prompt = json.loads(properties["resource-pack-prompt"])["text"]
-        assert "staff rank icons" in prompt and "must accept it to join" in prompt
+        assert "staff rank and Discord chat icons" in prompt
+        assert "must accept it to join" in prompt
         assert properties["rcon.password"] == "@RCON@"
 
 with tempfile.TemporaryDirectory() as directory:
@@ -129,7 +171,15 @@ with tempfile.TemporaryDirectory() as directory:
         source.write_text(json.dumps(styles))
         output = root / f"pack-{index}"
         subprocess.run(
-            [sys.executable, generator, "build", client, str(source), str(output)],
+            [
+                sys.executable,
+                generator,
+                "build",
+                client,
+                str(source),
+                discord_asset,
+                str(output),
+            ],
             check=True,
         )
         assert (output / "rank-icons.zip").read_bytes() == data
@@ -178,5 +228,5 @@ with tempfile.TemporaryDirectory() as directory:
         process.wait(timeout=5)
 
 print(
-    "PASS: reproducible glyph pack, format 97.1, rank mappings, properties SHA-1, static download without Paper"
+    "PASS: reproducible rank/Discord glyph pack, format 97.1, properties SHA-1, static download without Paper"
 )

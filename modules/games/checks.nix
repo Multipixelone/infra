@@ -180,7 +180,7 @@
             }
             ''
               python3 - ${fixture} <<'PY'
-              import hashlib, json, pathlib, re, sys
+              import hashlib, json, pathlib, re, sys, zipfile
               data = json.load(open(sys.argv[1]))
               pack = data["minecraftRankPack"]
               assert pack["absentWithoutGames"]
@@ -189,6 +189,11 @@
               properties = pathlib.Path(pack["properties"]).read_text()
               assert f"resource-pack-sha1={digest}\n" in properties
               assert "require-resource-pack=true\n" in properties
+              assert "Discord chat icons" in properties
+              with zipfile.ZipFile(pathlib.Path(pack["artifact"]) / "rank-icons.zip") as archive:
+                  translations = json.loads(archive.read("assets/infra/lang/en_us.json"))
+                  assert translations["infra.source.discord"] == "\ue103"
+                  assert set(translations) == {"infra.rank.mod", "infra.rank.admin", "infra.rank.builder", "infra.source.discord"}
               units = {"minecraft-server-survival.service", "minecraft-server-velocity.service", "podman-games-terraria.service"}
               for name in ("missing", "enabled"):
                   fixture = data[name]

@@ -1,4 +1,4 @@
-"""Build original staff glyphs and substitute the digest of the served ZIP."""
+"""Build staff/source glyphs and substitute the digest of the served ZIP."""
 
 import hashlib
 import json
@@ -34,7 +34,7 @@ def png(rows):
     )
 
 
-def build(client, ranks, output):
+def build(client, ranks, discord, output):
     with zipfile.ZipFile(client) as jar:
         version = json.loads(jar.read("version.json"))
     assert version["id"] == "26.3", "Review font compatibility when upgrading Minecraft"
@@ -47,6 +47,11 @@ def build(client, ranks, output):
     glyphs = [style["glyph"] for style in ranks.values() if "glyph" in style]
     assert len(glyphs) == len(set(glyphs)) == 3
     assert all(len(glyph) == 1 and 0xE000 <= ord(glyph) <= 0xF8FF for glyph in glyphs)
+    discord_glyph = "\ue103"
+    assert discord_glyph not in glyphs
+    discord = pathlib.Path(discord).read_bytes()
+    assert discord[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">IIBBBBB", discord[16:29]) == (12, 9, 8, 6, 0, 0, 0)
 
     def encode(value):
         return (
@@ -61,7 +66,7 @@ def build(client, ranks, output):
                     "pack_format": pack_version[0],
                     "min_format": pack_version,
                     "max_format": pack_version,
-                    "description": "Original staff rank icons for Finn's Survival",
+                    "description": "Staff rank and Discord chat icons for Finn's Survival",
                 }
             }
         ),
@@ -82,9 +87,29 @@ def build(client, ranks, output):
         )
         translations[f"infra.rank.{rank}"] = style["glyph"]
     entries["assets/infra/font/ranks.json"] = encode({"providers": providers})
+    entries["assets/infra/textures/font/discord.png"] = discord
+    entries["assets/infra/font/chat.json"] = encode(
+        {
+            "providers": [
+                {
+                    "type": "bitmap",
+                    "file": "infra:font/discord.png",
+                    "height": 9,
+                    "ascent": 8,
+                    "chars": [discord_glyph],
+                }
+            ]
+        }
+    )
+    translations["infra.source.discord"] = discord_glyph
     # Font provider lists from packs are combined; add only our private glyphs.
     entries["assets/minecraft/font/default.json"] = encode(
-        {"providers": [{"type": "reference", "id": "infra:ranks"}]}
+        {
+            "providers": [
+                {"type": "reference", "id": "infra:ranks"},
+                {"type": "reference", "id": "infra:chat"},
+            ]
+        }
     )
     entries["assets/infra/lang/en_us.json"] = encode(translations)
     output = pathlib.Path(output)

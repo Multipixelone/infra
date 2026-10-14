@@ -202,8 +202,10 @@
                   # %name% is the Discord server nickname, including the Carbon
                   # name maintained by nickname synchronization for linked users.
                   # Keep Discord roles in hover text rather than staff rank badges.
-                  DiscordToMinecraftChatMessageFormat = "<white><hover:show_text:'Discord'>[Discord]</hover></white> <#cba6f7><hover:show_text:'Discord role: %toprole%'>%name%</hover></#cba6f7>%reply% <#a6adc8>›</#a6adc8> <#cdd6f4>%message%</#cdd6f4>";
-                  DiscordToMinecraftChatMessageFormatNoRole = "<white><hover:show_text:'Discord'>[Discord]</hover></white> <#cba6f7>%name%</#cba6f7>%reply% <#a6adc8>›</#a6adc8> <#cdd6f4>%message%</#cdd6f4>";
+                  # Keep the translation component until client delivery: Java
+                  # resolves the pack glyph; Bedrock/no-pack clients use the label.
+                  DiscordToMinecraftChatMessageFormat = "<white><hover:show_text:'Discord'><lang_or:infra.source.discord:'[Discord]'></hover></white> <#cba6f7><hover:show_text:'Discord role: %toprole%'>%name%</hover></#cba6f7>%reply% <#a6adc8>›</#a6adc8> <#cdd6f4>%message%</#cdd6f4>";
+                  DiscordToMinecraftChatMessageFormatNoRole = "<white><hover:show_text:'Discord'><lang_or:infra.source.discord:'[Discord]'></hover></white> <#cba6f7>%name%</#cba6f7>%reply% <#a6adc8>›</#a6adc8> <#cdd6f4>%message%</#cdd6f4>";
                   DiscordToMinecraftMessageReplyFormat = " <#a6adc8>(replying to %name%)</#a6adc8>";
                   # Rank prefixes are MiniMessage on Minecraft. Do not pass them
                   # through Vault's legacy string path into Discord messages.

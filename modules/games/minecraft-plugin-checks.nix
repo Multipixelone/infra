@@ -446,7 +446,7 @@ in
         ''
           python3 ${./tests/minecraft_resource_pack_test.py} \
             ${pkgs.writeText "minecraft-rank-fixtures.json" (builtins.toJSON polishFixtures)} \
-            ${./minecraft-resource-pack.py} ${cfg.infra.games.artifacts.games-minecraft-client} \
+            ${./minecraft-resource-pack.py} ${cfg.infra.games.artifacts.games-minecraft-client} ${./assets/discord.png} \
             ${pkgs.writeText "minecraft-rank-nginx.conf" ''
               pid @ROOT@/nginx.pid;
               error_log stderr;

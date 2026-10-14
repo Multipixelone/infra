@@ -7,7 +7,7 @@
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       ranks = pkgs.writeText "minecraft-ranks.json" (builtins.toJSON cfg.minecraftRanks);
       pack = pkgs.runCommand "minecraft-rank-icons-26.3" { } ''
-        ${pkgs.python3}/bin/python3 ${./minecraft-resource-pack.py} build ${cfg.artifacts.games-minecraft-client} ${ranks} "$out"
+        ${pkgs.python3}/bin/python3 ${./minecraft-resource-pack.py} build ${cfg.artifacts.games-minecraft-client} ${ranks} ${./assets/discord.png} "$out"
       '';
       # The derivation path versions the URL without import-from-derivation.
       # nginx location keys cannot carry store dependencies; the alias below
@@ -19,7 +19,7 @@
         type = lib.types.str;
         readOnly = true;
         default = "https://map.finnrut.is${path}";
-        description = "Immutable HTTPS URL of the Java staff icon pack.";
+        description = "Immutable HTTPS URL of the Java staff and chat icon pack.";
       };
       config = lib.mkIf (servers != { }) {
         infra.games.artifacts.games-rank-icons = pack;

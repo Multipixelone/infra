@@ -1,12 +1,16 @@
 import java.lang.reflect.Proxy;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipFile;
+import com.google.gson.JsonParser;
 import io.papermc.paper.plugin.configuration.PluginMeta;
 import io.papermc.paper.plugin.provider.classloader.ConfiguredPluginClassLoader;
 import io.papermc.paper.plugin.provider.classloader.PluginClassLoaderGroup;
@@ -29,11 +33,13 @@ import net.draycia.carbon.paper.integration.dsrv.DSRVListener;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.renderer.TranslatableComponentRenderer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 // Run the pinned formatter with a real Paper plugin classloader contract and
 // API fixtures. No plugin startup, bot, credentials, server or network is used.
 public class CheckDiscordFormats {
+    static TranslatableComponentRenderer<Locale> packedRenderer;
     public static class Loader extends URLClassLoader implements ConfiguredPluginClassLoader {
         private JavaPlugin plugin;
         public Loader(URL jar, URL classes) {
@@ -79,6 +85,20 @@ public class CheckDiscordFormats {
         require(ReadCarbon.checkText(component, null, body, TextColor.fromHexString("#cdd6f4")), "Missing body");
         require(hasRole(component) == role, "Discord role did not stay in sender hover");
         require(!plain.contains("mod"), "Discord role became a visible rank badge");
+        if (packedRenderer != null) {
+            require(ReadCarbon.hasRank(component, "infra.source.discord", "[Discord]", "Discord"),
+                "Carbon bridge lost Discord translation, fallback or hover");
+            var packed = packedRenderer.render(component, Locale.US);
+            require(PlainTextComponentSerializer.plainText().serialize(packed).equals(
+                "\ue103 " + name + reply + " › " + body), "Java did not resolve the Discord glyph");
+            require(ReadCarbon.checkText(packed, null, "\ue103", TextColor.fromHexString("#ffffff")),
+                "Discord logo lost its white brand colour");
+            var bedrock = new org.geysermc.geyser.text.MinecraftTranslationRegistry().render(component, "en_us");
+            String bedrockText = PlainTextComponentSerializer.plainText().serialize(bedrock);
+            require(expected.equals(bedrockText), "Bedrock did not retain the Discord text fallback");
+            require(bedrockText.codePoints().noneMatch(cp -> cp >= 0xe000 && cp <= 0xf8ff),
+                "Discord glyph leaked to Bedrock without the Java pack");
+        }
     }
     static boolean hasRole(Component component) {
         if (component instanceof TextComponent text && component.hoverEvent() != null
@@ -93,6 +113,21 @@ public class CheckDiscordFormats {
             || component.children().stream().anyMatch(CheckDiscordFormats::hasCommand);
     }
     public static void main(String[] args) throws Exception {
+        if (args.length > 3) {
+            com.google.gson.JsonObject translations;
+            try (var pack = new ZipFile(args[3]); var reader = new InputStreamReader(
+                    pack.getInputStream(pack.getEntry("assets/infra/lang/en_us.json")), StandardCharsets.UTF_8)) {
+                translations = JsonParser.parseReader(reader).getAsJsonObject();
+            }
+            require(translations.get("infra.source.discord").getAsString().equals("\ue103"),
+                "Wrong packed Discord codepoint");
+            packedRenderer = TranslatableComponentRenderer.usingTranslationSource(new net.kyori.adventure.translation.Translator() {
+                public net.kyori.adventure.key.Key name() { return net.kyori.adventure.key.Key.key("infra:discord-test"); }
+                public java.text.MessageFormat translate(String key, Locale locale) {
+                    return translations.has(key) ? new java.text.MessageFormat(translations.get(key).getAsString(), locale) : null;
+                }
+            });
+        }
         var classes = CheckDiscordFormats.class.getProtectionDomain().getCodeSource().getLocation();
         try (var loader = new Loader(Path.of(args[0]).toUri().toURL(), classes)) {
             loader.loadClass("CheckDiscordFormats$Runner").getMethod("run", String[].class)

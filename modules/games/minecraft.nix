@@ -124,7 +124,7 @@
                     resource-pack=${cfg.minecraftRankPackUrl}
                     resource-pack-sha1=@RESOURCE_PACK_SHA1@
                     require-resource-pack=true
-                    resource-pack-prompt={"text":"This server uses a small resource pack for staff rank icons. Java players must accept it to join."}
+                    resource-pack-prompt={"text":"This server uses a small resource pack for staff rank and Discord chat icons. Java players must accept it to join."}
                   '';
                 }
                 ''

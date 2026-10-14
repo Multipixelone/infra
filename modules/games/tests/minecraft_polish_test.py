@@ -467,6 +467,7 @@ with tempfile.TemporaryDirectory() as directory:
             artifacts["discordsrv"],
             discord_templates[f"{template_dir}/DiscordSRV/config.yml"]["source"],
             discord_templates[f"{template_dir}/DiscordSRV/messages.yml"]["source"],
+            str(pathlib.Path(fixtures["withDiscord"]["rankPack"]) / "rank-icons.zip"),
         ],
         check=True,
     )

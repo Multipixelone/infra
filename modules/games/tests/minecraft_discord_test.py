@@ -159,8 +159,8 @@ for case in cases:
         ):
             incoming = messages[key]
             assert (
-                "<white><hover:show_text:'Discord'>[Discord]</hover></white>"
-                in incoming
+                "<white><hover:show_text:'Discord'>"
+                "<lang_or:infra.source.discord:'[Discord]'></hover></white>" in incoming
             )
             assert "%name%" in incoming and "%reply%" in incoming
             assert "<#cba6f7>" in incoming
