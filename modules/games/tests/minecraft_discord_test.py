@@ -85,6 +85,18 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
     )
     linked_role_key = b"MinecraftDiscordAccountLinkedRoleNameToAddUserTo"
     assert linked_role_key in account_manager and linked_role_key in group_manager
+    assert b"resolveRole" in account_manager and b"resolveRole" in group_manager
+    discord_util = jar.read("github/scarsz/discordsrv/util/DiscordUtil.class")
+    # Both account-link paths use the pinned name-or-ID resolver.
+    for symbol in (
+        b"resolveRole",
+        b"lambda$resolveRole$0",
+        b"getRoles",
+        b"getName",
+        b"getId",
+        b"equalsIgnoreCase",
+    ):
+        assert symbol in discord_util
     assert b"afterLink" in account_manager and b"addRoleToMember" in account_manager
     assert (
         b"beforeUnlink" in account_manager
@@ -97,7 +109,22 @@ with zipfile.ZipFile(sys.argv[2]) as jar:
 assert discord_defaults["ConfigVersion"] == "1.30.5"
 assert cases[0]["linkingDefaults"] == {"linkChannelId": "", "linkedRoleName": ""}
 assert cases[0]["discord"]["linkChannelId"] == "1559824382208253973"
-assert cases[0]["discord"]["linkedRoleName"] == "linked"
+assert cases[0]["discord"]["linkedRoleName"] == "1559828466336145408"
+assert cases[0]["discord"]["roles"] == {
+    "builder": "1559828413437583360",
+    "mod": "1558172717218533468",
+    "admin": "1558173111931904092",
+}
+assert {case["discord"]["linkedRoleName"] for case in cases} >= {
+    "",
+    "fixture-linked",
+    "789012345678901234",
+}
+assert {
+    tuple(sorted(group for group, role in case["discord"]["roles"].items() if role))
+    for case in cases
+    if case["expected"]
+} >= {(), ("builder",), ("mod",), ("admin",), ("admin", "builder", "mod")}
 
 
 def supported(value, defaults, path=""):
@@ -356,6 +383,9 @@ for case in cases:
             configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"]
             == case["discord"]["linkedRoleName"]
         )
+        assert isinstance(
+            configuration["MinecraftDiscordAccountLinkedRoleNameToAddUserTo"], str
+        )
         assert configuration["Experiment_JdbcAccountLinkBackend"] == ""
         # Existing in-game Discord chat uses the Discord role's configured colour.
         assert (
@@ -442,6 +472,7 @@ for case in cases:
 
 print(
     "PASS: pinned DiscordSRV schema, mandatory linking, guild, owner whitelist, "
-    "channel/DM linking, linked role, code cleanup, kick placeholders, Floodgate, "
+    "channel/DM linking, linked role names/IDs, builder rank sync, playing count, "
+    "code cleanup, kick placeholders, Floodgate, "
     "styling, credentials and notifier gating"
 )

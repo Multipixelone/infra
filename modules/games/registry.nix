@@ -111,7 +111,7 @@ let
             linkedRoleName = mkOption {
               type = types.str;
               default = "";
-              description = "Unique Discord role name granted on account linking and removed on unlinking; empty disables it.";
+              description = "Discord role ID or unique role name granted on account linking and removed on unlinking; empty disables it.";
             };
             eventsChannelId = mkOption {
               type = types.strMatching "([0-9]{17,20})?";
@@ -262,10 +262,11 @@ in
             guildId = "1518484285466873997";
             channelId = "1557960229528797265";
             linkChannelId = "1559824382208253973";
-            linkedRoleName = "linked";
+            linkedRoleName = "1559828466336145408";
             eventsChannelId = "1518484285982769204";
             consoleChannelId = "1557960243101831168";
             roles = {
+              builder = "1559828413437583360";
               admin = "1558173111931904092";
               mod = "1558172717218533468";
             };

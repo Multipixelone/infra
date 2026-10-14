@@ -1086,9 +1086,10 @@ options for Finn's existing bot:
 | `guildId`          | `1518484285466873997` | Guild owning the channels                         |
 | `channelId`        | `1557960229528797265` | Main bidirectional chat, deaths and advancements  |
 | `linkChannelId`    | `1559824382208253973` | `#mc-link`, accepting account-link codes          |
-| `linkedRoleName`   | `linked` (role name)  | Discord channel access on link; removed on unlink |
+| `linkedRoleName`   | `1559828466336145408` | Discord channel access on link; removed on unlink |
 | `eventsChannelId`  | `1518484285982769204` | Join, first join and leave messages               |
 | `consoleChannelId` | `1557960243101831168` | Private Paper logs and diagnostic commands        |
+| `roles.builder`    | `1559828413437583360` | LuckPerms `builder` → Discord Builder             |
 | `roles.mod`        | `1558172717218533468` | LuckPerms `mod` → Discord Mod (purple)            |
 | `roles.admin`      | `1558173111931904092` | LuckPerms `admin` → Discord Admin (green)         |
 
@@ -1148,14 +1149,14 @@ death, advancement and bidirectional chat messages are enabled. Test them after
 the first configured start. Confirm token permissions remain private and neither
 configuration nor logs expose it.
 
-Create Discord roles **Mod (purple)** and **Admin (green)**. Colours are set in
-Discord's role editor, not by DiscordSRV. Put Admin above Mod and the bot's own
-role **above both** in the role list; Manage Roles cannot manage roles at or
-above the bot's role. Enable **Developer Mode**, right-click each role and
-select **Copy Role ID**. Set those IDs in Survival's
-`gameServers.servers.survival.minecraft.discord.roles.mod` and `.roles.admin`
-declaration. These options default to empty on other servers. Only nonempty
-IDs are mapped; with neither set, linking remains available but rank sync is
+Keep Discord roles **Builder**, **Mod (purple)** and **Admin (green)**. Colours
+are set in Discord's role editor, not by DiscordSRV. Put Admin above Mod above
+Builder and the bot's own role **above all three** in the role list; Manage Roles
+cannot manage roles at or above the bot's role. Enable **Developer Mode**,
+right-click each role and select **Copy Role ID**. Set those IDs in Survival's
+`gameServers.servers.survival.minecraft.discord.roles.builder`, `.roles.mod`
+and `.roles.admin` declarations. These options default to empty on other servers.
+Only nonempty IDs are mapped; with all three empty, linking remains available but rank sync is
 inert and Vault is not installed. Missing token/guild/chat IDs or a disabled
 bridge still prevent DiscordSRV and Vault installation.
 
@@ -1170,10 +1171,13 @@ file backend strips non-digits before lookup and consumes a successful code.
 Send just the displayed code, without a command prefix.
 
 `MinecraftDiscordAccountLinkedRoleNameToAddUserTo` uses the declared
-`minecraft.discord.linkedRoleName`, set to **linked** for Survival. Keep this
-name unique among all guild roles visible to the bot, since `resolveRole` uses
-the first matching name or ID. Other servers default to an empty role name and
-link channel ID. The role is independent of LuckPerms staff mappings:
+`minecraft.discord.linkedRoleName`, set to role ID **1559828466336145408** for
+Survival. The option keeps its existing name for compatibility and accepts a
+role ID or unique role name; empty disables it. The pinned
+[`resolveRole` matches a name or ID](https://github.com/DiscordSRV/DiscordSRV/blob/da9e027f7acd76e0f91d53a11e5b53832ac36e92/src/main/java/github/scarsz/discordsrv/util/DiscordUtil.java#L734).
+Using the ID keeps the linked role stable when its display name changes.
+Other servers default to an empty linked role and link channel ID.
+The role is independent of LuckPerms staff mappings:
 `AbstractAccountLinkManager` grants/removes it directly when group sync is off,
 and `GroupSynchronizationManager` handles it alongside staff roles when sync is
 on. Linking therefore grants Minecraft-channel visibility without a Minecraft
@@ -1183,9 +1187,10 @@ Neither `minecraft-discord-token.py` (private token preparation) nor
 `minecraft-discord-status.py` (status-message delivery) manages guild roles or
 channel permissions. Finn must apply these settings in Discord:
 
-1. In **Server Settings → Roles**, create or keep exactly one **linked** role.
-   Grant the bot **Manage Roles** and drag its role above **linked**, Mod and
-   Admin. Retain the existing Message Content and Server Members intents.
+1. In **Server Settings → Roles**, keep the **linked** role with ID
+   `1559828466336145408`. Grant the bot **Manage Roles** and drag its role above
+   **linked**, Builder, Mod and Admin. Retain the existing Message Content and
+   Server Members intents.
 2. Open **Edit Channel → Permissions → Advanced permissions** for the Minecraft
    channels and set the following overrides. If using a category for chat,
    events or voice, synchronize only channels that should share its settings;
@@ -1349,7 +1354,10 @@ LuckPerms group membership is authoritative. Both
 `GroupRoleSynchronizationMinecraftIsAuthoritative = true` and
 `GroupRoleSynchronizationOneWay = true` are required for **Minecraft → Discord
 only**. `default` is never mapped. All memberships, including inherited groups,
-count: an admin inherits mod and receives both roles when both IDs are set.
+count: a mod inherits builder and receives Builder and Mod; an admin inherits
+mod and builder and receives all three mapped roles. The existing LuckPerms
+bootstrap declares `builder → default`, `mod → builder`, and `admin → mod`;
+this mapping adds no permissions or membership grants.
 Sync runs on linking and periodically every five minutes for online players;
 full-guild cycling is disabled. Discord role grants/removals cannot create or
 remove LuckPerms membership and are reconciled to Minecraft membership on the
@@ -1375,11 +1383,12 @@ The JDBC account-link backend is explicitly empty, selecting DiscordSRV
 already included in clean-stop backups. Account records remain mutable player
 state and are never replaced by a generated Nix file.
 
-After deployment, test with a linked account: grant/remove `mod` and `admin`
-in LuckPerms and confirm the corresponding Discord roles follow (including
-inherited Mod for Admin). Grant a mapped role directly in Discord to a linked
-default player and confirm LuckPerms stays default; the role should disappear
-on resync. Check that removing a Discord role does not demote Minecraft, that
+After deployment, test with a linked account: grant/remove `builder`, `mod` and
+`admin` in LuckPerms and confirm the corresponding Discord roles follow
+(including inherited Builder for Mod and Builder/Mod for Admin). Grant a mapped
+role directly in Discord to a linked default player and confirm LuckPerms stays
+default; the role should disappear on resync. Check that removing a Discord role
+does not demote Minecraft, that
 unlinked players get no roles, and that `/discord unlink` removes managed roles.
 An operator can run `/discord resync` to avoid waiting for the periodic cycle.
 

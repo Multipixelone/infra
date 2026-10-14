@@ -202,6 +202,13 @@ let
           guild = "123456789012345678";
           channel = "234567890123456789";
           enable = true;
+          overrides.linkedRoleName = "789012345678901234";
+        }
+        {
+          token = true;
+          guild = "123456789012345678";
+          channel = "234567890123456789";
+          enable = true;
           ownerUuid = null;
         }
         {
@@ -246,6 +253,7 @@ let
           channel = "234567890123456789";
           enable = true;
           overrides.roles = {
+            builder = "";
             mod = "345678901234567890";
             admin = "";
           };
@@ -256,6 +264,7 @@ let
           channel = "234567890123456789";
           enable = true;
           overrides.roles = {
+            builder = "";
             mod = "";
             admin = "456789012345678901";
           };
