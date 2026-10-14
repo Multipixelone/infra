@@ -6,6 +6,28 @@
       cfg = config.infra.games;
       servers = lib.filterAttrs (_: s: s.game == "minecraft-paper") cfg.servers;
       format = pkgs.formats.yaml { };
+      # WorldEditPlugin reads this separate file, not FAWE's config.yml.
+      # Preserve the pinned jar's complete defaults while freeing survival tools.
+      worldeditConfiguration =
+        pkgs.runCommand "worldedit-config.yml"
+          {
+            nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
+          }
+          ''
+            python3 - ${cfg.artifacts.games-fawe} "$out" <<'PY'
+            import sys
+            import zipfile
+            import yaml
+
+            with zipfile.ZipFile(sys.argv[1]) as jar:
+                configuration = yaml.safe_load(jar.read("defaults/worldedit-config.yml"))
+            configuration["wand-item"] = "minecraft:breeze_rod"
+            # Admin's wildcard permission also enables compass click interception.
+            configuration["navigation-wand"]["item"] = "minecraft:blaze_rod"
+            with open(sys.argv[2], "w") as output:
+                yaml.safe_dump(configuration, output, sort_keys=False)
+            PY
+          '';
       # Both profiles are bounded: the fallback must not restore upstream's
       # 50-million-block limit when a player lacks fawe.limit.builder.
       limits = {
@@ -119,12 +141,17 @@
           voxelsniper = cfg.artifacts.games-voxelsniper;
           worldedit-visualizer = cfg.artifacts.games-worldedit-visualizer;
         };
-        templates = lib.mapAttrs' (
-          name: value:
-          lib.nameValuePair "/srv/games/minecraft/${id}/plugins/${name}/config.yml" {
-            source = toString (format.generate "${id}-${name}.yml" value);
-          }
-        ) configurations;
+        templates =
+          lib.mapAttrs' (
+            name: value:
+            lib.nameValuePair "/srv/games/minecraft/${id}/plugins/${name}/config.yml" {
+              source = toString (format.generate "${id}-${name}.yml" value);
+            }
+          ) configurations
+          // {
+            "/srv/games/minecraft/${id}/plugins/FastAsyncWorldEdit/worldedit-config.yml".source =
+              toString worldeditConfiguration;
+          };
         statePaths = map (name: "/srv/games/minecraft/${id}/plugins/${name}") (
           lib.attrNames configurations
         );

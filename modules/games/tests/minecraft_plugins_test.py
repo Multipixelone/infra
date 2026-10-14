@@ -453,6 +453,21 @@ def building_config(name):
 
 
 fawe = building_config("FastAsyncWorldEdit")
+assert "wand-item" not in fawe and "navigation-wand" not in fawe
+worldedit = yaml.safe_load(
+    pathlib.Path(
+        building["templates"][
+            "/srv/games/minecraft/survival/plugins/FastAsyncWorldEdit/worldedit-config.yml"
+        ]["source"]
+    ).read_text()
+)
+assert worldedit["wand-item"] == "minecraft:breeze_rod"
+assert worldedit["navigation-wand"]["item"] == "minecraft:blaze_rod"
+with zipfile.ZipFile(building["plugins"]["fawe"]) as jar:
+    defaults = yaml.safe_load(jar.read("defaults/worldedit-config.yml"))
+defaults["wand-item"] = "minecraft:breeze_rod"
+defaults["navigation-wand"]["item"] = "minecraft:blaze_rod"
+assert worldedit == defaults, "preserve every other packaged WorldEdit default"
 assert not fawe["region-restrictions"]
 assert not any(fawe["enabled-components"].values())
 for profile in ("default", "builder"):
