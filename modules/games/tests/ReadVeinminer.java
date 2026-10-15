@@ -23,8 +23,9 @@ public class ReadVeinminer {
         require(settings.getMaxChain() == 64 && settings.getSearchRadius() == 1, "unsafe limits");
         require(settings.getSeparateGroupMining(), "mixed material mining");
         require(settings.getPermissionRestricted(), "permissions disabled");
-        require(!settings.getClient().getAllow() && !settings.getClient().getRequire()
-            && !settings.getClient().getAllBlocks(), "client bypass or requirement");
+        require(settings.getHungerPerBlock() == 0.1, "wrong hunger cost");
+        require(settings.getClient().getAllow() && !settings.getClient().getRequire()
+            && settings.getClient().getAllBlocks(), "wrong client block access or requirement");
         require(settings.getClient().getOverrides().nonNullKeys().isEmpty(), "client overrides");
         require(!settings.getAutoUpdate() && settings.getHideUpdates(), "update settings");
 

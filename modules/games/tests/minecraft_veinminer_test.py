@@ -103,14 +103,14 @@ for case_name, case in fixtures.items():
         assert settings["cooldown"] == 20 and settings["delay"] == 0
         assert settings["separateGroupMining"] and settings["permissionRestricted"]
         assert settings["client"] == {
-            "allow": False,
+            "allow": True,
             "require": False,
-            "allBlocks": False,
+            "allBlocks": True,
             "overrides": {},
         }
         assert (
             not settings["mergeItemDrops"]
-            and settings["hungerPerBlock"] == 0
+            and settings["hungerPerBlock"] == 0.1
             and settings["miningSpeedModifier"] == 0
         )
         assert (

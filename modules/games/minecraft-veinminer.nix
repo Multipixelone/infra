@@ -13,7 +13,7 @@
         d
         // {
           source = pkgs.fetchurl {
-            name = builtins.baseNameOf d.path;
+            name = baseNameOf d.path;
             inherit (d) url sha256;
           };
         }
@@ -22,9 +22,9 @@
       # manifest's repository IDs. Preseed POMs/BOMs as well as runtime jars.
       cache = pkgs.runCommand "veinminer-2.12.3-libraries" { } (
         lib.concatMapStrings (d: ''
-          mkdir -p "$out/${builtins.dirOf d.path}"
+          mkdir -p "$out/${dirOf d.path}"
           ln -s ${d.source} "$out/${d.path}"
-          echo '${builtins.baseNameOf d.path}>MavenRepo=' >> "$out/${builtins.dirOf d.path}/_remote.repositories"
+          echo '${baseNameOf d.path}>MavenRepo=' >> "$out/${dirOf d.path}/_remote.repositories"
         '') libraries
       );
       format = pkgs.formats.json { };
@@ -41,7 +41,8 @@
         separateGroupMining = true;
         permissionRestricted = true;
         mergeItemDrops = false;
-        hungerPerBlock = 0.0;
+        # The plugin adds this as exhaustion for each extra block mined.
+        hungerPerBlock = 0.1;
         miningSpeedModifier = 0.0;
         autoUpdate = false;
         # 2.12.3 still checks/downloads updates unconditionally. Finn accepted
@@ -49,9 +50,9 @@
         dontDisplayUpdatesAndIWillNotAskForSupportBeforeUpdatingISwear = true;
         debug = false;
         client = {
-          allow = false;
+          allow = true;
           require = false;
-          allBlocks = false;
+          allBlocks = true;
           overrides = { };
         };
       };
@@ -114,7 +115,7 @@
       services.minecraft-servers.servers = lib.mapAttrs (_: _: {
         symlinks = lib.listToAttrs (
           map (path: lib.nameValuePair "libraries/${path}" "${cache}/${path}") (
-            lib.unique (map (d: builtins.dirOf d.path) definitions)
+            lib.unique (map (d: dirOf d.path) definitions)
           )
         );
       }) servers;

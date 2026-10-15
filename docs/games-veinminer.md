@@ -10,7 +10,10 @@ support. The project is [AGPL-3.0-only](https://github.com/MiraculixxT/Veinminer
 
 Sneak while mining ore, diorite or andesite with a suitable pickaxe to mine up
 to 64 connected blocks of the same type. Fortune and Silk Touch still work,
-and each extra block uses normal tool durability. No client mod needed.
+and each extra block uses normal tool durability plus 0.1 exhaustion for a
+small hunger cost. The client addon is allowed but optional.
+Client addon users can vein-mine any block; the groups below apply to mining
+without the addon.
 
 All vanilla ores are included: coal, copper, iron, gold, redstone, lapis,
 diamond and emerald, including deepslate variants; nether gold, nether quartz
@@ -30,8 +33,9 @@ break can still break a worn tool.
 Vanilla Java clients need no addon. The pinned Geyser 2.11.3 build 1249 forwards
 Bedrock sneak input as Java shift input; Veinminer checks Paper's
 `Player.isSneaking()`. If the server sees no sneak state, the block is mined
-normally. The client-addon registration is disabled, with no client requirement
-or override. These are jar/config checks, not a claim of a live Bedrock test.
+normally. Client-addon registration and all-block access are enabled, with no
+client requirement or settings overrides. These are jar/config checks, not a
+claim of a live Bedrock test.
 
 ## Configuration and compatibility
 
