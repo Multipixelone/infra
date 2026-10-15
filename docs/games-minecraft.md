@@ -43,19 +43,20 @@ is not published as a newer build; it changes the command library dependency.
 No Floodgate bump is required for Geyser 2.12.0's Java protocol translation.
 This change does not deploy or establish a successful live Bedrock login.
 
-| Plugin             | Version / placement            | Evidence                                                                                                                                                                                                                                   |
-| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| SkinsRestorer      | 15.12.6 / Velocity and Paper   | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml)                          |
-| MiniMOTD           | 2.2.5 / Velocity               | [Release](https://github.com/jpenilla/MiniMOTD/releases/tag/v2.2.5); [source](https://github.com/jpenilla/MiniMOTD/tree/v2.2.5/platform/velocity) ping, command and favicon calls inspected against the pinned Velocity 4.2.0 build 30 API |
-| TAB                | 6.2.0 / Paper                  | [Release explicitly adds Bukkit 26.3](https://github.com/NEZNAMY/TAB/releases/tag/6.2.0); pinned universal JAR descriptor, 26.3 version bound and native Paper implementation inspected                                                    |
-| BlueMap            | 5.28 / Paper                   | [Explicit Paper 26.3 support](https://github.com/BlueMap-Minecraft/BlueMap/releases/tag/v5.28)                                                                                                                                             |
-| LuckPerms          | 5.5.71 / Velocity and Paper    | [Paper 26.3 release](https://modrinth.com/plugin/luckperms/version/v5.5.71-bukkit), [Velocity release](https://modrinth.com/plugin/luckperms/version/v5.5.71-velocity); Finn explicitly approved Velocity compatibility                    |
-| Simple Voice Chat  | bukkit-2.6.24 / Paper          | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24)                                                                                                                                                 |
-| TickScope          | 2.0.1 / Paper                  | [Maintained release](https://github.com/gzimbric/TickScope/releases/tag/v2.0.1), [26.3 compatibility](https://hangar.papermc.io/gzimbric/TickScope/versions/2.0.1)                                                                         |
-| DiscordSRV classic | 1.30.5 / Paper                 | [26.3 release](https://modrinth.com/plugin/discordsrv/version/1.30.5)                                                                                                                                                                      |
-| Vault              | 1.7.3 / Paper (rank sync only) | [Pinned release](https://github.com/MilkBowl/Vault/releases/tag/1.7.3); isolated Paper 26.3 build 159 startup and DiscordSRV's LuckPerms provider lookup passed                                                                            |
-| HuskHomes          | 4.11-9ed80cc **alpha** / Paper | [Pinned release metadata](https://api.modrinth.com/v2/version/eXHdkjXf) explicitly lists Paper and 26.3; [source commit](https://github.com/WiIIiam278/HuskHomes/commit/9ed80cc)                                                           |
-| AxGraves           | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
+| Plugin              | Version / placement            | Evidence                                                                                                                                                                                                                                   |
+| ------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SkinsRestorer       | 15.12.6 / Velocity and Paper   | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml)                          |
+| MiniMOTD            | 2.2.5 / Velocity               | [Release](https://github.com/jpenilla/MiniMOTD/releases/tag/v2.2.5); [source](https://github.com/jpenilla/MiniMOTD/tree/v2.2.5/platform/velocity) ping, command and favicon calls inspected against the pinned Velocity 4.2.0 build 30 API |
+| TAB                 | 6.2.0 / Paper                  | [Release explicitly adds Bukkit 26.3](https://github.com/NEZNAMY/TAB/releases/tag/6.2.0); pinned universal JAR descriptor, 26.3 version bound and native Paper implementation inspected                                                    |
+| BlueMap             | 5.28 / Paper                   | [Explicit Paper 26.3 support](https://github.com/BlueMap-Minecraft/BlueMap/releases/tag/v5.28)                                                                                                                                             |
+| LuckPerms           | 5.5.71 / Velocity and Paper    | [Paper 26.3 release](https://modrinth.com/plugin/luckperms/version/v5.5.71-bukkit), [Velocity release](https://modrinth.com/plugin/luckperms/version/v5.5.71-velocity); Finn explicitly approved Velocity compatibility                    |
+| Simple Voice Chat   | bukkit-2.6.24 / Paper          | [26.3 release](https://hangar.papermc.io/henkelmax/SimpleVoiceChat/versions/bukkit-2.6.24)                                                                                                                                                 |
+| TickScope           | 2.0.1 / Paper                  | [Maintained release](https://github.com/gzimbric/TickScope/releases/tag/v2.0.1), [26.3 compatibility](https://hangar.papermc.io/gzimbric/TickScope/versions/2.0.1)                                                                         |
+| DiscordSRV classic  | 1.30.5 / Paper                 | [26.3 release](https://modrinth.com/plugin/discordsrv/version/1.30.5)                                                                                                                                                                      |
+| Vault               | 1.7.3 / Paper (rank sync only) | [Pinned release](https://github.com/MilkBowl/Vault/releases/tag/1.7.3); isolated Paper 26.3 build 159 startup and DiscordSRV's LuckPerms provider lookup passed                                                                            |
+| HuskHomes           | 4.11-9ed80cc **alpha** / Paper | [Pinned release metadata](https://api.modrinth.com/v2/version/eXHdkjXf) explicitly lists Paper and 26.3; [source commit](https://github.com/WiIIiam278/HuskHomes/commit/9ed80cc)                                                           |
+| AxGraves            | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
+| Double Doors Server | 1.4.9 / Paper (Bukkit jar)     | [September 18 release supports 26.3](https://modrinth.com/plugin/double-doors-server/version/HhnvErM4); shaded Bukkit artifact avoids Paper's runtime SQL-library downloads                                                                |
 
 HuskHomes' stable 4.11 declares support through 26.2. The pinned September 23
 Paper alpha explicitly declares 26.3, so it is used with Finn's approval of a
@@ -100,6 +101,26 @@ skin services; this is separate from downloading plugin code.
 
 Custom `minecraft.plugins` names cannot replace managed JAR names. A Paper
 version change requires a new compatibility review and matching asset pins.
+
+## Paired doors
+
+**Double Doors 1.4.9:** everyone explicitly receives `doubledoors.use` and
+`doubledoors.toggle`; `/dd toggle` controls personal participation. Mirrored
+doors open together through ordinary block-state updates on Java and Bedrock.
+Fence gates, trapdoors and recursive opening are disabled: those modes search
+connected blocks rather than restricting updates to a mirrored pair. Auto-close,
+knocking, particles, SQL, anonymous tracking and update checks are disabled.
+
+There is no backend Geyser/Floodgate installation. The pinned
+[interaction listener](https://github.com/SzaBee13/double-doors-server/blob/v1.4.9/bukkit/src/main/java-common/me/szabee/doubledoors/bukkit/listeners/DoorInteractListener.java)
+calls its duplicate guard without checking bridge availability. It tracks the
+player UUID, world UUID and block position using monotonic time, suppressing
+duplicates within 80 ms and retaining the configured 250 ms cooldown. Local
+bridge detection and optional shared-SQL proxy heartbeats are separate from
+that guard. Neither a Double Doors proxy companion nor Floodgate data forwarding
+is needed for the debounce in this single-backend setup. Disposable Paper tests
+exercise pairing and the guard with neither bridge installed; this does not
+establish a live Bedrock-client interaction test.
 
 ## Player list and community invite
 

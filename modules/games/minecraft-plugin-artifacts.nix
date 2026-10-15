@@ -1,6 +1,13 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-doubledoors = pkgs.fetchurl {
+        # Shaded Bukkit jar avoids runtime SQL-library downloads. SHA-256 was
+        # computed from Modrinth bytes checked against its API's SHA-512.
+        name = "doubledoors-bukkit-1.4.9.jar";
+        url = "https://cdn.modrinth.com/data/Fdj5mcgC/versions/HhnvErM4/doubledoors-bukkit-1.4.9.jar";
+        sha256 = "4c6ae5a00d136192dd25c4c6283bcff948035844d6ca7a39c6d7f5b2aa7766b9";
+      };
       games-veinminer = pkgs.fetchurl {
         name = "veinminer-paper-2.12.3.jar";
         url = "https://cdn.modrinth.com/data/OhduvhIc/versions/O12m3jOR/veinminer-paper-2.12.3.jar";

@@ -199,6 +199,8 @@
                 "axgraves.list"
                 "axgraves.allowgraves"
                 "veinminer.use"
+                "doubledoors.use"
+                "doubledoors.toggle"
               ]
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
