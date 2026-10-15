@@ -9,6 +9,23 @@ from pathlib import Path
 import yaml
 
 fixture = json.loads(Path(sys.argv[1]).read_text())
+join_tips = fixture["joinTips"]
+assert "join-tips" not in join_tips["disabledPackNames"]
+assert not any(
+    pack["name"] == "Survival Join Tips" for pack in join_tips["disabledInventory"]
+)
+for name, files in join_tips["messageVariants"].items():
+    welcome = files["data/infra/function/join_tips/first.mcfunction"]
+    map_tip = files["data/infra/function/join_tips/tips/13.mcfunction"]
+    discord_tip = files["data/infra/function/join_tips/tips/16.mcfunction"]
+    assert "map.example.test" in welcome and "map.example.test" in map_tip
+    assert "map.finnrut.is" not in "".join(files.values())
+    assert "hHurpHK8RT" not in "".join(files.values())
+    assert ("https://discord.gg/joinTipsFixture" in welcome) == (name == "alternate")
+    assert ("https://discord.gg/joinTipsFixture" in discord_tip) == (
+        name == "alternate"
+    )
+    assert '"url":""' not in welcome and '"url":""' not in discord_tip
 assert fixture["fingerprint"] != fixture["modifiedFingerprint"]
 assert "/srv/games/minecraft/survival/world" in fixture["worldPaths"]
 assert "/srv/games/minecraft/survival/plugins/Chunky" in fixture["worldPaths"]
@@ -33,7 +50,7 @@ survival = next(s for s in fixture["manifest"]["servers"] if s["id"] == "surviva
 assert survival["datapacks"] == fixture["packs"]["inventory"]
 assert not any(pack["name"] == "Anti Enderman Grief" for pack in survival["datapacks"])
 assert not any(pack["name"] == "AFK Display" for pack in survival["datapacks"])
-assert len(survival["datapacks"]) == 8
+assert len(survival["datapacks"]) == 9
 assert all(pack["installed"] for pack in survival["datapacks"])
 assert set(fixture["packs"]["packs"]) == {
     "confetti-creepers",
@@ -41,11 +58,21 @@ assert set(fixture["packs"]["packs"]) == {
     "mini-blocks",
     "more-mob-heads",
     "custom-nether-portals",
-    "double-shulker-shells", "world-policy", "grave-compass",
+    "double-shulker-shells",
+    "world-policy",
+    "grave-compass",
+    "join-tips",
 }
 sources = fixture["sources"]
-assert set(fixture["metadataFiles"]) == {"sources.json", "credits.txt", "grave-compass"}
-assert sources["minecraftVersion"] == fixture["serverVersion"] == "26.3" and sources["dataPackFormat"] == [121, 0]
+assert set(fixture["metadataFiles"]) == {
+    "sources.json",
+    "credits.txt",
+    "grave-compass",
+    "join-tips",
+}
+assert sources["minecraftVersion"] == fixture["serverVersion"] == "26.3" and sources[
+    "dataPackFormat"
+] == [121, 0]
 assert sources["upstream"] == "https://vanillatweaks.net/picker/datapacks/"
 assert sources["bundle"]["id"] == "d326112"
 assert sources["bundle"]["retrieved"] == "2026-10-09"
@@ -54,7 +81,14 @@ assert (
     == "05f9f2a4256b4bf3a40e10b1a250959e6850e9ecf6ff55e68f6aebe0a0f53ce4"
 )
 assert "mirror" not in sources and len(sources["packs"]) == 6
-assert {"name": "Grave Compass", "version": "26.3 / 1", "installed": True} in survival["datapacks"]
+assert {"name": "Grave Compass", "version": "26.3 / 1", "installed": True} in survival[
+    "datapacks"
+]
+assert {
+    "name": "Survival Join Tips",
+    "version": "26.3 / 1",
+    "installed": True,
+} in survival["datapacks"]
 assert "afk-display" not in {pack["id"] for pack in sources["packs"]}
 assert not any("afk-display" in path for path in fixture["retainedInputs"])
 for pack in sources["packs"]:

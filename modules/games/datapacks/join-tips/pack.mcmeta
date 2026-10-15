@@ -1,0 +1,7 @@
+{
+  "pack": {
+    "description": "Private Survival welcome and one random tip per returning join",
+    "min_format": [121, 0],
+    "max_format": [121, 0]
+  }
+}

@@ -320,7 +320,7 @@ headroom before a substantial refresh.
 ## World datapacks and game rules
 
 The separate dashboard **Datapacks** list shows the following installed set,
-plus the generated Survival World Policy and Grave Compass packs. Installation
+plus the generated Survival World Policy, Grave Compass and Survival Join Tips packs. Installation
 status describes the declaration; it does not assert that Paper is awake or a
 player's HUD is on.
 
@@ -619,6 +619,106 @@ next start; a different declaration reconciles after its prechange snapshot.
 `/reload`. Minecraft owns the resulting `level.dat` persistence; Nix never
 patches NBT directly. A manual gamerule change is overridden on the next load.
 The policy pack runs without a polling unit, extra wake or RCON credential.
+
+### Private join guidance
+
+Survival enables `gameServers.servers.survival.minecraft.joinTips.enable`;
+other backends default to disabled. The managed `infra-join-tips.zip` datapack
+sends returning players exactly two private chat lines: `· Welcome back, NAME!`
+and one randomly chosen `· Tip: …` line. The name is the player's selector name,
+not Carbon's nickname: datapacks have no cheap direct Carbon display-name hook.
+Nobody else receives either line. Random choices are independent and can repeat.
+There are no periodic tips or broadcast tips.
+
+A genuine first join receives only this six-line Getting Started block:
+
+```text
+· Welcome to Finn's Survival! Quick start:
+· Homes: /sethome <name>, then /home <name> (10 max)
+· Friends: /tpa <player>, they reply /tpaccept
+· Mine ores while sneaking to vein-mine them
+· Death keeps items+XP in a grave; follow your Grave Compass
+· Map: map.finnrut.is · Discord: /discord
+```
+
+FlectonePulse's existing public first-join announcement and Discord invite are
+unchanged. Its greeting and periodic auto-message modules stay disabled.
+
+The pack polls player join state each tick, before player ticks increment
+`play_time`. A missing `ijt_leave` score triggers classification: the persistent
+`infra.join_tips.seen` tag or a saved `minecraft:play_time` / `minecraft:leave_game`
+statistic of at least one means returning. The predicate reads the player's
+actual persisted statistics; a newly created statistic scoreboard does **not**
+backfill history. Thus friends who played before installation get the returning
+welcome and tip, without manually tagging UUIDs or editing player data. Historical
+leave counts also recognize a prior session that ended before its first full tick.
+The assumption is that ordinary saved player statistics have been retained.
+
+After either path, the pack records its tag and consumes the leave counter.
+`ijt_leave` uses `minecraft.custom:minecraft.leave_game`; a normal disconnect,
+including a clean server shutdown, increments it for the next join. Load functions
+only create objectives, retaining tags and scores across `/reload`. Death,
+respawn, dimension changes and staying online do not send another tip. The random
+choice is stored in `ijt_tip`; neither objective is displayed or changes TAB teams.
+All message commands are `tellraw @s` inside the joining player's function context.
+
+The text source is `lib/minecraft-join-tips.nix`: edit its `tips` list to change
+advice, or `welcome` to change the six-line block. Numbered functions and the random
+range are generated from the list length. Static functions and history predicates
+live under `modules/games/datapacks/join-tips`. Nix builds the deterministic ZIP
+through the same `packFiles`/installer path as Grave Compass. Map text and links
+use the backend's runtime `mapUrl`; Discord links use its `minecraft.discord.inviteUrl`.
+An empty invite omits clickable invite links, retaining the `/discord` suggestion.
+
+The 20 tips cover homes, public homes, TPA, vein-mining, graves, the Grave Compass,
+`/ec`, ordinary home/TPA `/back`, sleeping, the map, AFK, nicknames, Discord,
+mini blocks, `/tpignore`, custom portals and `/rtp`. Public-home advice uses
+`/edithome <name> privacy public` and `/phome <player>:<home>` (the colon matters
+for Floodgate names). Voice chat, skins, LOD, `/msg`, `/spawn` and named warps
+are not advertised.
+
+Nickname advice is `/nick <aqua>Name` and `/nick reset`. The pinned Carbon
+3.0.0-beta.39 [command parser](https://github.com/Hexaoxide/Carbon/blob/6e486ad3fc7757e844c9403c7efd67531e8cd730/common/src/main/java/net/draycia/carbon/common/command/commands/NicknameCommand.java)
+parses permitted MiniMessage tags before applying the 3–16-character name limit
+and alphanumeric/underscore filter to the **plain** name. Existing colour/reset
+permissions suffice; no permissions are added. DiscordSRV's configured nickname
+sync copies the plain name to linked Discord server nicknames on its three-minute
+cycle while the player is online, where bot permissions and role hierarchy permit;
+Minecraft colours are stripped. It is not a Discord username change or an instant
+sync guarantee.
+
+Finn chose to keep `/rtp` open to everyone. The tip describes random teleporting
+into the wild and the default ten-minute cooldown. The pinned HuskHomes
+4.11-9ed80cc [transaction resolver](https://github.com/WiIIiam278/HuskHomes/blob/9ed80cc/common/src/main/java/net/william278/huskhomes/util/TransactionResolver.java)
+defines `RANDOM_TELEPORT(25d, 600)` and uses `Instant.now().plusSeconds` for its
+cooldown. Cooldowns default to enabled and are not overridden by this repository;
+players with the existing cooldown-bypass permission are exempt. This change does
+not alter permissions or RTP generation settings.
+
+The new messages follow the shared FlectonePulse/Carbon/TAB system style.
+HuskHomes and AxGraves retain their existing upstream palettes; this addition does
+not restyle their messages. Survey references and reuse:
+
+| Convention                                                                               | Existing source                                                               | Join guidance                                                                                    |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Muted prose `#a6adc8`, mauve names `#cba6f7`; event pink `#f5c2e7` and peach `#fab387`   | `flectonepulse-config.py:84`, `:100`, `:107`                                  | Exact hex prose/name/link components; event glyphs retain their existing meanings                |
+| Private system bullet `·`, sentence case                                                 | `flectonepulse-config.py:113`                                                 | `· Welcome back, NAME!`, `· Tip: …`, welcome bullets                                             |
+| Carbon sender separator `›`, text `#cdd6f4`                                              | `minecraft-chat.nix:63`                                                       | Tips follow the private system-message layout rather than impersonating chat                     |
+| Bold mauve → pink → peach server-name gradient; `Map:`/`Discord:` labels, `·` separators | `minecraft-tab.nix:78`, `:85`                                                 | Same per-character gradient in the welcome; same labels and separator                            |
+| Default mauve, mod `light_purple`, admin `green`, builder `gold`; rank-name hover        | `rank-icons.json:2`, `minecraft-ranks.nix:14`, `minecraft-permissions.nix:23` | Neutral system messages use mauve emphasis, without player rank badges                           |
+| HuskHomes retains green `#00FB9A`, error `#FF7E5E`, hover and command suggestion actions | `minecraft-homes.nix:68`, pinned `locales/en-gb.yml:138`                      | Commands suggest input with “Click to suggest” hover; URLs open links; shared Catppuccin colours |
+| AxGraves magenta gradient, `»`, white help commands                                      | `minecraft-graves.nix:84`, `:170`                                             | Grave tips use the shared system style; existing grave messages stay intact                      |
+
+JSON text components preserve exact colours and explicit decoration boundaries;
+commands and links use mauve emphasis. Commands with placeholder arguments suggest
+their editable prefix, and complete examples suggest the complete command. Literal
+`<name>` and `<aqua>Name` examples are text, never MiniMessage input.
+
+The world check compiles and runs the pack on disposable pinned Paper 26.3 players,
+including historical statistics and private two-line returning output. The plugin
+check exercises the real Carbon colour example and reset. Installing the pack
+requires the normal future approved stopped-server reconcile/start and prechange
+snapshot gate. This change does not activate, restart or test the live server.
 
 ### Grave compass
 

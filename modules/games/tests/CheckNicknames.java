@@ -118,7 +118,7 @@ public class CheckNicknames {
             });
             var tab = ReadTab.empty(BukkitTabPlayer.class);
             ReadTab.set(TabPlayer.class, tab, "player", bukkit);
-            for (String input : new String[]{"<red>Finn", "<#55aaff>Abc", "<green>1234567890123456", "<red>A<reset>bc"}) {
+            for (String input : new String[]{"<aqua>Name", "<red>Finn", "<#55aaff>Abc", "<green>1234567890123456", "<red>A<reset>bc"}) {
                 errors[0] = null;
                 apply.invoke(command, sender, target, input);
                 ReadCarbon.require(errors[0] == null, "Valid nickname rejected: " + input);

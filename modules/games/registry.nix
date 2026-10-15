@@ -35,6 +35,11 @@ let
           default = true;
         };
         minecraft = {
+          joinTips.enable = mkOption {
+            type = types.bool;
+            default = false;
+            description = "Send private Getting Started guidance on first join and a welcome plus random tip on returning joins.";
+          };
           lazymc.enable = mkOption {
             type = types.bool;
             default = true;
@@ -253,6 +258,7 @@ in
         survival = {
           game = "minecraft-paper";
           displayName = "Survival";
+          minecraft.joinTips.enable = true;
           minecraft.lazymc.enable = false;
           minecraft.whitelist.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";
           minecraft.operators.Tunnelmaker = "3f771d00-3456-4007-8d66-13fe158488fa";

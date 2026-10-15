@@ -1,0 +1,35 @@
+{
+  "type": "minecraft:any_of",
+  "terms": [
+    {
+      "type": "minecraft:entity_properties",
+      "entity": "this",
+      "predicate": {
+        "minecraft:type_specific/player": {
+          "stats": [
+            {
+              "type": "minecraft:custom",
+              "stat": "minecraft:play_time",
+              "value": { "min": 1 }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "minecraft:entity_properties",
+      "entity": "this",
+      "predicate": {
+        "minecraft:type_specific/player": {
+          "stats": [
+            {
+              "type": "minecraft:custom",
+              "stat": "minecraft:leave_game",
+              "value": { "min": 1 }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

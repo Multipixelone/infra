@@ -7,6 +7,8 @@ in
   perSystem.treefmt.settings.global.excludes = [
     "modules/games/datapacks/grave-compass/**/*.mcfunction"
     "modules/games/datapacks/grave-compass/pack.mcmeta"
+    "modules/games/datapacks/join-tips/**/*.mcfunction"
+    "modules/games/datapacks/join-tips/pack.mcmeta"
   ];
   # requireFile marks manual inputs unfree; allow only this declared selection.
   nixpkgs.config.allowUnfreePackages = map (pack: pack.id) sources.packs;
@@ -77,6 +79,21 @@ in
         ${pkgs.python3}/bin/python3 ${./minecraft-datapacks.py} build \
           ${pkgs.writeText "grave-compass-files.json" (builtins.toJSON (packFiles ./datapacks/grave-compass))} "$out"
       '';
+      joinTips =
+        id: s:
+        let
+          files =
+            packFiles ./datapacks/join-tips
+            // import ../../lib/minecraft-join-tips.nix {
+              inherit lib;
+              inherit (cfg.runtime.${id}) mapUrl;
+              inherit (s.minecraft.discord) inviteUrl;
+            };
+        in
+        pkgs.runCommand "join-tips-${id}-26.3.zip" { } ''
+          ${pkgs.python3}/bin/python3 ${./minecraft-datapacks.py} build \
+            ${pkgs.writeText "join-tips-${id}-files.json" (builtins.toJSON files)} "$out"
+        '';
       installer = pkgs.writeScript "minecraft-datapacks-prepare" ''
         #!${pkgs.python3}/bin/python3
         import runpy
@@ -108,11 +125,14 @@ in
         system.extraDependencies = lib.attrValues vanillaTweaks;
         infra.games.artifacts.games-minecraft-world-policy = policy;
         infra.games.artifacts.games-minecraft-grave-compass = graveCompass;
-        infra.games.minecraftDatapacks.backends = lib.mapAttrs (_: _: {
-          packs = vanillaTweaks // {
-            world-policy = policy;
-            grave-compass = graveCompass;
-          };
+        infra.games.minecraftDatapacks.backends = lib.mapAttrs (id: s: {
+          packs =
+            vanillaTweaks
+            // {
+              world-policy = policy;
+              grave-compass = graveCompass;
+            }
+            // lib.optionalAttrs s.minecraft.joinTips.enable { join-tips = joinTips id s; };
           inventory =
             map (pack: {
               inherit (pack) name version;
@@ -129,7 +149,12 @@ in
                 version = "26.3 / 1";
                 installed = true;
               }
-            ];
+            ]
+            ++ lib.optional s.minecraft.joinTips.enable {
+              name = "Survival Join Tips";
+              version = "26.3 / 1";
+              installed = true;
+            };
         }) servers;
         infra.games.minecraftPlugins.backends = lib.mapAttrs (id: _: {
           statePaths = [ "/srv/games/minecraft/${id}/plugins/bStats" ];

@@ -4,6 +4,31 @@ let
   cfg = host.config;
   runtime = cfg.infra.games.runtime.survival;
   packs = cfg.infra.games.minecraftDatapacks.backends.survival;
+  withoutJoinTips =
+    (host.extendModules {
+      modules = [
+        {
+          infra.games.servers = lib.mkForce (
+            cfg.infra.games.servers
+            // {
+              survival = cfg.infra.games.servers.survival // {
+                minecraft = cfg.infra.games.servers.survival.minecraft // {
+                  joinTips.enable = false;
+                };
+              };
+            }
+          );
+        }
+      ];
+    }).config.infra.games.minecraftDatapacks.backends.survival;
+  messageVariants = lib.genAttrs [ "alternate" "empty" ] (
+    name:
+    import ../../lib/minecraft-join-tips.nix {
+      inherit lib;
+      mapUrl = "https://map.example.test";
+      inviteUrl = if name == "empty" then "" else "https://discord.gg/joinTipsFixture";
+    }
+  );
   modified =
     (host.extendModules {
       modules = [
@@ -15,6 +40,11 @@ let
       ];
     }).config;
   fixture = {
+    joinTips = {
+      disabledPackNames = lib.attrNames withoutJoinTips.packs;
+      disabledInventory = withoutJoinTips.inventory;
+      inherit messageVariants;
+    };
     inherit (runtime) worldPaths fingerprint;
     modifiedFingerprint = modified.infra.games.runtime.survival.fingerprint;
     properties = runtime.configTemplates."/srv/games/minecraft/survival/server.properties".source;
@@ -58,6 +88,11 @@ in
             ${packs.packs.grave-compass} \
             ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \
             ${vanillaServer}
+          python3 ${./tests/minecraft_join_tips_test.py} \
+            ${packs.packs.join-tips} \
+            ${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar \
+            ${vanillaServer} \
+            ${./tests/JoinTipsProbe.java}
           touch "$out"
         '';
   };
