@@ -292,6 +292,26 @@ let
         }
       ];
   cfg = host.config;
+  # Disposable LuckPerms JSON storage avoids a database service. Its extra
+  # loader is test-only; production keeps the existing PostgreSQL closure.
+  additionsLuckPermsLibraries =
+    pkgs:
+    let
+      base = cfg.infra.games.artifacts.games-luckperms-libraries;
+      gson = pkgs.fetchurl {
+        name = "configurate-gson-3.7.3.jar";
+        url = "https://repo.maven.apache.org/maven2/org/spongepowered/configurate-gson/3.7.3/configurate-gson-3.7.3.jar";
+        sha256 = "40cf9b1ab82bcdfc13f67bc8bd31ed4764d4129ba7f91c255c83bf6bd054d0c7";
+      };
+    in
+    pkgs.runCommand "minecraft-additions-luckperms-libraries" { } ''
+      mkdir -p "$out"
+      cp -rs ${base}/. "$out/"
+      ln -s ${gson} "$out/configurate-gson-3.7.3.jar"
+      ${pkgs.jdk25_headless}/bin/java -cp ${base}/asm-9.8.jar:${base}/asm-commons-9.8.jar:${base}/jar-relocator-1.7.jar \
+        ${./LuckPermsRelocate.java} ${gson} "$out/configurate-gson-3.7.3-remapped.jar" \
+        ninja.leaping.configurate me.lucko.luckperms.lib.configurate
+    '';
   buildingNames = [
     "FastAsyncWorldEdit"
     "FastAsyncVoxelSniper"
@@ -529,6 +549,39 @@ in
           ];
         }
         ''
+          python3 ${./tests/minecraft_additions_test.py} \
+            ${
+              pkgs.writeText "minecraft-additions-fixture.json" (
+                builtins.toJSON {
+                  fixtures = polishFixtures;
+                  bootstrap =
+                    permissions.infra.games.minecraftPlugins.backends.survival.templates."/srv/games/minecraft/survival/plugins/LuckPerms/bootstrap.json.gz".source;
+                  artifacts = lib.mapAttrs (_: toString) (
+                    lib.getAttrs [
+                      "games-doubledoors"
+                      "games-axiom"
+                      "games-crazyenchantments"
+                      "games-luckperms-paper"
+                      "games-luckperms-libraries"
+                      "games-fawe"
+                      "games-veinminer"
+                      "games-veinminer-libraries"
+                      "games-vault"
+                      "games-velocity"
+                    ] cfg.infra.games.artifacts
+                    // {
+                      games-luckperms-libraries = additionsLuckPermsLibraries pkgs;
+                    }
+                  );
+                  paper = "${cfg.infra.games.artifacts.games-paper-survival}/lib/minecraft/server.jar";
+                  vanilla = pkgs.fetchurl {
+                    name = "minecraft-server-26.3.jar";
+                    url = "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar";
+                    sha256 = "d052f14d7a173734fba553711e5b570162e2f2a313267ee31a21b975a679be64";
+                  };
+                }
+              )
+            } ${./tests/MinecraftAdditionsProbe.java}
           python3 ${./tests/minecraft_discord_token_test.py} ${./minecraft-discord-token.py}
           python3 ${./tests/minecraft_discord_test.py} \
             ${pkgs.writeText "minecraft-discord-fixtures.json" (builtins.toJSON fixtures)} \

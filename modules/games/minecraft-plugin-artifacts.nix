@@ -13,6 +13,12 @@
         url = "https://cdn.modrinth.com/data/evkiwA7V/versions/V2yAy4up/AxiomPaper-6.0.1-for-MC26.3.jar";
         sha256 = "8f3c478c4c7d5e3e9864cb0c5cc848a6663c06864ea5761edad246eba4f40752";
       };
+      games-crazyenchantments = pkgs.fetchurl {
+        # Pinned 26.3 beta; stable 2.8.1 only lists 26.2.
+        name = "crazyenchantments-26.3-ed9d9ab.jar";
+        url = "https://cdn.modrinth.com/data/krxPuhWb/versions/lIRmXa3P/CrazyEnchantments-26.3-ed9d9ab.jar";
+        sha256 = "e73c3b50e134e75b171b29345c563a0ba2760195e669d5125101bdbbd0b79fd0";
+      };
       games-veinminer = pkgs.fetchurl {
         name = "veinminer-paper-2.12.3.jar";
         url = "https://cdn.modrinth.com/data/OhduvhIc/versions/O12m3jOR/veinminer-paper-2.12.3.jar";

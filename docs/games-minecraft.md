@@ -58,6 +58,7 @@ This change does not deploy or establish a successful live Bedrock login.
 | AxGraves            | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
 | Double Doors Server | 1.4.9 / Paper (Bukkit jar)     | [September 18 release supports 26.3](https://modrinth.com/plugin/double-doors-server/version/HhnvErM4); shaded Bukkit artifact avoids Paper's runtime SQL-library downloads                                                                |
 | AxiomPaper          | 6.0.1+26.3 / Paper             | [Pinned MIT server component](https://modrinth.com/plugin/axiom-paper-plugin/version/V2yAy4up); descriptor targets API 26.3                                                                                                                |
+| CrazyEnchantments   | 26.3-ed9d9ab **beta** / Paper  | [October 14 beta supports 26.3](https://modrinth.com/plugin/crazyenchantments/version/lIRmXa3P); stable 2.8.1 only lists 26.2                                                                                                              |
 
 HuskHomes' stable 4.11 declares support through 26.2. The pinned September 23
 Paper alpha explicitly declares 26.3, so it is used with Finn's approval of a
@@ -103,7 +104,11 @@ skin services; this is separate from downloading plugin code.
 Custom `minecraft.plugins` names cannot replace managed JAR names. A Paper
 version change requires a new compatibility review and matching asset pins.
 
-## Paired doors
+## Paired doors, Axiom and custom enchantments
+
+All three JARs are immutable fixed-output Nix downloads. Their data folders are
+included in clean-stop backups and the plugin inventory. Adding them does not
+change the service's credential gates or apply LuckPerms changes to its database.
 
 **Double Doors 1.4.9:** everyone explicitly receives `doubledoors.use` and
 `doubledoors.toggle`; `/dd toggle` controls personal participation. Mirrored
@@ -122,8 +127,6 @@ that guard. Neither a Double Doors proxy companion nor Floodgate data forwarding
 is needed for the debounce in this single-backend setup. Disposable Paper tests
 exercise pairing and the guard with neither bridge installed; this does not
 establish a live Bedrock-client interaction test.
-
-## Axiom building
 
 **Axiom:** Java builders need the **Fabric client mod Axiom 6.1.3 for 26.3** plus
 **Fabric API**. Bedrock cannot use its editor. Multiplayer use requires an
@@ -174,6 +177,40 @@ Fabric client handshake after a separately authorized deployment.
 logger or rollback system: CoreProtect/Prism remain deferred. Backups are the
 only server-side undo/recovery for these edits, requiring whole-world recovery
 rather than a per-player rollback. FAWE's change limits do not constrain Axiom.
+
+**CrazyEnchantments:** the October 14 `26.3-ed9d9ab` build is a deliberately
+pinned **beta**, MIT-licensed with no hard dependencies. Everyone receives
+`crazyenchantments.player.*`: GUI, tinker, blacksmith, GKitz, limit and information
+access. Vanilla enchanting-table interaction remains unchanged; use `/ce` for
+the separate custom-enchant GUI. Unsafe enchantment levels are disabled and the
+default custom-enchant limit remains **3**. Bedrock sees custom enchants as
+**plain item lore**, without Java-specific UI presentation.
+
+Vault has no economy provider here; its existing permission hook serves rank
+sync only. Vault-priced scramblers, slot/protection crystals, transmog/black/white
+scrolls, success/destroy dust and lost-book shop entries have `InGUI: false`.
+XP-priced enchant-book categories, the XP-priced blacksmith and tinker/info
+remain available. No economy dependency or currency conversion is added.
+
+Disabled enchants are **VeinMiner** (duplicates connected ore mining) and
+**Blast** (adds another multi-block mining handler alongside the existing
+Veinminer). **TreeFeller stays enabled**: existing Veinminer groups cover ores
+and decorative stone, not logs. Other release defaults remain intact. CE metrics
+are disabled; this pinned jar contains no update checker to enable or disable.
+
+Axiom's chunk buffers, queued changes and native Zstandard compression make bulk
+edits the main added resource concern. CE's armor processor can use 1–10 worker
+threads with a bounded 10,000-item queue, scheduling work when players move
+between block positions; some enchants also create entities. Paper retains
+`-Xmx4G` and `MemoryMax=6G`, against
+the previously measured **5.23 GiB** peak; the remaining margin is about 0.77 GiB.
+Disposable startup measurements are not a multiplayer capacity guarantee.
+After a separately authorized activation, use the existing memory/TPS panels
+and bounded builder edits to assess headroom before increasing throughput.
+
+The generated LuckPerms bootstrap and additive `chat-inventory.commands` include
+these grants/denials. Existing databases need the documented operator application
+and sync procedure after deployment; this change runs no live permission commands.
 
 ## Player list and community invite
 

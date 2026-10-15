@@ -209,6 +209,7 @@
                 "veinminer.use"
                 "doubledoors.use"
                 "doubledoors.toggle"
+                "crazyenchantments.player.*"
               ]
             ++ grants polishPermissions.default
             ++ nicknameRestrictions
