@@ -57,6 +57,7 @@ This change does not deploy or establish a successful live Bedrock login.
 | HuskHomes           | 4.11-9ed80cc **alpha** / Paper | [Pinned release metadata](https://api.modrinth.com/v2/version/eXHdkjXf) explicitly lists Paper and 26.3; [source commit](https://github.com/WiIIiam278/HuskHomes/commit/9ed80cc)                                                           |
 | AxGraves            | 1.32.1 / Paper                 | [Release supports 1.20.2–26.3](https://hangar.papermc.io/Artillex-Studios/AxGraves/versions/1.32.1), published September 26, 2026                                                                                                          |
 | Double Doors Server | 1.4.9 / Paper (Bukkit jar)     | [September 18 release supports 26.3](https://modrinth.com/plugin/double-doors-server/version/HhnvErM4); shaded Bukkit artifact avoids Paper's runtime SQL-library downloads                                                                |
+| AxiomPaper          | 6.0.1+26.3 / Paper             | [Pinned MIT server component](https://modrinth.com/plugin/axiom-paper-plugin/version/V2yAy4up); descriptor targets API 26.3                                                                                                                |
 
 HuskHomes' stable 4.11 declares support through 26.2. The pinned September 23
 Paper alpha explicitly declares 26.3, so it is used with Finn's approval of a
@@ -121,6 +122,58 @@ that guard. Neither a Double Doors proxy companion nor Floodgate data forwarding
 is needed for the debounce in this single-backend setup. Disposable Paper tests
 exercise pairing and the guard with neither bridge installed; this does not
 establish a live Bedrock-client interaction test.
+
+## Axiom building
+
+**Axiom:** Java builders need the **Fabric client mod Axiom 6.1.3 for 26.3** plus
+**Fabric API**. Bedrock cannot use its editor. Multiplayer use requires an
+**Axiom commercial license or a whitelist request on the Axiom Discord**;
+Finn will arrange that himself. The server plugin's MIT license does not grant
+the client mod's commercial-use entitlement. See the
+[official licensing instructions](https://axiomdocs.moulberry.com/other/commerciallicense.html).
+
+Only builder has the explicit grants `axiom.use`, `axiom.editor.*`,
+`axiom.build.*`, `axiom.tool.*`, `axiom.builder_tool.*`, `axiom.chunk.*`,
+`axiom.can_import_blocks` and `axiom.can_export_blocks`. Mod inherits builder.
+Builder explicitly denies world time/properties, player teleport/movement bypass,
+infinite reach/no-clip/phantom/fast-place, entity editing, dangerous block ticking
+and Axiom gamemode controls. No `axiom.default` grant is used. Admin retains `*`:
+Axiom's `axiom.all` grants all its capabilities internally, even where a raw
+LuckPerms query sees an inherited specific denial. Existing vanilla gamemode
+permissions remain independent of Axiom's controls.
+
+The managed `plugins/Axiom/config.yml` permits only `^world$`, the Survival
+overworld, excluding `world_nether`, `world_the_end` and other world names.
+The descriptor names its data folder `AxiomPaper`; a declarative directory link
+from `plugins/AxiomPaper` to `plugins/Axiom` ensures the plugin consumes this
+configuration and all of its persistent data is backed up. Disallowed placement
+includes bedrock, barriers, all command blocks, structure blocks/void, jigsaws,
+spawners/trial spawners, portal frames/blocks, gateways, light, reinforced
+deepslate, moving-piston/head and test blocks. These are placement restrictions,
+not a claim that existing blocks are protected from all editing tools.
+
+Blueprint sharing, annotations, large chunk-data requests, enlarged payloads and
+cross-world view teleporting are disabled. The block buffer allows **2 chunk
+sections per second** (each section contains 4096 blocks), with at most **2 chunk
+sends and 2 relights per tick** and edit-data loading limited to render distance.
+The complete pinned configuration defaults are preserved. This server jar has no
+update-check implementation or corresponding configuration switch.
+
+No Velocity forwarding option or proxy Axiom plugin is required. The pinned
+Velocity **4.2.0 build 30** bytecode forwards unregistered channels in both play
+handlers; registration messages pass through too. The upstream
+[client handler](https://github.com/PaperMC/Velocity/blob/dev/3.0.0/proxy/src/main/java/com/velocitypowered/proxy/connection/client/ClientPlaySessionHandler.java)
+and [backend handler](https://github.com/PaperMC/Velocity/blob/dev/3.0.0/proxy/src/main/java/com/velocitypowered/proxy/connection/backend/BackendPlaySessionHandler.java)
+show that path; the games plugin check inspects those same branches in the pinned
+jar. Axiom registers namespaced channels such as `axiom:hello`, `axiom:enable`,
+`axiom:response_chunk_data` and `axiom:tunnel`; these are client/backend traffic,
+not the proxy's BungeeCord channel. This evidence does not substitute for a live
+Fabric client handshake after a separately authorized deployment.
+
+**Axiom edits do not enter FAWE's undo history.** There is no installed block
+logger or rollback system: CoreProtect/Prism remain deferred. Backups are the
+only server-side undo/recovery for these edits, requiring whole-world recovery
+rather than a per-player rollback. FAWE's change limits do not constrain Axiom.
 
 ## Player list and community invite
 

@@ -302,7 +302,15 @@ for field, directory, server in (
         "wesv.use",
         "wesv.toggle",
     } <= builder_nodes
-    assert not any("*" in node for node in builder_nodes)
+    # Axiom's deliberately scoped feature groups are the only builder
+    # wildcards; FAWE/WorldEdit/VoxelSniper retain individual grants.
+    assert {node for node in builder_nodes if "*" in node} == {
+        "axiom.editor.*",
+        "axiom.build.*",
+        "axiom.tool.*",
+        "axiom.builder_tool.*",
+        "axiom.chunk.*",
+    }
     assert (
         not {
             "worldedit.regen",

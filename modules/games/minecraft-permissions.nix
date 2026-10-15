@@ -91,6 +91,14 @@
           ];
       builderPermissions = [
         "group.default"
+        "axiom.use"
+        "axiom.editor.*"
+        "axiom.build.*"
+        "axiom.tool.*"
+        "axiom.builder_tool.*"
+        "axiom.chunk.*"
+        "axiom.can_import_blocks"
+        "axiom.can_export_blocks"
         "minecraft.command.gamemode"
         "minecraft.command.gamemode.survival"
         "minecraft.command.gamemode.creative"
@@ -234,6 +242,25 @@
                 ];
           builder.nodes =
             grants builderPermissions
+            ++
+              map
+                (key: {
+                  inherit key;
+                  value = false;
+                })
+                [
+                  "axiom.world.time"
+                  "axiom.world.property"
+                  "axiom.player.teleport"
+                  "axiom.player.bypass_movement_restrictions"
+                  "axiom.capability.infinite_reach"
+                  "axiom.capability.no_clip"
+                  "axiom.capability.phantom"
+                  "axiom.capability.fast_place"
+                  "axiom.entity.*"
+                  "axiom.build_dangerous.*"
+                  "axiom.player.gamemode.*"
+                ]
             ++ rankNodes "builder"
             ++ chatPlaceholderRestrictions
             ++ deathReturnRestrictions

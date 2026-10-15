@@ -8,6 +8,11 @@
         url = "https://cdn.modrinth.com/data/Fdj5mcgC/versions/HhnvErM4/doubledoors-bukkit-1.4.9.jar";
         sha256 = "4c6ae5a00d136192dd25c4c6283bcff948035844d6ca7a39c6d7f5b2aa7766b9";
       };
+      games-axiom = pkgs.fetchurl {
+        name = "axiom-paper-6.0.1+26.3.jar";
+        url = "https://cdn.modrinth.com/data/evkiwA7V/versions/V2yAy4up/AxiomPaper-6.0.1-for-MC26.3.jar";
+        sha256 = "8f3c478c4c7d5e3e9864cb0c5cc848a6663c06864ea5761edad246eba4f40752";
+      };
       games-veinminer = pkgs.fetchurl {
         name = "veinminer-paper-2.12.3.jar";
         url = "https://cdn.modrinth.com/data/OhduvhIc/versions/O12m3jOR/veinminer-paper-2.12.3.jar";
