@@ -198,8 +198,10 @@ in
     in
     {
       # Preserve the plugin's default, but make exporter/store agreement explicit.
-      home-manager.users.${owner}.programs.beets.settings.embed.store =
-        "${home.xdg.dataHome}/beets/embeddings.sqlite3";
+      home-manager.users.${owner}.programs.beets.settings = {
+        embed.store = "${home.xdg.dataHome}/beets/embeddings.sqlite3";
+        mix = { inherit store; };
+      };
 
       users.users.album-graph = {
         isSystemUser = true;
