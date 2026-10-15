@@ -17,7 +17,7 @@
           driver = "overlay";
         };
         libvirtd = {
-          enable = true;
+          enable = false;
           onBoot = "ignore";
           onShutdown = "shutdown";
           qemu = {
