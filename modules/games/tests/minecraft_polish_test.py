@@ -39,9 +39,14 @@ for name, fixture in fixtures.items():
     if name == "noPaper":
         continue
     chat = name != "missingSecrets"
-    assert not {"openinv", "carbon", "miniplaceholders", "flectonepulse", "tab", "placeholderapi"} & set(
-        fixture["proxyJars"]
-    )
+    assert not {
+        "openinv",
+        "carbon",
+        "miniplaceholders",
+        "flectonepulse",
+        "tab",
+        "placeholderapi",
+    } & set(fixture["proxyJars"])
     assert set(fixture["servers"]) == (
         {"survival", "testing"} if name == "additionalBackend" else {"survival"}
     )
@@ -105,11 +110,19 @@ for name, fixture in fixtures.items():
         assert not event_config["database"]["use_playtime_tracking"]
         assert not event_config["metrics"]["enable"]
         assert event_commands["enable"] and integrations["enable"]
-        assert {k for k, v in event_commands.items() if isinstance(v, dict) and v.get("enable")} == {"afk"}
+        assert {
+            k
+            for k, v in event_commands.items()
+            if isinstance(v, dict) and v.get("enable")
+        } == {"afk"}
         assert event_commands["afk"]["aliases"] == ["afk"]
         assert not event_commands["afk"]["cooldown"]["enable"]
         assert not event_commands["afk"]["sound"]["enable"]
-        assert {k for k, v in integrations.items() if isinstance(v, dict) and v.get("enable")} == {"placeholderapi"}
+        assert {
+            k
+            for k, v in integrations.items()
+            if isinstance(v, dict) and v.get("enable")
+        } == {"placeholderapi"}
         for category in ("command", "message"):
             assert event_permissions[category]["afk"]["type"] == "TRUE"
         assert {
@@ -128,7 +141,9 @@ for name, fixture in fixtures.items():
             assert set(event_language["afk"][state]) == {"global", "local"}
             assert "<player>" in event_language["afk"][state]["global"]
             assert "<#cba6f7>" in event_language["afk"][state]["global"]
-            assert all("<#a6adc8>" in value for value in event_language["afk"][state].values())
+            assert all(
+                "<#a6adc8>" in value for value in event_language["afk"][state].values()
+            )
         assert not event_messages["vanilla"]["cancel_default_death_screen"]
         assert (
             event_messages["join"]["range"]
@@ -276,9 +291,12 @@ for name, fixture in fixtures.items():
                     for node in bootstrap["groups"][group]["nodes"]
                     if node["key"] == permission
                 ] == [False]
-                assert commands.count(
-                    ["lp", "group", group, "permission", "set", permission, "false"]
-                ) == 1
+                assert (
+                    commands.count(
+                        ["lp", "group", group, "permission", "set", permission, "false"]
+                    )
+                    == 1
+                )
         default = permission_nodes(bootstrap, "default")
         mod = permission_nodes(bootstrap, "mod")
         assert {
@@ -287,6 +305,9 @@ for name, fixture in fixtures.items():
             "carbon.channel.global",
             "carbon.channel.global.see",
             "carbon.channel.global.speak",
+            "carbon.messagetags.*",
+            "carbon.chatlinks",
+            "carbon.itemlink",
         } <= default
         assert {
             "openinv.inventory.open.other",
@@ -470,13 +491,23 @@ with tempfile.TemporaryDirectory() as directory:
     ]
     assert accepted < downloaded < loaded < declined
     player_info = subprocess.run(
-        ["javap", "-c", "-p", "-classpath", artifacts["geyser"],
-         "org.geysermc.geyser.translator.protocol.java.entity.player.JavaPlayerInfoUpdateTranslator"],
-        capture_output=True, text=True, check=True,
+        [
+            "javap",
+            "-c",
+            "-p",
+            "-classpath",
+            artifacts["geyser"],
+            "org.geysermc.geyser.translator.protocol.java.entity.player.JavaPlayerInfoUpdateTranslator",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     assert "PlayerListEntryAction.ADD_PLAYER:" in player_info
     assert "PlayerListEntryAction.UPDATE_LISTED:" in player_info
-    assert "UPDATE_DISPLAY_NAME" not in player_info  # Native Bedrock list degrades harmlessly.
+    assert (
+        "UPDATE_DISPLAY_NAME" not in player_info
+    )  # Native Bedrock list degrades harmlessly.
     for name in ("withLuckPerms", "withoutInvite", "alternateInvite"):
         templates = fixtures[name]["backends"]["survival"]["templates"]
         subprocess.run(
@@ -500,11 +531,25 @@ with tempfile.TemporaryDirectory() as directory:
         )
     subprocess.run(["java", "-cp", classpath, "CheckCarbonBridge"], check=True)
     subprocess.run(
-        ["java", "-cp", classpath, "CheckAfk", *[
-            fixtures["withLuckPerms"]["backends"]["survival"]["templates"][
-                f"{template_dir}/FlectonePulse/{path}.yml"
-            ]["source"] for path in ("message", "command", "integration", "localizations/en_us", "permission")
-        ]], check=True,
+        [
+            "java",
+            "-cp",
+            classpath,
+            "CheckAfk",
+            *[
+                fixtures["withLuckPerms"]["backends"]["survival"]["templates"][
+                    f"{template_dir}/FlectonePulse/{path}.yml"
+                ]["source"]
+                for path in (
+                    "message",
+                    "command",
+                    "integration",
+                    "localizations/en_us",
+                    "permission",
+                )
+            ],
+        ],
+        check=True,
     )
     discord_templates = fixtures["withDiscord"]["backends"]["survival"]["templates"]
     subprocess.run(

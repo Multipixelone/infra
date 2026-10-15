@@ -282,7 +282,11 @@ overhead nametags. Chat announces `· Finn is now AFK` / `· Finn is no longer A
 with mauve names and muted text; the player sees the corresponding `You` message.
 FlectonePulse's own chat, tab rendering and scoreboard remain disabled.
 
-Carbon keeps its MiniPlaceholders/LuckPerms formats. Managed ranks explicitly
+Carbon keeps its MiniPlaceholders/LuckPerms formats. Everyone inherits
+`carbon.messagetags.*`, `carbon.chatlinks` and `carbon.itemlink` from the default
+group, enabling all MiniMessage chat formatting, clickable URLs and item links.
+For example, `<rainbow>hello</rainbow>` and `<bold>hello</bold>` work in chat.
+Managed ranks explicitly
 deny `carbon.chatplaceholders`, including wildcard admins, so adding
 PlaceholderAPI does not reinterpret literal player chat. The backend needs a
 restart after deployment to load the new plugin and reconcile datapacks.
