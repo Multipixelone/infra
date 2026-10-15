@@ -135,10 +135,12 @@ def configuration(folder, filename="config.yml"):
 
 doors = configuration("DoubleDoors")
 assert doors["serverWideEnabled"] and doors["enableDoors"]
+assert doors["enableRecursiveOpening"], (
+    "the click listener also requires this for paired doors"
+)
 assert not any(
     doors[key]
     for key in (
-        "enableRecursiveOpening",
         "enableFenceGates",
         "enableTrapdoors",
         "enableAutoClose",

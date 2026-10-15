@@ -113,8 +113,9 @@ change the service's credential gates or apply LuckPerms changes to its database
 **Double Doors 1.4.9:** everyone explicitly receives `doubledoors.use` and
 `doubledoors.toggle`; `/dd toggle` controls personal participation. Mirrored
 doors open together through ordinary block-state updates on Java and Bedrock.
-Fence gates, trapdoors and recursive opening are disabled: those modes search
-connected blocks rather than restricting updates to a mirrored pair. Auto-close,
+`enableRecursiveOpening` is enabled: in 1.4.9 this switch also gates ordinary
+paired-door clicks. Fence gates and trapdoors are disabled separately; wooden
+door clicks use the partner search rather than the connected-block search. Auto-close,
 knocking, particles, SQL, anonymous tracking and update checks are disabled.
 
 There is no backend Geyser/Floodgate installation. The pinned

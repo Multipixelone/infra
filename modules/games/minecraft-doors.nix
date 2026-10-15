@@ -8,8 +8,9 @@
       configuration = (pkgs.formats.yaml { }).generate "doubledoors-1.4.9.yml" {
         serverWideEnabled = true;
         enableDoors = true;
-        # Gates/trapdoors use a connected-block search, not mirrored pairs.
-        enableRecursiveOpening = false;
+        # Despite its name, this also gates ordinary paired-door clicks in 1.4.9.
+        # Gates/trapdoors remain disabled separately below.
+        enableRecursiveOpening = true;
         enableFenceGates = false;
         enableTrapdoors = false;
         enableAutoClose = false;

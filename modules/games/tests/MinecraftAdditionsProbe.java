@@ -161,6 +161,7 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
 
     private void doors(World world) throws Exception {
         var plugin = (DoubleDoors) Bukkit.getPluginManager().getPlugin("DoubleDoors");
+        check(plugin.getPluginConfig().isEnableRecursiveOpening(), "paired-door click handler enabled");
         Player player = rankPlayer("default", world);
         check(!Bukkit.getPluginManager().isPluginEnabled("floodgate"), "no backend Floodgate");
         check(!plugin.isGeyserBridgeAvailable(), "proxy-only setup has no local bridge detection");
