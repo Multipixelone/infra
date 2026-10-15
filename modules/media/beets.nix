@@ -736,7 +736,10 @@ in
               "types"
               "importsource"
             ]
-            ++ lib.optional xtractor-enabled "xtractor";
+            ++ lib.optionals xtractor-enabled [
+              "xtractor"
+              "mix"
+            ];
             clutter = [
               "Thumbs.DB"
               ".DS_Store"
