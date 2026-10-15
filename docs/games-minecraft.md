@@ -193,11 +193,34 @@ scrolls, success/destroy dust and lost-book shop entries have `InGUI: false`.
 XP-priced enchant-book categories, the XP-priced blacksmith and tinker/info
 remain available. No economy dependency or currency conversion is added.
 
-Disabled enchants are **VeinMiner** (duplicates connected ore mining) and
+Disabled enchants are **VeinMiner** (duplicates connected ore mining),
 **Blast** (adds another multi-block mining handler alongside the existing
-Veinminer). **TreeFeller stays enabled**: existing Veinminer groups cover ores
-and decorative stone, not logs. Other release defaults remain intact. CE metrics
+Veinminer), and **TreeFeller** (duplicates the dedicated timber plugin).
+Other release defaults remain intact. CE metrics
 are disabled; this pinned jar contains no update checker to enable or disable.
+
+**Timber:** [Thizzy'z Tree Feller 1.32.1](https://modrinth.com/plugin/thizzyz-tree-feller/version/Y03wbmYU)
+explicitly supports Paper 26.3. Sneak while breaking a log with an axe to fell
+the tree. Logs fall away from the player, then become item drops rather than
+placing blocks. Normal axe durability costs and Unbreaking apply; a tool without
+enough durability cannot fell the tree. The upstream vanilla tree definitions,
+leaf checks and structure detection are retained, with a 250-log limit, a
+one-second cooldown and forest cascading disabled. Saplings replant only from
+the tree's own drops; none are created or taken from player inventories.
+Everyone can use `/treefeller toggle`; configuration and reload remain staff
+commands. No timber client mod is required. These heuristics reduce accidental
+structure damage but do not replace care when chopping logs near builds.
+
+**Simple Voice Distance is deferred:** the newest
+[Paper bridge 1.5.3-beta](https://modrinth.com/plugin/simplevoicedistance/version/CMtWkQlV)
+declares support only through 26.1.1. Its packet handler also applies proximity
+limits to Simple Voice Chat group packets: a direct probe against the pinned
+2.6.24 API allowed a group packet at five blocks but cancelled it at 1,000.
+Installing it would break existing long-distance group calls. The
+[26.3 Fabric client mod](https://modrinth.com/mod/simplevoice-distance/versions)
+does not establish Paper bridge compatibility. Keep the existing Simple Voice
+Chat plugin and group calls until a corrected bridge is verified or the group
+distance limitation is explicitly accepted.
 
 Axiom's chunk buffers, queued changes and native Zstandard compression make bulk
 edits the main added resource concern. CE's armor processor can use 1–10 worker

@@ -403,42 +403,42 @@ let
         inviteUrl = "";
       } true
     );
-    alternateInvite = polishFixture (
-      (host.extendModules {
-        modules = [
-          {
-            infra.games.secretFiles = lib.mkForce {
-              "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
-            };
-            infra.games.servers = lib.mkForce (
-              base
-              // {
-                survival = base.survival // {
-                  minecraft = base.survival.minecraft // {
-                    maxPlayers = 42;
-                    discord = base.survival.minecraft.discord // {
-                      inviteUrl = "https://discord.gg/tabFixture";
+    alternateInvite =
+      polishFixture
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.secretFiles = lib.mkForce {
+                "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+              };
+              infra.games.servers = lib.mkForce (
+                base
+                // {
+                  survival = base.survival // {
+                    minecraft = base.survival.minecraft // {
+                      maxPlayers = 42;
+                      discord = base.survival.minecraft.discord // {
+                        inviteUrl = "https://discord.gg/tabFixture";
+                      };
                     };
                   };
-                };
-              }
-            );
-          }
-        ];
-      }).config
-    );
-    withoutAdmin = polishFixture (
-      (host.extendModules {
-        modules = [
-          {
-            infra.games.secretFiles = lib.mkForce {
-              "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
-            };
-            infra.games.minecraftAdminUuid = lib.mkForce null;
-          }
-        ];
-      }).config
-    );
+                }
+              );
+            }
+          ];
+        }).config;
+    withoutAdmin =
+      polishFixture
+        (host.extendModules {
+          modules = [
+            {
+              infra.games.secretFiles = lib.mkForce {
+                "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
+              };
+              infra.games.minecraftAdminUuid = lib.mkForce null;
+            }
+          ];
+        }).config;
     withDiscord = polishFixture (
       evaluate {
         "games/minecraft/luckperms-db-password" = ./tests/fixture.age;
@@ -561,6 +561,7 @@ in
                       "games-doubledoors"
                       "games-axiom"
                       "games-crazyenchantments"
+                      "games-treefeller"
                       "games-luckperms-paper"
                       "games-luckperms-libraries"
                       "games-fawe"

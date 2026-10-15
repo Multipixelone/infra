@@ -19,11 +19,13 @@ plugins = {
     "doubledoors": ("DoubleDoors", "1.4.9"),
     "axiom": ("AxiomPaper", "6.0.1+26.3"),
     "crazyenchantments": ("CrazyEnchantments", "26.3-ed9d9ab"),
+    "treefeller": ("TreeFeller", "1.32.1"),
 }
 folders = {
     "doubledoors": "DoubleDoors",
     "axiom": "Axiom",
     "crazyenchantments": "CrazyEnchantments",
+    "treefeller": "TreeFeller",
 }
 grants = [
     "axiom.use",
@@ -55,7 +57,7 @@ for key, (name, version) in plugins.items():
         assert descriptor["name"] == name and descriptor["version"] == version
         assert not descriptor.get("depend") and not descriptor.get("libraries")
         descriptors[key] = descriptor
-        if key != "doubledoors":
+        if key in ("axiom", "crazyenchantments"):
             assert descriptor["api-version"] == "26.3"
 
 axiom_nodes = descriptors["axiom"]["permissions"]
@@ -134,6 +136,18 @@ def configuration(folder, filename="config.yml"):
 
 
 doors = configuration("DoubleDoors")
+timber = configuration("TreeFeller")
+assert timber["with-sneak"] and not timber["without-sneak"]
+assert timber["log-behavior"] == "FALL_NATURAL_BREAK"
+assert timber["directional-fall-behavior"] == "AWAY"
+assert timber["replant-saplings"] and timber["spawn-saplings"] == 0
+assert timber["respect-unbreaking"] and timber["damage-mult"] == 1.0
+assert not timber["allow-partial-tool"] and not timber["cascade"]
+with zipfile.ZipFile(artifacts["games-treefeller"]) as jar:
+    defaults = yaml.safe_load(jar.read("config.yml"))
+assert timber["trees"] == defaults["trees"]
+assert timber["tools"] == defaults["tools"]
+assert timber["required-leaves"] == defaults["required-leaves"]
 assert doors["serverWideEnabled"] and doors["enableDoors"]
 assert doors["enableRecursiveOpening"], (
     "the click listener also requires this for paired doors"
@@ -204,9 +218,9 @@ for category in ce["Categories"].values():
 with zipfile.ZipFile(artifacts["games-crazyenchantments"]) as jar:
     defaults = yaml.safe_load(jar.read("Enchantments.yml"))
     actual = configuration("CrazyEnchantments", "Enchantments.yml")
-    for name in ("VeinMiner", "Blast"):
+    for name in ("VeinMiner", "Blast", "TreeFeller"):
         defaults["Enchantments"][name]["Enabled"] = False
-    assert actual == defaults, "preserve unrelated enchantments, including TreeFeller"
+    assert actual == defaults, "preserve unrelated enchantments"
 
 # Verify both forwarding paths against the exact pinned Velocity implementation.
 velocity = str(pathlib.Path(artifacts["games-velocity"]) / "lib/minecraft/server.jar")
@@ -367,6 +381,7 @@ with tempfile.TemporaryDirectory(prefix="minecraft-additions-") as directory:
                 "DoubleDoors",
                 "Axiom",
                 "CrazyEnchantments",
+                "TreeFeller",
                 "MinecraftAdditionsProbe",
             )
         )
@@ -380,5 +395,5 @@ with tempfile.TemporaryDirectory(prefix="minecraft-additions-") as directory:
         f"Disposable child peak RSS: {resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024:.0f} MiB"
     )
     print(
-        "PASS: all three plugins on Paper 26.3 build 159, effective rank policy and runtime restrictions"
+        "PASS: gameplay plugins on Paper 26.3 build 159, effective rank policy and runtime restrictions"
     )

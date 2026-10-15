@@ -187,6 +187,8 @@
                 "voicechat.listen"
                 "voicechat.speak"
                 "voicechat.groups"
+                "treefeller.help"
+                "treefeller.toggle"
                 "huskhomes.max_homes.10"
                 "huskhomes.command.home"
                 "huskhomes.command.sethome"

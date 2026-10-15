@@ -34,7 +34,7 @@
                     category["InGUI"] = False
                 if category["LostBook"]["Currency"] == "Vault":
                     category["LostBook"]["InGUI"] = False
-            for name in ("VeinMiner", "Blast"):
+            for name in ("VeinMiner", "Blast", "TreeFeller"):
                 enchants["Enchantments"][name]["Enabled"] = False
             for name, value in (("config.yml", config), ("Enchantments.yml", enchants)):
                 (pathlib.Path(sys.argv[2]) / name).write_text(yaml.safe_dump(value, sort_keys=False))
@@ -51,7 +51,7 @@
               "Enchantments.yml"
             ])
             (path: {
-              source = "${configuration}/${builtins.baseNameOf path}";
+              source = "${configuration}/${baseNameOf path}";
             });
         statePaths = [ "/srv/games/minecraft/${id}/plugins/CrazyEnchantments" ];
         inventory = [

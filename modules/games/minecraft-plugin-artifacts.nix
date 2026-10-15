@@ -1,6 +1,12 @@
 { lib, ... }: {
   flake.modules.nixos.games-minecraft = { pkgs, ... }: {
     config.infra.games.artifacts = {
+      games-treefeller = pkgs.fetchurl {
+        # Modrinth release explicitly supports Paper 26.3.
+        name = "treefeller-1.32.1.jar";
+        url = "https://cdn.modrinth.com/data/YrkmSvXh/versions/Y03wbmYU/TreeFeller-1.32.1.jar";
+        sha256 = "fcc72f04fc3342319478f9bd7fbc0ea66a29b40fac23d0c2bdde1518d27788c5";
+      };
       games-doubledoors = pkgs.fetchurl {
         # Shaded Bukkit jar avoids runtime SQL-library downloads. SHA-256 was
         # computed from Modrinth bytes checked against its API's SHA-512.

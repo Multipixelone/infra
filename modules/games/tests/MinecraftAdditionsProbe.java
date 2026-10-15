@@ -209,7 +209,7 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
                 .map(enchant -> enchant.getName()).toList();
         check(!names.isEmpty(), "CE registers enchantments");
         check(names.stream().noneMatch(name -> name.equalsIgnoreCase("VeinMiner") || name.equalsIgnoreCase("Blast")), "CE mining duplicates disabled");
-        check(names.stream().anyMatch(name -> name.equalsIgnoreCase("TreeFeller")), "CE TreeFeller preserved");
+        check(names.stream().noneMatch(name -> name.equalsIgnoreCase("TreeFeller")), "CE TreeFeller duplicate disabled");
         check(manager.getPlayerMaxEnchantments(rankPlayer("default", world)) == 3, "CE default limit is three");
     }
 
@@ -220,7 +220,7 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
                 seedPermissions();
                 Bukkit.getScheduler().runTask(this, () -> {
                     try {
-                        for (String name : List.of("DoubleDoors", "AxiomPaper", "CrazyEnchantments", "FastAsyncWorldEdit", "Veinminer", "Vault")) {
+                        for (String name : List.of("DoubleDoors", "AxiomPaper", "CrazyEnchantments", "TreeFeller", "FastAsyncWorldEdit", "Veinminer", "Vault")) {
                             check(Bukkit.getPluginManager().isPluginEnabled(name), name + " enabled");
                         }
                         check(Bukkit.getVersion().contains("159"), "pinned Paper build 159");
