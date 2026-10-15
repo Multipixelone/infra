@@ -26,7 +26,7 @@
           lod-backchannel-port = lodPort;
           lod-backchannel-bind-address = "0.0.0.0";
           lod-backchannel-host = lodHost;
-          lod-index-budget-mb = 256;
+          lod-index-budget-mb = 0;
 
           # These BukkitConfig keys are supported by the pinned plugin. Keep
           # Paper's existing heap/service limits and yield early to players.

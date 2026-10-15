@@ -378,8 +378,8 @@ target, a 5 ms generation budget, 30 ms player reserve and 60 ms ceiling;
 queued writes are capped at 100, the LOD queue at 64, heap pressure at 75%, and
 overload auto-pause uses a 30-second grace period. These are cooperative
 controls, not a CPU quota or per-chunk deadline. Paper retains its 4 GiB maximum
-heap and 6 GiB service limit. The 256 MiB `lod-index-budget-mb` limits one index
-response's advertised data budget, not total disk usage or bytes per second.
+heap and 6 GiB service limit. Setting `lod-index-budget-mb` to `0` removes the
+index response's advertised data budget, allowing all regions within the requested radius.
 There is no configurable global bandwidth or store-size cap; the HTTP server
 has four workers, six concurrent requests per IP and a 30-second stalled-write
 timeout. Monitor disk, tick time and outbound traffic before expanding an area.

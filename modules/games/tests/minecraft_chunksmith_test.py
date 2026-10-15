@@ -65,7 +65,7 @@ for name in ("production", "additional"):
         assert configuration["throttle-max-lod-queue"] <= 64
         assert configuration["auto-pause-on-overload"] is True
         assert configuration["auto-pause-grace-seconds"] == 30
-        assert configuration["lod-index-budget-mb"] == 256
+        assert configuration["lod-index-budget-mb"] == 0
         assert (
             yaml.safe_load(
                 Path(
