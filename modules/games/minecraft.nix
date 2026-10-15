@@ -24,9 +24,9 @@
       forwardingPath = secretPath "games/minecraft/velocity-forwarding";
       floodgatePath = secretPath "games/minecraft/floodgate-key";
       geyser = pkgs.fetchurl {
-        name = "geyser-velocity-2.11.3-1249.jar";
-        url = "https://download.geysermc.org/v2/projects/geyser/versions/2.11.3/builds/1249/downloads/velocity";
-        sha256 = "0ea113ce061273c52f489bc40a3b287b98875b91b881cebde4d6be342f7a540d";
+        name = "geyser-velocity-2.12.0-1256.jar";
+        url = "https://download.geysermc.org/v2/projects/geyser/versions/2.12.0/builds/1256/downloads/velocity";
+        sha256 = "15b2bf8e025a46949a02bc3f6829667faa14938e8b6dbf09fc638ba1cfd3aae3";
       };
       floodgate = pkgs.fetchurl {
         name = "floodgate-velocity-2.2.5-141.jar";
@@ -263,12 +263,11 @@
               "${dataRoot}/velocity/plugins/Geyser-Velocity/config.yml" = {
                 source = toString (
                   (pkgs.formats.yaml { }).generate "geyser.yml" {
-                    config-version = 8;
+                    config-version = 10;
                     bedrock = {
                       address = "0.0.0.0";
                       port = 19132;
                       transport = "raknet";
-                      signaling.mode = "none";
                     };
                     java.auth-type = "floodgate";
                     advanced.floodgate-key-file = floodgatePath;

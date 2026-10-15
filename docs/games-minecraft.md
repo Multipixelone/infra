@@ -12,6 +12,37 @@ installed plugin JAR is updated at runtime. Configurations use Nix formats.
 [Veinminer 2.12.3](games-veinminer.md) is an accepted exception for network
 checks: it downloads updates into its data folder without installing them.
 
+Geyser was rechecked on 2026-10-15 after Bedrock players reached the proxy but
+Paper rejected them with `Outdated client! Please use 26.3`. Velocity now pins
+[Geyser 2.12.0 build 1256](https://download.geysermc.org/v2/projects/geyser/versions/2.12.0/builds/1256),
+published 2026-10-14 at 22:26:30 UTC, with Velocity SHA-256
+`15b2bf8e025a46949a02bc3f6829667faa14938e8b6dbf09fc638ba1cfd3aae3`.
+Its commit is `fc2170c97e088f910ba52e519ae3180e068af333`:
+the [Java dependency targets 26.3](https://github.com/GeyserMC/Geyser/blob/fc2170c97e088f910ba52e519ae3180e068af333/gradle/libs.versions.toml),
+and the [supported Bedrock list](https://github.com/GeyserMC/Geyser/blob/fc2170c97e088f910ba52e519ae3180e068af333/core/src/main/java/org/geysermc/geyser/network/bedrock/GameProtocol.java)
+explicitly includes `26.52` (the reported iOS Bedrock 1.26.52 client) under
+protocol `2193`.
+
+The declarative Geyser YAML uses config version **10**, matching the pinned
+[schema constant](https://github.com/GeyserMC/Geyser/blob/fc2170c97e088f910ba52e519ae3180e068af333/core/src/main/java/org/geysermc/geyser/Constants.java)
+and [configuration interface](https://github.com/GeyserMC/Geyser/blob/fc2170c97e088f910ba52e519ae3180e068af333/core/src/main/java/org/geysermc/geyser/configuration/GeyserConfig.java).
+The listener remains RakNet on UDP 19132 with Floodgate authentication and the
+existing key path. The obsolete `bedrock.signaling.mode: none` override is
+removed: valid modes are `builtin`, `nxs` and `hybrid`, and signaling is unused
+with RakNet. New `advanced.nxs` options retain upstream defaults; no NXS keys
+are overridden. Declaring the current schema avoids a startup version migration;
+the remaining configured keys are present in that interface.
+
+Floodgate stays at **2.2.5 build 141**, published 2026-09-17. The
+[latest published build API](https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest)
+still resolves to b141 with the already pinned Velocity SHA-256
+`649835022de37ff09255fc626d4bfe7bc2a3b926d07b0dfaf1f51e12bf37001d`.
+There is no newer published build to select. Upstream's newer
+[26.3 source update](https://github.com/GeyserMC/Floodgate/commit/81b65ccb766bf8024858ebf3eefa6974056aecc5)
+is not published as a newer build; it changes the command library dependency.
+No Floodgate bump is required for Geyser 2.12.0's Java protocol translation.
+This change does not deploy or establish a successful live Bedrock login.
+
 | Plugin             | Version / placement            | Evidence                                                                                                                                                                                                                                   |
 | ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | SkinsRestorer      | 15.12.6 / Velocity and Paper   | [26.3 fixes](https://github.com/SkinsRestorer/SkinsRestorer/releases/tag/15.12.6); [release source targets Velocity 4.2.0](https://github.com/SkinsRestorer/SkinsRestorer/blob/15.12.6/gradle/libs.versions.toml)                          |
@@ -121,8 +152,8 @@ deny `carbon.chatplaceholders`, including wildcard admins, so adding
 PlaceholderAPI does not reinterpret literal player chat. The backend needs a
 restart after deployment to load the new plugin and reconcile datapacks.
 
-Bedrock gracefully keeps its native player list. The pinned Geyser 2.11.3 build
-1249 does not translate Java list display names, sorting or header/footer;
+Bedrock gracefully keeps its native player list. The pinned Geyser 2.12.0 build
+1256 does not translate Java list display names, sorting or header/footer;
 the Java formatting cannot be promised there. The Discord invite remains
 available in first-join chat, DiscordSRV's existing `/discord` command when the
 bridge is installed, and the games dashboard's Connect section beside Map.
@@ -748,7 +779,7 @@ reliably clear the old item. An old compass can therefore remain in a grave;
 the next respawn still receives a fresh one. The datapack never edits grave
 contents or removes nearby dropped items.
 
-Pinned Geyser 2.11.3 build 1249 maps `minecraft:recovery_compass` directly to
+Pinned Geyser 2.12.0 build 1256 maps `minecraft:recovery_compass` directly to
 Bedrock's native item and translates the Java respawn packet's last-death
 position, dimension and has-died metadata. This supports the ordinary
 Bedrock recovery compass without extra mappings or resource packs. Grant and
@@ -1000,7 +1031,7 @@ fallbacks and rank-name hover tooltips. The pack translates `infra.rank.mod`,
 `infra.rank.admin`, and `infra.rank.builder` to U+E100, U+E101, and U+E102 in the
 default font. Without those translations, clients display colored `[Mod]`,
 `[Admin]`, or `[Builder]` labels. Bedrock intentionally uses these labels: no
-Bedrock font pack is installed. Pinned Geyser 2.11.3 build 1249 acknowledges
+Bedrock font pack is installed. Pinned Geyser 2.12.0 build 1256 acknowledges
 required Java packs without downloading them and honors component fallbacks.
 Changing that pin must preserve both behaviors. Hover tooltips are a Java feature.
 
