@@ -24,6 +24,7 @@
                 port = toString s.minecraft.voicechatPort;
                 bind_address = "0.0.0.0";
                 voice_host = "${lib.head s.hostnames}:${toString s.minecraft.voicechatPort}";
+                max_voice_distance = "256.0";
                 force_voice_chat = "false";
                 enable_groups = "true";
               }

@@ -1307,6 +1307,9 @@ BlueMap tiles are rebuildable but included in incremental backups.
 
 ## Voice chat operator steps
 
+Proximity voice chat reaches 256 blocks (`max_voice_distance`), up from the
+plugin's 48-block default. The default `broadcast_range = -1` follows that range.
+
 UDP 24454 is open in link's Nix firewall and advertised as
 `survival.mc.finnrut.is:24454`. Add a router UDP port forward to link; router
 forwarding is not managed in this repo. The existing dynamic DNS record is the
