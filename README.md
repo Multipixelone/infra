@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (137)</summary>
+<summary>Packages exposed by this flake (141)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -124,6 +124,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-acknowledge-unclean` · `nix run github:Multipixelone/infra#games-acknowledge-unclean`
 - `games-axgraves` · `nix run github:Multipixelone/infra#games-axgraves`
 - `games-axgraves-libraries` · `nix run github:Multipixelone/infra#games-axgraves-libraries`
+- `games-axiom` · `nix run github:Multipixelone/infra#games-axiom`
 - `games-backup` · `nix run github:Multipixelone/infra#games-backup`
 - `games-backup-recover` · `nix run github:Multipixelone/infra#games-backup-recover`
 - `games-backup-recover-all` · `nix run github:Multipixelone/infra#games-backup-recover-all`
@@ -138,9 +139,11 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-console` · `nix run github:Multipixelone/infra#games-console`
 - `games-container-result` · `nix run github:Multipixelone/infra#games-container-result`
 - `games-container-stop` · `nix run github:Multipixelone/infra#games-container-stop`
+- `games-crazyenchantments` · `nix run github:Multipixelone/infra#games-crazyenchantments`
 - [`games-dashboard`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-package.nix) — Private game server dashboard with packaged frontend · `nix run github:Multipixelone/infra#games-dashboard`
 - [`games-dashboard-dev`](https://github.com/Multipixelone/infra/blob/main/modules/games/dashboard-dev.nix) — Run the loopback dashboard skeleton with Python reload and Vite HMR · `nix run github:Multipixelone/infra#games-dashboard-dev`
 - `games-discordsrv` · `nix run github:Multipixelone/infra#games-discordsrv`
+- `games-doubledoors` · `nix run github:Multipixelone/infra#games-doubledoors`
 - `games-fawe` · `nix run github:Multipixelone/infra#games-fawe`
 - `games-flectonepulse` · `nix run github:Multipixelone/infra#games-flectonepulse`
 - `games-flectonepulse-config` · `nix run github:Multipixelone/infra#games-flectonepulse-config`
@@ -179,6 +182,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - `games-tab` · `nix run github:Multipixelone/infra#games-tab`
 - `games-tickscope` · `nix run github:Multipixelone/infra#games-tickscope`
 - `games-tmodloader-runtime` · `nix run github:Multipixelone/infra#games-tmodloader-runtime`
+- `games-treefeller` · `nix run github:Multipixelone/infra#games-treefeller`
 - `games-vault` · `nix run github:Multipixelone/infra#games-vault`
 - `games-veinminer` · `nix run github:Multipixelone/infra#games-veinminer`
 - `games-veinminer-libraries` · `nix run github:Multipixelone/infra#games-veinminer-libraries`
