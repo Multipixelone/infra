@@ -699,7 +699,7 @@ in
             ];
             plugins = [
               # "albumtypes"
-              # "alternatives"
+              "alternatives"
               "badfiles"
               "chroma"
               "convert"
@@ -884,6 +884,22 @@ in
             #   formats = "musepack";
             #   removable = false;
             # };
+            alternatives.rekordbox = {
+              directory = "${media-drive}/DJ";
+              query = "dj:1";
+              # mp3/aac are copied as-is; everything else (flac, alac, opus) becomes aiff
+              formats = "aiff mp3 aac";
+              removable = false;
+              album_art_embed = true;
+              album_art_maxwidth = 500;
+              album_art_deinterlace = true;
+              # Omit [$media_type$source] to avoid path churn breaking rekordbox's absolute paths.
+              paths = {
+                default = "%the{$albumartist}/$album%aunique{}/$disc_and_track$title";
+                comp = "Various Artists/$album%aunique{}/$disc_and_track$artist - $title";
+                singleton = "%the{$artist}/Singles/$artist - $title";
+              };
+            };
             convert = {
               auto = true;
               never_convert_lossy_files = true;
@@ -894,6 +910,7 @@ in
               copy_album_art = true;
               max_bitrate = 4000;
               formats = {
+                aiff.command = "${ffmpeg} -i $source -map 0:a:0 -af aresample=resampler=soxr:osr=44100:osf=s16:dither_method=triangular -c:a pcm_s16be -y $dest";
                 # bring anything higher then 96000Hz down to that.
                 flac.command = "${ffmpeg} -i $source -af aformat=sample_rates=8000|11025|16000|22050|32000|44100|48000|88200|96000 -compression_level 5 -y -acodec flac $dest";
                 mp3.command = "${ffmpeg} -i $source -ab 320k -ac 2 -ar 44100 -joint_stereo 0 $dest";
