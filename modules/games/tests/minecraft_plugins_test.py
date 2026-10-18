@@ -256,13 +256,22 @@ for field, directory, server in (
     }
     for rank, weight in zip(("default", "builder", "mod", "admin"), (0, 10, 20, 30)):
         nodes = bootstrap["groups"][rank]["nodes"]
-        for permission in ("huskhomes.command.back.death", "axgraves.tp", "axgraves.tp.bypass"):
-            assert [node["value"] for node in nodes if node["key"] == permission] == [False]
+        for permission in (
+            "huskhomes.command.back.death",
+            "axgraves.tp",
+            "axgraves.tp.bypass",
+        ):
+            assert [node["value"] for node in nodes if node["key"] == permission] == [
+                False
+            ]
         for permission in ("discordsrv.silentjoin", "discordsrv.silentquit"):
-            assert [node["value"] for node in nodes if node["key"] == permission] == [False]
+            assert [node["value"] for node in nodes if node["key"] == permission] == [
+                False
+            ]
         assert not any(
             node["key"] in {"huskhomes.command.back", "huskhomes.command.back.previous"}
-            and not node["value"] for node in nodes
+            and not node["value"]
+            for node in nodes
         )
         assert {"key": f"weight.{weight}", "value": True} in nodes
         prefixes = [node["key"] for node in nodes if node["key"].startswith("prefix.")]
@@ -391,6 +400,31 @@ for field, directory, server in (
         "axgraves.allowgraves",
     } <= default_nodes
     assert "*" not in default_nodes and "axgraves.admin" not in default_nodes
+    for permission in (
+        "minecraft.command.locate",
+        "minecraft.command.teleport",
+        "huskhomes.command.tp",
+        "huskhomes.command.tp.other",
+        "huskhomes.command.tp.coordinates",
+        "huskhomes.command.tphere",
+        "huskhomes.command.tpa",
+        "huskhomes.command.tpahere",
+        "huskhomes.command.tpaccept",
+        "huskhomes.command.tpdecline",
+        "huskhomes.command.tpall",
+        "huskhomes.command.tpaall",
+        "huskhomes.command.tpoffline",
+        "huskhomes.command.tpignore",
+        "huskhomes.command.rtp",
+        "huskhomes.command.rtp.other",
+        "huskhomes.command.back",
+        "huskhomes.command.back.previous",
+    ):
+        assert [
+            node["value"]
+            for node in bootstrap["groups"]["mod"]["nodes"]
+            if node["key"] == permission
+        ] == [True]
     mod_nodes = {
         node["key"] for node in bootstrap["groups"]["mod"]["nodes"] if node["value"]
     }

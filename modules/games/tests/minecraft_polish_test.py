@@ -285,7 +285,13 @@ for name, fixture in fixtures.items():
         # track writes that could discard unrelated interactive state.
         assert sorted(commands) == sorted(expected)
         for group in ("default", "builder", "mod", "admin"):
-            for permission in ("discordsrv.silentjoin", "discordsrv.silentquit"):
+            for permission in (
+                "discordsrv.silentjoin",
+                "discordsrv.silentquit",
+                "huskhomes.command.back.death",
+                "axgraves.tp",
+                "axgraves.tp.bypass",
+            ):
                 assert [
                     node["value"]
                     for node in bootstrap["groups"][group]["nodes"]
