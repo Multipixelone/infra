@@ -160,12 +160,8 @@
                   mkLuaInline ''hl.dsp.window.move({ workspace = "name:gaming", follow = false })''
                 ))
                 # move workspaces between monitors
-                (bind "${mod} + SHIFT + ALT + bracketleft" (
-                  mkLuaInline ''hl.dsp.workspace.move({ monitor = "l" })''
-                ))
-                (bind "${mod} + SHIFT + ALT + bracketright" (
-                  mkLuaInline ''hl.dsp.workspace.move({ monitor = "r" })''
-                ))
+                (bind "${mod} + SHIFT + bracketleft" (mkLuaInline ''hl.dsp.workspace.move({ monitor = "l" })''))
+                (bind "${mod} + SHIFT + bracketright" (mkLuaInline ''hl.dsp.workspace.move({ monitor = "r" })''))
                 # (bind "SUPER + Tab" (mkLuaInline ''hl.dsp.layout("hyprexpo:expo, toggle")''))
                 # (bind "${mod} + H" (exec "pypr toggle helvum"))
               ]
