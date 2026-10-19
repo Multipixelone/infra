@@ -184,20 +184,6 @@
                 };
               };
             };
-            gpt = {
-              command = "copilot-language-server";
-              args = [ "--stdio" ];
-              config = {
-                editorInfo = {
-                  name = "Helix";
-                  version = "25.01";
-                };
-                editorPluginInfo = {
-                  name = "helix-copilot";
-                  version = "0.1.0";
-                };
-              };
-            };
             taplo = {
               command = lib.getExe pkgs.taplo;
               args = [
@@ -310,10 +296,7 @@
           language = [
             {
               name = "nix";
-              language-servers = [
-                "nixd"
-                "gpt"
-              ];
+              language-servers = [ "nixd" ];
               formatter.command = lib.getExe pkgs.nixfmt;
               auto-format = true;
             }
@@ -325,10 +308,7 @@
             }
             {
               name = "fish";
-              language-servers = [
-                "fish-lsp"
-                "gpt"
-              ];
+              language-servers = [ "fish-lsp" ];
             }
             {
               name = "markdown";
@@ -411,25 +391,17 @@
           ];
         };
     };
-  nixpkgs.config.allowUnfreePackages = [
-    "copilot-language-server"
-    "replace"
-  ];
+  nixpkgs.config.allowUnfreePackages = [ "replace" ];
   flake.modules = {
     homeManager.base =
-      hmArgs@{
+      {
         pkgs,
         lib,
         ...
       }:
       let
-        gpt-wrapped = pkgs.writeShellScriptBin "copilot-language-server" ''
-          export GITHUB_COPILOT_TOKEN=$(cat ${hmArgs.config.age.secrets."copilot".path})
-          ${lib.getExe pkgs.copilot-language-server} "$@"
-        '';
         packages =
           (with pkgs; [
-            gpt-wrapped
             marksman
             prettier
             markdown-oxide
