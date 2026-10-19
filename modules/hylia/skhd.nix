@@ -34,7 +34,7 @@
         # Lock the screen (Hyprland had a hyprlock bind).
         ctrl + alt - q      : pmset displaysleepnow
 
-        # Launcher: Hyprland $mod+SPACE opens anyrun. On macOS bind the
+        # Launcher: Hyprland $mod+SPACE opens the noctalia launcher. On macOS bind the
         # equivalent inside Alfred (Alfred → Preferences → hotkey), since the
         # search bar has no stable CLI trigger for skhd to call.
         #

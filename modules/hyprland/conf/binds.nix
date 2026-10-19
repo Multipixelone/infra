@@ -140,8 +140,7 @@
                 (bind "ALT + Print" (exec (lib.getExe screenshot-area)))
                 (bind "SHIFT + Print" (exec (lib.getExe screenshot-area-ocr)))
                 # (bind "${mod} + SPACE" (exec "pkill rofi || uwsm app -- rofi -show combi"))
-                # `anyrun close` fails when the launcher isn't open, so this toggles via the daemon
-                (bind "${mod} + SPACE" (exec "anyrun close || anyrun"))
+                (bind "${mod} + SPACE" (exec "noctalia msg panel-toggle launcher"))
                 (bind "${mod} + ESCAPE" (exec (lib.getExe pkgs.wlogout)))
                 (bind "${mod} + V" (mkLuaInline ''hl.dsp.window.float({ action = "toggle" })''))
                 (bind "SUPER + F" (mkLuaInline "hl.dsp.window.fullscreen()"))
