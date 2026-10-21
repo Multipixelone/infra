@@ -37,19 +37,10 @@
           luna = "openai/gpt-6-luna-fast";
           # retired. rip
           # spark = "openai/gpt-5.3-codex-spark";
-
-          # opencode go
-          # luna = "opencode-go/gpt-6-luna";
-          kimi = "opencode-go/kimi-k3";
-          deepseek-flash = "opencode-go/deepseek-v4-flash";
-          glm = "opencode-go/glm-5.2";
-          mimo = "opencode-go/mimo-v2.5";
-          mimo-pro = "opencode-go/mimo-v2.5-pro";
-          qwen = "opencode-go/qwen3.8-max";
         };
 
         # Role definitions are model-agnostic. Reasoning variants live in the
-        # preset assignment so Go-primary roles do not inherit Codex-only modes.
+        # preset assignment.
         roles = {
           orchestrator = {
             skills = [ "*" ];
@@ -115,11 +106,10 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Terra handles the interactive coordinator and implementation lanes,
-        # Sol remains the deep-reasoning oracle, and Luna handles bounded
-        # lookup work. Go supplies model diversity and quota-independent
-        # fallbacks.
-        presetGoCodex = mkPreset {
+        # Sol handles the interactive coordinator and implementation lanes,
+        # Astra is the deep-reasoning oracle and designer, and Luna handles
+        # bounded lookup and vision work.
+        presetCodex = mkPreset {
           orchestrator = {
             model = "sol";
             variant = "medium";
@@ -137,19 +127,18 @@
             variant = "low";
           };
           designer = {
-            model = "sol";
-            variant = "medium";
+            model = "astra";
+            variant = "high";
           };
           fixer = {
             model = "sol-fast";
             variant = "medium";
           };
-          observer.model = "mimo";
-          # Council has no per-agent fallback slot. Kimi K3 is retained as the
-          # strongest Go synthesizer with reliable stream behavior.
+          observer.model = "luna";
+          # Council has no per-agent fallback slot.
           council = {
-            model = "kimi";
-            variant = "max";
+            model = "astra";
+            variant = "high";
           };
         };
 
@@ -162,20 +151,20 @@
         # preset.
         councilConfig = {
           default_preset = "default";
-          # Keep deliberation on the strongest Go models from three different
-          # families.
+          # Only one model family is available, so diversity comes from
+          # different model sizes instead.
           presets.default = {
             alpha = {
-              model = models.glm;
-              variant = "max";
+              model = models.astra;
+              variant = "xhigh";
             };
             beta = {
-              model = models.qwen;
-              variant = "max";
+              model = models.sol;
+              variant = "xhigh";
             };
             gamma = {
-              model = models.kimi;
-              variant = "max";
+              model = models.luna;
+              variant = "xhigh";
             };
           };
         };
@@ -203,22 +192,21 @@
             model = [
               (modelVariant "low" models.luna)
               # (modelVariant "low" models.spark)
-              (modelVariant "low" models.deepseek-flash)
+              (modelVariant "low" models.sol-fast)
             ];
           };
           explorer = {
             model = [
               (modelVariant "low" models.luna)
               # (modelVariant "low" models.spark)
-              (modelVariant "low" models.deepseek-flash)
+              (modelVariant "low" models.sol-fast)
             ];
           };
           designer = {
             model = [
-              (modelVariant "max" models.kimi)
+              (modelVariant "high" models.astra)
               (modelVariant "medium" models.sol)
-              (modelVariant "max" models.glm)
-              (modelVariant "max" models.qwen)
+              (modelVariant "xhigh" models.luna)
             ];
           };
           fixer = {
@@ -235,9 +223,7 @@
           # Spark is text-only. Keep the complete observer chain multimodal.
           observer = {
             model = [
-              models.mimo
-              models.mimo-pro
-              models.kimi
+              models.luna
               models.sol
             ];
           };
@@ -423,30 +409,18 @@
             # nudgeFrequency fetches. So the min is where compression pressure
             # *starts* — keep it high or the session compresses all session.
             # Sol and Terra have 1.05M windows (922k input + 128k output),
-            # Spark has 128k total, Go models are 256k-class.
+            # Spark has 128k total.
             modelMaxLimits = {
               ${models.sol} = 780000;
               ${models.sol-fast} = 780000;
               # ${models.spark} = 80000;
               ${models.luna} = 192000;
-              ${models.kimi} = 192000;
-              ${models.deepseek-flash} = 192000;
-              ${models.glm} = 192000;
-              ${models.qwen} = 192000;
-              ${models.mimo} = 192000;
-              ${models.mimo-pro} = 192000;
             };
             modelMinLimits = {
               ${models.sol} = 700000;
               ${models.sol-fast} = 700000;
               # ${models.spark} = 68000;
               ${models.luna} = 160000;
-              ${models.kimi} = 160000;
-              ${models.deepseek-flash} = 160000;
-              ${models.glm} = 160000;
-              ${models.qwen} = 160000;
-              ${models.mimo} = 160000;
-              ${models.mimo-pro} = 160000;
             };
             # nudgeFrequency counts fetches between nudges above the ceiling,
             # so higher = quieter. iterationNudgeThreshold is how many messages
@@ -479,16 +453,16 @@
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@${omoVersion}/oh-my-opencode-slim.schema.json";
           autoUpdate = false;
           multiplexer.type = "zellij";
-          preset = "go-codex";
+          preset = "codex";
           council = councilConfig;
           fallback = fallbackConfig;
           agents = agentFallbacks;
           # v3 lacks todoContinuation's prior threshold/cap controls; configure
           # backgroundJobs.orchestratorWake only after verifying its v3 schema.
           # Enable observer agent (disabled by default upstream).
-          # mimo-v2.5 is vision-capable, so the block below activates.
+          # Luna is vision-capable, so the block below activates.
           disabled_agents = [ ];
-          presets.go-codex.agents = presetGoCodex;
+          presets.codex.agents = presetCodex;
         };
       in
       {
@@ -541,11 +515,8 @@
               "openrtk"
             ];
             # Ignore any other configured credentials and keep all routing on
-            # the two subscription providers represented in the active preset.
-            enabled_providers = [
-              "openai"
-              "opencode-go"
-            ];
+            # the subscription provider represented in the active preset.
+            enabled_providers = [ "openai" ];
             provider.openai.models = {
               "gpt-6.1-sol".limit = {
                 context = 1050000;
