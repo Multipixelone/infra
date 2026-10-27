@@ -11,7 +11,7 @@
         text = ''
           #!/usr/bin/env bash
           # rtk-hook-version: 4
-          # RTK Claude Code hook — rewrites commands to use rtk for token savings.
+          # RTK hook for Claude Code and Codex: rewrite commands for token savings.
           # Requires: rtk >= 0.23.0, jq
           #
           # This is a thin delegating hook: all rewrite logic lives in `rtk rewrite`,
@@ -22,7 +22,7 @@
           #   0 + stdout  Rewrite found, no deny/ask rule matched → auto-allow
           #   1           No RTK equivalent → pass through unchanged
           #   2           Deny rule matched → pass through (Claude Code native deny handles it)
-          #   3 + stdout  Ask rule matched → rewrite but let Claude Code prompt the user
+          #   3 + stdout  Ask rule matched → pass through for normal approval
 
           INPUT=$(cat)
           CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
@@ -52,8 +52,9 @@
               exit 0
               ;;
             3)
-              # Ask rule matched — rewrite the command but do NOT auto-allow so that
-              # Claude Code prompts the user for confirmation.
+              # Codex accepts updatedInput only with permissionDecision: allow.
+              # Keep approval-gated commands unchanged instead of granting them.
+              exit 0
               ;;
             *)
               exit 0
@@ -63,29 +64,17 @@
           ORIGINAL_INPUT=$(echo "$INPUT" | jq -c '.tool_input')
           UPDATED_INPUT=$(echo "$ORIGINAL_INPUT" | jq --arg cmd "$REWRITTEN" '.command = $cmd')
 
-          if [ "$EXIT_CODE" -eq 3 ]; then
-            # Ask: rewrite the command, omit permissionDecision so Claude Code prompts.
-            jq -n \
-              --argjson updated "$UPDATED_INPUT" \
-              '{
-                "hookSpecificOutput": {
-                  "hookEventName": "PreToolUse",
-                  "updatedInput": $updated
-                }
-              }'
-          else
-            # Allow: rewrite the command and auto-allow.
-            jq -n \
-              --argjson updated "$UPDATED_INPUT" \
-              '{
-                "hookSpecificOutput": {
-                  "hookEventName": "PreToolUse",
-                  "permissionDecision": "allow",
-                  "permissionDecisionReason": "RTK auto-rewrite",
-                  "updatedInput": $updated
-                }
-              }'
-          fi
+          # Rewrite only when RTK's permission check allows the command.
+          jq -n \
+            --argjson updated "$UPDATED_INPUT" \
+            '{
+              "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "RTK auto-rewrite",
+                "updatedInput": $updated
+              }
+            }'
         '';
       };
     };

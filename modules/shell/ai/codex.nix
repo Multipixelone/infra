@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  withSystem,
   ...
 }:
 {
@@ -11,6 +12,31 @@
       nixpkgs.follows = "nixpkgs";
     };
   };
+
+  perSystem =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    {
+      packages.codex-hooks = pkgs.writeText "codex-hooks.json" (
+        builtins.toJSON {
+          hooks.PreToolUse = [
+            {
+              matcher = "Bash";
+              hooks = [
+                {
+                  type = "command";
+                  command = lib.getExe config.packages.rtk-rewrite;
+                }
+              ];
+            }
+          ];
+        }
+      );
+    };
 
   # OpenAI Codex — terminal coding agent, the OpenAI counterpart to Claude
   # Code. Apache-2.0, so no unfree allowlisting needed. Both packages
@@ -69,5 +95,9 @@
       };
 
       home.packages = [ pkgs.codex-acp ];
+      # Keep the hook and its store path in sync with the shared RTK package.
+      home.file.".codex/hooks.json".source = withSystem pkgs.stdenv.hostPlatform.system (
+        psArgs: psArgs.config.packages.codex-hooks
+      );
     };
 }
