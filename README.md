@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (141)</summary>
+<summary>Packages exposed by this flake (142)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -116,6 +116,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`beets-plugins`](https://github.com/Multipixelone/infra/blob/main/modules/media/beets.nix) — Music tagger and library organizer · `nix run github:Multipixelone/infra#beets-plugins`
 - `caldera-headless` — Caldera Music headless Plex-compatible player · `nix run github:Multipixelone/infra#caldera-headless`
 - [`claude-status-line`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/status-line.nix) · `nix run github:Multipixelone/infra#claude-status-line`
+- [`codex-hooks`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/codex.nix) · `nix run github:Multipixelone/infra#codex-hooks`
 - [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
 - `convert-mpc` · `nix run github:Multipixelone/infra#convert-mpc`
 - [`dawarich-home-assistant`](https://github.com/Multipixelone/infra/blob/main/modules/iot/dawarich.nix) — Dawarich integration for Home Assistant · `nix run github:Multipixelone/infra#dawarich-home-assistant`
