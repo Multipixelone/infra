@@ -61,8 +61,11 @@ in
         name = "beets-embed-backfill";
         runtimeInputs = [
           pkgs.coreutils
-          inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-embed-worker-rocm
-        ];
+        ]
+        # Auto device selection finds this on PATH; without it the packaged CPU worker runs.
+        ++
+          lib.optional cfg.rocm
+            inputs.beets-plugins.packages.${pkgs.stdenv.hostPlatform.system}.beets-embed-worker-rocm;
         text = ''
           install -d -m 0700 -- "$MIOPEN_CUSTOM_CACHE_DIR" "$MIOPEN_USER_DB_PATH"
           export BEETS_EMBED_BUDGET_SECONDS=${toString (cfg.budgetHours * 3600)}
@@ -192,6 +195,14 @@ in
             default = 8;
             description = "Maximum elapsed budget including shutdown; nightly attempts share a budget anchored at the first 01:00 and finish before 09:00 America/New_York. Manual runs receive a fresh budget.";
           };
+          rocm = lib.mkOption {
+            type = lib.types.bool;
+            # The full-library backfill finished on ROCm (~0.9 s/track versus ~9.5 s/track
+            # on CPU). Nightly additions are small, and the ROCm worker compiles Torch from
+            # source on every input bump, while CPU Torch comes from the binary cache.
+            default = false;
+            description = "Put the gfx1101 ROCm worker on the backfill's PATH so AMCLAP (and Torch Style) run on the GPU. Disabled, the cached CPU worker is used.";
+          };
           threads = lib.mkOption {
             type = lib.types.ints.between 1 16;
             # A 30-track torch/ROCm benchmark with batch 8 reached ~1 track/s
@@ -205,7 +216,8 @@ in
               "onnx"
               "torch"
             ];
-            default = "torch";
+            default = if cfg.rocm then "torch" else "onnx";
+            defaultText = lib.literalExpression ''if cfg.rocm then "torch" else "onnx"'';
             description = "Style inference backend; torch uses the ROCm worker's GPU support. The worker's --style-backend flag overrides this environment default.";
           };
           cpuQuotaPercent = lib.mkOption {
