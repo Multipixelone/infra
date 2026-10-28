@@ -107,12 +107,12 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Sol handles the interactive coordinator, Terra Fast handles fixes,
-        # documentation lookup, and vision work, Astra is the deep-reasoning
-        # oracle and designer, and Luna handles bounded code exploration.
+        # Terra Fast handles coordination, documentation lookup, and vision
+        # work, Sol writes code, Astra is the deep-reasoning oracle and
+        # designer, and Luna handles bounded code exploration.
         presetCodex = mkPreset {
           orchestrator = {
-            model = "sol";
+            model = "terra-fast";
             variant = "medium";
           };
           oracle = {
@@ -132,8 +132,8 @@
             variant = "high";
           };
           fixer = {
-            model = "terra-fast";
-            variant = "high";
+            model = "sol";
+            variant = "medium";
           };
           observer = {
             model = "terra-fast";
@@ -180,6 +180,7 @@
         agentFallbacks = {
           orchestrator = {
             model = [
+              (modelVariant "medium" models.terra-fast)
               (modelVariant "medium" models.sol)
               (modelVariant "xhigh" models.luna)
               # (modelVariant "xhigh" models.spark)
@@ -216,10 +217,10 @@
           };
           fixer = {
             model = [
+              (modelVariant "medium" models.sol)
               (modelVariant "high" models.terra-fast)
               (modelVariant "high" models.sol-fast)
               # (modelVariant "high" models.spark)
-              (modelVariant "high" models.sol)
               (modelVariant "high" models.luna)
             ];
             orchestratorPrompt = ''
@@ -550,7 +551,7 @@
               #   output = 128000;
               # };
             };
-            model = models.sol;
+            model = models.terra-fast;
             small_model = models.luna;
             autoupdate = false;
             # Core OpenCode LSP server configuration, not plugin configuration.
