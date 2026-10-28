@@ -3,9 +3,9 @@
     services.avahi = {
       enable = true;
       nssmdns4 = true;
-      publish = {
-        enable = true;
-        addresses = true;
+      settings.publish = {
+        disable-publishing = false;
+        publish-addresses = true;
       };
     };
   };
