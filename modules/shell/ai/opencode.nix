@@ -15,7 +15,7 @@
         aiConfig = config.flake.aiConfig;
         # OpenCode fetches this npm plugin; update this version and its schema
         # together here, not with the installer (which writes HM-managed files).
-        omoVersion = "3.0.3";
+        omoVersion = "3.0.6";
 
         # ── Composable building blocks ──────────────────────────────────
         #
