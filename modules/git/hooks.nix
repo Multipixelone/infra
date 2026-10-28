@@ -91,13 +91,7 @@
         check-executables-have-shebangs.enable = true;
         check-added-large-files.enable = true;
         # git secret checking
-        gitleaks = {
-          enable = true;
-          name = "gitleaks";
-          entry = "gitleaks git --pre-commit --redact --staged --verbose";
-          pass_filenames = false;
-          language = "system";
-        };
+        gitleaks.enable = true;
       };
     };
 }
