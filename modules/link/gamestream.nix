@@ -392,6 +392,21 @@
       # (Worth an upstream option: `capSysNice`, or folding it into capSysAdmin.)
       security.wrappers.sunshine.capabilities = lib.mkForce "cap_sys_admin,cap_sys_nice+p";
 
+      # nixpkgs' sunshine module still sets the obsolete avahi.publish options,
+      # whose warnings abort evaluation under abort-on-warn. Null them and set
+      # the equivalent settings directly until the module is migrated.
+      services.avahi = {
+        publish = {
+          enable = lib.mkForce null;
+          userServices = lib.mkForce null;
+        };
+        settings.publish = {
+          disable-publishing = false;
+          disable-user-service-publishing = false;
+          publish-addresses = true;
+        };
+      };
+
       services.sunshine = {
         enable = true;
         package = pkgs.sunshine.override {
