@@ -7,7 +7,6 @@
     # defaults for visible kernel, initrd and systemd boot output.
     laptop = {
       boot.consoleLogLevel = 0;
-      boot.initrd.verbose = false;
       boot.kernelParams = [
         "rd.udev.log_level=3"
         "udev.log_priority=3"

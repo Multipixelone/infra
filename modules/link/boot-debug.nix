@@ -38,7 +38,6 @@
         boot = {
           plymouth.enable = lib.mkForce false;
           consoleLogLevel = lib.mkForce 7;
-          initrd.verbose = lib.mkForce true;
           kernelParams = lib.mkForce (
             normalKernelParams
             ++ [

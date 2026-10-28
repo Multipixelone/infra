@@ -6,7 +6,6 @@
     # last-wins, hence mkAfter for these recovery-specific settings.
     boot.plymouth.enable = lib.mkForce false;
     boot.consoleLogLevel = lib.mkForce 4;
-    boot.initrd.verbose = lib.mkForce true;
     boot.kernelParams = lib.mkAfter [
       "loglevel=4"
       "systemd.show_status=true"
