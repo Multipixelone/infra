@@ -9,12 +9,17 @@ let
   streamrip-master-config = "/home/tunnel/.config/streamrip/config.toml";
   streamrip-runtime-root = "/volume1/Media/ImportMusic/Streamrip";
   streamrip-launcher-name = "openclaw-streamrip";
-  # Upstream builds with python314 from the explicitly followed nixpkgs input.
-  # Check every dependency's interpreter rather than silently mixing closures.
+  # Upstream ships streamrip as a makeWrapper shim around a uv2nix venv and
+  # does not export the venv itself. Reuse the venv's interpreter, which
+  # already has streamrip and its locked dependencies importable.
   makeStreamripPython =
     pkgs:
-    assert lib.all (dependency: dependency.pythonModule == pkgs.python314) pkgs.streamrip.dependencies;
-    pkgs.python314.withPackages (_: pkgs.streamrip.dependencies);
+    pkgs.runCommand "streamrip-python" { meta.mainProgram = "python"; } ''
+      venv=$(grep -o '/nix/store/[^/"]*-streamrip-env' ${lib.getExe pkgs.streamrip} | head -n1)
+      test -x "$venv/bin/python"
+      mkdir -p "$out/bin"
+      ln -s "$venv/bin/python" "$out/bin/python"
+    '';
   makeStreamripMergeConfig =
     pkgs:
     let
@@ -27,7 +32,6 @@ let
         isolated_home=$(mktemp -d)
         trap 'rm -rf -- "$isolated_home"' EXIT
         export HOME="$isolated_home" XDG_CONFIG_HOME="$isolated_home/.config"
-        export PYTHONPATH=${lib.escapeShellArg "${pkgs.streamrip}/${pkgs.python314.sitePackages}"}
         ${lib.getExe python} ${./tests/streamrip_merge.py} "$@"
       '';
     };
@@ -387,7 +391,6 @@ in
           import sys
 
           root = pathlib.Path(sys.argv[1])
-          sys.path.insert(0, "${pkgs.streamrip}/${pkgs.python314.sitePackages}")
           sys.path.insert(0, "${rootPath}/pkgs/openclaw-music")
           from openclaw_music.streamrip import StreamripAdapter
           from streamrip.config import Config
@@ -744,7 +747,6 @@ in
       streamrip-qobuz-preflight = pkgs.writeShellApplication {
         name = "streamrip-qobuz-preflight";
         text = ''
-          export PYTHONPATH=${lib.escapeShellArg "${pkgs.streamrip}/${pkgs.python314.sitePackages}"}
           exec ${lib.getExe (makeStreamripPython pkgs)} ${streamrip-qobuz-preflight-script} "$@"
         '';
       };
