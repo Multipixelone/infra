@@ -549,14 +549,17 @@
             };
             agent.orchestrator.permission.glob = "deny";
           };
-          tui = {
-            scroll_speed = 1;
-            scroll_acceleration.enabled = true;
-            # Cache hit rate + token breakdown in the sidebar. A TUI plugin,
-            # so it loads from tui.json and not settings.plugin — the two
-            # lists are separate loaders and a TUI plugin listed in the main
-            # one is silently ignored.
-            plugin = [ "opencode-visual-cache" ];
+          # OpenCode 2 replaced tui.json with cli.json.
+          cli = {
+            scroll = {
+              speed = 1;
+              acceleration = true;
+            };
+            # Cache hit rate + token breakdown in the sidebar. A terminal
+            # plugin, so it loads from cli.json and not settings.plugin — the
+            # two lists are separate loaders and a terminal plugin listed in
+            # the main one is silently ignored.
+            plugins = [ "opencode-visual-cache" ];
           };
         };
 
