@@ -1,4 +1,6 @@
 {
+  # rtk 1.0 relicensed part of its code under BSL 1.1.
+  nixpkgs.config.allowUnfreePackages = [ "rtk" ];
   perSystem =
     { pkgs, ... }:
     {
