@@ -120,14 +120,6 @@ in
           };
         };
       };
-      security.wrappers = {
-        gamemode = {
-          owner = "root";
-          group = "root";
-          source = "${lib.getExe' pkgs.gamemode "gamemoderun"}";
-          capabilities = "cap_sys_ptrace,cap_sys_nice+pie";
-        };
-      };
       systemd.tmpfiles.rules = [
         # Textfile metrics persist across a reboot. Remove both forms before
         # the first timer run so an old active value cannot excuse downtime.
