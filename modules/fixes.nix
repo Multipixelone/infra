@@ -1,11 +1,17 @@
 {
   nixpkgs.overlays = [
-    # https://github.com/NixOS/nixpkgs/pull/503253
     (
 
       _final: prev: {
         python3Packages = prev.python3Packages.overrideScope (
           pyFinal: pyPrev: {
+            # FastMCP 3.x still requires MCP SDK 1.x. nixpkgs now defaults
+            # to SDK 2.x and marks fastmcp-slim broken with that dependency.
+            # Keep the compatible SDK until FastMCP supports the new API.
+            fastmcp-slim = pyPrev.fastmcp-slim.override {
+              mcp = pyFinal.mcp_1;
+            };
+            # https://github.com/NixOS/nixpkgs/pull/503253
             wand = pyPrev.wand.overridePythonAttrs (_: rec {
               version = "0.6.13";
               src = pyFinal.fetchPypi {
@@ -17,21 +23,6 @@
           }
         );
       })
-    # No aioboto3 / fastmcp / syrupy overrides here, on purpose.
-    #
-    # All three only ever failed on `python312Packages`, a side set Hydra
-    # barely builds — so the whole closure compiled locally and every flaky
-    # suite in it got a chance to bite. modules/link/openclaw.nix now
-    # instantiates pkgs/agentmail on the default (3.14) set, where aioboto3,
-    # py-key-value-aio, pydocket, fastmcp, cyclopts and syrupy all substitute
-    # straight from cache.nixos.org.
-    #
-    # Re-adding any of them is worse than useless: an override forks the
-    # derivation, so the cache hit is lost and the package must be built —
-    # which is the only way its tests ever run. The aioboto3 one was the
-    # sharpest case: nothing here uses aioboto3 directly, but overriding it
-    # rewrote py-key-value-aio -> pydocket -> fastmcp, forcing a local fastmcp
-    # build whose Supabase integration test then failed in the sandbox.
     # calibre-web 0.6.27b0 declares requests<2.33.0 but works with 2.33.x
     (_final: prev: {
       calibre-web = prev.calibre-web.overridePythonAttrs (old: {
