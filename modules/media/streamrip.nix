@@ -1156,6 +1156,8 @@ in
 
         function usage
           printf '%s\n' 'Usage: spotify-qobuz-albums [--output FILE] [--match-cache FILE] [--refresh-matches] [--no-download] [--retry-existing] [--yes] EXPORTIFY.csv'
+          printf '%s\n' ${lib.escapeShellArg "  --output FILE  Manifest path (default: ${config.xdg.stateHome}/spotify-qobuz-albums/spotify-qobuz-albums.json)."}
+          printf '%s\n' '  Derived reports live beside the manifest; explicit output directories must already exist.'
           printf '%s\n' '  --match-cache FILE  Persistent Spotify-to-Qobuz selection cache.'
           printf '%s\n' '  --refresh-matches   Forget each current cached selection before resolving it.'
           printf '%s\n' '  --retry-existing  Process all metadata-valid current albums; Streamrip still skips downloaded tracks.'
@@ -1316,12 +1318,25 @@ in
           die 'expected a regular readable Exportify CSV file'
         end
 
-        set -l output "$PWD/spotify-qobuz-albums.json"
+        set -l state_dir ${lib.escapeShellArg "${config.xdg.stateHome}/spotify-qobuz-albums"}
+        set -l output "$state_dir/spotify-qobuz-albums.json"
         if set -q _flag_output
           if test -z "$_flag_output"
             die '--output requires a non-empty file path'
           end
           set output "$_flag_output"
+        else
+          # Only the managed default gets automatic directory creation. Do not
+          # follow a substituted state directory or chmod user-supplied parents.
+          if test -L "$state_dir"
+            die "state directory must not be a symlink: $state_dir"
+          end
+          umask 077
+          ${lib.getExe' pkgs.coreutils "mkdir"} -p -m 700 -- "$state_dir"
+          or die "could not create state directory: $state_dir"
+          if test -L "$state_dir"; or not test -d "$state_dir"
+            die "state directory is not a directory: $state_dir"
+          end
         end
         set -l match_cache ${lib.escapeShellArg "${config.xdg.stateHome}/spotify-qobuz-albums/matches.json"}
         if set -q _flag_match_cache

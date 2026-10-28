@@ -100,6 +100,7 @@ class IntegrationTests(unittest.TestCase):
         self.calls = self.root / "calls.jsonl"
         self.output = self.root / "albums.json"
         self.cache = self.root / "state" / "matches.json"
+        self.state_dir = self.cache.parent
         self.input = self.root / "playlist export.csv"
         self.downloaded = self.root / "downloaded.json"
         self.write_csv()
@@ -161,8 +162,10 @@ class IntegrationTests(unittest.TestCase):
             '${lib.escapeShellArg "${config.xdg.configHome}/streamrip/config.toml"}': self.root
             / "config.toml",
             '${lib.escapeShellArg "${config.xdg.stateHome}/spotify-qobuz-albums/matches.json"}': self.cache,
+            '${lib.escapeShellArg "${config.xdg.stateHome}/spotify-qobuz-albums"}': self.state_dir,
+            '${lib.escapeShellArg "  --output FILE  Manifest path (default: ${config.xdg.stateHome}/spotify-qobuz-albums/spotify-qobuz-albums.json)."}': f"  --output FILE  Manifest path (default: {self.state_dir}/spotify-qobuz-albums.json).",
         }
-        for command in ("mktemp", "chmod", "rm", "mv"):
+        for command in ("mktemp", "chmod", "rm", "mv", "mkdir"):
             replacements["${lib.getExe' pkgs.coreutils \"" + command + '"}'] = (
                 shutil.which(command)
             )
@@ -187,16 +190,22 @@ class IntegrationTests(unittest.TestCase):
                     ["spotify:track:bad", f"spotify:album:{ALBUM_ID}", name, artist]
                 )
 
-    def run_import(self, flags=(), env=None, input_path=None):
+    def run_import(self, flags=(), env=None, input_path=None, defaults=False):
         result = subprocess.run(
             [
                 "fish",
                 "--no-config",
                 str(self.script),
-                "--output",
-                str(self.output),
-                "--match-cache",
-                str(self.cache),
+                *(
+                    []
+                    if defaults
+                    else [
+                        "--output",
+                        str(self.output),
+                        "--match-cache",
+                        str(self.cache),
+                    ]
+                ),
                 *flags,
                 "--",
                 str(input_path or self.input),
@@ -238,6 +247,55 @@ class IntegrationTests(unittest.TestCase):
 
     def assert_success(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_default_output_and_reports_use_private_state_directory(self):
+        self.assertFalse(self.state_dir.exists())
+        self.assert_success(self.run_import(["--no-download"], defaults=True))
+        self.assertEqual(stat.S_IMODE(self.state_dir.stat().st_mode), 0o700)
+        for suffix in (
+            "",
+            ".rejected",
+            ".status",
+            ".unmatched",
+            ".beets",
+            ".match-evidence",
+        ):
+            name = f"spotify-qobuz-albums{suffix}.json"
+            self.assertTrue((self.state_dir / name).is_file(), name)
+            self.assertFalse((self.root / name).exists(), name)
+        self.assertTrue(self.cache.is_file())
+
+    def test_default_output_rejects_symlink_state_directory(self):
+        target = self.root / "other state"
+        target.mkdir()
+        self.state_dir.symlink_to(target, target_is_directory=True)
+        result = self.run_import(["--no-download"], defaults=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("state directory must not be a symlink", result.stderr)
+        self.assertEqual(list(target.iterdir()), [])
+
+    def test_explicit_relative_output_does_not_create_parent(self):
+        result = self.run_import(["--output", "missing/albums.json", "--no-download"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("output directory does not exist", result.stderr)
+        self.assertFalse((self.root / "missing").exists())
+        self.assertFalse(self.state_dir.exists())
+
+    def test_explicit_relative_output_keeps_reports_and_global_cache(self):
+        self.assert_success(
+            self.run_import(["--output", "relative.json", "--no-download"])
+        )
+        for suffix in (
+            "",
+            ".rejected",
+            ".status",
+            ".unmatched",
+            ".beets",
+            ".match-evidence",
+        ):
+            self.assertTrue((self.root / f"relative{suffix}.json").is_file())
+        self.assertTrue(self.cache.is_file())
+        self.assertFalse((self.state_dir / "spotify-qobuz-albums.json").exists())
 
     def test_valid_no_auth_atomic_private_publication_and_multiline(self):
         self.write_csv(
@@ -473,6 +531,8 @@ class IntegrationTests(unittest.TestCase):
         self.assert_success(result)
         self.assertIn("EXPORTIFY.csv", result.stdout)
         self.assertIn("not offline", result.stdout)
+        self.assertIn(str(self.state_dir / "spotify-qobuz-albums.json"), result.stdout)
+        self.assertIn("Derived reports live beside the manifest", result.stdout)
         self.assertFalse(self.cache.parent.exists())
         self.assertEqual(self.logged(), [])
 
