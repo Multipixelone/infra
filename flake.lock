@@ -4720,11 +4720,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1792963068,
-        "narHash": "sha256-moQ/adyUaeJL2/IIxfbtC12wAMTrFWq7r5OCUn/nJ9g=",
+        "lastModified": 1793187896,
+        "narHash": "sha256-PMnS8zgag2sk9FLLmzMwPJSbwdiVlCxFZSPRCJcW5M0=",
         "owner": "Stensel8",
         "repo": "streamrip",
-        "rev": "e9347330fd2d51c29443cf753cbd8023c45708c3",
+        "rev": "b64b2f039cb2a8daf6c4e71d69d871af2c106432",
         "type": "github"
       },
       "original": {
