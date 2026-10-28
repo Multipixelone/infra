@@ -108,7 +108,7 @@
         # ── Preset definitions ──────────────────────────────────────────
 
         # Terra Fast handles coordination, documentation lookup, and vision
-        # work, Sol writes code, Astra is the deep-reasoning oracle and
+        # work, Sol Fast writes code, Astra is the deep-reasoning oracle and
         # designer, and Luna handles bounded code exploration.
         presetCodex = mkPreset {
           orchestrator = {
@@ -132,7 +132,7 @@
             variant = "high";
           };
           fixer = {
-            model = "sol";
+            model = "sol-fast";
             variant = "medium";
           };
           observer = {
@@ -217,9 +217,9 @@
           };
           fixer = {
             model = [
+              (modelVariant "medium" models.sol-fast)
               (modelVariant "medium" models.sol)
               (modelVariant "high" models.terra-fast)
-              (modelVariant "high" models.sol-fast)
               # (modelVariant "high" models.spark)
               (modelVariant "high" models.luna)
             ];
