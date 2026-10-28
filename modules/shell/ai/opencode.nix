@@ -34,6 +34,7 @@
           astra = "openai/gpt-6-astra";
           sol = "openai/gpt-6.1-sol";
           sol-fast = "openai/gpt-6.1-sol-fast";
+          terra-fast = "openai/gpt-6.1-terra-fast";
           luna = "openai/gpt-6-luna-fast";
           # retired. rip
           # spark = "openai/gpt-5.3-codex-spark";
@@ -106,9 +107,9 @@
 
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Sol handles the interactive coordinator and implementation lanes,
-        # Astra is the deep-reasoning oracle and designer, and Luna handles
-        # bounded lookup and vision work.
+        # Sol handles the interactive coordinator, Terra Fast handles fixes,
+        # documentation lookup, and vision work, Astra is the deep-reasoning
+        # oracle and designer, and Luna handles bounded code exploration.
         presetCodex = mkPreset {
           orchestrator = {
             model = "sol";
@@ -119,7 +120,7 @@
             variant = "xhigh";
           };
           librarian = {
-            model = "luna";
+            model = "terra-fast";
             variant = "low";
           };
           explorer = {
@@ -131,10 +132,13 @@
             variant = "high";
           };
           fixer = {
-            model = "sol-fast";
+            model = "terra-fast";
+            variant = "high";
+          };
+          observer = {
+            model = "terra-fast";
             variant = "medium";
           };
-          observer.model = "luna";
           # Council has no per-agent fallback slot.
           council = {
             model = "astra";
@@ -163,7 +167,7 @@
               variant = "xhigh";
             };
             gamma = {
-              model = models.luna;
+              model = models.terra-fast;
               variant = "xhigh";
             };
           };
@@ -190,6 +194,7 @@
           };
           librarian = {
             model = [
+              (modelVariant "low" models.terra-fast)
               (modelVariant "low" models.luna)
               # (modelVariant "low" models.spark)
               (modelVariant "low" models.sol-fast)
@@ -211,6 +216,7 @@
           };
           fixer = {
             model = [
+              (modelVariant "high" models.terra-fast)
               (modelVariant "high" models.sol-fast)
               # (modelVariant "high" models.spark)
               (modelVariant "high" models.sol)
@@ -223,6 +229,7 @@
           # Spark is text-only. Keep the complete observer chain multimodal.
           observer = {
             model = [
+              (modelVariant "medium" models.terra-fast)
               models.luna
               models.sol
             ];
@@ -413,12 +420,14 @@
             modelMaxLimits = {
               ${models.sol} = 780000;
               ${models.sol-fast} = 780000;
+              ${models.terra-fast} = 780000;
               # ${models.spark} = 80000;
               ${models.luna} = 192000;
             };
             modelMinLimits = {
               ${models.sol} = 700000;
               ${models.sol-fast} = 700000;
+              ${models.terra-fast} = 700000;
               # ${models.spark} = 68000;
               ${models.luna} = 160000;
             };
@@ -460,7 +469,7 @@
           # v3 lacks todoContinuation's prior threshold/cap controls; configure
           # backgroundJobs.orchestratorWake only after verifying its v3 schema.
           # Enable observer agent (disabled by default upstream).
-          # Luna is vision-capable, so the block below activates.
+          # Terra is vision-capable, so the block below activates.
           disabled_agents = [ ];
           presets.codex.agents = presetCodex;
         };
@@ -524,6 +533,11 @@
                 output = 128000;
               };
               "gpt-6.1-sol-fast".limit = {
+                context = 1050000;
+                input = 922000;
+                output = 128000;
+              };
+              "gpt-6.1-terra-fast".limit = {
                 context = 1050000;
                 input = 922000;
                 output = 128000;
