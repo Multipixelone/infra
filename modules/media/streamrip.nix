@@ -400,7 +400,7 @@ in
           adapter = StreamripAdapter("/nix/store/launcher", str(master), str(root / "runtime"))
           runtime = adapter.runtime("00000000-0000-0000-0000-000000000001")
           adapter.write_config(runtime)
-          parsed = Config(runtime["config"]).file
+          parsed = Config(pathlib.Path(runtime["config"])).file
           assert parsed.qobuz.user_id == "dummy" and parsed.qobuz.auth_token == "dummy-token"
           assert parsed.qobuz.quality == 3
           assert parsed.qobuz.download_booklets is False and parsed.qobuz.secrets == []
@@ -619,7 +619,7 @@ in
                 downloads_enabled = args.test_downloads_enabled != "false"
                 downloads_path = args.test_db
             else:
-                config = Config(args.config)
+                config = Config(Path(args.config))
                 client = QobuzClient(config)
                 downloads_enabled = config.session.database.downloads_enabled
                 downloads_path = config.session.database.downloads_path
