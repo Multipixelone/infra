@@ -5,12 +5,6 @@
       _final: prev: {
         python3Packages = prev.python3Packages.overrideScope (
           pyFinal: pyPrev: {
-            # FastMCP 3.x still requires MCP SDK 1.x. nixpkgs now defaults
-            # to SDK 2.x and marks fastmcp-slim broken with that dependency.
-            # Keep the compatible SDK until FastMCP supports the new API.
-            fastmcp-slim = pyPrev.fastmcp-slim.override {
-              mcp = pyFinal.mcp_1;
-            };
             # https://github.com/NixOS/nixpkgs/pull/503253
             wand = pyPrev.wand.overridePythonAttrs (_: rec {
               version = "0.6.13";
@@ -30,7 +24,14 @@
     # so Home Assistant's own interpreter sees it.
     (_final: prev: {
       pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-        (_pyFinal: pyPrev: {
+        (pyFinal: pyPrev: {
+          # FastMCP 3.x still requires MCP SDK 1.x. nixpkgs now defaults to
+          # SDK 2.x and marks fastmcp-slim broken with that dependency. Keep
+          # the compatible SDK until FastMCP supports the new API. An extension
+          # so every interpreter (python3.pkgs, python314Packages) sees it.
+          fastmcp-slim = pyPrev.fastmcp-slim.override {
+            mcp = pyFinal.mcp_1;
+          };
           urllib3-future = pyPrev.urllib3-future.overridePythonAttrs { doCheck = false; };
           niquests = pyPrev.niquests.overridePythonAttrs (old: {
             disabledTests = (old.disabledTests or [ ]) ++ [ "test_use_proxy_from_environment" ];
