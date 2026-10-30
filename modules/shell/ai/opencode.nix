@@ -410,7 +410,9 @@
             provider.omniroute = {
               npm = "@ai-sdk/openai-compatible";
               name = "OmniRoute";
-              options.baseURL = "http://localhost:20128/v1";
+              # Every device (link included) goes through the published name so
+              # the router is reached the same way everywhere, over TLS.
+              options.baseURL = "https://${config.flake.servicePublicationInventory.applications.ai.canonical}/v1";
               models = builtins.listToAttrs (
                 map
                   (name: {
