@@ -23,6 +23,21 @@
           }
         );
       })
+    # urllib3-future's suite hangs in the sandbox after the socks tests fail,
+    # and niquests' proxy-from-environment tests fail the same way. Hydra has
+    # no substitute for either, so every closure pulling in niquests (Home
+    # Assistant via caldav) builds them. An extension rather than overrideScope
+    # so Home Assistant's own interpreter sees it.
+    (_final: prev: {
+      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+        (_pyFinal: pyPrev: {
+          urllib3-future = pyPrev.urllib3-future.overridePythonAttrs { doCheck = false; };
+          niquests = pyPrev.niquests.overridePythonAttrs (old: {
+            disabledTests = (old.disabledTests or [ ]) ++ [ "test_use_proxy_from_environment" ];
+          });
+        })
+      ];
+    })
     # calibre-web 0.6.27b0 declares requests<2.33.0 but works with 2.33.x
     (_final: prev: {
       calibre-web = prev.calibre-web.overridePythonAttrs (old: {
