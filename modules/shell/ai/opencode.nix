@@ -401,7 +401,6 @@
               "oh-my-opencode-slim@${omoVersion}"
               # "true-mem"
               "opencode-history-search"
-              "openrtk"
             ];
             enabled_providers = [ "omniroute" ];
             # Store the gateway API key with OpenCode's /connect flow, outside

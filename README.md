@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (142)</summary>
+<summary>Packages exposed by this flake (140)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -116,7 +116,6 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`beets-plugins`](https://github.com/Multipixelone/infra/blob/main/modules/media/beets.nix) — Music tagger and library organizer · `nix run github:Multipixelone/infra#beets-plugins`
 - `caldera-headless` — Caldera Music headless Plex-compatible player · `nix run github:Multipixelone/infra#caldera-headless`
 - [`claude-status-line`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/status-line.nix) · `nix run github:Multipixelone/infra#claude-status-line`
-- [`codex-hooks`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/codex.nix) · `nix run github:Multipixelone/infra#codex-hooks`
 - [`convert-lossyflac`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) · `nix run github:Multipixelone/infra#convert-lossyflac`
 - `convert-mpc` · `nix run github:Multipixelone/infra#convert-mpc`
 - [`dawarich-home-assistant`](https://github.com/Multipixelone/infra/blob/main/modules/iot/dawarich.nix) — Dawarich integration for Home Assistant · `nix run github:Multipixelone/infra#dawarich-home-assistant`
@@ -236,7 +235,6 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`retroarch-saves-secret-scan`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/checks.nix) — Refuses a generated save-sync artifact that names a credential-bearing RetroArch key, carries a non-empty webdav_password, or contains a high-entropy token. · `nix run github:Multipixelone/infra#retroarch-saves-secret-scan`
 - [`retroarch-saves-snapshot-select`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — Resolve the newest completed read-only RetroArch save snapshot · `nix run github:Multipixelone/infra#retroarch-saves-snapshot-select`
 - [`retroarch-saves-versions`](https://github.com/Multipixelone/infra/blob/main/modules/link/saves-storage.nix) — List retained RetroArch save versions, local snapshots and offsite · `nix run github:Multipixelone/infra#retroarch-saves-versions`
-- [`rtk-rewrite`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/rtk-rewrite.nix) · `nix run github:Multipixelone/infra#rtk-rewrite`
 - [`screenshot-area`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area`
 - [`screenshot-area-ocr`](https://github.com/Multipixelone/infra/blob/main/modules/hyprland/screenshot.nix) · `nix run github:Multipixelone/infra#screenshot-area-ocr`
 - [`service-publication-deploy`](https://github.com/Multipixelone/infra/blob/main/modules/service-publication/opentofu.nix) — Run the full service publication deploy flow · `nix run github:Multipixelone/infra#service-publication-deploy`

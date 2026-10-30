@@ -110,10 +110,9 @@
 
           # Run Claude inside a fish *login* shell (tunnel's default shell) so the
           # session inherits the same environment an interactive `co` gets: the
-          # per-user Nix profile on PATH (rtk, ast-grep, …), HM session vars, etc.
+          # per-user Nix profile on PATH (ast-grep, …), HM session vars, etc.
           # Without this the process only sees the bare systemd `Environment=PATH`
-          # below, so PATH-dependent Bash hooks — notably rtk-rewrite, which
-          # rewrites commands to `rtk …` — die with exit 127. Only the environment
+          # below, so PATH-dependent tools and hooks die with exit 127. Only the environment
           # comes from fish; `claude` is pinned to the exact build this module
           # installs. fish's greeting is disabled in shellInit, so no banner leaks
           # into the session. A *non-interactive* login shell is deliberate: daemon

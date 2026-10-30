@@ -1,12 +1,12 @@
 ---
 name: cli-tools
-description: Reference docs for token-optimized CLI tools - qmd, ast-grep, semgrep, fastmod, and RTK. Load before first use of any code search/rewrite tool or RTK meta commands.
+description: Reference docs for token-optimized CLI tools - qmd, ast-grep, semgrep, and fastmod. Load before first use of any code search/rewrite tool.
 tools: Bash
 ---
 
 # CLI Tools Reference
 
-Token-optimized CLI tools for code search, structural rewriting, and analytics.
+Token-optimized CLI tools for code search, and structural rewriting.
 
 ## Tool Selection Decision Tree
 
@@ -14,7 +14,6 @@ Token-optimized CLI tools for code search, structural rewriting, and analytics.
 2. **Renaming a method call or expression?** → `ast-grep`
 3. **Structural pattern with varying arguments?** → `semgrep`
 4. **Literal string replacement (config keys, identifiers)?** → `fastmod`
-5. **Token savings analytics?** → `rtk gain` / `rtk discover`
 
 If the target is not a syntax expression (YAML keys, plain strings, config values), skip ast-grep/semgrep and use fastmod.
 
@@ -99,16 +98,3 @@ fastmod --accept-all --fixed-strings old_name new_name -e java,yaml .
 
 - Method call or expression → ast-grep
 - Structural variation (different argument shapes) → semgrep
-
----
-
-## RTK - Rust Token Killer
-
-Token-optimized CLI proxy (60-90% savings on dev operations). Most commands are transparently rewritten by the Claude Code hook — these are the meta commands you invoke directly:
-
-```bash
-rtk gain              # Show token savings analytics
-rtk gain --history    # Show command usage history with savings
-rtk discover          # Analyze Claude Code history for missed opportunities
-rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
-```

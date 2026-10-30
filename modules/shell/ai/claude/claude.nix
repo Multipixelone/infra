@@ -2,7 +2,6 @@
   rootPath,
   withSystem,
   inputs,
-  lib,
   config,
   ...
 }:
@@ -38,9 +37,6 @@
       claude-status-line = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.claude-status-line
       );
-      rtk-rewrite = withSystem pkgs.stdenv.hostPlatform.system (
-        psArgs: psArgs.config.packages.rtk-rewrite
-      );
 
       inherit (pkgs.stdenv.hostPlatform) system;
 
@@ -68,7 +64,6 @@
     in
     {
       home.packages = [
-        pkgs.rtk
         pkgs.ast-grep
         pkgs.fastmod
       ];
@@ -96,19 +91,6 @@
           autoCompactEnabled = true;
           enableAllProjectMcpServers = false;
           outputStyle = "Concise";
-          hooks = {
-            PreToolUse = [
-              {
-                matcher = "Bash";
-                hooks = [
-                  {
-                    type = "command";
-                    command = lib.getExe rtk-rewrite;
-                  }
-                ];
-              }
-            ];
-          };
           statusLine = {
             type = "command";
             command = "${claude-status-line}/bin/claude-status-line";
