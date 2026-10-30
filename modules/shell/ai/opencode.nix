@@ -462,6 +462,9 @@
             # two lists are separate loaders and a terminal plugin listed in
             # the main one is silently ignored.
             plugins = [ "opencode-visual-cache" ];
+            # Stylix and the catppuccin module are both disabled for opencode
+            # above, so pick its built-in theme here.
+            theme.name = "catppuccin";
           };
         };
 
@@ -508,6 +511,11 @@
         # 50k/100k), which is what made every model compress constantly.
         # Home-manager moves the stale stub to dcp.jsonc.bkp on activation.
         xdg.configFile."opencode/dcp.jsonc".text = dcpConfig;
+        # OpenCode replaces the cli.json symlink with a plain file whenever a
+        # setting changes in the TUI. The second such backup then collides with
+        # cli.json.bkp and fails home-manager activation, so overwrite instead;
+        # TUI-only changes are discarded on the next switch.
+        xdg.configFile."opencode/cli.json".force = true;
       };
   };
 }
