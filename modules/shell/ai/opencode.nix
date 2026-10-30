@@ -24,20 +24,12 @@
         # mkPreset: merges a model and optional variant onto the matching role.
 
         models = {
-          # OpenAI Codex via ChatGPT OAuth. Spark's separate Pro quota is far
-          # too small for the high-volume subagent lanes — exhausting it makes
-          # every librarian/explorer call fail over, and oh-my-opencode-slim's
-          # foreground fallback races opencode's task tool, so roughly half the
-          # swapped calls surface to the parent as "Task cancelled". Spark is
-          # therefore kept only as a late fallback. Its 128k, text-only window
-          # also makes it a poor orchestrator or observer despite its speed.
-          astra = "openai/gpt-6-astra";
-          sol = "openai/gpt-6.1-sol";
-          sol-fast = "openai/gpt-6.1-sol-fast";
-          terra-fast = "openai/gpt-6.1-terra-fast";
-          luna = "openai/gpt-6-luna-fast";
-          # retired. rip
-          # spark = "openai/gpt-5.3-codex-spark";
+          # Combo names are sent verbatim; OmniRoute owns their upstream
+          # model selection, reasoning effort, and fallback policy.
+          kestral = "omniroute/Kestral";
+          subagent = "omniroute/Subagent";
+          fixer = "omniroute/Fixer";
+          high-effort = "omniroute/High Effort";
         };
 
         # Role definitions are model-agnostic. Reasoning variants live in the
@@ -101,49 +93,17 @@
             // (roles.${role} or { })
           ) assignments;
 
-        # Keep the provider-specific reasoning variant attached to every model
-        # when oh-my-opencode-slim advances through a fallback chain.
-        modelVariant = variant: id: { inherit id variant; };
-
         # ── Preset definitions ──────────────────────────────────────────
 
-        # Terra Fast handles coordination, documentation lookup, and vision
-        # work, Sol Fast writes code, Astra is the deep-reasoning oracle and
-        # designer, and Luna handles bounded code exploration.
-        presetCodex = mkPreset {
-          orchestrator = {
-            model = "terra-fast";
-            variant = "medium";
-          };
-          oracle = {
-            model = "astra";
-            variant = "xhigh";
-          };
-          librarian = {
-            model = "terra-fast";
-            variant = "low";
-          };
-          explorer = {
-            model = "luna";
-            variant = "low";
-          };
-          designer = {
-            model = "astra";
-            variant = "high";
-          };
-          fixer = {
-            model = "sol-fast";
-            variant = "medium";
-          };
-          observer = {
-            model = "terra-fast";
-            variant = "medium";
-          };
-          # Council has no per-agent fallback slot.
-          council = {
-            model = "astra";
-            variant = "high";
-          };
+        presetOmniroute = mkPreset {
+          orchestrator.model = "kestral";
+          oracle.model = "high-effort";
+          librarian.model = "subagent";
+          explorer.model = "subagent";
+          designer.model = "high-effort";
+          fixer.model = "fixer";
+          observer.model = "kestral";
+          council.model = "high-effort";
         };
 
         # ── Shared config sections ──────────────────────────────────────
@@ -155,87 +115,20 @@
         # preset.
         councilConfig = {
           default_preset = "default";
-          # Only one model family is available, so diversity comes from
-          # different model sizes instead.
+          # Use distinct routing lanes for the three councillors.
           presets.default = {
-            alpha = {
-              model = models.astra;
-              variant = "xhigh";
-            };
-            beta = {
-              model = models.sol;
-              variant = "xhigh";
-            };
-            gamma = {
-              model = models.terra-fast;
-              variant = "xhigh";
-            };
+            alpha.model = models.high-effort;
+            beta.model = models.fixer;
+            gamma.model = models.kestral;
           };
         };
 
-        fallbackConfig = {
-          enabled = true;
-        };
+        # Each combo already retries and falls back inside OmniRoute.
+        fallbackConfig.enabled = false;
 
-        agentFallbacks = {
-          orchestrator = {
-            model = [
-              (modelVariant "medium" models.terra-fast)
-              (modelVariant "medium" models.sol)
-              (modelVariant "xhigh" models.luna)
-              # (modelVariant "xhigh" models.spark)
-            ];
-          };
-          oracle = {
-            model = [
-              (modelVariant "xhigh" models.astra)
-              (modelVariant "xhigh" models.sol)
-              (modelVariant "xhigh" models.luna)
-            ];
-          };
-          librarian = {
-            model = [
-              (modelVariant "low" models.terra-fast)
-              (modelVariant "low" models.luna)
-              # (modelVariant "low" models.spark)
-              (modelVariant "low" models.sol-fast)
-            ];
-          };
-          explorer = {
-            model = [
-              (modelVariant "low" models.luna)
-              # (modelVariant "low" models.spark)
-              (modelVariant "low" models.sol-fast)
-            ];
-          };
-          designer = {
-            model = [
-              (modelVariant "high" models.astra)
-              (modelVariant "medium" models.sol)
-              (modelVariant "xhigh" models.luna)
-            ];
-          };
-          fixer = {
-            model = [
-              (modelVariant "medium" models.sol-fast)
-              (modelVariant "medium" models.sol)
-              (modelVariant "high" models.terra-fast)
-              # (modelVariant "high" models.spark)
-              (modelVariant "high" models.luna)
-            ];
-            orchestratorPrompt = ''
-              @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. On Linux, use the `agent-run-long` skill and helper rather than constructing logging or timing wrappers. Return its compact report fields.
-            '';
-          };
-          # Spark is text-only. Keep the complete observer chain multimodal.
-          observer = {
-            model = [
-              (modelVariant "medium" models.terra-fast)
-              models.luna
-              models.sol
-            ];
-          };
-        };
+        agentFallbacks.fixer.orchestratorPrompt = ''
+          @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. On Linux, use the `agent-run-long` skill and helper rather than constructing logging or timing wrappers. Return its compact report fields.
+        '';
 
         lspServers = {
           nixd = {
@@ -416,22 +309,9 @@
             # reminders switch on; above modelMaxLimits it nudges hard every
             # nudgeFrequency fetches. So the min is where compression pressure
             # *starts* — keep it high or the session compresses all session.
-            # Sol and Terra have 1.05M windows (922k input + 128k output),
-            # Spark has 128k total.
-            modelMaxLimits = {
-              ${models.sol} = 780000;
-              ${models.sol-fast} = 780000;
-              ${models.terra-fast} = 780000;
-              # ${models.spark} = 80000;
-              ${models.luna} = 192000;
-            };
-            modelMinLimits = {
-              ${models.sol} = 700000;
-              ${models.sol-fast} = 700000;
-              ${models.terra-fast} = 700000;
-              # ${models.spark} = 68000;
-              ${models.luna} = 160000;
-            };
+            # Combos can route to models with different context windows.
+            # Use the conservative shared thresholds above instead of the
+            # old Codex-specific million-token overrides.
             # nudgeFrequency counts fetches between nudges above the ceiling,
             # so higher = quieter. iterationNudgeThreshold is how many messages
             # after a user message before reminders resume, so higher is also
@@ -463,16 +343,15 @@
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@${omoVersion}/oh-my-opencode-slim.schema.json";
           autoUpdate = false;
           multiplexer.type = "zellij";
-          preset = "codex";
+          preset = "omniroute";
           council = councilConfig;
           fallback = fallbackConfig;
           agents = agentFallbacks;
           # v3 lacks todoContinuation's prior threshold/cap controls; configure
           # backgroundJobs.orchestratorWake only after verifying its v3 schema.
           # Enable observer agent (disabled by default upstream).
-          # Terra is vision-capable, so the block below activates.
           disabled_agents = [ ];
-          presets.codex.agents = presetCodex;
+          presets.omniroute.agents = presetOmniroute;
         };
       in
       {
@@ -524,35 +403,43 @@
               "opencode-history-search"
               "openrtk"
             ];
-            # Ignore any other configured credentials and keep all routing on
-            # the subscription provider represented in the active preset.
-            enabled_providers = [ "openai" ];
-            provider.openai.models = {
-              "gpt-6.1-sol".limit = {
-                context = 1050000;
-                input = 922000;
-                output = 128000;
-              };
-              "gpt-6.1-sol-fast".limit = {
-                context = 1050000;
-                input = 922000;
-                output = 128000;
-              };
-              "gpt-6.1-terra-fast".limit = {
-                context = 1050000;
-                input = 922000;
-                output = 128000;
-              };
-              # OpenCode's models.dev catalog exposes Spark as 128k for each
-              # required limit field.
-              # "gpt-5.3-codex-spark".limit = {
-              #   context = 128000;
-              #   input = 128000;
-              #   output = 128000;
-              # };
+            enabled_providers = [ "omniroute" ];
+            # Store the gateway API key with OpenCode's /connect flow, outside
+            # the Nix store. See OmniRoute's OpenCode integration guide:
+            # https://omniroute.hagicode.com/en-US/frameworks/opencode/
+            provider.omniroute = {
+              npm = "@ai-sdk/openai-compatible";
+              name = "OmniRoute";
+              options.baseURL = "http://localhost:20128/v1";
+              models = builtins.listToAttrs (
+                map
+                  (name: {
+                    inherit name;
+                    value = {
+                      inherit name;
+                      tool_call = true;
+                      modalities = {
+                        input = [ "text" ] ++ lib.optional (name != "Subagent") "image";
+                        output = [ "text" ];
+                      };
+                      # Conservative client caps for heterogeneous combos;
+                      # the gateway controls the actual upstream limits.
+                      limit = {
+                        context = 128000;
+                        output = 16384;
+                      };
+                    };
+                  })
+                  [
+                    "Kestral"
+                    "Subagent"
+                    "Fixer"
+                    "High Effort"
+                  ]
+              );
             };
-            model = models.terra-fast;
-            small_model = models.luna;
+            model = models.kestral;
+            small_model = models.subagent;
             autoupdate = false;
             # Core OpenCode LSP server configuration, not plugin configuration.
             lsp = lspServers;
