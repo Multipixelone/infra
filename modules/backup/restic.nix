@@ -124,6 +124,12 @@
               environment.RESTIC_CACHE_DIR = "/var/cache/restic-prune";
               serviceConfig = {
                 Type = "oneshot";
+                # A stale lock left by a crashed restic run once blocked this
+                # prune for weeks (--retry-lock cannot outwait a dead holder).
+                # Plain `unlock` (never --remove-all) only drops stale locks,
+                # and only link writes to this repository, so this is safe —
+                # same preflight nixpkgs' services.restic.backups runs.
+                ExecStartPre = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} unlock";
                 ExecStart = "${lib.getExe config.services.restic.backups.home.package} -r ${cfg.repository} -p ${default-restic-options.passwordFile} forget --prune --retry-lock 2h ${lib.concatStringsSep " " retentionOpts}";
                 Environment = "RCLONE_CONFIG=${rclone.configFile}";
                 CacheDirectory = "restic-prune";

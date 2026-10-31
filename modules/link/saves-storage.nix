@@ -1567,6 +1567,10 @@ in
             Environment = "RCLONE_CONFIG=${rcloneCfg.configFile}";
             CacheDirectory = "restic-forget-${instance}";
             CacheDirectoryMode = "0700";
+            # Drop stale locks from crashed runs first: one blocked repo
+            # maintenance for weeks. Plain `unlock` (never --remove-all) only
+            # removes stale locks; safe because only link writes to the repo.
+            ExecStartPre = "${resticCmd} unlock";
             ExecStart = "${resticCmd} forget --tag ${resticTag} --group-by host,tags --retry-lock 2h --keep-last 7 --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --keep-yearly 5";
           };
         };
