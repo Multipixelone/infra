@@ -27,7 +27,12 @@
 # The master switch deliberately has no `initial`: HA restores the user's
 # on/off choice. On first installation, turn it on once in HA (a brand-new
 # input_boolean otherwise defaults off). Datetime helpers also restore state;
-# 1970-01-01 00:00:00 is the empty-time sentinel, not an `initial` override.
+# UTC text helpers are authoritative and have no `initial`; missing text is
+# unknown, NEVER a reason to fall back to naive display datetimes. Epoch zero
+# (1970-01-01T00:00:00+00:00) explicitly clears a cap/nap. Local datetime helpers
+# are display/legacy only. The daemon owns input_text.commute_alarm_handled_at:
+# write the ORIGINAL offset-bearing deadline only after successful audio start,
+# including after snooze; a heartbeat alone does not acknowledge playback.
 #
 # Legacy pull-model contract is retained: `commutecompass tomorrow` POSTs
 # `alarm_at` to script.commute_set_tomorrow_alarm. The field is not called
@@ -35,14 +40,28 @@
 {
   configurations.nixos.iot.module =
     let
-      sentinel = "1970-01-01 00:00:00";
+      utcSentinel = "1970-01-01T00:00:00+00:00";
+      # Text is authoritative across DST folds/restarts. Write it first, then
+      # the local display helper; never reconstruct an instant from the latter.
+      writeInstant = textId: displayId: timestamp: [
+        {
+          service = "input_text.set_value";
+          target.entity_id = "input_text.commute_${textId}";
+          data.value = "{{ (${timestamp}) | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false) }}";
+        }
+        {
+          service = "input_datetime.set_datetime";
+          target.entity_id = "input_datetime.commute_${displayId}";
+          data.timestamp = "{{ ${timestamp} }}";
+        }
+      ];
       # Shared by the sensor state, availability and kind. Compare instants,
       # not ISO strings: offsets/DST must not change ordering or skip matching.
       nextAlarm = ''
-        {% set skipped = as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) %}
+        {% set skipped = as_timestamp(states('input_text.commute_alarm_skipped_utc'), 0) %}
         {% set ns = namespace(alarms=[]) %}
         {% for kind in ['wake', 'nap'] %}
-          {% set at = as_timestamp(states('input_datetime.commute_' ~ kind ~ '_at'), 0) %}
+          {% set at = as_timestamp(states('input_text.commute_' ~ kind ~ '_utc'), 0) %}
           {% if at > as_timestamp(now()) and at != skipped %}
             {% set ns.alarms = ns.alarms + [{'at': at, 'kind': kind}] %}
           {% endif %}
@@ -92,7 +111,24 @@
             name = "Commute — fallback claims";
             max = 255;
           };
-        };
+        }
+        // builtins.listToAttrs (
+          map
+            (id: {
+              name = "commute_${id}";
+              value = {
+                name = "Commute — ${id}";
+                max = 64;
+              };
+            })
+            [
+              "wake_utc"
+              "nap_utc"
+              "alarm_skipped_utc"
+              "next_prep_utc"
+              "alarm_handled_at"
+            ]
+        );
         input_boolean = {
           commute_alarm_enabled = {
             name = "Commute — alarm enabled";
@@ -163,7 +199,7 @@
                   {{ raw[3:] | from_json([]) if raw.startswith('v1:') else [] }}
                 '';
                 enabled = "{{ is_state('input_boolean.commute_alarm_enabled', 'on') }}";
-                skipped = "{{ as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) | int }}";
+                skipped = "{{ as_timestamp(states('input_text.commute_alarm_skipped_utc'), 0) | int }}";
                 unhealthy = ''
                   {{ as_timestamp(now()) - as_timestamp(states('input_datetime.commute_alarm_heartbeat'), 0) > 180
                      or is_state('input_boolean.commute_alarm_audio_failed', 'on') }}
@@ -175,12 +211,13 @@
                 {% set ns = namespace(claims=claims | list, alert=false) %}
                 {% set now_ts = as_timestamp(now()) %}
                 {% for kind in ['wake', 'nap', 'alarm_skipped'] %}
-                  {% set at = as_timestamp(states('input_datetime.commute_' ~ kind ~ '_at'), 0) | int %}
+                  {% set at = as_timestamp(states('input_text.commute_' ~ kind ~ '_utc'), 0) | int %}
                   {% set age = now_ts - at %}
                   {% set due = 60 <= age < 180 %}
                   {% if at > 86400 and at not in ns.claims and (not enabled or at == skipped or due) %}
                     {% set ns.claims = ns.claims + [at] %}
-                    {% if enabled and at != skipped and due and unhealthy %}
+                    {% set acknowledged = as_timestamp(states('input_text.commute_alarm_handled_at'), 0) | int == at %}
+                    {% if enabled and at != skipped and due and (unhealthy or not acknowledged) %}
                       {% set ns.alert = true %}
                     {% endif %}
                   {% endif %}
@@ -203,7 +240,7 @@
               condition = "template";
               value_template = ''
                 {{ selection.alert and is_state('input_boolean.commute_alarm_enabled', 'on')
-                   and as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) | int == skipped }}
+                   and as_timestamp(states('input_text.commute_alarm_skipped_utc'), 0) | int == skipped }}
               '';
             }
             {
@@ -267,18 +304,38 @@
           };
           sequence = [
             {
-              service = "input_datetime.set_datetime";
-              target.entity_id = "input_datetime.commute_wake_at";
-              data.timestamp = "{{ as_timestamp(wake_at) }}";
+              variables = {
+                incoming = "{{ as_timestamp(wake_at) }}";
+                existing = "{{ as_timestamp(states('input_text.commute_wake_utc'), 0) }}";
+                prep = "{{ as_timestamp(next_prep_at) if next_prep_at | default(\"\", true) | trim else 0 }}";
+              };
             }
             {
-              service = "input_datetime.set_datetime";
-              target.entity_id = "input_datetime.commute_next_prep_at";
-              data.datetime = ''
-                {{ as_local(as_datetime(next_prep_at)).strftime('%Y-%m-%d %H:%M:%S')
-                   if next_prep_at | default("", true) | trim else '${sentinel}' }}
-              '';
+              choose = [
+                {
+                  # Preserve today's just-due wake during ordinary next-day
+                  # rollover, until the daemon/fallback has had its window.
+                  # A later publisher timer installs tomorrow; cap/event still
+                  # update now. Explicit same-day replans remain authoritative.
+                  conditions = [
+                    {
+                      condition = "template";
+                      value_template = ''
+                        {% set rollover = as_local(as_datetime(incoming)).date() > as_local(as_datetime(existing)).date() %}
+                        {% set preserve = is_state('input_boolean.commute_alarm_enabled', 'on')
+                           and existing != as_timestamp(states('input_text.commute_alarm_skipped_utc'), 0)
+                           and 0 <= as_timestamp(now()) - existing <= 180 and rollover %}
+                        {{ not preserve }}
+                      '';
+                    }
+                  ];
+                  sequence = writeInstant "wake_utc" "wake_at" "incoming";
+                }
+              ];
             }
+          ]
+          ++ writeInstant "next_prep_utc" "next_prep_at" "prep"
+          ++ [
             {
               service = "input_text.set_value";
               target.entity_id = "input_text.commute_next_event";
@@ -301,6 +358,40 @@
           };
           sequence = [
             {
+              # Housekeeping shares this queue with nap writes and rechecks
+              # current state/deadline after waiting; it cannot clear a new nap.
+              choose = [
+                {
+                  conditions = [
+                    {
+                      condition = "template";
+                      value_template = "{{ cleanup | default(false) }}";
+                    }
+                  ];
+                  sequence = [
+                    {
+                      choose = [
+                        {
+                          conditions = [
+                            {
+                              condition = "template";
+                              value_template = ''
+                                {% set nap = as_timestamp(states('input_text.commute_nap_utc'), 0) %}
+                                {{ nap > 0 and nap + 1200 <= as_timestamp(now())
+                                   and is_state('input_select.commute_alarm_state', 'idle') }}
+                              '';
+                            }
+                          ];
+                          sequence = writeInstant "nap_utc" "nap_at" "0";
+                        }
+                      ];
+                    }
+                    { stop = "Nap housekeeping finished (active alarms are retained)."; }
+                  ];
+                }
+              ];
+            }
+            {
               choose = [
                 {
                   conditions = [
@@ -320,7 +411,7 @@
               ];
             }
             {
-              variables.cap_state = "{{ states('input_datetime.commute_next_prep_at') }}";
+              variables.cap_state = "{{ states('input_text.commute_next_prep_utc') }}";
             }
             {
               choose = [
@@ -329,7 +420,7 @@
                     {
                       condition = "template";
                       value_template = ''
-                        {{ cap_state not in ['unknown', 'unavailable', '${sentinel}']
+                        {{ cap_state not in ['unknown', 'unavailable', '${utcSentinel}']
                            and as_timestamp(cap_state, 0) <= as_timestamp(now()) }}
                       '';
                     }
@@ -347,7 +438,7 @@
             {
               variables = {
                 requested = "{{ as_timestamp(now()) + ([1, minutes | default(30) | int(30)] | max) * 60 }}";
-                prep = "{{ as_timestamp(states('input_datetime.commute_next_prep_at'), 0) }}";
+                prep = "{{ as_timestamp(states('input_text.commute_next_prep_utc'), 0) }}";
               };
             }
             {
@@ -356,11 +447,9 @@
                 nap = "{{ prep | float if prep | float > as_timestamp(now()) and prep | float < requested | float else requested | float }}";
               };
             }
-            {
-              service = "input_datetime.set_datetime";
-              target.entity_id = "input_datetime.commute_nap_at";
-              data.timestamp = "{{ nap }}";
-            }
+          ]
+          ++ writeInstant "nap_utc" "nap_at" "nap | float"
+          ++ [
             {
               service = "notify.iphone";
               data.message = ''
@@ -377,7 +466,7 @@
         {
           id = "commute_alarm_skip";
           alias = "Commute — skip next alarm";
-          mode = "single";
+          mode = "queued";
           sequence = [
             {
               variables.alarm = "{{ states('sensor.commute_next_alarm') }}";
@@ -386,11 +475,9 @@
               condition = "template";
               value_template = "{{ as_timestamp(alarm, 0) > as_timestamp(now()) }}";
             }
-            {
-              service = "input_datetime.set_datetime";
-              target.entity_id = "input_datetime.commute_alarm_skipped_at";
-              data.timestamp = "{{ as_timestamp(alarm) }}";
-            }
+          ]
+          ++ writeInstant "alarm_skipped_utc" "alarm_skipped_at" "as_timestamp(alarm)"
+          ++ [
             { service = "script.commute_alarm_fallback_check"; }
             {
               service = "notify.iphone";
@@ -444,9 +531,9 @@
               platform = "state";
               entity_id = [
                 "input_boolean.commute_alarm_enabled"
-                "input_datetime.commute_alarm_skipped_at"
-                "input_datetime.commute_wake_at"
-                "input_datetime.commute_nap_at"
+                "input_text.commute_alarm_skipped_utc"
+                "input_text.commute_wake_utc"
+                "input_text.commute_nap_utc"
               ];
             }
           ];
@@ -474,7 +561,7 @@
               condition = "template";
               value_template = ''
                 {{ (as_timestamp(states('input_datetime.commute_alarm_confirmed'), 0) / 60) | int
-                   != (as_timestamp(states('input_datetime.commute_wake_at'), 0) / 60) | int }}
+                   != (as_timestamp(states('input_text.commute_wake_utc'), 0) / 60) | int }}
               '';
             }
           ];
@@ -495,21 +582,10 @@
               minutes = "/1";
             }
           ];
-          condition = [
-            {
-              condition = "template";
-              value_template = ''
-                {% set nap = states('input_datetime.commute_nap_at') %}
-                {{ nap not in ['unknown', 'unavailable', '${sentinel}']
-                   and as_timestamp(nap, 0) + 1200 <= as_timestamp(now()) }}
-              '';
-            }
-          ];
           action = [
             {
-              service = "input_datetime.set_datetime";
-              target.entity_id = "input_datetime.commute_nap_at";
-              data.datetime = sentinel;
+              service = "script.commute_nap";
+              data.cleanup = true;
             }
           ];
         }
