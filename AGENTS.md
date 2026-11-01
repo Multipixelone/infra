@@ -21,6 +21,17 @@
   SSH configuration, not this private key. Rotate it with overlapping public-key
   authorization until the new key works on every node.
 
+## CommuteCompass privacy boundary (authoritative)
+
+- Never put personal origin values (home address or coordinates) in the public
+  `infra` or `commutecop` Git repositories, including examples and documentation.
+- Plaintext home address/coordinates are explicitly allowed in the private
+  `/home/tunnel/Documents/Git/nix-secrets/commutecompass/config.toml` and the
+  Nix store. This is the intentional existing `configFile` design; do not invent
+  an encryption migration for non-credential config without a user request.
+- API keys and tokens must remain encrypted in `tokens.age`, never tracked in
+  plaintext. The non-credential config allowance does not extend to credentials.
+
 ## Grafana investigations
 
 - When investigating a firing alert in this infrastructure, use Grafana to
