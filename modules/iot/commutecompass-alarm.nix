@@ -301,6 +301,25 @@
           };
           sequence = [
             {
+              choose = [
+                {
+                  conditions = [
+                    {
+                      condition = "template";
+                      value_template = "{{ not is_state('input_boolean.commute_alarm_enabled', 'on') }}";
+                    }
+                  ];
+                  sequence = [
+                    {
+                      service = "notify.iphone";
+                      data.message = "Alarms disabled — nap not set; enable commute alarms first";
+                    }
+                    { stop = "Alarms disabled: do not set a nap or enable alarms implicitly."; }
+                  ];
+                }
+              ];
+            }
+            {
               variables.cap_state = "{{ states('input_datetime.commute_next_prep_at') }}";
             }
             {
