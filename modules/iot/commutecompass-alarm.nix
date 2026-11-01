@@ -4,12 +4,25 @@
 # - Run the alarm-sync shortcut daily at 21:00 and on charger connect.
 # - Add a "Nap" home-screen shortcut: press input_button.commute_nap_30 via
 #   the HA action, wait 5 seconds, then run alarm sync.
-# - Alarm sync: GET sensor.commute_next_alarm; delete existing Clock alarms
-#   labelled "CommuteCompass". If the sensor has a valid future timestamp,
-#   create an alarm at that local time labelled "CommuteCompass", then call
-#   input_datetime.set_datetime on input_datetime.commute_alarm_confirmed
-#   with that timestamp (not the time the shortcut ran). Do not confirm an
-#   unavailable/empty sensor. Enable "Run Immediately" on the automations.
+# - Alarm sync: read the master switch, skipped timestamp and next-alarm sensor.
+#   Validate the schedule BEFORE modifying Clock. Convert the offset-bearing
+#   timestamp to phone-local time (HA/link use America/New_York). Clock alarms
+#   have a time but no date: only sync if the requested instant is the NEXT
+#   occurrence of that local time; otherwise warn and keep the existing backup.
+#   Reject ambiguous DST times unless the next occurrence matches the instant.
+# - Snapshot OLD Clock alarms labelled "CommuteCompass". Create the new labelled
+#   alarm FIRST, verify creation/enabled time, then delete ONLY the old alarms
+#   (exclude the newly created alarm by identity). If any step fails, preserve
+#   the old backup and do not confirm. Finally call input_datetime.set_datetime
+#   on input_datetime.commute_alarm_confirmed with the planned timestamp, not
+#   the shortcut execution time. Enable "Run Immediately" on the automations.
+# - Explicit master-off: delete owned Clock alarms when this shortcut runs.
+#   For skip, delete owned alarms only if the skipped timestamp matches the
+#   last phone-confirmed alarm, then sync a valid replacement if present.
+#   Never touch unrelated alarms. Unknown/unavailable HA data alone is NOT a
+#   deletion instruction; a persisted old skip is not a new cancellation.
+#   Skip/off in HA cannot remotely modify Clock: the phone applies them only
+#   when the shortcut runs; run it manually after changing either in HA.
 #
 # The master switch deliberately has no `initial`: HA restores the user's
 # on/off choice. On first installation, turn it on once in HA (a brand-new
@@ -67,13 +80,30 @@
               "alarm_confirmed"
             ]
         );
-        input_text.commute_next_event = {
-          name = "Commute — next event";
-          max = 255;
+        input_text = {
+          commute_next_event = {
+            name = "Commute — next event";
+            max = 255;
+          };
+          # Restored JSON epoch-second ledger; never set `initial`. Sixteen
+          # deadlines fit HA's 255-character limit. Older evicted entries are
+          # already outside the fallback's two-minute catch-up window.
+          commute_alarm_fallback_claims = {
+            name = "Commute — fallback claims";
+            max = 255;
+          };
         };
-        input_boolean.commute_alarm_enabled = {
-          name = "Commute — alarm enabled";
-          icon = "mdi:alarm-check";
+        input_boolean = {
+          commute_alarm_enabled = {
+            name = "Commute — alarm enabled";
+            icon = "mdi:alarm-check";
+          };
+          # Python sets on for audio start/update failure; only a successful
+          # audio start clears it. A live heartbeat alone cannot prove sound.
+          commute_alarm_audio_failed = {
+            name = "Commute — alarm audio failed";
+            icon = "mdi:volume-off";
+          };
         };
         input_button = {
           commute_alarm_stop.name = "Commute — stop alarm";
@@ -113,6 +143,83 @@
 
       iotHass.nixScripts = [
         {
+          id = "commute_alarm_fallback_check";
+          alias = "Commute — claim fallback deadline";
+          # All callers serialize here; ledger is written BEFORE any send.
+          # At-most-once delivery: a failed notify is not retried. HA restores
+          # helpers on ordinary restarts; abrupt loss before restore-state is
+          # flushed cannot offer transactional exactly-once guarantees.
+          mode = "queued";
+          max = 10;
+          sequence = [
+            {
+              condition = "template";
+              value_template = "{{ states('input_boolean.commute_alarm_enabled') in ['on', 'off'] }}";
+            }
+            {
+              variables = {
+                claims = ''
+                  {% set raw = states('input_text.commute_alarm_fallback_claims') %}
+                  {{ raw[3:] | from_json([]) if raw.startswith('v1:') else [] }}
+                '';
+                enabled = "{{ is_state('input_boolean.commute_alarm_enabled', 'on') }}";
+                skipped = "{{ as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) | int }}";
+                unhealthy = ''
+                  {{ as_timestamp(now()) - as_timestamp(states('input_datetime.commute_alarm_heartbeat'), 0) > 180
+                     or is_state('input_boolean.commute_alarm_audio_failed', 'on') }}
+                '';
+              };
+            }
+            {
+              variables.selection = ''
+                {% set ns = namespace(claims=claims | list, alert=false) %}
+                {% set now_ts = as_timestamp(now()) %}
+                {% for kind in ['wake', 'nap', 'alarm_skipped'] %}
+                  {% set at = as_timestamp(states('input_datetime.commute_' ~ kind ~ '_at'), 0) | int %}
+                  {% set age = now_ts - at %}
+                  {% set due = 60 <= age < 180 %}
+                  {% if at > 86400 and at not in ns.claims and (not enabled or at == skipped or due) %}
+                    {% set ns.claims = ns.claims + [at] %}
+                    {% if enabled and at != skipped and due and unhealthy %}
+                      {% set ns.alert = true %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {{ {'claims': ns.claims[-16:], 'alert': ns.alert} }}
+              '';
+            }
+            {
+              condition = "template";
+              value_template = "{{ selection.claims != claims }}";
+            }
+            {
+              service = "input_text.set_value";
+              target.entity_id = "input_text.commute_alarm_fallback_claims";
+              # Prefix prevents HA's native-template conversion turning a
+              # JSON array string into a list rejected by input_text.
+              data.value = "{{ 'v1:' ~ (selection.claims | to_json) }}";
+            }
+            {
+              condition = "template";
+              value_template = ''
+                {{ selection.alert and is_state('input_boolean.commute_alarm_enabled', 'on')
+                   and as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) | int == skipped }}
+              '';
+            }
+            {
+              service = "notify.iphone";
+              data = {
+                message = "link alarm offline — WAKE UP";
+                data.push.sound = {
+                  name = "default";
+                  critical = 1;
+                  volume = 1.0;
+                };
+              };
+            }
+          ];
+        }
+        {
           id = "commute_set_tomorrow_alarm";
           alias = "Commute — set tomorrow alarm";
           description = ''
@@ -150,7 +257,7 @@
               selector.text = { };
             };
             next_prep_at = {
-              description = "ISO-8601 next prep datetime, or empty to clear.";
+              description = "ISO-8601 hard nap cap (next prep minus wake lead), or empty to clear.";
               selector.text = { };
             };
             next_event = {
@@ -194,6 +301,31 @@
           };
           sequence = [
             {
+              variables.cap_state = "{{ states('input_datetime.commute_next_prep_at') }}";
+            }
+            {
+              choose = [
+                {
+                  conditions = [
+                    {
+                      condition = "template";
+                      value_template = ''
+                        {{ cap_state not in ['unknown', 'unavailable', '${sentinel}']
+                           and as_timestamp(cap_state, 0) <= as_timestamp(now()) }}
+                      '';
+                    }
+                  ];
+                  sequence = [
+                    {
+                      service = "notify.iphone";
+                      data.message = "Nap not set — commute prep cap has passed; refresh the commute plan first";
+                    }
+                    { stop = "Past prep cap: do not silently remove the hard nap limit."; }
+                  ];
+                }
+              ];
+            }
+            {
               variables = {
                 requested = "{{ as_timestamp(now()) + ([1, minutes | default(30) | int(30)] | max) * 60 }}";
                 prep = "{{ as_timestamp(states('input_datetime.commute_next_prep_at'), 0) }}";
@@ -216,6 +348,9 @@
                 {% set time = as_local(as_datetime(nap | float)).strftime('%H:%M') %}
                 {{ 'Nap capped to ' ~ time ~ ' — ' ~ states('input_text.commute_next_event') ~ ' prep'
                    if capped else 'Nap alarm set for ' ~ time }}
+                {% if cap_state in ['unknown', 'unavailable'] %}
+                  — prep cap unavailable; commute safety not verified
+                {% endif %}
               '';
             }
           ];
@@ -237,6 +372,7 @@
               target.entity_id = "input_datetime.commute_alarm_skipped_at";
               data.timestamp = "{{ as_timestamp(alarm) }}";
             }
+            { service = "script.commute_alarm_fallback_check"; }
             {
               service = "notify.iphone";
               data.message = "{{ 'Skipped commute alarm at ' ~ as_local(as_datetime(alarm)).strftime('%H:%M') }}";
@@ -273,55 +409,30 @@
           mode = "single";
           # The future-only sensor drops an elapsed alarm at the next minute
           # tick, cancelling a sensor time trigger with a positive offset.
-          # Watch its backing deadlines once per minute instead. The narrow
-          # window sends once per due deadline, even if wake == nap, without
-          # missing consecutive-minute alarms or retrying on helper updates.
+          # Check at +1m, with catch-up only until +3m after a HA restart.
+          # Claim even healthy deadlines, so later audio failure cannot revive
+          # an already assessed alarm. Off/skip immediately consume deadlines.
           trigger = [
             {
               platform = "time_pattern";
               minutes = "/1";
             }
-          ];
-          condition = [
             {
-              condition = "template";
-              value_template = ''
-                {% set now_ts = as_timestamp(now()) %}
-                {% set skipped = as_timestamp(states('input_datetime.commute_alarm_skipped_at'), 0) %}
-                {% set ns = namespace(due=false) %}
-                {% for kind in ['wake', 'nap'] %}
-                  {% set at = as_timestamp(states('input_datetime.commute_' ~ kind ~ '_at'), 0) %}
-                  {% if at != skipped and 60 <= now_ts - at < 120 %}
-                    {% set ns.due = true %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.due }}
-              '';
+              platform = "homeassistant";
+              event = "start";
             }
             {
-              condition = "state";
-              entity_id = "input_boolean.commute_alarm_enabled";
-              state = "on";
-            }
-            {
-              condition = "template";
-              value_template = ''
-                {{ as_timestamp(now()) - as_timestamp(states('input_datetime.commute_alarm_heartbeat'), 0) > 180 }}
-              '';
+              platform = "state";
+              entity_id = [
+                "input_boolean.commute_alarm_enabled"
+                "input_datetime.commute_alarm_skipped_at"
+                "input_datetime.commute_wake_at"
+                "input_datetime.commute_nap_at"
+              ];
             }
           ];
           action = [
-            {
-              service = "notify.iphone";
-              data = {
-                message = "link alarm offline — WAKE UP";
-                data.push.sound = {
-                  name = "default";
-                  critical = 1;
-                  volume = 1.0;
-                };
-              };
-            }
+            { service = "script.commute_alarm_fallback_check"; }
           ];
         }
         {
