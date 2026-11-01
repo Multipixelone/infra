@@ -73,7 +73,7 @@
         };
       };
 
-      # Loosen two upstream hardening defaults so the openclaw (Node.js)
+      # Adjust upstream hardening so the openclaw (Node.js)
       # stage can run:
       #   * ProtectHome=true → read-only, plus a ReadWritePaths carve-out
       #     so openclaw can read its credentials and write its delivery
@@ -81,6 +81,8 @@
       #   * MemoryDenyWriteExecute=true → false. V8 needs W^X mappings to
       #     bring up its JIT; with MDWE on, node aborts in
       #     v8::base::OS::SetPermissions before main().
+      #   * Expose only boot_id read-only for Gateway ownership verification;
+      #     retain upstream ProcSubset=pid and ProtectProc=invisible.
       systemd.services =
         let
           openclawHardening = {
@@ -88,6 +90,7 @@
               ProtectHome = lib.mkForce "read-only";
               ReadWritePaths = [ "/home/tunnel/.openclaw" ];
               MemoryDenyWriteExecute = lib.mkForce false;
+              BindReadOnlyPaths = [ "/proc/sys/kernel/random/boot_id" ];
             };
           };
         in
