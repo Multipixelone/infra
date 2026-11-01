@@ -33,6 +33,8 @@
 # are display/legacy only. The daemon owns input_text.commute_alarm_handled_at:
 # write the ORIGINAL offset-bearing deadline only after successful audio start,
 # including after snooze; a heartbeat alone does not acknowledge playback.
+# The daemon also writes offset-bearing UTC to commute_alarm_heartbeat_utc on
+# every heartbeat; fallback never reads the ambiguous legacy datetime mirror.
 #
 # Legacy pull-model contract is retained: `commutecompass tomorrow` POSTs
 # `alarm_at` to script.commute_set_tomorrow_alarm. The field is not called
@@ -127,6 +129,7 @@
               "alarm_skipped_utc"
               "next_prep_utc"
               "alarm_handled_at"
+              "alarm_heartbeat_utc"
             ]
         );
         input_boolean = {
@@ -201,7 +204,7 @@
                 enabled = "{{ is_state('input_boolean.commute_alarm_enabled', 'on') }}";
                 skipped = "{{ as_timestamp(states('input_text.commute_alarm_skipped_utc'), 0) | int }}";
                 unhealthy = ''
-                  {{ as_timestamp(now()) - as_timestamp(states('input_datetime.commute_alarm_heartbeat'), 0) > 180
+                  {{ as_timestamp(now()) - as_timestamp(states('input_text.commute_alarm_heartbeat_utc'), 0) > 180
                      or is_state('input_boolean.commute_alarm_audio_failed', 'on') }}
                 '';
               };
