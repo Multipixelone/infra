@@ -1,0 +1,40 @@
+{
+  "package": "omniroute",
+  "version": "3.8.52",
+  "license": "MIT",
+  "sourceKind": "installed npm package; generated dist/skills documentation",
+  "upstreamRevision": null,
+  "notes": "Selected references and LICENSE copied byte-for-byte. Root SKILL.md and operating-boundaries.md are locally authored. No verified upstream gitHead is known.",
+  "files": [
+    {
+      "source": "dist/skills/omni-mcp/SKILL.md",
+      "destination": "references/omni-mcp.md",
+      "sha256": "a871defe59365d76ed8f4486ed3f1ba0786297f2746dc7eb9cef1ca8870c6715"
+    },
+    {
+      "source": "dist/skills/omni-usage-logs/SKILL.md",
+      "destination": "references/omni-usage-logs.md",
+      "sha256": "a41b21aeba9a3f083dd945ace7cd798c388a9f411db4da8319fad3f9652271e4"
+    },
+    {
+      "source": "dist/skills/omni-context-rtk/SKILL.md",
+      "destination": "references/omni-context-rtk.md",
+      "sha256": "7fc1f159a9600a9d2c09c8fae3e2212bba3499864eb584c78d1f9a62c55324a6"
+    },
+    {
+      "source": "dist/skills/omni-providers/SKILL.md",
+      "destination": "references/omni-providers/reference.md",
+      "sha256": "3082e241c135b820aa6323f40b9b3c9c62552ed738f5a662c1bde917cd1bccbd"
+    },
+    {
+      "source": "dist/skills/omni-providers/references/endpoints.md",
+      "destination": "references/omni-providers/references/endpoints.md",
+      "sha256": "89a80d10dbdbd31ea898c5fb7b290e67af21933a0b654d52c6b43beac1fb3799"
+    },
+    {
+      "source": "LICENSE",
+      "destination": "LICENSE",
+      "sha256": "5f3caa52b2c2ce5dfb40c85404a370d23b6dc3e26a1447d17dc7e56f773b91de"
+    }
+  ]
+}
