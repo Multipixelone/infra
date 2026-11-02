@@ -1,5 +1,5 @@
-# The installed core set is a PROJECTION of the Core policy, never a second
-# list beside it.
+# The required core set is a PROJECTION of the Core policy, never a second
+# list beside it. Host-local additions do not prescribe a new save policy.
 #
 # The trap this avoids is quiet and expensive: a hand-written `withCores` list
 # drifts from modules/gaming/saves/policy.nix the moment the policy moves a
@@ -17,6 +17,9 @@
 # cores that WROTE the saves now on disk (gpSP, bsnes) stay installed for the
 # migration without being prescribed for anything.
 { config, ... }:
+let
+  requiredCores = config.flake.saveSyncInventory.requiredCores;
+in
 {
   # libretro-snes9x and libretro-genesis-plus-gx are both
   # `unfreeRedistributable` in nixpkgs -- Snes9x for its non-commercial clause,
@@ -31,7 +34,12 @@
   ];
 
   flake.modules.homeManager.gaming =
-    { pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       # `withCores` hands the callback `pkgs.libretro` itself, so a policy core
       # name is an attribute path into that set. A missing name must be a hard
@@ -53,11 +61,21 @@
         '');
 
       retroarch-cores = pkgs.retroarch.withCores (
-        cores: map (coreOf cores) config.flake.saveSyncInventory.requiredCores
+        cores: map (coreOf cores) requiredCores ++ config.gaming.retroarch.extraCores
       );
     in
     {
-      home.packages = [
+      options.gaming.retroarch.extraCores = lib.mkOption {
+        type = lib.types.listOf lib.types.package;
+        default = [ ];
+        description = ''
+          Host-local libretro packages added to the policy-required cores.
+          Installing a core does not change save paths or prescribe a new
+          cross-device save policy.
+        '';
+      };
+
+      config.home.packages = [
         retroarch-cores
       ];
     };
