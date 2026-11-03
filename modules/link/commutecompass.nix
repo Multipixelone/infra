@@ -110,6 +110,13 @@
         {
           "commutecompass-morning" = openclawHardening;
           "commutecompass-poll" = openclawHardening;
+
+          # pw-dump calls sched_setscheduler during PipeWire initialization;
+          # upstream's ~@resources filter killed it with SIGSYS (x86_64 audit
+          # syscall=144), preventing the alarm from starting audio.
+          # Re-allow just that syscall, appended after ~@resources.
+          # RestrictRealtime=true still rejects realtime scheduling policies.
+          "commutecompass-alarm".serviceConfig.SystemCallFilter = lib.mkAfter [ "sched_setscheduler" ];
         };
     };
 }
