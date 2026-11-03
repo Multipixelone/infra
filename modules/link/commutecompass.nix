@@ -81,8 +81,11 @@
       #   * MemoryDenyWriteExecute=true → false. V8 needs W^X mappings to
       #     bring up its JIT; with MDWE on, node aborts in
       #     v8::base::OS::SetPermissions before main().
-      #   * Expose only boot_id read-only for Gateway ownership verification;
-      #     retain upstream ProcSubset=pid and ProtectProc=invisible.
+      #   * ProcSubset=all makes boot_id available for Gateway ownership
+      #     verification. With pid, /proc/sys is absent and binding boot_id
+      #     fails before startup. Retain upstream ProtectProc=invisible and
+      #     ProtectKernelTunables=true to hide other users' processes and
+      #     keep sysctls read-only.
       systemd.services =
         let
           openclawHardening = {
@@ -90,7 +93,7 @@
               ProtectHome = lib.mkForce "read-only";
               ReadWritePaths = [ "/home/tunnel/.openclaw" ];
               MemoryDenyWriteExecute = lib.mkForce false;
-              BindReadOnlyPaths = [ "/proc/sys/kernel/random/boot_id" ];
+              ProcSubset = lib.mkForce "all";
             };
           };
         in
