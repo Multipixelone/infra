@@ -503,12 +503,10 @@
           mode = "single";
           trigger = [
             {
-              platform = "state";
-              entity_id = "input_button.commute_nap_30";
-              not_from = [
-                "unknown"
-                "unavailable"
-              ];
+              # Accept the first press from unknown, but ignore initial/restored
+              # states and unavailable recovery (native stateless-button guards).
+              trigger = "button.pressed";
+              target.entity_id = "input_button.commute_nap_30";
             }
           ];
           action = [

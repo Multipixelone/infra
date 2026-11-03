@@ -1544,6 +1544,99 @@ _: {
           }
         ];
         sections = [
+          # ── CommuteCompass: active alarm controls + always-available nap ──
+          {
+            type = "grid";
+            column_span = 2;
+            cards = [
+              {
+                type = "heading";
+                heading = "CommuteCompass";
+                heading_style = "title";
+                icon = "mdi:alarm";
+              }
+              {
+                type = "conditional";
+                conditions = [
+                  {
+                    condition = "or";
+                    conditions = [
+                      {
+                        condition = "state";
+                        entity = "input_select.commute_alarm_state";
+                        state = "ringing";
+                      }
+                      {
+                        condition = "state";
+                        entity = "input_select.commute_alarm_state";
+                        state = "snoozed";
+                      }
+                    ];
+                  }
+                ];
+                card = {
+                  type = "vertical-stack";
+                  cards = [
+                    (
+                      {
+                        type = "entity";
+                        entity = "input_select.commute_alarm_state";
+                        name = "Commute alarm";
+                        icon = "mdi:alarm";
+                        tap_action.action = "none";
+                        hold_action.action = "none";
+                        double_tap_action.action = "none";
+                      }
+                      // (accentStyle "var(--warning-color)")
+                    )
+                    {
+                      type = "grid";
+                      columns = 2;
+                      square = false;
+                      cards = [
+                        {
+                          type = "button";
+                          name = "Stop alarm";
+                          icon = "mdi:alarm-off";
+                          tap_action = {
+                            action = "perform-action";
+                            perform_action = "input_button.press";
+                            target.entity_id = "input_button.commute_alarm_stop";
+                          };
+                          hold_action.action = "none";
+                          double_tap_action.action = "none";
+                        }
+                        {
+                          type = "button";
+                          name = "Snooze";
+                          icon = "mdi:alarm-snooze";
+                          tap_action = {
+                            action = "perform-action";
+                            perform_action = "input_button.press";
+                            target.entity_id = "input_button.commute_alarm_snooze";
+                          };
+                          hold_action.action = "none";
+                          double_tap_action.action = "none";
+                        }
+                      ];
+                    }
+                  ];
+                };
+              }
+              {
+                type = "button";
+                name = "Commute — nap 30 minutes";
+                icon = "mdi:sleep";
+                tap_action = {
+                  action = "perform-action";
+                  perform_action = "input_button.press";
+                  target.entity_id = "input_button.commute_nap_30";
+                };
+                hold_action.action = "none";
+                double_tap_action.action = "none";
+              }
+            ];
+          }
           # ── Reminders: personal fridge nudges (hidden when empty) ─────────
           {
             type = "grid";
