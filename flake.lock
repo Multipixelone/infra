@@ -644,11 +644,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1791038428,
-        "narHash": "sha256-MZVpBCLv1QvBnguFr9mmCAJiqCEb5PnM7UrUsF9bFhM=",
+        "lastModified": 1793640073,
+        "narHash": "sha256-rvVzpnEd6g2qELh2+nZUqmNcESPtYHkn9beIbD4SiDU=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "e7f7ad3687ca8bf9829c1111a17133b9f7a036de",
+        "rev": "9175bcea2c0f013262bb3a8957287d016cac6d87",
         "type": "github"
       },
       "original": {
@@ -1403,11 +1403,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "lastModified": 1791914995,
+        "narHash": "sha256-Zf/xfQEAasnwnmEfHqW/4hjDE/s44yn2hD4RuVIZRjA=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "rev": "b7a79d3fea1e214f6d668d521cecec0c01e26544",
         "type": "github"
       },
       "original": {
@@ -1579,11 +1579,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1783008725,
-        "narHash": "sha256-jGiy6+sxjNWXSjp25uoJuNfyH9zBK1PEDY0lVoL4ibQ=",
+        "lastModified": 1791909798,
+        "narHash": "sha256-VAhpCOmrun/KXimYfR8NM88bciKCui7CqHHhThSzgag=",
         "owner": "cachix",
         "repo": "git-hooks.nix",
-        "rev": "bca82caa46d5ec0f5d422c61fb1e30bc51313cbe",
+        "rev": "1ba1dbfe28738c9a71c266be6efa5b89e75491a9",
         "type": "github"
       },
       "original": {
@@ -3932,11 +3932,11 @@
     },
     "nixpkgs_8": {
       "locked": {
-        "lastModified": 1782918843,
-        "narHash": "sha256-ETYnV9U7Sr+A45dohzZdfCZKOss4qrTkO+wgNZNvEc0=",
+        "lastModified": 1787631388,
+        "narHash": "sha256-vMiXptXarfSdJb1Gkc+FYVOAibuBRj7qxGa8z68q1Uw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e8273b29fe1390ec8d4603f2477357555291432e",
+        "rev": "ac6b2166e7a9375683b8e98f860f273222337b16",
         "type": "github"
       },
       "original": {
@@ -3948,11 +3948,11 @@
     },
     "nixpkgs_9": {
       "locked": {
-        "lastModified": 1783224372,
-        "narHash": "sha256-8i/87eeoqiGE4yOTjwSA3Eh/ziJRQEmd/unYU+K27sk=",
+        "lastModified": 1793341285,
+        "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "d407951447dcd00442e97087bf374aad70c04cea",
+        "rev": "1c89083e451e891152365b799595cf7790a43325",
         "type": "github"
       },
       "original": {
@@ -4532,11 +4532,11 @@
     "secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1791517847,
-        "narHash": "sha256-ojiI+IJu6m7N5JfE5dygIMJFbvQqVsyPXW9sR5l7N5M=",
+        "lastModified": 1793553533,
+        "narHash": "sha256-2vVKfv0IDZh3ZIZmUhA1QW8WjOq47PIlJO3EWa83FC4=",
         "ref": "refs/heads/main",
-        "rev": "14010e5aa8046ecdab4724488ed33bea01224a7b",
-        "revCount": 155,
+        "rev": "096c6100d83f10f7fc91cee7f6dba86179025d77",
+        "revCount": 158,
         "type": "git",
         "url": "ssh://git@github.com/Multipixelone/nix-secrets.git"
       },
