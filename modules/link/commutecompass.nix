@@ -48,7 +48,13 @@
         createUser = false;
         createGroup = false;
 
-        configFile = "${inputs.secrets}/commutecompass/config.toml";
+        # Enable [alarm] on top of the private config so the wake/nap daemon
+        # below can run; everything else passes through unchanged.
+        configFile = (pkgs.formats.toml { }).generate "commutecompass-config.toml" (
+          lib.recursiveUpdate (fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml")) {
+            alarm.enabled = true;
+          }
+        );
         venuesFile = "${inputs.secrets}/commutecompass/known_venues.yaml";
         environmentFile = config.age.secrets."commutecompass".path;
 
@@ -63,6 +69,10 @@
         # directly: installs `commutecompass-skill` on PATH and joins tunnel
         # to the commutecompass group so it can read the env file above.
         skill.users = [ "tunnel" ];
+
+        # PipeWire wake/nap alarm daemon. Runs as tunnel (uid 1000, the login
+        # user owning the PipeWire session at the default runtimeDir).
+        alarm.enable = true;
 
         openclaw = {
           package = openclawPkg;
