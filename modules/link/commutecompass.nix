@@ -48,11 +48,17 @@
         createUser = false;
         createGroup = false;
 
-        # Enable [alarm] on top of the private config so the wake/nap daemon
-        # below can run; everything else passes through unchanged.
+        # Enable the wake/nap alarm with a runtime-only personal sound file
+        # and a fixed ten-second volume ramp; pass other settings through.
         configFile = (pkgs.formats.toml { }).generate "commutecompass-config.toml" (
           lib.recursiveUpdate (fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml")) {
-            alarm.enabled = true;
+            alarm = {
+              enabled = true;
+              # Keep this a string: the personal audio must not enter the store.
+              sound = "/home/tunnel/Music/alarm.opus";
+              ramp_start_percent = 30;
+              ramp_seconds = 10;
+            };
           }
         );
         venuesFile = "${inputs.secrets}/commutecompass/known_venues.yaml";
