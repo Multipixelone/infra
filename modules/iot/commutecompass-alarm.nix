@@ -43,6 +43,8 @@
   configurations.nixos.iot.module =
     let
       utcSentinel = "1970-01-01T00:00:00+00:00";
+      # Finn's phone (iOS companion app); keeps critical push payloads valid.
+      notifyPhone = "notify.mobile_app_nougat";
       # Text is authoritative across DST folds/restarts. Write it first, then
       # the local display helper; never reconstruct an instant from the latter.
       writeInstant = textId: displayId: timestamp: [
@@ -247,7 +249,7 @@
               '';
             }
             {
-              service = "notify.iphone";
+              service = notifyPhone;
               data = {
                 message = "link alarm offline — WAKE UP";
                 data.push.sound = {
@@ -405,7 +407,7 @@
                   ];
                   sequence = [
                     {
-                      service = "notify.iphone";
+                      service = notifyPhone;
                       data.message = "Alarms disabled — nap not set; enable commute alarms first";
                     }
                     { stop = "Alarms disabled: do not set a nap or enable alarms implicitly."; }
@@ -430,7 +432,7 @@
                   ];
                   sequence = [
                     {
-                      service = "notify.iphone";
+                      service = notifyPhone;
                       data.message = "Nap not set — commute prep cap has passed; refresh the commute plan first";
                     }
                     { stop = "Past prep cap: do not silently remove the hard nap limit."; }
@@ -454,7 +456,11 @@
           ++ writeInstant "nap_utc" "nap_at" "nap | float"
           ++ [
             {
-              service = "notify.iphone";
+              # Informational only: the nap is already stored, so a delivery
+              # failure must not mark a successful nap as failed. HA still
+              # aborts on configuration errors (e.g. service not found).
+              service = notifyPhone;
+              continue_on_error = true;
               data.message = ''
                 {% set time = as_local(as_datetime(nap | float)).strftime('%H:%M') %}
                 {{ 'Nap capped to ' ~ time ~ ' — ' ~ states('input_text.commute_next_event') ~ ' prep'
@@ -483,7 +489,7 @@
           ++ [
             { service = "script.commute_alarm_fallback_check"; }
             {
-              service = "notify.iphone";
+              service = notifyPhone;
               data.message = "{{ 'Skipped commute alarm at ' ~ as_local(as_datetime(alarm)).strftime('%H:%M') }}";
             }
           ];
@@ -570,7 +576,7 @@
           ];
           action = [
             {
-              service = "notify.iphone";
+              service = notifyPhone;
               data.message = "⚠️ Phone alarm not set — run the CommuteCompass Shortcut";
             }
           ];
