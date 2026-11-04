@@ -58,6 +58,9 @@
               sound = "/home/tunnel/Music/alarm.opus";
               ramp_start_percent = 30;
               ramp_seconds = 10;
+              # First commute alarm an hour before the buffered leave time
+              # (upstream default is 37 minutes).
+              window.first_alarm_lead_minutes = 60;
             };
           }
         );
