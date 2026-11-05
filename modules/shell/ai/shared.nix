@@ -19,11 +19,9 @@
 
   config = {
     flake.aiConfig = {
-      # Must be a real Nix path, not a string: Home Manager's opencode module
-      # only links agents when `lib.isPath cfg.agents`. `rootPath` is
-      # `inputs.self` (an attrset), so `rootPath + /docs/agents` yields a
-      # string; use a path literal instead.
-      agentsDir = ../../../docs/agents;
+      # Agents now live in OMO customAgents; no shared Markdown directory.
+      # Claude accepts null; OpenCode maps it to an empty agent set.
+      agentsDir = null;
       skillsDir = builtins.path {
         path = rootPath + /docs/skills;
         name = "infra-skills";

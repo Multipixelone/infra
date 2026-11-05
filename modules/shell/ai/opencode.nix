@@ -105,6 +105,10 @@
             skills = [ ];
             mcps = [ ];
           };
+          secrets = {
+            skills = [ "nix" ];
+            mcps = [ "nixos" ];
+          };
           observer = {
             skills = [ ];
             mcps = [ ];
@@ -142,6 +146,7 @@
           tester.model = "fixer";
           diagnostician.model = "subagent";
           documenter.model = "subagent";
+          secrets.model = "high-effort";
           observer.model = "kestral";
           council.model = "high-effort";
         };
@@ -239,6 +244,27 @@
             task = "deny";
             execute = "deny";
             ast_grep_replace = "deny";
+          };
+        };
+
+        customAgents.secrets = {
+          description = "Manages agenix recipient rules and safe new-secret generation without exposing plaintext; returns patch-ready infra wiring and user-only credential/rotation steps.";
+          prompt = builtins.readFile ./prompts/secrets.md;
+          color = "#d946ef";
+          orchestratorPrompt = ''
+            @secrets — owns agenix recipient rules, safe new generated secrets, and patch-ready NixOS/Home Manager secret wiring. Delegate secret creation, recipient changes, supplied-credential/rotation guidance, and agenix failures with consumer scope and non-secret facts only. Never pass plaintext credentials or private keys. Existing payload edits and rekeying remain user-only; infra edits belong to fixer.
+          '';
+          # OMO 3.0.7 accepts legacy maps, not core v2 rule arrays. Its server
+          # adapter preserves resource order and maps bash to shell + bash;
+          # core write/edit/patch tools all check the edit action.
+          permission = {
+            edit = {
+              "*" = "deny";
+              "/home/tunnel/Documents/Git/nix-secrets/secrets.nix" = "allow";
+            };
+            bash = "ask";
+            webfetch = "deny";
+            websearch = "deny";
           };
         };
 
@@ -492,7 +518,7 @@
           package = pkgs.opencode;
           enableMcpIntegration = true;
           inherit (aiConfig) context;
-          agents = aiConfig.agentsDir;
+          agents = if aiConfig.agentsDir == null then { } else aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
           settings = {
             # programs.mcp uses Claude-style ${VAR} placeholders, but OpenCode
