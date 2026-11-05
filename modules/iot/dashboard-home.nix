@@ -290,6 +290,156 @@ _: {
         '';
       };
 
+      # ── CommuteCompass alarm controls (Finn view) ──────────────────────────
+      # Current wake decisions come ONLY from the daemon's REST-created
+      # `sensor.commute_alarm_status` (no YAML declaration; see commutecop
+      # docs/alarm-ha-contract.md "Status wire format"), never the legacy
+      # input_select mirror. Built conditional cards cannot test attributes or
+      # freshness, so a filter.template (auto-entities, already a module here)
+      # renders the card list; HA re-renders on every status change and at least
+      # once a minute (now()), so a stale export drops its controls.
+      #   - unknown (status card, no controls): observed_at invalid/naive/future
+      #     or older than statusMaxAgeSeconds; schema != 1; malformed ids or
+      #     timestamps; original_at after observed_at; a nap outside `legacy`;
+      #     window/final without a locked deadline after original_at; legacy
+      #     with one; or an `ended` record for this session;
+      #   - controls need a running ring: state ringing, ring.playback running,
+      #     audio_failed false, original_at <= started_at <= checked_at <=
+      #     observed_at and checked_at itself fresh (starting/stopped/failed
+      #     never count);
+      #   - window: "Snooze 5 min" only, sent as the token
+      #     CC_SNOOZE:<session.id>:<ring.id>:window to script.commute_alarm_reconcile,
+      #     which re-checks identity/playback/time when pressed — a card
+      #     rendered earlier cannot snooze a newer ring or a final. Never Stop
+      #     (the daemon treats HA stop as snooze; dismissal is desktop-only);
+      #   - final: at/after locked_deadline_at a window is final even if the
+      #     last export still says window (the final keeps the same ring id, so
+      #     only phase/time move). No Stop/Snooze, "Dismiss at desktop" instead;
+      #   - legacy (nap / no-deadline wake): unchanged direct buttons — Stop +
+      #     "Snooze 9 min" while running, Stop alone while snoozed.
+      # Timestamps accept Z or ±HH:MM (the daemon emits canonical Z only).
+      # The nap button sits outside this card and is always available.
+      commuteAlarm = import ../../lib/commute-alarm.nix;
+      commuteStatus = "sensor.commute_alarm_status";
+      commuteAlarmCard = {
+        type = "custom:auto-entities";
+        card_param = "cards";
+        show_empty = false;
+        card.type = "vertical-stack";
+        filter.template = ''
+          {%- macro epoch(v) -%}
+            {%- set dt = as_datetime(v, none) if v is string and v is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$') else none -%}
+            {{- as_timestamp(dt, -1) if dt is not none and dt.tzinfo is not none else -1 -}}
+          {%- endmacro -%}
+          {%- set idre = '^[a-f0-9]{32}$' -%}
+          {%- set max_age = ${toString commuteAlarm.statusMaxAgeSeconds} -%}
+          {%- set s = '${commuteStatus}' -%}
+          {%- set now_ts = as_timestamp(now()) -%}
+          {%- set raw = states(s) -%}
+          {%- set obs = epoch(state_attr(s, 'observed_at')) | float(-1) -%}
+          {%- set fresh = obs > 0 and 0 <= now_ts - obs <= max_age
+               and state_attr(s, 'schema') == 1 and raw in ['idle', 'ringing', 'snoozed'] -%}
+          {%- set session = state_attr(s, 'session') -%}
+          {%- set ring = state_attr(s, 'ring') -%}
+          {%- set ended = state_attr(s, 'ended') -%}
+          {%- set ok = fresh and raw in ['ringing', 'snoozed'] and session is mapping
+               and session.get('id') is string and session.get('id') is match(idre)
+               and session.get('kind') in ['wake', 'nap']
+               and session.get('phase') in ['legacy', 'window', 'final'] -%}
+          {%- set sw = epoch(session.get('original_at')) | float(-1) if ok else -1 -%}
+          {%- set sd = epoch(session.get('locked_deadline_at')) | float(-1) if ok else -1 -%}
+          {%- set ok = ok and 0 < sw <= obs -%}
+          {%- if ok and session.phase == 'legacy' -%}
+            {%- set ok = session.get('locked_deadline_at') is none -%}
+          {%- elif ok -%}
+            {%- set ok = session.kind == 'wake' and sd > sw -%}
+          {%- endif -%}
+          {%- if ok and ended is mapping -%}
+            {%- set last = ended.get(session.kind) -%}
+            {%- set ok = not (last is mapping and last.get('session_id') == session.id) -%}
+          {%- endif -%}
+          {%- if not ok -%}
+            {%- set phase = none -%}
+          {%- elif session.phase == 'legacy' -%}
+            {%- set phase = 'legacy' -%}
+          {%- else -%}
+            {#- Time moves the phase even before the next export does. -#}
+            {%- set phase = 'final' if session.phase == 'final' or now_ts >= sd else 'window' -%}
+          {%- endif -%}
+          {%- set started = epoch(ring.get('started_at')) | float(-1) if ring is mapping else -1 -%}
+          {%- set checked = epoch(ring.get('checked_at')) | float(-1) if ring is mapping else -1 -%}
+          {%- set running = ok and raw == 'ringing' and ring is mapping
+               and ring.get('id') is string and ring.get('id') is match(idre)
+               and ring.get('playback') == 'running'
+               and state_attr(s, 'audio_failed') is sameas false
+               and sw <= started <= checked <= obs and 0 <= now_ts - checked <= max_age -%}
+          {%- set stop = dict(type='button', name='Stop alarm', icon='mdi:alarm-off',
+                tap_action=dict(action='perform-action', perform_action='input_button.press',
+                                target=dict(entity_id='input_button.commute_alarm_stop')),
+                hold_action=dict(action='none'), double_tap_action=dict(action='none')) -%}
+          {%- set snooze = dict(type='button', icon='mdi:alarm-snooze',
+                tap_action=dict(action='perform-action', perform_action='input_button.press',
+                                target=dict(entity_id='input_button.commute_alarm_snooze')),
+                hold_action=dict(action='none'), double_tap_action=dict(action='none')) -%}
+          {%- set quiet = dict(tap_action=dict(action='none'), hold_action=dict(action='none'),
+                double_tap_action=dict(action='none')) -%}
+          {%- set warn = ${builtins.toJSON (accentStyle "var(--warning-color)").card_mod.style} -%}
+          {%- set bad = ${builtins.toJSON (accentStyle "var(--error-color)").card_mod.style} -%}
+          {%- if ok -%}
+            {%- set title = 'Commute nap' if session.kind == 'nap' else 'Commute alarm' -%}
+            {%- if raw == 'snoozed' -%}
+              {%- set until = epoch(state_attr(s, 'snooze_until')) | float(-1) -%}
+              {%- set detail = ('Snoozed until ' ~ until | timestamp_custom('%-I:%M %p')) if until > 0 else 'Snoozed' -%}
+              {%- set color, icon = 'blue', 'mdi:alarm-snooze' -%}
+            {%- elif running -%}
+              {%- set detail = 'Ringing' -%}
+              {%- set color, icon = 'orange', 'mdi:alarm-light' -%}
+            {%- elif state_attr(s, 'audio_failed') is sameas true or (ring is mapping and ring.get('playback') == 'failed') -%}
+              {%- set detail = 'Sound failed — check the desktop' -%}
+              {%- set color, icon = 'red', 'mdi:volume-off' -%}
+            {%- elif ring is mapping and ring.get('playback') == 'starting' -%}
+              {%- set detail = 'Starting…' -%}
+              {%- set color, icon = 'orange', 'mdi:alarm' -%}
+            {%- else -%}
+              {%- set detail = 'Not playing' -%}
+              {%- set color, icon = 'grey', 'mdi:alarm' -%}
+            {%- endif -%}
+            {%- if phase == 'window' -%}
+              {%- set detail = detail ~ ' · until leave time' -%}
+            {%- elif phase == 'final' -%}
+              {%- set detail = detail ~ ' · leave time reached' -%}
+            {%- endif -%}
+            {%- set ns = namespace(cards=[dict(quiet, type='custom:mushroom-template-card',
+                  entity=s, primary=title, secondary=detail, icon=icon, icon_color=color,
+                  card_mod=dict(style=(bad if color == 'red' else warn)))]) -%}
+            {%- if phase == 'final' -%}
+              {%- set ns.cards = ns.cards + [dict(quiet, type='custom:mushroom-template-card',
+                    primary='Dismiss at desktop', secondary='Stop and snooze are off after leave time',
+                    icon='mdi:monitor', icon_color='orange')] -%}
+            {%- elif phase == 'window' and running -%}
+              {%- set ns.cards = ns.cards + [dict(type='button', name='Snooze 5 min', icon='mdi:alarm-snooze',
+                    tap_action=dict(action='perform-action', perform_action='script.commute_alarm_reconcile',
+                                    data=dict(request='CC_SNOOZE:' ~ session.id ~ ':' ~ ring.id ~ ':window')),
+                    hold_action=dict(action='none'), double_tap_action=dict(action='none'))] -%}
+            {%- elif phase == 'legacy' and running -%}
+              {%- set ns.cards = ns.cards + [dict(type='grid', columns=2, square=false,
+                    cards=[stop, dict(snooze, name='Snooze 9 min')])] -%}
+            {%- elif phase == 'legacy' and raw == 'snoozed' -%}
+              {%- set ns.cards = ns.cards + [stop] -%}
+            {%- endif -%}
+            {{ ns.cards }}
+          {%- elif raw in ['ringing', 'snoozed']
+               or states('input_select.commute_alarm_state') in ['ringing', 'snoozed'] -%}
+            {#- Display only: the legacy mirror never unlocks a control. -#}
+            {{ [dict(quiet, type='custom:mushroom-template-card', entity=s,
+                 primary='Commute alarm', secondary='Status unknown — check the desktop',
+                 icon='mdi:alarm-off', icon_color='red', card_mod=dict(style=bad))] }}
+          {%- else -%}
+            []
+          {%- endif -%}
+        '';
+      };
+
       # Per-person presence tile (vertical avatar) in the member's accent colour.
       personCard =
         entity: color:
@@ -1555,74 +1705,7 @@ _: {
                 heading_style = "title";
                 icon = "mdi:alarm";
               }
-              {
-                type = "conditional";
-                conditions = [
-                  {
-                    condition = "or";
-                    conditions = [
-                      {
-                        condition = "state";
-                        entity = "input_select.commute_alarm_state";
-                        state = "ringing";
-                      }
-                      {
-                        condition = "state";
-                        entity = "input_select.commute_alarm_state";
-                        state = "snoozed";
-                      }
-                    ];
-                  }
-                ];
-                card = {
-                  type = "vertical-stack";
-                  cards = [
-                    (
-                      {
-                        type = "entity";
-                        entity = "input_select.commute_alarm_state";
-                        name = "Commute alarm";
-                        icon = "mdi:alarm";
-                        tap_action.action = "none";
-                        hold_action.action = "none";
-                        double_tap_action.action = "none";
-                      }
-                      // (accentStyle "var(--warning-color)")
-                    )
-                    {
-                      type = "grid";
-                      columns = 2;
-                      square = false;
-                      cards = [
-                        {
-                          type = "button";
-                          name = "Stop alarm";
-                          icon = "mdi:alarm-off";
-                          tap_action = {
-                            action = "perform-action";
-                            perform_action = "input_button.press";
-                            target.entity_id = "input_button.commute_alarm_stop";
-                          };
-                          hold_action.action = "none";
-                          double_tap_action.action = "none";
-                        }
-                        {
-                          type = "button";
-                          name = "Snooze";
-                          icon = "mdi:alarm-snooze";
-                          tap_action = {
-                            action = "perform-action";
-                            perform_action = "input_button.press";
-                            target.entity_id = "input_button.commute_alarm_snooze";
-                          };
-                          hold_action.action = "none";
-                          double_tap_action.action = "none";
-                        }
-                      ];
-                    }
-                  ];
-                };
-              }
+              commuteAlarmCard
               {
                 type = "button";
                 name = "Commute — nap 30 minutes";
