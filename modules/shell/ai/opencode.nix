@@ -61,7 +61,7 @@
           # knowledge (nix skill + nixos MCP for option/package lookups).
           explorer = {
             skills = [
-              "cartography"
+              "infra-navigation"
               "nix"
             ];
             mcps = [ "nixos" ];
@@ -70,11 +70,13 @@
             skills = [ "agent-browser" ];
             mcps = [ ];
           };
-          # agent-run-long: fixer runs assigned builds/tests via the helper.
+          # Reusable implementation procedures; validator owns long-running checks.
           fixer = {
             skills = [
               "nix"
               "agent-run-long"
+              "package-add"
+              "service-add"
             ];
             mcps = [ "nixos" ];
           };
@@ -82,6 +84,25 @@
           # owns agent-run-long validation lanes.
           validator = {
             skills = [ "agent-run-long" ];
+            mcps = [ ];
+          };
+          # Test author; execution is delegated to validator, so no
+          # agent-run-long.
+          tester = {
+            skills = [ "nix" ];
+            mcps = [ "nixos" ];
+          };
+          # grafana-local is only registered on Link; listing it here is a
+          # capability filter, not provisioning.
+          diagnostician = {
+            skills = [ "nix" ];
+            mcps = [
+              "nixos"
+              "grafana-local"
+            ];
+          };
+          documenter = {
+            skills = [ ];
             mcps = [ ];
           };
           observer = {
@@ -118,6 +139,9 @@
           designer.model = "high-effort";
           fixer.model = "fixer";
           validator.model = "fixer";
+          tester.model = "fixer";
+          diagnostician.model = "subagent";
+          documenter.model = "subagent";
           observer.model = "kestral";
           council.model = "high-effort";
         };
@@ -156,6 +180,64 @@
             edit = "deny";
             write = "deny";
             apply_patch = "deny";
+            ast_grep_replace = "deny";
+          };
+        };
+
+        # Locally authored selective test author. Edit permissions are coarse;
+        # prompt boundaries and diff review keep it to test-only scope.
+        customAgents.tester = {
+          description = "Selectively authors regression tests for realistic defects, extends existing coverage, and explains when no new tests are warranted; leaves production fixes and validation execution to their owners.";
+          prompt = builtins.readFile ./prompts/tester.md;
+          orchestratorPrompt = ''
+            @tester — assesses existing coverage and authors only worthwhile tests, fixtures, and test-only helpers. Delegate the behavior/specification, changed scope, and non-overlapping write ownership; delegation authorizes test writing without approval per test. Accept an evidence-backed “no new tests.” Assign narrow check wiring explicitly or leave it to fixer. Production fixes belong to fixer; every agent-run-long task, build, Nix validation, VM/runtime run, and long/full check belongs to a background validator after relevant writers are reconciled. Tiny local test iteration requires explicit delegation and repository-policy permission. Don't: coverage quotas, redundant tests, implementation mirrors, blanket snapshots, new frameworks, or making tests accommodate implementation bugs.
+          '';
+          permission = {
+            edit = "allow";
+            write = "allow";
+            apply_patch = "allow";
+            ast_grep_replace = "allow";
+          };
+        };
+
+        # Locally authored read-only investigator for Nix and service
+        # failures. Bash is for reads; denials are not a shell sandbox.
+        customAgents.diagnostician = {
+          description = "Investigates Nix evaluation, build, activation, and service failures using scoped read-only evidence; returns causal hypotheses, owning paths, and the smallest discriminating next step.";
+          prompt = builtins.readFile ./prompts/diagnostician.md;
+          orchestratorPrompt = ''
+            @diagnostician — investigates Nix evaluation/build/activation failures and service/runtime incidents using scoped read-only evidence. Delegate: CI/Nix check failures; unexplained service failures; firing infrastructure alerts. Supply the known error/logs, target/installable/unit, relevant revision/tree state, and authorized host/environment/time window where applicable. Returns facts, hypotheses, owning paths, and the smallest discriminating probe. Don't: routine repo mapping (@explorer), architecture decisions or difficult synthesis after evidence collection (@oracle), implementation (@fixer), or build/test/long-reproduction execution (background @validator). No deployment, restart, or debugger attachment. The orchestrator owns execution and repair handoffs.
+          '';
+          permission = {
+            bash = "allow";
+            edit = "deny";
+            write = "deny";
+            apply_patch = "deny";
+            ast_grep_replace = "deny";
+          };
+        };
+
+        # Documentation writer: read + file edits only, no shell, delegation,
+        # or code-mode execution. The plugin maps bash to shell+bash and task
+        # to subagent; host permission rules still merge on top.
+        customAgents.documenter = {
+          description = "Reconciles substantial project documentation, runbooks, and multi-file guides against source, configuration, and tests.";
+          prompt = builtins.readFile ./prompts/documenter.md;
+          orchestratorPrompt = ''
+            @documenter — delegate substantial source-to-doc reconciliation, operational runbooks, architecture/migration guides, or coordinated documentation updates, including literal prose in existing generated-doc sources. Pass the requested outcome, scope/file constraints, known evidence, and open questions; it can inspect local sources without a complete dossier. Keep short corrections or summaries already supported by your context in the orchestrator. Do not delegate implementation changes, generated-output edits, source comments/docstrings, or agent-policy/routing changes. Route required source wiring and regeneration to fixer, and checks to validator.
+          '';
+          permission = {
+            "*" = "deny";
+            read = "allow";
+            glob = "allow";
+            grep = "allow";
+            ast_grep_search = "allow";
+            edit = "allow";
+            write = "allow";
+            apply_patch = "allow";
+            bash = "deny";
+            task = "deny";
+            execute = "deny";
             ast_grep_replace = "deny";
           };
         };
