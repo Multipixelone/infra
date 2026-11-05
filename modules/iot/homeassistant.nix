@@ -1364,6 +1364,16 @@
                 };
               }
               {
+                # Check at the write, not just at automation start (also guards loops).
+                condition = "template";
+                value_template = ''
+                  {% set raw = states('input_text.commute_alarm_light_owner') %}
+                  {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                  {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                     and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                '';
+              }
+              {
                 service = "select.select_option";
                 target = {
                   entity_id = "select.fairy_lights_preset";
@@ -1561,6 +1571,16 @@
                             ];
                             sequence = [
                               {
+                                # Check at the write, not just at automation start (also guards loops).
+                                condition = "template";
+                                value_template = ''
+                                  {% set raw = states('input_text.commute_alarm_light_owner') %}
+                                  {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                                  {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                                     and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                                '';
+                              }
+                              {
                                 service = "select.select_option";
                                 target = {
                                   entity_id = "select.fairy_lights_preset";
@@ -1573,6 +1593,16 @@
                           }
                         ];
                         default = [
+                          {
+                            # Check at the write, not just at automation start (also guards loops).
+                            condition = "template";
+                            value_template = ''
+                              {% set raw = states('input_text.commute_alarm_light_owner') %}
+                              {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                              {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                                 and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                            '';
+                          }
                           {
                             service = "select.select_option";
                             target = {
@@ -1641,6 +1671,16 @@
                             ];
                             sequence = [
                               {
+                                # Check at the write, not just at automation start (also guards loops).
+                                condition = "template";
+                                value_template = ''
+                                  {% set raw = states('input_text.commute_alarm_light_owner') %}
+                                  {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                                  {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                                     and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                                '';
+                              }
+                              {
                                 service = "select.select_option";
                                 target = {
                                   entity_id = "select.fairy_lights_preset";
@@ -1653,6 +1693,16 @@
                           }
                         ];
                         default = [
+                          {
+                            # Check at the write, not just at automation start (also guards loops).
+                            condition = "template";
+                            value_template = ''
+                              {% set raw = states('input_text.commute_alarm_light_owner') %}
+                              {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                              {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                                 and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                            '';
+                          }
                           {
                             service = "select.select_option";
                             target = {
@@ -1704,6 +1754,16 @@
                         ];
                         sequence = [
                           {
+                            # Check at the write, not just at automation start (also guards loops).
+                            condition = "template";
+                            value_template = ''
+                              {% set raw = states('input_text.commute_alarm_light_owner') %}
+                              {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                              {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                                 and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                            '';
+                          }
+                          {
                             service = "select.select_option";
                             target = {
                               entity_id = "select.fairy_lights_preset";
@@ -1716,6 +1776,16 @@
                       }
                     ];
                     default = [
+                      {
+                        # Check at the write, not just at automation start (also guards loops).
+                        condition = "template";
+                        value_template = ''
+                          {% set raw = states('input_text.commute_alarm_light_owner') %}
+                          {% set o = raw[3:] | from_json(none) if raw.startswith('v1:') else none %}
+                          {{ is_state('binary_sensor.commute_alarm_lights_owned', 'off')
+                             and o is mapping and (o | count == 0 or o.get('p') == 'released') }}
+                        '';
+                      }
                       {
                         service = "select.select_option";
                         target = {

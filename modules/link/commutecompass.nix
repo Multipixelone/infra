@@ -12,6 +12,7 @@
       ...
     }:
     let
+      alarmTiming = import ../../lib/commute-alarm.nix;
       # Reuse the openclaw binary that modules/link/openclaw.nix installs into
       # tunnel's home via `npm install -g openclaw`. The wrapper adds nodejs to
       # PATH so the binary's `#!/usr/bin/env node` shebang resolves inside the
@@ -58,9 +59,12 @@
               sound = "/home/tunnel/Music/alarm.opus";
               ramp_start_percent = 30;
               ramp_seconds = 10;
-              # First commute alarm an hour before the buffered leave time
-              # (upstream default is 37 minutes).
-              window.first_alarm_lead_minutes = 60;
+              # Advisory status is REST-created by the daemon; the schedule
+              # remains on the existing helper contract, not the opt-in v1 relay.
+              schedule_contract = "legacy";
+              status_entity = "sensor.commute_alarm_status";
+              # Share the first-ring lead with iot's ten-minute light fade.
+              window.first_alarm_lead_minutes = alarmTiming.firstAlarmLeadMinutes;
             };
           }
         );

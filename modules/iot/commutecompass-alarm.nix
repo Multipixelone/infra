@@ -132,6 +132,8 @@
               "next_prep_utc"
               "alarm_handled_at"
               "alarm_heartbeat_utc"
+              "alarm_deadline_utc"
+              "alarm_window_done_utc"
             ]
         );
         input_boolean = {
@@ -298,6 +300,10 @@
               required = true;
               selector.text = { };
             };
+            deadline_at = {
+              description = "Optional buffered leave deadline, ISO-8601 with offset; empty or epoch zero clears.";
+              selector.text = { };
+            };
             next_prep_at = {
               description = "ISO-8601 hard nap cap (next prep minus wake lead), or empty to clear.";
               selector.text = { };
@@ -309,7 +315,19 @@
           };
           sequence = [
             {
+              # Reject malformed/naive deadlines BEFORE any helper changes.
+              # Legacy callers omitting the field explicitly clear the anchor.
+              condition = "template";
+              value_template = ''
+                {% set raw = deadline_at | default("", true) | string | trim %}
+                {% set dt = as_datetime(raw, none) if raw else none %}
+                {{ not raw or (dt is not none and dt.tzinfo is not none
+                   and raw | regex_search('T.*(Z|[+-][0-9]{2}:[0-9]{2})$')) }}
+              '';
+            }
+            {
               variables = {
+                deadline = "{{ as_timestamp(deadline_at) if deadline_at | default('', true) | string | trim else 0 }}";
                 incoming = "{{ as_timestamp(wake_at) }}";
                 existing = "{{ as_timestamp(states('input_text.commute_wake_utc'), 0) }}";
                 prep = "{{ as_timestamp(next_prep_at) if next_prep_at | default(\"\", true) | trim else 0 }}";
@@ -334,7 +352,16 @@
                       '';
                     }
                   ];
-                  sequence = writeInstant "wake_utc" "wake_at" "incoming";
+                  # The same rollover decision protects BOTH parts of the pair.
+                  # These are serialized writes, not an atomic v1 publication.
+                  sequence = [
+                    {
+                      service = "input_text.set_value";
+                      target.entity_id = "input_text.commute_alarm_deadline_utc";
+                      data.value = "{{ (deadline | float if incoming | float > 0 else 0) | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false) }}";
+                    }
+                  ]
+                  ++ writeInstant "wake_utc" "wake_at" "incoming";
                 }
               ];
             }
