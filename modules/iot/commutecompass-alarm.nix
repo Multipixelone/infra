@@ -523,7 +523,137 @@
         }
       ];
 
+      # Logging-only phone trial: no alarm controls or persisted eligibility.
+      # Retrieve in HA Activity/Logbook, filter these phone sensors and look for
+      # "Commute phone observation" (logbook_entry events; recorder keeps 21 days).
+      # Event time is HA delivery time, NOT proof of sensor freshness, continuous
+      # overnight charging, or wakefulness. Unknown/restored states are gaps.
       iotHass.nixAutomations = [
+        {
+          alias = "Commute — phone battery observation only";
+          id = "commute_phone_battery_observation_only";
+          mode = "queued";
+          max = 50;
+          trigger = [
+            {
+              platform = "state";
+              entity_id = "sensor.nougat_battery_state";
+              # Ignore attribute-only updates, but include initial/gap states.
+              to = null;
+            }
+          ];
+          action = [
+            {
+              service = "logbook.log";
+              data = {
+                name = "Commute phone observation";
+                entity_id = "sensor.nougat_battery_state";
+                message = ''
+                  {% set old = trigger.from_state %}
+                  {% set new = trigger.to_state %}
+                  {% set valid = ['Charging', 'Full', 'Not Charging'] %}
+                  {% if old is none or new is none or old.attributes.get('restored', false) or new.attributes.get('restored', false) %}
+                    {% set reason = 'initial_or_restored_gap' %}
+                  {% elif old.state not in valid or new.state not in valid %}
+                    {% set reason = 'invalid_state_gap' %}
+                  {% elif old.state in ['Charging', 'Full'] and new.state == 'Not Charging' %}
+                    {% set reason = 'disconnect_candidate_only' %}
+                  {% else %}
+                    {% set reason = 'battery_transition_only' %}
+                  {% endif %}
+                  observational_only; reason={{ reason }};
+                  previous={{ old.state if old is not none else 'missing' }};
+                  new={{ new.state if new is not none else 'missing' }};
+                  alarm_mode={{ states('input_select.commute_alarm_state') }};
+                  master={{ states('input_boolean.commute_alarm_enabled') }};
+                  scheduled_wake_utc={{ states('input_text.commute_wake_utc') }}
+                '';
+              };
+            }
+          ];
+        }
+        {
+          alias = "Commute — phone movement observation only";
+          id = "commute_phone_movement_observation_only";
+          mode = "queued";
+          max = 50;
+          trigger = [
+            {
+              platform = "state";
+              entity_id = [
+                "sensor.nougat_activity"
+                "sensor.nougat_steps"
+              ];
+              to = null;
+            }
+          ];
+          condition = [
+            {
+              # The authoritative wake instant, not the strictly-future next
+              # alarm sensor (which can point at a nap or tomorrow). A stale
+              # wake stops qualifying after +1h unless actively ringing/snoozed.
+              condition = "or";
+              conditions = [
+                {
+                  condition = "state";
+                  entity_id = "input_select.commute_alarm_state";
+                  state = [
+                    "ringing"
+                    "snoozed"
+                  ];
+                }
+                {
+                  condition = "template";
+                  value_template = ''
+                    {% set wake = as_datetime(states('input_text.commute_wake_utc'), none) %}
+                    {{ wake is not none and wake.tzinfo is not none
+                       and -7200 <= as_timestamp(now()) - as_timestamp(wake) <= 3600 }}
+                  '';
+                }
+              ];
+            }
+            {
+              # Only new valid transitions/deltas, never initial/restored data,
+              # unknown recovery, a daily counter reset, or attribute refreshes.
+              condition = "template";
+              value_template = ''
+                {% set old = trigger.from_state %}
+                {% set new = trigger.to_state %}
+                {% if old is none or new is none or old.attributes.get('restored', false) or new.attributes.get('restored', false) %}
+                  false
+                {% elif trigger.entity_id == 'sensor.nougat_activity' %}
+                  {% set valid = ['Stationary', 'Walking', 'Running', 'Automotive', 'Cycling'] %}
+                  {{ old.state in valid and new.state in valid and old.state != new.state }}
+                {% else %}
+                  {{ is_number(old.state) and is_number(new.state)
+                     and old.state | float(0) >= 0
+                     and new.state | float(0) > old.state | float(0) }}
+                {% endif %}
+              '';
+            }
+          ];
+          action = [
+            {
+              service = "logbook.log";
+              data = {
+                name = "Commute phone observation";
+                entity_id = "{{ trigger.entity_id }}";
+                message = ''
+                  observational_only; reason={{ 'activity_transition_only' if trigger.entity_id == 'sensor.nougat_activity' else 'positive_step_delta_only' }};
+                  previous={{ trigger.from_state.state }}; new={{ trigger.to_state.state }};
+                  {% if trigger.entity_id == 'sensor.nougat_steps' %}
+                    step_delta={{ trigger.to_state.state | float(0) - trigger.from_state.state | float(0) }};
+                  {% else %}
+                    confidence={{ trigger.to_state.attributes.get('Confidence', 'missing') }};
+                  {% endif %}
+                  alarm_mode={{ states('input_select.commute_alarm_state') }};
+                  master={{ states('input_boolean.commute_alarm_enabled') }};
+                  scheduled_wake_utc={{ states('input_text.commute_wake_utc') }}
+                '';
+              };
+            }
+          ];
+        }
         {
           id = "commute_nap_30";
           alias = "Commute — nap button";
