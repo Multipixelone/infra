@@ -36,7 +36,7 @@
         Always use Conventional Commits: `type(scope): imperative summary`. Types: feat/fix/refactor/perf/docs/test/build/ci/chore/revert. Add a scope when useful (host/module); lowercase summary, no trailing period, header ≤72 characters. Explain why in the body when non-obvious; mark breaking changes with `!` and/or `BREAKING CHANGE:`. One logical change per commit.
 
         ## Env
-        Nix-managed NixOS+HM. Shell-scripts: prefer fish (no bash syntax). Terminal: foot+zellij. Bash tool: zsh, not fish — prefix `eval "$(direnv export zsh 2>/dev/null)"` when needed.
+        Nix-managed NixOS+HM. Shell-scripts: prefer fish (no bash syntax). Terminal: foot+zellij. Agent shell tools may differ from `$SHELL`; use the tool's actual interpreter. If a dev-shell load is needed, run `direnv exec . COMMAND` from the repo root; keep stderr visible. Inherited environment variables do not prove freshness.
 
         ## Long builds and tests (Linux)
         On Linux, load and use the `agent-run-long` skill before long builds, tests, or Nix validation. Invoke `agent-run-long --label NAME --timeout 30m -- COMMAND…` through the Bash tool with an outer timeout of at least `(inner seconds + 60) × 1000` milliseconds (30m: `1860000`). The helper owns logging, timing, status, excerpts, and cleanup; do not add wrappers. Keep full validation delegated to background validators; if unavailable, report the limitation.

@@ -45,9 +45,11 @@ shell is re-entered. Signs of stale hooks: a hook is missing or outdated,
 `.pre-commit-config.yaml` points at a store path that doesn't exist or was
 garbage-collected, or you see `pre-commit: command not found`.
 
-Fix: run `direnv reload` (from an agent shell:
-`eval "$(direnv export zsh 2>/dev/null)"`), check that
-`.pre-commit-config.yaml` resolves, then retry the commit. Do not bypass the
-hooks.
+Fix (from the repo root): run `direnv reload && direnv exec . true` to
+invalidate and load the environment, reinstalling the hooks. Keep stderr
+visible and resolve errors or fallback warnings before proceeding. Check
+that `.pre-commit-config.yaml` resolves to the expected hook configuration,
+then retry with `direnv exec . git commit ...`. Environment updates in one
+tool call do not propagate to later calls. Do not bypass the hooks.
 
 Make one logical change per commit. Split unrelated changes into separate commits.
