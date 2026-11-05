@@ -57,17 +57,26 @@
               "grep_app"
             ];
           };
+          # explorer/fixer do most hands-on repo work, so give them Nix
+          # knowledge (nix skill + nixos MCP for option/package lookups).
           explorer = {
-            skills = [ "cartography" ];
-            mcps = [ ];
+            skills = [
+              "cartography"
+              "nix"
+            ];
+            mcps = [ "nixos" ];
           };
           designer = {
             skills = [ "agent-browser" ];
             mcps = [ ];
           };
+          # agent-run-long: fixer runs assigned builds/tests via the helper.
           fixer = {
-            skills = [ ];
-            mcps = [ ];
+            skills = [
+              "nix"
+              "agent-run-long"
+            ];
+            mcps = [ "nixos" ];
           };
           # Custom agent forked from marketplace alvin/validator@1.0.1;
           # owns agent-run-long validation lanes.
