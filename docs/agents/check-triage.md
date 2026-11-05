@@ -16,7 +16,7 @@ Purpose: classify `nix flake check` failures quickly and route to the correct fi
 
 1. Start from the reported CI failure and capture its key failing section. Do
    not run `nix flake check` by default: full checks stay in CI. If a user
-   explicitly requests local full validation, delegate it to a background fixer
+   explicitly requests local full validation, delegate it to a background validator
    using the `agent-run-long` skill.
 
 2. Classify failure type:

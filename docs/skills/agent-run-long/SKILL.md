@@ -62,7 +62,7 @@ group; daemonized children, Nix daemon or remote jobs, and uninterruptible tasks
 may require separate inspection and cleanup.
 
 Report the command, exit code, duration, pass/fail, smallest actionable
-excerpt, and log path. Keep full validation delegated to background fixers; if
+excerpt, and log path. Keep full validation delegated to background validators; if
 delegation is unavailable, report that limitation.
 
 ## Privacy and retention

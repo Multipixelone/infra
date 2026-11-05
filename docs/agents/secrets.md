@@ -86,7 +86,7 @@ Tell them to paste the secret value into the editor and save. If relevant, sugge
 
 Use the narrowest relevant evaluation only when needed; verify that the secret
 file exists in `inputs.secrets`. Full `nix flake check` validation stays in CI.
-If a user explicitly requests it locally, delegate it to a background fixer
+If a user explicitly requests it locally, delegate it to a background validator
 using the `agent-run-long` skill.
 
 ## Output Contract

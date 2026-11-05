@@ -94,7 +94,7 @@ git add modules/<path>/<service>.nix
 
 Use the narrowest relevant evaluation or existing check for the service. Full
 `nix flake check` validation stays in CI; if explicitly requested locally,
-delegate it to a background fixer using the `agent-run-long` skill.
+delegate it to a background validator using the `agent-run-long` skill.
 
 ## Output Contract
 

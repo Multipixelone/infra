@@ -66,6 +66,12 @@
             mcps = [ ];
           };
           fixer = {
+            skills = [ ];
+            mcps = [ ];
+          };
+          # Custom agent forked from marketplace alvin/validator@1.0.1;
+          # owns agent-run-long validation lanes.
+          validator = {
             skills = [ "agent-run-long" ];
             mcps = [ ];
           };
@@ -102,6 +108,7 @@
           explorer.model = "subagent";
           designer.model = "high-effort";
           fixer.model = "fixer";
+          validator.model = "fixer";
           observer.model = "kestral";
           council.model = "high-effort";
         };
@@ -126,9 +133,23 @@
         # Each combo already retries and falls back inside OmniRoute.
         fallbackConfig.enabled = false;
 
-        agentFallbacks.fixer.orchestratorPrompt = ''
-          @fixer: delegate each independent long-running build, test, or CI validation lane to a separate background fixer. Use non-overlapping scopes; serialize overlaps. On Linux, use the `agent-run-long` skill and helper rather than constructing logging or timing wrappers. Return its compact report fields.
-        '';
+        # Locally maintained fork of marketplace package alvin/validator@1.0.1
+        # (MIT, by Alvin). Top-level `agents` keys that aren't built-ins are
+        # custom agents; the model/skills come from the preset entry above.
+        customAgents.validator = {
+          description = "Runs tests, lint, typechecks, builds, and Nix validation via agent-run-long, returning concise failure evidence while keeping full logs on disk.";
+          prompt = builtins.readFile ./prompts/validator.md;
+          orchestratorPrompt = ''
+            @validator — runs established builds, tests, lint, typechecks, and Nix validation; owns every `agent-run-long` task and returns PASS/FAIL/BLOCKED with commands, exit codes, excerpts, and log paths. Delegate: each independent long-running build, test, or CI validation lane to a separate background validator with non-overlapping scopes (serialize overlaps); the final required checks after writers are reconciled. Don't: trivial short checks, writing or fixing tests or code, coverage/architecture/visual review.
+          '';
+          # Execution-only: shell + read, no file mutation.
+          permission = {
+            edit = "deny";
+            write = "deny";
+            apply_patch = "deny";
+            ast_grep_replace = "deny";
+          };
+        };
 
         lspServers = {
           nixd = {
@@ -346,7 +367,7 @@
           preset = "omniroute";
           council = councilConfig;
           fallback = fallbackConfig;
-          agents = agentFallbacks;
+          agents = customAgents;
           # v3 lacks todoContinuation's prior threshold/cap controls; configure
           # backgroundJobs.orchestratorWake only after verifying its v3 schema.
           # Enable observer agent (disabled by default upstream).

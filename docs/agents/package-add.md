@@ -53,7 +53,7 @@ rg -n "environment\\.systemPackages|home\\.packages|with pkgs" modules --type ni
 Use the narrowest relevant evaluation or existing check for the edited package
 scope when validation is needed. Do not make `nix flake check` the default:
 full checks stay in CI. If a user explicitly requests local full validation,
-delegate it to a background fixer using the `agent-run-long` skill.
+delegate it to a background validator using the `agent-run-long` skill.
 
 If user asked for activation/deploy:
 
