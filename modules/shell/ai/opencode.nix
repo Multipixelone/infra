@@ -534,11 +534,11 @@
               headers.Authorization = "Bearer {env:PARALLEL_API_KEY}";
             };
             plugin = [
-              "@simonwjackson/opencode-direnv"
+              # "@simonwjackson/opencode-direnv"
               "@tarquinen/opencode-dcp"
               "oh-my-opencode-slim@${omoVersion}"
               # "true-mem"
-              "opencode-history-search"
+              # "opencode-history-search"
             ];
             enabled_providers = [ "omniroute" ];
             # Store the gateway API key with OpenCode's /connect flow, outside
