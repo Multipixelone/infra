@@ -2303,6 +2303,43 @@ def run_tests(generated, selected=(), excluded=()):
                     presses(), pressed, "window token honoured at locked deadline"
                 )
 
+        async def test_snooze_with_unknown_skip_helper(self):
+            """Never-written skip helper (native unknown) must not disable snooze.
+
+            Regression: 2026-11-05 dashboard snooze was inert while ringing.
+            """
+            async with Runtime(generated) as runtime:
+                await self.window(runtime, 0)
+                await runtime.set("input_text.commute_alarm_skipped_utc", "unknown")
+                session, ring = "a" * 32, "b" * 32
+                state, attrs = status(runtime.now, session=session, ring=ring)
+                await runtime.set("sensor.commute_alarm_status", state, attrs)
+
+                def presses():
+                    return runtime.state("input_button.commute_alarm_snooze")
+
+                token = f"CC_SNOOZE:{session}:{ring}:window"
+                before = presses()
+                await runtime.run("commute_alarm_reconcile", request=token)
+                self.assertNotEqual(
+                    presses(), before, "unknown skip blocked a ringing snooze"
+                )
+                # A skip of this exact session still blocks the control.
+                runtime.now += timedelta(seconds=5)
+                attrs["observed_at"] = attrs["ring"]["checked_at"] = (
+                    runtime.now.isoformat(timespec="seconds").replace("+00:00", "Z")
+                )
+                await runtime.set(
+                    "input_text.commute_alarm_skipped_utc",
+                    attrs["session"]["original_at"],
+                )
+                await runtime.set("sensor.commute_alarm_status", state, attrs)
+                pressed = presses()
+                await runtime.run("commute_alarm_reconcile", request=token)
+                self.assertEqual(
+                    presses(), pressed, "skipped session token still snoozed"
+                )
+
         async def test_bedside_claim_only_after_successful_action(self):
             from homeassistant.exceptions import HomeAssistantError
 

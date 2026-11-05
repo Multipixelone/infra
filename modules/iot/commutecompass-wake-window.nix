@@ -129,8 +129,11 @@
         {% set current_ended = session_valid and e is mapping and e.get('kind') == 'wake'
            and e.get('session_id') == s.id %}
         {# Unlike pending publication, a fresh active session can acquire late,
-           including final after restart. Its fade endpoint is already past. #}
-        {% set active = window and not current_ended and enabled and wake > 0 and skip >= 0 and skip != sw %}
+           including final after restart. Its fade endpoint is already past.
+           The daemon is already ringing, so an unknown skip (-1, e.g. a
+           never-written helper) means "no skip" like alarm sync and the
+           daemon; only a skip equal to this session's original_at blocks. #}
+        {% set active = window and not current_ended and enabled and wake > 0 and skip != sw %}
         {% set target_w = sw if active else wake %}
         {% set target_d = sd if active else deadline %}
         {% set target_s = s.id if active else "" %}
