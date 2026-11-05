@@ -1,7 +1,6 @@
 ---
 description: Add NixOS services or systemd units to Multipixelone/infra. Creates modules, configures services, and validates.
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 color: "#06b6d4"
 permission:
   webfetch: deny

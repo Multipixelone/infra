@@ -1,7 +1,6 @@
 ---
 description: Fast first-pass triage for `nix flake check` failures in Multipixelone/infra, with clear routing to fix owners.
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 color: "#ef4444"
 permission:
   edit: deny

@@ -1,7 +1,6 @@
 ---
 description: Central guide for navigating the Multipixelone/infra repository. Use this agent to find where options, hosts, profiles, packages, and services are defined in this flake-parts Nix codebase.
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 color: "#22c55e"
 permission:
   edit: deny

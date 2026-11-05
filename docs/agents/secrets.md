@@ -1,7 +1,6 @@
 ---
 description: Guide agenix secret workflows for Multipixelone/infra by finding patterns, generating infra snippets, and prompting the user to create encrypted files in `~/Documents/Git/nix-secrets`.
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 color: "#d946ef"
 permission:
   edit: deny

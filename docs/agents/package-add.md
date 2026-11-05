@@ -1,7 +1,6 @@
 ---
 description: Add packages to Multipixelone/infra with correct scope and safe validation. Searches nixpkgs, finds the right module, edits, and validates.
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 color: "#3b82f6"
 permission:
   webfetch: deny

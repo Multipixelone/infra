@@ -19,10 +19,11 @@
 
   config = {
     flake.aiConfig = {
-      agentsDir = builtins.path {
-        path = rootPath + /docs/agents;
-        name = "infra-agents";
-      };
+      # Must be a real Nix path, not a string: Home Manager's opencode module
+      # only links agents when `lib.isPath cfg.agents`. `rootPath` is
+      # `inputs.self` (an attrset), so `rootPath + /docs/agents` yields a
+      # string; use a path literal instead.
+      agentsDir = ../../../docs/agents;
       skillsDir = builtins.path {
         path = rootPath + /docs/skills;
         name = "infra-skills";
