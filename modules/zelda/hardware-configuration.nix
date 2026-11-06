@@ -58,7 +58,6 @@ in
           tmpfsSize = "30%";
         };
         initrd = {
-          systemd.enable = true;
           availableKernelModules = [
             "xhci_pci"
             "ahci"
