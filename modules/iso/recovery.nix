@@ -62,7 +62,6 @@
         exfatprogs
         f2fs-tools
         mtools
-        simple-mtpfs
         sshfs
         ntfs3g
         e2fsprogs
