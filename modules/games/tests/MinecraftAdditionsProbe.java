@@ -1,16 +1,13 @@
+import com.badbones69.crazyenchantments.paper.CrazyEnchantments;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.moulberry.axiom.AxiomPaper;
 import com.moulberry.axiom.restrictions.AxiomPermission;
-import com.badbones69.crazyenchantments.paper.CrazyEnchantments;
-import java.lang.reflect.Proxy;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+
 import me.szabee.doubledoors.bukkit.DoubleDoors;
 import me.szabee.doubledoors.bukkit.config.PluginConfig;
 import me.szabee.doubledoors.bukkit.listeners.DoorInteractListener;
+
 import net.kyori.adventure.util.TriState;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
@@ -20,6 +17,7 @@ import net.luckperms.api.util.Tristate;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -30,6 +28,12 @@ import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 /** No client connections, production database, or live server state. */
 public final class MinecraftAdditionsProbe extends JavaPlugin {
@@ -42,7 +46,10 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
 
     private JsonObject json(String resource) throws Exception {
         try (var input = getResource(resource)) {
-            return new Gson().fromJson(new String(input.readAllBytes(), StandardCharsets.UTF_8), JsonObject.class);
+            return new Gson()
+                    .fromJson(
+                            new String(input.readAllBytes(), StandardCharsets.UTF_8),
+                            JsonObject.class);
         }
     }
 
@@ -59,34 +66,52 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
     }
 
     private Player player(User user, World world) {
-        return (Player) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] { Player.class }, (proxy, method, args) -> {
-            return switch (method.getName()) {
-                case "getName", "getDisplayName" -> user.getUsername();
-                case "getUniqueId" -> user.getUniqueId();
-                case "getWorld" -> world;
-                case "getGameMode" -> org.bukkit.GameMode.CREATIVE;
-                case "getLocale" -> "en_us";
-                case "locale" -> java.util.Locale.US;
-                case "isOnline", "isValid" -> true;
-                case "getEffectivePermissions" -> Set.of();
-                case "getMetadata" -> List.of();
-                case "permissionValue", "hasPermission", "isPermissionSet" -> {
-                    String node = args[0] instanceof Permission permission ? permission.getName() : args[0].toString();
-                    Tristate value = user.getCachedData().getPermissionData().checkPermission(node);
-                    if (method.getName().equals("permissionValue")) {
-                        yield switch (value) { case TRUE -> TriState.TRUE; case FALSE -> TriState.FALSE; default -> TriState.NOT_SET; };
-                    }
-                    if (method.getName().equals("isPermissionSet")) yield value != Tristate.UNDEFINED;
-                    if (value != Tristate.UNDEFINED) yield value == Tristate.TRUE;
-                    Permission permission = Bukkit.getPluginManager().getPermission(node);
-                    yield permission != null && permission.getDefault().getValue(false);
-                }
-                case "hashCode" -> user.getUniqueId().hashCode();
-                case "equals" -> proxy == args[0];
-                case "toString" -> "AdditionsProbePlayer[" + user.getUsername() + "]";
-                default -> empty(method.getReturnType());
-            };
-        });
+        return (Player)
+                Proxy.newProxyInstance(
+                        getClass().getClassLoader(),
+                        new Class<?>[] {Player.class},
+                        (proxy, method, args) -> {
+                            return switch (method.getName()) {
+                                case "getName", "getDisplayName" -> user.getUsername();
+                                case "getUniqueId" -> user.getUniqueId();
+                                case "getWorld" -> world;
+                                case "getGameMode" -> org.bukkit.GameMode.CREATIVE;
+                                case "getLocale" -> "en_us";
+                                case "locale" -> java.util.Locale.US;
+                                case "isOnline", "isValid" -> true;
+                                case "getEffectivePermissions" -> Set.of();
+                                case "getMetadata" -> List.of();
+                                case "permissionValue", "hasPermission", "isPermissionSet" -> {
+                                    String node =
+                                            args[0] instanceof Permission permission
+                                                    ? permission.getName()
+                                                    : args[0].toString();
+                                    Tristate value =
+                                            user.getCachedData()
+                                                    .getPermissionData()
+                                                    .checkPermission(node);
+                                    if (method.getName().equals("permissionValue")) {
+                                        yield switch (value) {
+                                            case TRUE -> TriState.TRUE;
+                                            case FALSE -> TriState.FALSE;
+                                            default -> TriState.NOT_SET;
+                                        };
+                                    }
+                                    if (method.getName().equals("isPermissionSet"))
+                                        yield value != Tristate.UNDEFINED;
+                                    if (value != Tristate.UNDEFINED) yield value == Tristate.TRUE;
+                                    Permission permission =
+                                            Bukkit.getPluginManager().getPermission(node);
+                                    yield permission != null
+                                            && permission.getDefault().getValue(false);
+                                }
+                                case "hashCode" -> user.getUniqueId().hashCode();
+                                case "equals" -> proxy == args[0];
+                                case "toString" ->
+                                        "AdditionsProbePlayer[" + user.getUsername() + "]";
+                                default -> empty(method.getReturnType());
+                            };
+                        });
     }
 
     private void seedPermissions() throws Exception {
@@ -97,12 +122,17 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
             group.data().clear();
             for (var value : entry.getValue().getAsJsonObject().getAsJsonArray("nodes")) {
                 var node = value.getAsJsonObject();
-                group.data().add(Node.builder(node.get("key").getAsString()).value(node.get("value").getAsBoolean()).build());
+                group.data()
+                        .add(
+                                Node.builder(node.get("key").getAsString())
+                                        .value(node.get("value").getAsBoolean())
+                                        .build());
             }
             api.getGroupManager().saveGroup(group).join();
         }
         for (String rank : List.of("default", "builder", "mod", "admin")) {
-            UUID uuid = UUID.nameUUIDFromBytes(("additions-" + rank).getBytes(StandardCharsets.UTF_8));
+            UUID uuid =
+                    UUID.nameUUIDFromBytes(("additions-" + rank).getBytes(StandardCharsets.UTF_8));
             User user = api.getUserManager().loadUser(uuid, "Probe_" + rank).join();
             user.data().clear();
             user.data().add(InheritanceNode.builder(rank).build());
@@ -121,8 +151,14 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
             Player player = rankPlayer(rank, world);
             boolean builder = !rank.equals("default");
             boolean admin = rank.equals("admin");
-            for (String node : List.of("doubledoors.use", "doubledoors.toggle", "crazyenchantments.player.*",
-                    "crazyenchantments.gui", "crazyenchantments.tinker", "crazyenchantments.info")) {
+            for (String node :
+                    List.of(
+                            "doubledoors.use",
+                            "doubledoors.toggle",
+                            "crazyenchantments.player.*",
+                            "crazyenchantments.gui",
+                            "crazyenchantments.tinker",
+                            "crazyenchantments.info")) {
                 check(player.hasPermission(node), rank + " grant " + node);
             }
             for (var value : expectations.getAsJsonArray("grants")) {
@@ -139,10 +175,24 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
             }
             for (AxiomPermission permission : AxiomPermission.values()) {
                 String node = permission.getPermissionNode();
-                boolean expectedGrant = admin || (builder && expectations.getAsJsonArray("grants").asList().stream()
-                        .map(value -> value.getAsString()).anyMatch(grant -> grant.endsWith(".*")
-                                ? node.startsWith(grant.substring(0, grant.length() - 1)) : node.equals(grant)));
-                check(axiom.hasPermission(player, permission) == expectedGrant, rank + " Axiom evaluates " + node);
+                boolean expectedGrant =
+                        admin
+                                || (builder
+                                        && expectations.getAsJsonArray("grants").asList().stream()
+                                                .map(value -> value.getAsString())
+                                                .anyMatch(
+                                                        grant ->
+                                                                grant.endsWith(".*")
+                                                                        ? node.startsWith(
+                                                                                grant.substring(
+                                                                                        0,
+                                                                                        grant
+                                                                                                        .length()
+                                                                                                - 1))
+                                                                        : node.equals(grant)));
+                check(
+                        axiom.hasPermission(player, permission) == expectedGrant,
+                        rank + " Axiom evaluates " + node);
             }
         }
     }
@@ -161,7 +211,9 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
 
     private void doors(World world) throws Exception {
         var plugin = (DoubleDoors) Bukkit.getPluginManager().getPlugin("DoubleDoors");
-        check(plugin.getPluginConfig().isEnableRecursiveOpening(), "paired-door click handler enabled");
+        check(
+                plugin.getPluginConfig().isEnableRecursiveOpening(),
+                "paired-door click handler enabled");
         Player player = rankPlayer("default", world);
         check(!Bukkit.getPluginManager().isPluginEnabled("floodgate"), "no backend Floodgate");
         check(!plugin.isGeyserBridgeAvailable(), "proxy-only setup has no local bridge detection");
@@ -169,26 +221,45 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
         Block partner = world.getBlockAt(1, 70, 0);
         door(origin, Door.Hinge.LEFT);
         door(partner, Door.Hinge.RIGHT);
-        check(plugin.getApi().triggerLinkedOpen(origin, player), "default player opens linked door");
+        check(
+                plugin.getApi().triggerLinkedOpen(origin, player),
+                "default player opens linked door");
         check(((Door) partner.getBlockData()).isOpen(), "partner bottom opens");
-        check(((Door) partner.getRelative(BlockFace.UP).getBlockData()).isOpen(), "partner top opens");
+        check(
+                ((Door) partner.getRelative(BlockFace.UP).getBlockData()).isOpen(),
+                "partner top opens");
         // Check the actual release's duplicate guard without installing a fake
         // bridge or relying on a timed sleep to reproduce duplicate packets.
         var listener = new DoorInteractListener(plugin);
-        var limiter = DoorInteractListener.class.getDeclaredMethod("isInteractionRateLimited", Player.class, Block.class, PluginConfig.class);
+        var limiter =
+                DoorInteractListener.class.getDeclaredMethod(
+                        "isInteractionRateLimited", Player.class, Block.class, PluginConfig.class);
         limiter.setAccessible(true);
-        check(!(boolean) limiter.invoke(listener, player, origin, plugin.getPluginConfig()), "first interaction accepted without bridge");
-        check((boolean) limiter.invoke(listener, player, origin, plugin.getPluginConfig()), "duplicate interaction debounced without bridge");
-        check(!(boolean) limiter.invoke(listener, player, partner, plugin.getPluginConfig()), "different block accepted");
+        check(
+                !(boolean) limiter.invoke(listener, player, origin, plugin.getPluginConfig()),
+                "first interaction accepted without bridge");
+        check(
+                (boolean) limiter.invoke(listener, player, origin, plugin.getPluginConfig()),
+                "duplicate interaction debounced without bridge");
+        check(
+                !(boolean) limiter.invoke(listener, player, partner, plugin.getPluginConfig()),
+                "different block accepted");
     }
 
     private void restrictions(AxiomPaper axiom, World world) {
         Player builder = rankPlayer("builder", world);
-        check(axiom.getDataFolder().toPath().resolve("config.yml").toFile().exists(), "Axiom data-folder alias resolves");
-        check(axiom.configuration.getInt("block-buffer-rate-limit") == 2, "Axiom reads managed rate limit");
+        check(
+                axiom.getDataFolder().toPath().resolve("config.yml").toFile().exists(),
+                "Axiom data-folder alias resolves");
+        check(
+                axiom.configuration.getInt("block-buffer-rate-limit") == 2,
+                "Axiom reads managed rate limit");
         check(axiom.canModifyWorld(builder, world), "Axiom overworld allowed");
         for (World other : Bukkit.getWorlds()) {
-            if (!other.equals(world)) check(!axiom.canModifyWorld(builder, other), "Axiom dimension denied " + other.getName());
+            if (!other.equals(world))
+                check(
+                        !axiom.canModifyWorld(builder, other),
+                        "Axiom dimension denied " + other.getName());
         }
         for (String name : axiom.configuration.getStringList("disallowed-blocks")) {
             var block = BuiltInRegistries.BLOCK.getValue(Identifier.parse(name));
@@ -197,7 +268,9 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
                 check(axiom.allowedBlockRegistry.getId(state) == -1, "Axiom disallows " + state);
             }
         }
-        check(axiom.allowedBlockRegistry.getId(Blocks.STONE.defaultBlockState()) >= 0, "Axiom allows ordinary building blocks");
+        check(
+                axiom.allowedBlockRegistry.getId(Blocks.STONE.defaultBlockState()) >= 0,
+                "Axiom allows ordinary building blocks");
     }
 
     private void enchantments(World world) {
@@ -205,44 +278,82 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
         var manager = plugin.getStarter().getCrazyManager();
         // Disabled enchants remain registered for reading existing item lore.
         // Gameplay and shop selection consult the activation flag instead.
-        var names = manager.getRegisteredEnchantments().stream().filter(enchant -> enchant.isActivated())
-                .map(enchant -> enchant.getName()).toList();
+        var names =
+                manager.getRegisteredEnchantments().stream()
+                        .filter(enchant -> enchant.isActivated())
+                        .map(enchant -> enchant.getName())
+                        .toList();
         check(!names.isEmpty(), "CE registers enchantments");
-        check(names.stream().noneMatch(name -> name.equalsIgnoreCase("VeinMiner") || name.equalsIgnoreCase("Blast")), "CE mining duplicates disabled");
-        check(names.stream().noneMatch(name -> name.equalsIgnoreCase("TreeFeller")), "CE TreeFeller duplicate disabled");
-        check(manager.getPlayerMaxEnchantments(rankPlayer("default", world)) == 3, "CE default limit is three");
+        check(
+                names.stream()
+                        .noneMatch(
+                                name ->
+                                        name.equalsIgnoreCase("VeinMiner")
+                                                || name.equalsIgnoreCase("Blast")),
+                "CE mining duplicates disabled");
+        check(
+                names.stream().noneMatch(name -> name.equalsIgnoreCase("TreeFeller")),
+                "CE TreeFeller duplicate disabled");
+        check(
+                manager.getPlayerMaxEnchantments(rankPlayer("default", world)) == 3,
+                "CE default limit is three");
     }
 
-    @Override public void onEnable() {
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-            try {
-                expectations = json("expectations.json");
-                seedPermissions();
-                Bukkit.getScheduler().runTask(this, () -> {
-                    try {
-                        for (String name : List.of("DoubleDoors", "AxiomPaper", "CrazyEnchantments", "TreeFeller", "FastAsyncWorldEdit", "Veinminer", "Vault")) {
-                            check(Bukkit.getPluginManager().isPluginEnabled(name), name + " enabled");
-                        }
-                        check(Bukkit.getVersion().contains("159"), "pinned Paper build 159");
-                        World world = Bukkit.getWorld("world");
-                        AxiomPaper axiom = (AxiomPaper) Bukkit.getPluginManager().getPlugin("AxiomPaper");
-                        permissions(axiom, world);
-                        restrictions(axiom, world);
-                        doors(world);
-                        enchantments(world);
-                        getLogger().info("ADDITIONS_PROBE_PASS");
-                    } catch (Throwable failure) {
-                        getLogger().severe("ADDITIONS_PROBE_FAIL");
-                        failure.printStackTrace();
-                    } finally {
-                        Bukkit.getScheduler().runTask(this, Bukkit::shutdown);
-                    }
-                });
-            } catch (Throwable failure) {
-                getLogger().severe("ADDITIONS_PROBE_FAIL");
-                failure.printStackTrace();
-                Bukkit.getScheduler().runTask(this, Bukkit::shutdown);
-            }
-        });
+    @Override
+    public void onEnable() {
+        Bukkit.getScheduler()
+                .runTaskAsynchronously(
+                        this,
+                        () -> {
+                            try {
+                                expectations = json("expectations.json");
+                                seedPermissions();
+                                Bukkit.getScheduler()
+                                        .runTask(
+                                                this,
+                                                () -> {
+                                                    try {
+                                                        for (String name :
+                                                                List.of(
+                                                                        "DoubleDoors",
+                                                                        "AxiomPaper",
+                                                                        "CrazyEnchantments",
+                                                                        "TreeFeller",
+                                                                        "FastAsyncWorldEdit",
+                                                                        "Veinminer",
+                                                                        "Vault")) {
+                                                            check(
+                                                                    Bukkit.getPluginManager()
+                                                                            .isPluginEnabled(name),
+                                                                    name + " enabled");
+                                                        }
+                                                        check(
+                                                                Bukkit.getVersion().contains("159"),
+                                                                "pinned Paper build 159");
+                                                        World world = Bukkit.getWorld("world");
+                                                        AxiomPaper axiom =
+                                                                (AxiomPaper)
+                                                                        Bukkit.getPluginManager()
+                                                                                .getPlugin(
+                                                                                        "AxiomPaper");
+                                                        permissions(axiom, world);
+                                                        restrictions(axiom, world);
+                                                        doors(world);
+                                                        enchantments(world);
+                                                        getLogger().info("ADDITIONS_PROBE_PASS");
+                                                    } catch (Throwable failure) {
+                                                        getLogger().severe("ADDITIONS_PROBE_FAIL");
+                                                        failure.printStackTrace();
+                                                    } finally {
+                                                        Bukkit.getScheduler()
+                                                                .runTask(this, Bukkit::shutdown);
+                                                    }
+                                                });
+                            } catch (Throwable failure) {
+                                getLogger().severe("ADDITIONS_PROBE_FAIL");
+                                failure.printStackTrace();
+                                Bukkit.getScheduler().runTask(this, Bukkit::shutdown);
+                            }
+                        });
     }
 }

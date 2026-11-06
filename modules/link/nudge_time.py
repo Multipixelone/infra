@@ -60,9 +60,7 @@ def _parse_sleep(data: dict):
     sleep_end = None
     if end_raw:
         try:
-            sleep_end = datetime.fromisoformat(
-                str(end_raw).replace("Z", "+00:00")
-            ).astimezone(TZ)
+            sleep_end = datetime.fromisoformat(str(end_raw)).astimezone(TZ)
         except ValueError:
             sleep_end = None
 

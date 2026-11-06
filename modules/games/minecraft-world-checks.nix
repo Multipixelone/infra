@@ -33,9 +33,8 @@ let
     (host.extendModules {
       modules = [
         {
-          infra.games.minecraftDatapacks.backends.survival.packs.world-policy = lib.mkForce (
-            cfg.infra.games.artifacts.games-chunksmith
-          );
+          infra.games.minecraftDatapacks.backends.survival.packs.world-policy =
+            lib.mkForce cfg.infra.games.artifacts.games-chunksmith;
         }
       ];
     }).config;

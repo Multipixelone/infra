@@ -5,7 +5,7 @@ import math
 import os
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .errors import invalid
 from .library import normalize, number
@@ -61,7 +61,7 @@ def next_commute_duration():
     if not plans:
         return None, "commute_no_plans"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upcoming = []
     for plan in plans:
         leave_at = plan.get("leave_at")
@@ -71,7 +71,7 @@ def next_commute_duration():
             departure = datetime.fromisoformat(leave_at)
             if departure.utcoffset() is None:
                 continue
-            departure = departure.astimezone(timezone.utc)
+            departure = departure.astimezone(UTC)
         except (ValueError, OverflowError):
             continue
         if departure > now:
@@ -107,12 +107,12 @@ def cap_for(max_minutes):
 def date_bound(text):
     try:
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
-            value = datetime.fromisoformat(text).replace(tzinfo=timezone.utc)
+            value = datetime.fromisoformat(text).replace(tzinfo=UTC)
         else:
-            value = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            value = datetime.fromisoformat(text)
             if value.tzinfo is None:
                 raise ValueError("Timezone required")
-        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
     except ValueError as exc:
         raise invalid("Dates must be YYYY-MM-DD or ISO 8601 with an offset.") from exc
 

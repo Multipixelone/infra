@@ -2,6 +2,7 @@ import com.flowpowered.math.vector.Vector3d;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+
 import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.POIMarker;
 import de.bluecolored.bluemap.common.BlueMapConfiguration;
@@ -20,6 +21,7 @@ import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
 import de.bluecolored.bluemap.core.map.BmMap;
 import de.bluecolored.bluemap.core.storage.compression.Compression;
 import de.bluecolored.bluemap.core.storage.file.FileMapStorage;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -44,28 +46,66 @@ public final class CheckBlueMapPlayers {
             this.name = name;
             this.world = world;
         }
-        public UUID getUuid() { return uuid; }
-        public Text getName() { return Text.of(name); }
-        public ServerWorld getWorld() { return world; }
-        public Vector3d getPosition() { return position; }
-        public Vector3d getRotation() { return Vector3d.ZERO; }
-        public int getSkyLight() { return 15; }
-        public int getBlockLight() { return 15; }
-        public boolean isSneaking() { return false; }
-        public boolean isInvisible() { return invisible; }
-        public boolean isVanished() { return vanished; }
-        public Gamemode getGamemode() { return gamemode; }
+
+        public UUID getUuid() {
+            return uuid;
+        }
+
+        public Text getName() {
+            return Text.of(name);
+        }
+
+        public ServerWorld getWorld() {
+            return world;
+        }
+
+        public Vector3d getPosition() {
+            return position;
+        }
+
+        public Vector3d getRotation() {
+            return Vector3d.ZERO;
+        }
+
+        public int getSkyLight() {
+            return 15;
+        }
+
+        public int getBlockLight() {
+            return 15;
+        }
+
+        public boolean isSneaking() {
+            return false;
+        }
+
+        public boolean isInvisible() {
+            return invisible;
+        }
+
+        public boolean isVanished() {
+            return vanished;
+        }
+
+        public Gamemode getGamemode() {
+            return gamemode;
+        }
     }
 
     private static ServerWorld world() {
-        return BlueMapFixture.proxy(ServerWorld.class, (p, m, a) -> switch (m.getName()) {
-            case "equals" -> p == a[0];
-            default -> BlueMapFixture.unsupported(m);
-        });
+        return BlueMapFixture.proxy(
+                ServerWorld.class,
+                (p, m, a) ->
+                        switch (m.getName()) {
+                            case "equals" -> p == a[0];
+                            default -> BlueMapFixture.unsupported(m);
+                        });
     }
 
     private static JsonArray players(Path file) throws Exception {
-        return JsonParser.parseString(Files.readString(file)).getAsJsonObject().getAsJsonArray("players");
+        return JsonParser.parseString(Files.readString(file))
+                .getAsJsonObject()
+                .getAsJsonArray("players");
     }
 
     private static JsonObject player(JsonArray players, UUID uuid) {
@@ -85,13 +125,18 @@ public final class CheckBlueMapPlayers {
         Path configuration = Path.of(args[0]);
         ConfigManager loader = new ConfigManager(configuration.getParent());
         PluginConfig config = loader.loadConfig(configuration, PluginConfig.class);
-        BlueMapFixture.require(config.getWritePlayersInterval() == 3 && config.getWriteMarkersInterval() == 30,
-            "static player/marker schedules changed");
-        BlueMapFixture.require(!config.isLivePlayerMarkers()
-            && !loader.loadConfig(Path.of(args[1]), WebserverConfig.class).isEnabled(),
-            "embedded live server was enabled");
-        BlueMapFixture.require(config.getHiddenGameModes().equals(List.of("spectator"))
-            && config.isHideVanished() && config.isHideInvisible(), "visibility protections changed");
+        BlueMapFixture.require(
+                config.getWritePlayersInterval() == 3 && config.getWriteMarkersInterval() == 30,
+                "static player/marker schedules changed");
+        BlueMapFixture.require(
+                !config.isLivePlayerMarkers()
+                        && !loader.loadConfig(Path.of(args[1]), WebserverConfig.class).isEnabled(),
+                "embedded live server was enabled");
+        BlueMapFixture.require(
+                config.getHiddenGameModes().equals(List.of("spectator"))
+                        && config.isHideVanished()
+                        && config.isHideInvisible(),
+                "visibility protections changed");
 
         Path root = Path.of(args[2]);
         Path mapRoot = root.resolve("web/maps/world");
@@ -107,24 +152,36 @@ public final class CheckBlueMapPlayers {
         spectator.gamemode = Gamemode.SPECTATOR;
         vanished.vanished = true;
         invisible.invisible = true;
-        for (FixturePlayer p : List.of(java, bedrock, spectator, vanished, invisible, hidden)) online.put(p.uuid, p);
-        Server server = BlueMapFixture.proxy(Server.class, (p, m, a) -> switch (m.getName()) {
-            case "getOnlinePlayers" -> online;
-            case "getServerWorld" -> Optional.of(world);
-            default -> BlueMapFixture.unsupported(m);
-        });
-        BlueMapConfiguration settings = BlueMapFixture.proxy(BlueMapConfiguration.class, (p, m, a) -> switch (m.getName()) {
-            case "getPluginConfig" -> config;
-            default -> BlueMapFixture.unsupported(m);
-        });
+        for (FixturePlayer p : List.of(java, bedrock, spectator, vanished, invisible, hidden))
+            online.put(p.uuid, p);
+        Server server =
+                BlueMapFixture.proxy(
+                        Server.class,
+                        (p, m, a) ->
+                                switch (m.getName()) {
+                                    case "getOnlinePlayers" -> online;
+                                    case "getServerWorld" -> Optional.of(world);
+                                    default -> BlueMapFixture.unsupported(m);
+                                });
+        BlueMapConfiguration settings =
+                BlueMapFixture.proxy(
+                        BlueMapConfiguration.class,
+                        (p, m, a) ->
+                                switch (m.getName()) {
+                                    case "getPluginConfig" -> config;
+                                    default -> BlueMapFixture.unsupported(m);
+                                });
         // Only replace server/bootstrap state. Serialization, filters, atomic file
         // storage and both save methods below are the actual pinned release code.
         BmMap map = BlueMapFixture.allocate(BmMap.class);
         BlueMapFixture.setField(map, "id", "world");
-        BlueMapFixture.setField(map, "storage", new FileMapStorage(mapRoot, Compression.GZIP, true));
+        BlueMapFixture.setField(
+                map, "storage", new FileMapStorage(mapRoot, Compression.GZIP, true));
         MarkerSet offline = MarkerSet.builder().label("Offline Players").build();
-        offline.getMarkers().put("logout", POIMarker.builder().label("offline").position(12, 64, -4).build());
-        BlueMapFixture.setField(map, "markerSets", new ConcurrentHashMap<>(Map.of("offline-players", offline)));
+        offline.getMarkers()
+                .put("logout", POIMarker.builder().label("offline").position(12, 64, -4).build());
+        BlueMapFixture.setField(
+                map, "markerSets", new ConcurrentHashMap<>(Map.of("offline-players", offline)));
         map.saveMarkerState();
         String markers = Files.readString(mapRoot.resolve("live/markers.json"));
         BlueMapService service = BlueMapFixture.allocate(BlueMapService.class);
@@ -136,25 +193,36 @@ public final class CheckBlueMapPlayers {
         BlueMapFixture.setField(plugin, "blueMap", service);
         BlueMapFixture.setField(plugin, "pluginState", state);
         BlueMapFixture.setField(plugin, "loaded", true);
-        BlueMapFixture.setField(plugin, "livePlayerInfoTransformer", new PluginLivePlayerInfoTransformer(plugin));
+        BlueMapFixture.setField(
+                plugin, "livePlayerInfoTransformer", new PluginLivePlayerInfoTransformer(plugin));
 
         plugin.savePlayerStates();
         JsonArray visible = players(file);
-        BlueMapFixture.require(visible.size() == 2, "spectator, vanished, invisible or hidden player leaked");
-        BlueMapFixture.require(player(visible, java.uuid).get("name").getAsString().equals(java.name)
-            && player(visible, bedrock.uuid).get("name").getAsString().equals(bedrock.name), "Java/Bedrock names changed");
+        BlueMapFixture.require(
+                visible.size() == 2, "spectator, vanished, invisible or hidden player leaked");
+        BlueMapFixture.require(
+                player(visible, java.uuid).get("name").getAsString().equals(java.name)
+                        && player(visible, bedrock.uuid)
+                                .get("name")
+                                .getAsString()
+                                .equals(bedrock.name),
+                "Java/Bedrock names changed");
         snapshot(file, root, "online");
 
         java.position = new Vector3d(30, 70, -8);
         plugin.savePlayerStates();
-        BlueMapFixture.require(player(players(file), java.uuid).getAsJsonObject("position").get("x").getAsDouble() == 30,
-            "movement was not persisted");
+        BlueMapFixture.require(
+                player(players(file), java.uuid).getAsJsonObject("position").get("x").getAsDouble()
+                        == 30,
+                "movement was not persisted");
         snapshot(file, root, "moved");
 
         bedrock.world = world();
         plugin.savePlayerStates();
-        BlueMapFixture.require(player(players(file), bedrock.uuid).get("foreign").getAsBoolean()
-            && !player(players(file), java.uuid).get("foreign").getAsBoolean(), "dimension visibility changed");
+        BlueMapFixture.require(
+                player(players(file), bedrock.uuid).get("foreign").getAsBoolean()
+                        && !player(players(file), java.uuid).get("foreign").getAsBoolean(),
+                "dimension visibility changed");
         snapshot(file, root, "foreign");
 
         online.remove(java.uuid);
@@ -165,11 +233,15 @@ public final class CheckBlueMapPlayers {
 
         // Plugin.unload invokes this method to disable players on clean stop.
         map.savePlayerState();
-        BlueMapFixture.require(JsonParser.parseString(Files.readString(file)).getAsJsonObject().isEmpty(),
-            "clean stop left online data behind");
+        BlueMapFixture.require(
+                JsonParser.parseString(Files.readString(file)).getAsJsonObject().isEmpty(),
+                "clean stop left online data behind");
         snapshot(file, root, "stopped");
-        BlueMapFixture.require(markers.equals(Files.readString(mapRoot.resolve("live/markers.json"))),
-            "player writes changed the offline marker layer");
-        System.out.println("PASS: BlueMap static writer, Java/Bedrock, movement, dimensions, privacy, logout and clean stop");
+        BlueMapFixture.require(
+                markers.equals(Files.readString(mapRoot.resolve("live/markers.json"))),
+                "player writes changed the offline marker layer");
+        System.out.println(
+                "PASS: BlueMap static writer, Java/Bedrock, movement, dimensions, privacy, logout"
+                        + " and clean stop");
     }
 }

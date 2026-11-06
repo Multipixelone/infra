@@ -1,9 +1,6 @@
 {
   "minecraftVersion": "26.3",
-  "dataPackFormat": [
-    121,
-    0
-  ],
+  "dataPackFormat": [121, 0],
   "upstream": "https://vanillatweaks.net/picker/datapacks/",
   "bundle": {
     "id": "d326112",

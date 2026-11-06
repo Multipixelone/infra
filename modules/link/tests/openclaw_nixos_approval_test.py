@@ -109,7 +109,7 @@ def assert_notification(mode, output):
     assert len(delivered) == len(record) == 1, (delivered, record)
     record = record[0]
     expires = datetime.datetime.fromtimestamp(
-        record["expiresAt"], datetime.timezone.utc
+        record["expiresAt"], datetime.UTC
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     message = f"Local approval notification: openclaw-nixos-approve: APPROVED mode={mode} path={target} expires={expires}. Read skills/nixos-deploy/SKILL.md again. Continue only the matching pending deployment once through the root-owned approval gate, and report the result or blocker. If pending state is missing, mismatched, expired, or already handled, report the blocker and do not deploy."
     assert delivered == [

@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ lib, ... }:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -6,7 +6,7 @@
       checks.games-backups-btrfs = pkgs.testers.runNixOSTest {
         name = "games-backups-btrfs";
         requiredFeatures.kvm = false;
-        nodes.machine = { ... }: {
+        nodes.machine = _: {
           virtualisation.emptyDiskImages = [ 1024 ];
           virtualisation.qemu.forceAccel = false;
           boot.supportedFilesystems = [ "btrfs" ];

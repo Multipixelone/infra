@@ -2,13 +2,12 @@
 
 import importlib.util
 import json
-from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 import zipfile
-
+from pathlib import Path
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("datapacks", sys.argv.pop(1))
 datapacks = importlib.util.module_from_spec(spec)
@@ -23,13 +22,24 @@ class DatapacksTest(unittest.TestCase):
         self.directory = self.root / "world/datapacks"
         self.source = self.root / "policy.zip"
         self.make_pack(self.source)
-        self.configuration = {"directory": str(self.directory), "packs": {"world-policy": str(self.source)}}
+        self.configuration = {
+            "directory": str(self.directory),
+            "packs": {"world-policy": str(self.source)},
+        }
 
     def make_pack(self, source, value="50", metadata=None):
-        datapacks.build({
-            "pack.mcmeta": json.dumps({"pack": metadata or {"min_format": [121, 0], "max_format": [121, 0]}}),
-            "data/infra/function/world_policy.mcfunction": f"gamerule minecraft:players_sleeping_percentage {value}\n",
-        }, source)
+        datapacks.build(
+            {
+                "pack.mcmeta": json.dumps(
+                    {
+                        "pack": metadata
+                        or {"min_format": [121, 0], "max_format": [121, 0]}
+                    }
+                ),
+                "data/infra/function/world_policy.mcfunction": f"gamerule minecraft:players_sleeping_percentage {value}\n",
+            },
+            source,
+        )
 
     def test_deterministic_pack_and_idempotent_install(self):
         second = self.root / "second.zip"
@@ -42,9 +52,12 @@ class DatapacksTest(unittest.TestCase):
         self.assertEqual(target.stat().st_mtime_ns, original)
         self.assertFalse(target.is_symlink())
         self.assertEqual(target.read_bytes(), self.source.read_bytes())
-        self.assertEqual(json.loads((self.directory / datapacks.LEDGER).read_text()), {
-            target.name: [datapacks.digest(self.source)],
-        })
+        self.assertEqual(
+            json.loads((self.directory / datapacks.LEDGER).read_text()),
+            {
+                target.name: [datapacks.digest(self.source)],
+            },
+        )
 
     def test_update_and_removal_preserve_other_packs_and_world_files(self):
         datapacks.install(self.configuration)
@@ -57,7 +70,9 @@ class DatapacksTest(unittest.TestCase):
         self.make_pack(self.source, "75")
         datapacks.install(self.configuration)
         with zipfile.ZipFile(self.directory / "infra-world-policy.zip") as archive:
-            self.assertIn(b"75", archive.read("data/infra/function/world_policy.mcfunction"))
+            self.assertIn(
+                b"75", archive.read("data/infra/function/world_policy.mcfunction")
+            )
         datapacks.install({**self.configuration, "packs": {}})
         self.assertFalse((self.directory / "infra-world-policy.zip").exists())
         self.assertEqual(manual.read_bytes(), b"unmanaged")
@@ -80,12 +95,25 @@ class DatapacksTest(unittest.TestCase):
     def test_official_selection_removes_all_four_dropped_packs(self):
         # Synthetic prior archives exercise the deployed ledger without retaining
         # any retired third-party bytes in the repository or test closure.
-        retained = {"player-head-drops", "more-mob-heads", "double-shulker-shells", "world-policy"}
-        dropped = {"coordinates-hud", "silence-mobs", "durability-ping", "armor-statues"}
+        retained = {
+            "player-head-drops",
+            "more-mob-heads",
+            "double-shulker-shells",
+            "world-policy",
+        }
+        dropped = {
+            "coordinates-hud",
+            "silence-mobs",
+            "durability-ping",
+            "armor-statues",
+        }
         added = {"confetti-creepers", "mini-blocks", "custom-nether-portals"}
         old = {key: str(self.source) for key in retained | dropped}
         datapacks.install({**self.configuration, "packs": old})
-        retained_times = {key: (self.directory / f"infra-{key}.zip").stat().st_mtime_ns for key in retained}
+        retained_times = {
+            key: (self.directory / f"infra-{key}.zip").stat().st_mtime_ns
+            for key in retained
+        }
         manual = self.directory / "friends.zip"
         manual.write_bytes(b"unmanaged")
         world = self.directory.parent / "level.dat"
@@ -93,24 +121,37 @@ class DatapacksTest(unittest.TestCase):
         new = {key: str(self.source) for key in retained | added}
         for _ in range(2):
             datapacks.install({**self.configuration, "packs": new})
-            self.assertEqual({p.name for p in self.directory.glob("infra-*.zip")},
-                             {f"infra-{key}.zip" for key in new})
-            self.assertEqual(json.loads((self.directory / datapacks.LEDGER).read_text()),
-                             {f"infra-{key}.zip": [datapacks.digest(self.source)] for key in new})
+            self.assertEqual(
+                {p.name for p in self.directory.glob("infra-*.zip")},
+                {f"infra-{key}.zip" for key in new},
+            )
+            self.assertEqual(
+                json.loads((self.directory / datapacks.LEDGER).read_text()),
+                {f"infra-{key}.zip": [datapacks.digest(self.source)] for key in new},
+            )
             self.assertEqual(manual.read_bytes(), b"unmanaged")
             self.assertEqual(world.read_bytes(), b"existing world")
             for key, original in retained_times.items():
-                self.assertEqual((self.directory / f"infra-{key}.zip").stat().st_mtime_ns, original)
+                self.assertEqual(
+                    (self.directory / f"infra-{key}.zip").stat().st_mtime_ns, original
+                )
 
     def test_afk_retirement_preserves_retained_and_new_packs(self):
         # Keep the installed Grave Compass while retiring AFK, and also add an
         # independent pack to exercise future additive selections.
-        retained = {"world-policy", "custom-nether-portals", "player-head-drops", "grave-compass"}
+        retained = {
+            "world-policy",
+            "custom-nether-portals",
+            "player-head-drops",
+            "grave-compass",
+        }
         old = {key: str(self.source) for key in retained | {"afk-display"}}
         datapacks.install({**self.configuration, "packs": old})
         originals = {
-            key: ((self.directory / f"infra-{key}.zip").read_bytes(),
-                  (self.directory / f"infra-{key}.zip").stat().st_mtime_ns)
+            key: (
+                (self.directory / f"infra-{key}.zip").read_bytes(),
+                (self.directory / f"infra-{key}.zip").stat().st_mtime_ns,
+            )
             for key in retained
         }
         manual = self.directory / "friends.zip"
@@ -121,10 +162,14 @@ class DatapacksTest(unittest.TestCase):
         for _ in range(2):
             datapacks.install({**self.configuration, "packs": new})
             self.assertFalse((self.directory / "infra-afk-display.zip").exists())
-            self.assertEqual({p.name for p in self.directory.glob("infra-*.zip")},
-                             {f"infra-{key}.zip" for key in new})
-            self.assertEqual(json.loads((self.directory / datapacks.LEDGER).read_text()),
-                             {f"infra-{key}.zip": [datapacks.digest(self.source)] for key in new})
+            self.assertEqual(
+                {p.name for p in self.directory.glob("infra-*.zip")},
+                {f"infra-{key}.zip" for key in new},
+            )
+            self.assertEqual(
+                json.loads((self.directory / datapacks.LEDGER).read_text()),
+                {f"infra-{key}.zip": [datapacks.digest(self.source)] for key in new},
+            )
             self.assertEqual(manual.read_bytes(), b"unmanaged pack")
             self.assertEqual(world.read_bytes(), b"existing world")
             for key, (content, modified) in originals.items():
@@ -133,9 +178,15 @@ class DatapacksTest(unittest.TestCase):
                 self.assertEqual(path.stat().st_mtime_ns, modified)
 
     def test_modified_afk_retirement_fails_before_touching_other_packs(self):
-        datapacks.install({**self.configuration, "packs": {
-            "world-policy": str(self.source), "afk-display": str(self.source),
-        }})
+        datapacks.install(
+            {
+                **self.configuration,
+                "packs": {
+                    "world-policy": str(self.source),
+                    "afk-display": str(self.source),
+                },
+            }
+        )
         afk = self.directory / "infra-afk-display.zip"
         afk.write_bytes(b"modified by operator")
         ledger = (self.directory / datapacks.LEDGER).read_bytes()
@@ -149,34 +200,47 @@ class DatapacksTest(unittest.TestCase):
 
     def test_interrupted_first_install_and_upgrade_can_resume(self):
         write = datapacks.atomic_write
+
         def fail_archive(directory, name, content):
             if name.endswith(".zip"):
                 raise OSError("interrupted archive publication")
             write(directory, name, content)
+
         for value in ("50", "75"):
             self.make_pack(self.source, value)
-            with patch.object(datapacks, "atomic_write", side_effect=fail_archive):
-                with self.assertRaisesRegex(OSError, "interrupted"):
-                    datapacks.install(self.configuration)
+            with (
+                patch.object(datapacks, "atomic_write", side_effect=fail_archive),
+                self.assertRaisesRegex(OSError, "interrupted"),
+            ):
+                datapacks.install(self.configuration)
             datapacks.install(self.configuration)
-            self.assertEqual((self.directory / "infra-world-policy.zip").read_bytes(), self.source.read_bytes())
+            self.assertEqual(
+                (self.directory / "infra-world-policy.zip").read_bytes(),
+                self.source.read_bytes(),
+            )
 
     def test_interrupted_removal_can_resume(self):
         datapacks.install(self.configuration)
         write = datapacks.atomic_write
         calls = 0
+
         def fail_final_ledger(directory, name, content):
             nonlocal calls
             calls += 1
             if calls == 2:
                 raise OSError("interrupted ledger publication")
             write(directory, name, content)
+
         empty = {**self.configuration, "packs": {}}
-        with patch.object(datapacks, "atomic_write", side_effect=fail_final_ledger):
-            with self.assertRaises(OSError):
-                datapacks.install(empty)
+        with (
+            patch.object(datapacks, "atomic_write", side_effect=fail_final_ledger),
+            self.assertRaises(OSError),
+        ):
+            datapacks.install(empty)
         datapacks.install(empty)
-        self.assertEqual(json.loads((self.directory / datapacks.LEDGER).read_text()), {})
+        self.assertEqual(
+            json.loads((self.directory / datapacks.LEDGER).read_text()), {}
+        )
 
     def test_rejects_symlinked_world_archive_and_ledger(self):
         outside = self.root / "outside"
@@ -201,7 +265,9 @@ class DatapacksTest(unittest.TestCase):
             datapacks.install(self.configuration)
         self.assertFalse(self.directory.exists())
         with self.assertRaisesRegex(ValueError, "invalid managed"):
-            datapacks.install({**self.configuration, "packs": {"../escape": str(self.source)}})
+            datapacks.install(
+                {**self.configuration, "packs": {"../escape": str(self.source)}}
+            )
         self.assertFalse(self.directory.exists())
 
 

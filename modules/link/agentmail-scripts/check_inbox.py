@@ -35,7 +35,7 @@ def format_timestamp(ts):
     """Format a datetime or ISO string for display"""
     if isinstance(ts, str):
         try:
-            ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            ts = datetime.fromisoformat(ts)
         except ValueError:
             return ts
     return ts.strftime("%Y-%m-%d %H:%M:%S")

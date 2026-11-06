@@ -8,7 +8,7 @@ import sys
 import tempfile
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -35,7 +35,7 @@ def epoch(value):
     value = number(value, positive=True)
     if value is not None:
         try:
-            datetime.fromtimestamp(value, timezone.utc)
+            datetime.fromtimestamp(value, UTC)
             return value
         except (ValueError, OverflowError, OSError):
             pass

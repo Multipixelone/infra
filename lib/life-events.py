@@ -3,7 +3,7 @@
 import argparse
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
@@ -34,7 +34,7 @@ def added_timestamp(value):
     if not isinstance(value, str) or not ADDED_TIMESTAMP.fullmatch(value):
         return None
     try:
-        return datetime.fromisoformat(value).astimezone(timezone.utc)
+        return datetime.fromisoformat(value).astimezone(UTC)
     except (ValueError, OverflowError):
         return None
 

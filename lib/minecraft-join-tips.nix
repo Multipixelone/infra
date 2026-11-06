@@ -47,7 +47,7 @@ let
     bold = false;
     italic = false;
     underlined = false;
-    extra = extra;
+    inherit extra;
   };
   tellraw = extra: "tellraw @s ${builtins.toJSON (component extra)}\n";
   bullet = prose "· ";

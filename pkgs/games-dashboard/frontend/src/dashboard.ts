@@ -33,7 +33,12 @@ export type Server = {
   worldPaths: string[];
   wakeOnJoin: boolean;
   available: boolean;
-  backup: { online?: boolean; enabled: boolean; unit: string; command: string[] };
+  backup: {
+    online?: boolean;
+    enabled: boolean;
+    unit: string;
+    command: string[];
+  };
   status: ServerStatus;
 };
 

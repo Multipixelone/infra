@@ -1,4 +1,5 @@
 """Generate event and AFK configuration from the pinned plugin's complete schema."""
+
 import io
 import json
 import re
@@ -88,13 +89,15 @@ for key, text in sorted(language.items()):
     text = re.sub(r"%(?:(\d+)\$)?s", argument, text).replace("%%", "%")
     deaths[key] = f"<#fab387>×</#fab387> <#a6adc8>{text}</#a6adc8>"
 
-message["vanilla"]["types"] = [{
-    "name": "DEATH",
-    "multi_message": True,
-    "range": "SERVER",
-    "destination": {"type": "CHAT"},
-    "translation_keys": list(deaths),
-}]
+message["vanilla"]["types"] = [
+    {
+        "name": "DEATH",
+        "multi_message": True,
+        "range": "SERVER",
+        "destination": {"type": "CHAT"},
+        "translation_keys": list(deaths),
+    }
+]
 local = english["message"]
 local["join"] = {
     "format": "<#cba6f7>+</#cba6f7> <#cba6f7><player></#cba6f7> <#a6adc8>joined Survival</#a6adc8>",
@@ -104,7 +107,9 @@ if invite:
     local["join"]["format_first_time"] += (
         f"\n<#a6adc8>Discord: <#cba6f7>{invite}</#cba6f7></#a6adc8>"
     )
-local["quit"] = {"format": "<#f5c2e7>−</#f5c2e7> <#cba6f7><player></#cba6f7> <#a6adc8>left Survival</#a6adc8>"}
+local["quit"] = {
+    "format": "<#f5c2e7>−</#f5c2e7> <#cba6f7><player></#cba6f7> <#a6adc8>left Survival</#a6adc8>"
+}
 local["afk"] = {
     # A plain state token avoids color conversion in TAB's condition evaluator.
     "suffix": "AFK",
@@ -118,7 +123,11 @@ local["afk"] = {
     },
 }
 local["format"]["names"].update(
-    constant=[], display=["<player>"], entity="<name>", unknown="<name>", console="<name>"
+    constant=[],
+    display=["<player>"],
+    entity="<name>",
+    unknown="<name>",
+    console="<name>",
 )
 local["vanilla"] = {
     "format_player": "<display_name>",

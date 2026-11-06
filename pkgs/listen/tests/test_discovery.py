@@ -9,7 +9,7 @@ import threading
 import unittest
 import urllib.error
 from contextlib import redirect_stdout
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -72,7 +72,7 @@ class DecodingTests(unittest.TestCase):
         self.assertEqual(percentiles({1: 9}), {1: 0.5})
 
     def test_history_proxy_and_unknown_recency(self):
-        now = datetime(2026, 10, 6, tzinfo=timezone.utc)
+        now = datetime(2026, 10, 6, tzinfo=UTC)
         old = {"plays_per_track": 20, "listened_at": "2026-01-01T00:00:00Z"}
         recent = {**old, "listened_at": "2026-10-05T00:00:00Z"}
         unknown = {**old, "listened_at": None}
@@ -463,9 +463,7 @@ class DiscoveryTests(LibraryCase):
             queue = Queue(self.config, self.root / "state", read_only=True)
             try:
                 args = parser().parse_args(["find", "--rediscover", "--count", "10"])
-                data = discover(
-                    queue, args, now=datetime(2026, 10, 6, tzinfo=timezone.utc)
-                )
+                data = discover(queue, args, now=datetime(2026, 10, 6, tzinfo=UTC))
             finally:
                 queue.close()
         self.assertEqual(data["albums"][0]["id"], 2)

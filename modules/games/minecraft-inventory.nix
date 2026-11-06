@@ -11,7 +11,7 @@
         d
         // {
           source = pkgs.fetchurl {
-            name = builtins.baseNameOf d.path;
+            name = baseNameOf d.path;
             inherit (d) url sha256;
           };
         }
@@ -19,9 +19,9 @@
       # OpenInv uses Bukkit's Maven loader, sharing Paper's library repository.
       cache = pkgs.runCommand "openinv-5.3.5-libraries" { } (
         lib.concatMapStrings (d: ''
-          mkdir -p "$out/${builtins.dirOf d.path}"
+          mkdir -p "$out/${dirOf d.path}"
           ln -s ${d.source} "$out/${d.path}"
-          echo '${builtins.baseNameOf d.path}>central=' >> "$out/${builtins.dirOf d.path}/_remote.repositories"
+          echo '${baseNameOf d.path}>central=' >> "$out/${dirOf d.path}/_remote.repositories"
         '') libraries
       );
       format = pkgs.formats.yaml { };
@@ -67,7 +67,7 @@
       services.minecraft-servers.servers = lib.mapAttrs (_: _: {
         symlinks = lib.listToAttrs (
           map (path: lib.nameValuePair "libraries/${path}" "${cache}/${path}") (
-            lib.unique (map (d: builtins.dirOf d.path) definitions)
+            lib.unique (map (d: dirOf d.path) definitions)
           )
         );
       }) servers;

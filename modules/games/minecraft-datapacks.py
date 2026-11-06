@@ -3,12 +3,11 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sys
 import tempfile
 import zipfile
-
+from pathlib import Path
 
 NAME = re.compile(r"infra-[a-z0-9_-]+\.zip")
 LEDGER = ".infra-managed.json"
@@ -43,8 +42,10 @@ def validate_pack(path):
     with zipfile.ZipFile(path) as archive:
         # Reject outer UNZIP_ME bundles and unsupported metadata, never rewrite it.
         metadata = json.loads(archive.read("pack.mcmeta"))["pack"]
+
         def version(value):
             return tuple(value) if isinstance(value, list) else (value, 0)
+
         minimum = metadata.get("min_format", metadata.get("pack_format"))
         maximum = metadata.get("max_format", metadata.get("pack_format"))
         if minimum is None or maximum is None:
@@ -74,7 +75,10 @@ def install(configuration):
         not NAME.fullmatch(name)
         or not isinstance(hashes, list)
         or not hashes
-        or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in hashes)
+        or any(
+            not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+            for value in hashes
+        )
         for name, hashes in previous.items()
     ):
         raise ValueError("invalid managed datapack ledger")
@@ -83,14 +87,20 @@ def install(configuration):
         path = directory / name
         if path.is_symlink() or (path.exists() and not path.is_file()):
             raise ValueError(f"unsafe managed datapack path: {name}")
-        if path.exists() and (name not in previous or digest(path) not in previous[name]):
-            raise ValueError(f"refusing to replace an unowned or modified datapack: {name}")
+        if path.exists() and (
+            name not in previous or digest(path) not in previous[name]
+        ):
+            raise ValueError(
+                f"refusing to replace an unowned or modified datapack: {name}"
+            )
     # Journal both old and desired hashes before writes. Interrupted updates can
     # resume with either archive version, including removal and first installation.
     pending = {name: list(hashes) for name, hashes in previous.items()}
     for name, value in wanted.items():
         pending[name] = sorted(set(pending.get(name, []) + [value]))
-    atomic_write(directory, LEDGER, (json.dumps(pending, sort_keys=True) + "\n").encode())
+    atomic_write(
+        directory, LEDGER, (json.dumps(pending, sort_keys=True) + "\n").encode()
+    )
     for name, source in sources.items():
         path = directory / name
         if not path.exists() or digest(path) != wanted[name]:
@@ -99,7 +109,9 @@ def install(configuration):
     for name in previous.keys() - wanted.keys():
         (directory / name).unlink(missing_ok=True)
     installed = {name: [value] for name, value in wanted.items()}
-    atomic_write(directory, LEDGER, (json.dumps(installed, sort_keys=True) + "\n").encode())
+    atomic_write(
+        directory, LEDGER, (json.dumps(installed, sort_keys=True) + "\n").encode()
+    )
 
 
 def build(files, output):
@@ -118,7 +130,9 @@ if __name__ == "__main__":
         build(configuration, arguments[0])
     elif action == "install" and not arguments:
         if os.geteuid() == 0:
-            raise PermissionError("datapack preparation must run as the Minecraft unit user")
+            raise PermissionError(
+                "datapack preparation must run as the Minecraft unit user"
+            )
         install(configuration)
     else:
         raise ValueError("expected build FILE OUTPUT or install FILE")

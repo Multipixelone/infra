@@ -6,7 +6,7 @@ import json
 import os
 import signal
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .models import Manifest, SharedStatus, Status
 
@@ -28,7 +28,7 @@ class HelperFailure(Exception):
 def log_entry(identifier, line):
     return {
         "id": identifier,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "line": line,
     }
 

@@ -9,7 +9,7 @@ import tempfile
 import time
 import unicodedata
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .errors import ListenError, invalid
@@ -41,17 +41,13 @@ def timestamp(value):
     if value is None:
         return None
     try:
-        return (
-            datetime.fromtimestamp(value, timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        return datetime.fromtimestamp(value, UTC).isoformat().replace("+00:00", "Z")
     except (ValueError, OverflowError, OSError):
         return None
 
 
 def now_stamp():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def play_count(item):
@@ -423,7 +419,7 @@ class Queue:
                 "drop": "dropped",
             }[command]
             if command == "done":
-                album["listened_at"] = datetime.now(timezone.utc).timestamp()
+                album["listened_at"] = datetime.now(UTC).timestamp()
             album.store(inherit=False)
         # A crash between DB commit and clearing is safe: bare marking checks
         # that the saved album is still queued before changing it again.

@@ -54,15 +54,21 @@ def check_tab(fixtures, artifacts):
             assert entry == {"name": "TAB", "version": "6.2.0", "installed": ready}
             assert ("tab" in plugins["jars"]) == ready
             assert ("placeholderapi" in plugins["jars"]) == ready
-            assert next(p for p in plugins["inventory"] if p["name"] == "PlaceholderAPI") == {
-                "name": "PlaceholderAPI", "version": "2.12.3", "installed": ready,
+            assert next(
+                p for p in plugins["inventory"] if p["name"] == "PlaceholderAPI"
+            ) == {
+                "name": "PlaceholderAPI",
+                "version": "2.12.3",
+                "installed": ready,
             }
             assert (f"{directory}/TAB" in server["worldPaths"]) == ready
             assert (f"{directory}/PlaceholderAPI" in server["worldPaths"]) == ready
             assert server["discordInviteUrl"] == (server["inviteUrl"] or None)
             if not ready:
                 assert not any("/TAB/" in path for path in plugins["templates"])
-                assert not any("/PlaceholderAPI/" in path for path in plugins["templates"])
+                assert not any(
+                    "/PlaceholderAPI/" in path for path in plugins["templates"]
+                )
                 continue
             assert plugins["jars"]["tab"] == str(jar_path)
             assert server["symlinks"]["plugins/tab.jar"] == str(jar_path)
@@ -79,14 +85,25 @@ def check_tab(fixtures, artifacts):
             config = read("TAB/config.yml")
             papi = read("PlaceholderAPI/config.yml")
             assert papi.keys() == papi_defaults.keys()
-            assert not papi["check_updates"] and not papi["cloud_enabled"] and not papi["debug"]
-            assert {k: v for k, v in papi.items() if k not in {"check_updates", "cloud_enabled"}} == {
-                k: v for k, v in papi_defaults.items() if k not in {"check_updates", "cloud_enabled"}
+            assert (
+                not papi["check_updates"]
+                and not papi["cloud_enabled"]
+                and not papi["debug"]
+            )
+            assert {
+                k: v
+                for k, v in papi.items()
+                if k not in {"check_updates", "cloud_enabled"}
+            } == {
+                k: v
+                for k, v in papi_defaults.items()
+                if k not in {"check_updates", "cloud_enabled"}
             }
             assert config.keys() <= defaults.keys()
             for feature, value in config.items():
                 if isinstance(value, dict) and feature not in {
-                    "placeholder-refresh-intervals", "conditions"
+                    "placeholder-refresh-intervals",
+                    "conditions",
                 }:
                     assert value.keys() <= defaults[feature].keys(), feature
             assert config["config-version"] == defaults["config-version"] == 7
@@ -126,10 +143,13 @@ def check_tab(fixtures, artifacts):
             )
             assert intervals["%tps%"] == intervals["%mspt%"] == 5000
             assert intervals["%flectonepulse_setting_afk_suffix%"] == 1000
-            assert config["conditions"] == {"afk": {
-                "conditions": ["%flectonepulse_setting_afk_suffix%=AFK"],
-                "true": " <#a6adc8>AFK</#a6adc8>", "false": "",
-            }}
+            assert config["conditions"] == {
+                "afk": {
+                    "conditions": ["%flectonepulse_setting_afk_suffix%=AFK"],
+                    "true": " <#a6adc8>AFK</#a6adc8>",
+                    "false": "",
+                }
+            }
             design = config["header-footer"]["designs"]
             assert set(design) == {"default"}
             header, footer = design["default"]["header"], design["default"]["footer"]
@@ -149,7 +169,11 @@ def check_tab(fixtures, artifacts):
             groups = read("TAB/groups.yml")
             assert groups["_DEFAULT_"]["tabprefix"] == "%luckperms-prefix%"
             assert groups["_DEFAULT_"]["tagprefix"] == ""
-            assert groups["_DEFAULT_"]["tabsuffix"] == groups["_DEFAULT_"]["tagsuffix"] == "%condition:afk%"
+            assert (
+                groups["_DEFAULT_"]["tabsuffix"]
+                == groups["_DEFAULT_"]["tagsuffix"]
+                == "%condition:afk%"
+            )
             bootstrap = json.loads(
                 gzip.decompress(
                     Path(
@@ -163,7 +187,9 @@ def check_tab(fixtures, artifacts):
             assert set(groups) == set(ranks) | {"_DEFAULT_"}
             assert set(bootstrap["groups"]) == set(ranks)
             for rank, group in bootstrap["groups"].items():
-                assert {n["key"]: n["value"] for n in group["nodes"]}["carbon.chatplaceholders"] is False
+                assert {n["key"]: n["value"] for n in group["nodes"]}[
+                    "carbon.chatplaceholders"
+                ] is False
                 nodes = {n["key"] for n in group["nodes"] if n["value"]}
                 color = next(
                     n["key"].removeprefix("meta.chat_color.")

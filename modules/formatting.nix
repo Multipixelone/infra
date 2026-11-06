@@ -19,6 +19,10 @@
         inherit (config.flake-root) projectRootFile;
         enableDefaultExcludes = true;
         programs = {
+          google-java-format = {
+            enable = true;
+            aospStyle = true;
+          };
           prettier.enable = true;
           shellcheck.enable = true;
           shfmt.enable = true;
@@ -40,6 +44,8 @@
             "**/node_modules/*"
             "**/*.code-workspace"
             "pkgs/firefox-addons/generated.nix"
+            # Upstream plain-text attribution has no formatter syntax.
+            "modules/games/datapacks/credits.txt"
           ];
         };
       };

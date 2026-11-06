@@ -4,7 +4,7 @@ import copy
 import math
 import random
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .errors import ListenError, invalid
 from .graph import Graph, TextClient, decode_vector
@@ -61,8 +61,7 @@ def history_score(album, mode, now):
     age = (
         max(
             0,
-            (now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))).total_seconds()
-            / 86400,
+            (now - datetime.fromisoformat(stamp)).total_seconds() / 86400,
         )
         if stamp
         else None
@@ -380,7 +379,7 @@ def discover(queue, args, rng=None, now=None):
         for model in models.values()
     ]
     components, references = components_for(
-        inputs, graph, queue, library, now or datetime.now(timezone.utc)
+        inputs, graph, queue, library, now or datetime.now(UTC)
     )
     cap = (
         cap_for(args.max_minutes)

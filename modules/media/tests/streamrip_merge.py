@@ -4,10 +4,10 @@ import json
 import os
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 import tomlkit
-import tomllib
 from streamrip.config import BLANK_CONFIG_PATH, ConfigData
 
 

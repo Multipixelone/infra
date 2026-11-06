@@ -1,12 +1,13 @@
+import de.bluecolored.bluemap.common.WebFilesManager;
+import de.bluecolored.bluemap.common.config.ConfigManager;
+import de.bluecolored.bluemap.common.config.CoreConfig;
+import de.bluecolored.bluemap.common.config.PluginConfig;
+import de.bluecolored.bluemap.common.config.WebappConfig;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
-import de.bluecolored.bluemap.common.WebFilesManager;
-import de.bluecolored.bluemap.common.config.ConfigManager;
-import de.bluecolored.bluemap.common.config.WebappConfig;
-import de.bluecolored.bluemap.common.config.PluginConfig;
-import de.bluecolored.bluemap.common.config.CoreConfig;
 
 /** Exercise the pinned plugin's parser, settings writer and webroot updater. */
 public class ReadBlueMapWebSettings {
@@ -22,8 +23,9 @@ public class ReadBlueMapWebSettings {
         if (!core.getUpdateCooldown().equals(java.time.Duration.ofSeconds(60))
                 || !core.getFullUpdateInterval().equals(java.time.Duration.ofDays(1)))
             throw new AssertionError("render update timing changed");
-        WebappConfig config = new ConfigManager(configuration.getParent())
-            .loadConfig(configuration, WebappConfig.class);
+        WebappConfig config =
+                new ConfigManager(configuration.getParent())
+                        .loadConfig(configuration, WebappConfig.class);
         if (!config.getStyles().equals(new LinkedHashSet<>(List.of("css/homepage-theme.css"))))
             throw new AssertionError("custom stylesheet registration changed");
         if (!config.getScripts().isEmpty()) throw new AssertionError("unexpected scripts");

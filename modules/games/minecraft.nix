@@ -330,7 +330,7 @@
               s.minecraft.rconPort
               s.minecraft.metricsPort
             ];
-            publicTCPPorts = (backend id).publicTCPPorts;
+            inherit ((backend id)) publicTCPPorts;
             publicUDPPorts = [ s.minecraft.voicechatPort ];
             wakeOnJoin = s.minecraft.lazymc.enable;
             serverPort = s.minecraft.serverPort;

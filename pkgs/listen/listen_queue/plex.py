@@ -3,7 +3,7 @@
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .errors import ListenError
 from .library import normalize, now_stamp
@@ -247,7 +247,7 @@ def seed(queue, apply=False, plex=None):
     groups, updates, overlap = plan_matches(queue, plex)
     if apply:
         pick = queue.state.read("last-pick.json")
-        listened_at = datetime.now(timezone.utc).timestamp()
+        listened_at = datetime.now(UTC).timestamp()
         with queue.lib.transaction():
             for state, selected in updates.items():
                 for album in selected.values():
@@ -305,7 +305,7 @@ def sync(queue, apply=False, plex=None):
     # Report precedence only for new albums; existing decisions are preserved.
     overlap = [album_id for album_id in overlap if album_id in updates["listened"]]
     if apply:
-        listened_at = datetime.now(timezone.utc).timestamp()
+        listened_at = datetime.now(UTC).timestamp()
         with queue.lib.transaction():
             for state, selected in updates.items():
                 for album in selected.values():

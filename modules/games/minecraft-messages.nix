@@ -11,7 +11,7 @@
           d:
           lib.nameValuePair d.path (
             pkgs.fetchurl {
-              name = builtins.baseNameOf d.path;
+              name = baseNameOf d.path;
               inherit (d) url sha256;
             }
           )
@@ -29,7 +29,7 @@
       # its transitive resolver does not attempt network access at startup.
       cache = pkgs.runCommand "flectonepulse-1.14.0-libraries" { } (
         lib.concatMapStrings (d: ''
-          mkdir -p "$out/${builtins.dirOf d.path}"
+          mkdir -p "$out/${dirOf d.path}"
           ln -s ${sources.${d.path}} "$out/${d.path}"
         '') definitions.files
         + lib.concatMapStrings (path: ''

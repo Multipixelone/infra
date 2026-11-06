@@ -11,7 +11,7 @@
         d
         // {
           source = pkgs.fetchurl {
-            name = builtins.baseNameOf d.path;
+            name = baseNameOf d.path;
             inherit (d) url sha256;
           };
         }
@@ -20,9 +20,9 @@
       # Include parent/BOM POMs and repository identity, not just driver jars.
       cache = pkgs.runCommand "huskhomes-4.11-9ed80cc-libraries" { } (
         lib.concatMapStrings (d: ''
-          mkdir -p "$out/${builtins.dirOf d.path}"
+          mkdir -p "$out/${dirOf d.path}"
           ln -s ${d.source} "$out/${d.path}"
-          echo '${builtins.baseNameOf d.path}>maven=' >> "$out/${builtins.dirOf d.path}/_remote.repositories"
+          echo '${baseNameOf d.path}>maven=' >> "$out/${dirOf d.path}/_remote.repositories"
         '') libraries
       );
       configuration = (pkgs.formats.yaml { }).generate "huskhomes-4.11-9ed80cc.yml" {
@@ -94,7 +94,7 @@
         # directories are immutable, matching the resolver's local repo layout.
         symlinks = lib.listToAttrs (
           map (path: lib.nameValuePair "libraries/${path}" "${cache}/${path}") (
-            lib.unique (map (d: builtins.dirOf d.path) definitions)
+            lib.unique (map (d: dirOf d.path) definitions)
           )
         );
       }) servers;

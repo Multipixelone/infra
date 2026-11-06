@@ -7,10 +7,10 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 import tomlkit
-import tomllib
 
 MERGER, TEMPLATE = sys.argv[1:]
 DEFAULTS = tomllib.loads(Path(TEMPLATE).read_text())

@@ -1,10 +1,10 @@
 """Prepare only DiscordSRV's text token; generic game secrets remain raw bytes."""
 
 import os
-from pathlib import Path
 import pwd
 import sys
 import tempfile
+from pathlib import Path
 
 
 def prepare(source, destination):
@@ -12,7 +12,9 @@ def prepare(source, destination):
     if not token:
         raise ValueError("DiscordSRV token is empty after trimming whitespace")
     destination.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
-    descriptor, filename = tempfile.mkstemp(dir=destination.parent, prefix=".discord-token-")
+    descriptor, filename = tempfile.mkstemp(
+        dir=destination.parent, prefix=".discord-token-"
+    )
     temporary = Path(filename)
     try:
         with os.fdopen(descriptor, "wb") as output:

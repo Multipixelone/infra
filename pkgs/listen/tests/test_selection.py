@@ -1,7 +1,7 @@
 import json
 import subprocess
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from listen_queue.discovery import percentiles, ranked_sample
@@ -14,7 +14,7 @@ class AdapterTests(unittest.TestCase):
         clock = patch("listen_queue.selection.datetime", wraps=datetime)
         self.clock = clock.start()
         self.addCleanup(clock.stop)
-        self.clock.now.return_value = datetime(2026, 10, 3, 13, tzinfo=timezone.utc)
+        self.clock.now.return_value = datetime(2026, 10, 3, 13, tzinfo=UTC)
 
     @staticmethod
     def plan(leave_at="2026-10-03T10:00:00-04:00", minutes=30.5, **extra):

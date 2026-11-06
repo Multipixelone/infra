@@ -168,13 +168,13 @@ with (
     for phase in ("save-off", "save-all flush", "snapshot", "restic"):
         commands.clear()
 
-        def failing_rcon(item, command):
+        def failing_rcon(item, command, *, phase=phase):
             reply = rcon(item, command)
             if command == phase:
                 raise ConnectionError("injected lost response")
             return reply
 
-        def failing_run(configuration, tool, *arguments, **kwargs):
+        def failing_run(configuration, tool, *arguments, phase=phase, **kwargs):
             if (
                 phase == "snapshot"
                 and tool == "btrfs"

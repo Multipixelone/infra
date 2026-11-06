@@ -904,7 +904,15 @@ class RuntimeTest(unittest.TestCase):
             state = {"ActiveState": "active", "InvocationID": "old", "MainPID": "77"}
             operations = []
 
-            def control(_cfg, tool, *args, **kwargs):
+            def control(
+                _cfg,
+                tool,
+                *args,
+                operations=operations,
+                restart_fails=restart_fails,
+                state=state,
+                **kwargs,
+            ):
                 self.assertEqual(tool, "systemctl")
                 operations.append(args[0])
                 # Restart invokes prechange; it must be able to acquire this lock.
@@ -923,7 +931,9 @@ class RuntimeTest(unittest.TestCase):
 
             with (
                 patch.object(
-                    runtime, "unit_state", side_effect=lambda *_: state.copy()
+                    runtime,
+                    "unit_state",
+                    side_effect=lambda *_, state=state: state.copy(),
                 ),
                 patch.object(
                     runtime, "rcon", side_effect=ConnectionError("unreachable")

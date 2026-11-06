@@ -12,7 +12,7 @@ import sys
 import tempfile
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -183,7 +183,7 @@ def valid_epoch(value):
     try:
         value = float(value)
         if math.isfinite(value) and value > 0:
-            datetime.fromtimestamp(value, timezone.utc)
+            datetime.fromtimestamp(value, UTC)
             return value
     except (ValueError, TypeError, OverflowError, OSError):
         pass
@@ -198,7 +198,7 @@ def first_played(added, lastfm):
         value, source = added, "added"
     else:
         return None, None
-    return datetime.fromtimestamp(value, timezone.utc).date().isoformat(), source
+    return datetime.fromtimestamp(value, UTC).date().isoformat(), source
 
 
 def enrich_first_played(library, output):

@@ -124,7 +124,7 @@
           };
       }) servers;
       # BlueMap otherwise downloads its vanilla assets at first wake.
-      services.minecraft-servers.servers = lib.mapAttrs (id: _: {
+      services.minecraft-servers.servers = lib.mapAttrs (_id: _: {
         symlinks."plugins/BlueMap/data/minecraft-client-26.3.jar" = cfg.artifacts.games-minecraft-client;
       }) servers;
       users.groups.minecraft-map = { };

@@ -13,7 +13,7 @@
         d
         // {
           source = pkgs.fetchurl {
-            name = builtins.baseNameOf d.path;
+            name = baseNameOf d.path;
             inherit (d) url sha256;
           };
         }
@@ -22,7 +22,7 @@
       # relocations for this release. Preserve the exact embedded manifest paths.
       cache = pkgs.runCommand "carbon-3.0.0-beta.39-libraries" { } (
         lib.concatMapStrings (d: ''
-          mkdir -p "$out/${builtins.dirOf d.path}"
+          mkdir -p "$out/${dirOf d.path}"
           ln -s ${d.source} "$out/${d.path}"
         '') libraries
       );

@@ -13,7 +13,7 @@ import os
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .errors import ListenError, invalid
@@ -74,14 +74,14 @@ class Graph:
             or any(not isinstance(field, str) for field in fields)
         ):
             raise ValueError("Invalid graph encoding metadata")
-        exported = datetime.fromisoformat(data["exported_at"].replace("Z", "+00:00"))
+        exported = datetime.fromisoformat(data["exported_at"])
         if exported.utcoffset() is None:
             raise ValueError("Export timestamp needs a timezone")
         self.metadata = {
             key: value for key, value in data.items() if key not in ("albums", "labels")
         }
         self.metadata["stale"] = (
-            datetime.now(timezone.utc) - exported
+            datetime.now(UTC) - exported
         ).total_seconds() > 48 * 3600
         self.catalog = {}
         self.columns = {}

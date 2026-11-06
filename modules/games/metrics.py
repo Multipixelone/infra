@@ -457,9 +457,7 @@ def collect(inventory, persisted, now=None):
                 metrics.add(
                     "games_server_start_time_seconds",
                     labels,
-                    datetime.fromisoformat(
-                        container["State"]["StartedAt"].replace("Z", "+00:00")
-                    ).timestamp(),
+                    datetime.fromisoformat(container["State"]["StartedAt"]).timestamp(),
                 )
             except (ValueError, KeyError):
                 pass

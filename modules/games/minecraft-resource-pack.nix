@@ -12,7 +12,7 @@
       # The derivation path versions the URL without import-from-derivation.
       # nginx location keys cannot carry store dependencies; the alias below
       # retains the pack dependency, while this URL is only its public name.
-      path = "/packs/${builtins.unsafeDiscardStringContext (builtins.baseNameOf pack)}.zip";
+      path = "/packs/${builtins.unsafeDiscardStringContext (baseNameOf pack)}.zip";
     in
     {
       options.infra.games.minecraftRankPackUrl = lib.mkOption {

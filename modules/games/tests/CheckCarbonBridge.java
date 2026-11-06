@@ -1,6 +1,8 @@
 import github.scarsz.discordsrv.api.events.GameChatMessagePreProcessEvent;
 import github.scarsz.discordsrv.dependencies.kyori.adventure.text.Component;
+
 import net.draycia.carbon.paper.integration.dsrv.DSRVListener;
+
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
@@ -14,15 +16,25 @@ public class CheckCarbonBridge {
         var listener = constructor.newInstance((Object) null);
         var handle = subscriber.getDeclaredMethod("handle", GameChatMessagePreProcessEvent.class);
         handle.setAccessible(true);
-        Event original = new Event() {
-            public HandlerList getHandlers() { return new HandlerList(); }
-        };
-        var vanilla = new GameChatMessagePreProcessEvent("global", Component.text("hello"), null, original);
+        Event original =
+                new Event() {
+                    public HandlerList getHandlers() {
+                        return new HandlerList();
+                    }
+                };
+        var vanilla =
+                new GameChatMessagePreProcessEvent(
+                        "global", Component.text("hello"), null, original);
         handle.invoke(listener, vanilla);
-        if (!vanilla.isCancelled()) throw new AssertionError("Duplicate Bukkit bridge was not suppressed");
-        var carbon = new GameChatMessagePreProcessEvent("global", Component.text("hello"), null, null);
+        if (!vanilla.isCancelled())
+            throw new AssertionError("Duplicate Bukkit bridge was not suppressed");
+        var carbon =
+                new GameChatMessagePreProcessEvent("global", Component.text("hello"), null, null);
         handle.invoke(listener, carbon);
-        if (carbon.isCancelled()) throw new AssertionError("Native Carbon forwarding was suppressed");
-        System.out.println("PASS: actual Carbon/DiscordSRV hook suppresses duplicate Bukkit forwarding, keeps native chat");
+        if (carbon.isCancelled())
+            throw new AssertionError("Native Carbon forwarding was suppressed");
+        System.out.println(
+                "PASS: actual Carbon/DiscordSRV hook suppresses duplicate Bukkit forwarding, keeps"
+                        + " native chat");
     }
 }
