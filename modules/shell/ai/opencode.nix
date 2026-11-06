@@ -23,6 +23,9 @@
         # Roles:  per-role skills/mcps (model-agnostic).
         # mkPreset: merges a model and optional variant onto the matching role.
 
+        # All OmniRoute combos share a one-million-token context window.
+        modelContextLimit = 1000000;
+
         models = {
           # Combo names are sent verbatim; OmniRoute owns their upstream
           # model selection, reasoning effort, and fallback policy.
@@ -420,10 +423,9 @@
           # minutes, but that was never DCP's judgement — the config was
           # landing in dcp.json while DCP read a stub dcp.jsonc, so every
           # model ran on the stock 50k/100k thresholds and got nudged from
-          # 50k of a 1.05M window onward. With the file at the path DCP
-          # actually reads, the per-model floors below apply and nudging only
-          # starts near the real ceiling, which is when compression is worth
-          # its cost.
+          # 50k onward despite the much larger context windows. With the file
+          # at the path DCP actually reads, the shared thresholds below apply
+          # and nudging starts at 50% of the shared 1M-token window.
           #
           # This is only a *default*: DCP persists a per-session manualMode
           # boolean in ~/.local/share/opencode/storage/plugin/dcp/<session>.json
@@ -444,17 +446,14 @@
             permission = "allow";
             showCompression = false;
             summaryBuffer = true;
-            # Conservative fallback for models without an explicit override.
-            maxContextLimit = 96000;
-            minContextLimit = 64000;
+            # Numeric thresholds track 75%/50% of the shared context window.
+            maxContextLimit = modelContextLimit * 3 / 4;
+            minContextLimit = modelContextLimit / 2;
             # These are nudge thresholds, not compression targets. Below
             # modelMinLimits DCP stays silent; at or above it turn/iteration
             # reminders switch on; above modelMaxLimits it nudges hard every
             # nudgeFrequency fetches. So the min is where compression pressure
             # *starts* — keep it high or the session compresses all session.
-            # Combos can route to models with different context windows.
-            # Use the conservative shared thresholds above instead of the
-            # old Codex-specific million-token overrides.
             # nudgeFrequency counts fetches between nudges above the ceiling,
             # so higher = quieter. iterationNudgeThreshold is how many messages
             # after a user message before reminders resume, so higher is also
@@ -566,10 +565,9 @@
                         input = [ "text" ] ++ lib.optional (name != "Subagent") "image";
                         output = [ "text" ];
                       };
-                      # Conservative client caps for heterogeneous combos;
-                      # the gateway controls the actual upstream limits.
+                      # Explicit client limits for every OmniRoute combo.
                       limit = {
-                        context = 128000;
+                        context = modelContextLimit;
                         output = 16384;
                       };
                     };
