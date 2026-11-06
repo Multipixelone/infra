@@ -145,7 +145,7 @@
           validator.model = "fixer";
           tester.model = "fixer";
           diagnostician.model = "subagent";
-          documenter.model = "subagent";
+          documenter.model = "high-effort";
           secrets.model = "high-effort";
           observer.model = "kestral";
           council.model = "high-effort";
