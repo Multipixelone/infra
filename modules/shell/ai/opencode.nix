@@ -233,6 +233,11 @@
           '';
           permission = {
             "*" = "deny";
+            # Validators keep evidence outside the repository in private run dirs.
+            external_directory = {
+              "*" = "deny";
+              "/tmp/opencode/*" = "allow";
+            };
             read = "allow";
             glob = "allow";
             grep = "allow";
