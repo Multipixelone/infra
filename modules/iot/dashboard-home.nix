@@ -406,7 +406,7 @@ _: {
               {%- set color, icon = 'grey', 'mdi:alarm' -%}
             {%- endif -%}
             {%- if phase == 'window' -%}
-              {%- set detail = detail ~ ' · until leave time' -%}
+              {%- set detail = detail ~ ' · leave by ' ~ (sd | timestamp_custom('%-I:%M %p')) -%}
             {%- elif phase == 'final' -%}
               {%- set detail = detail ~ ' · leave time reached' -%}
             {%- endif -%}

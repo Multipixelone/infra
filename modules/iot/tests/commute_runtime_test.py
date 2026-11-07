@@ -2998,6 +2998,10 @@ def run_tests(generated, selected=(), excluded=()):
                 templates = [s["cards"][1]["filter"]["template"] for s in sections]
                 max_age = generated["contract"]["statusMaxAgeSeconds"]
                 self.assertEqual(max_age, 90)
+                # A newly published schedule must not replace the active session's deadline.
+                await runtime.set(
+                    "input_text.commute_alarm_deadline_utc", "2026-11-04T14:30:00Z"
+                )
                 for text in templates:
                     template = Template(text, runtime.hass)
 
@@ -3039,7 +3043,22 @@ def run_tests(generated, selected=(), excluded=()):
                         )
                     )
                     self.assertNotIn("input_button.commute_alarm_stop", window)
+                    # November UTC timestamps render in HA's America/New_York zone.
+                    # The locked deadline differs from both deadline_at and the live helper.
+                    snooze_until = "2026-11-04T12:05:00Z"
+                    snoozed_window = await rendered(
+                        state="snoozed",
+                        snooze_until=snooze_until,
+                        session_attrs={"locked_deadline_at": "2026-11-04T13:17:00Z"},
+                    )
+                    self.assertEqual(
+                        snoozed_window[0]["secondary"],
+                        "Snoozed until 7:05 AM · leave by 8:17 AM",
+                    )
                     final_cards = await rendered("final")
+                    self.assertEqual(
+                        final_cards[0]["secondary"], "Ringing · leave time reached"
+                    )
                     final = targets(final_cards)
                     self.assertNotIn("CC_SNOOZE:", json.dumps(final_cards))
                     self.assertNotIn("input_button.commute_alarm_snooze", final)
@@ -3047,9 +3066,21 @@ def run_tests(generated, selected=(), excluded=()):
                     legacy = targets(await rendered("legacy", kind="nap"))
                     self.assertIn("input_button.commute_alarm_stop", legacy)
                     self.assertIn("input_button.commute_alarm_snooze", legacy)
-                    snoozed = targets(
-                        await rendered("legacy", kind="nap", state="snoozed")
+                    for kind in ("wake", "nap"):
+                        snoozed_cards = await rendered(
+                            "legacy",
+                            kind=kind,
+                            state="snoozed",
+                            snooze_until=snooze_until,
+                        )
+                        self.assertEqual(
+                            snoozed_cards[0]["secondary"], "Snoozed until 7:05 AM", kind
+                        )
+                    snoozed_cards = await rendered(
+                        "legacy", kind="nap", state="snoozed"
                     )
+                    self.assertEqual(snoozed_cards[0]["secondary"], "Snoozed")
+                    snoozed = targets(snoozed_cards)
                     self.assertIn("input_button.commute_alarm_stop", snoozed)
                     self.assertNotIn("input_button.commute_alarm_snooze", snoozed)
                     idle = json.dumps(await rendered(state="idle"))
