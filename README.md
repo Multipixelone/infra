@@ -60,7 +60,7 @@ Task execution is managed via `just`.
 | `just games-dashboard-shell` | See Justfile recipe. |
 | `just games-dashboard-npm` | See Justfile recipe. |
 | `just games-dashboard-dev` | See Justfile recipe. |
-| `just deploy` | Rebuild and push closures to the Attic binary cache. |
+| `just deploy` | Rebuild and activate the local machine. |
 | `just colmena-apply <host>` | Deploy one host via Colmena. Host names are tags, so any node name works. |
 | `just colmena-apply-servers` | Deploy every always-on server (`@server`) in one run. |
 | `just colmena-apply-tag <tag>` | Deploy configurations to a specific Colmena tag. |
@@ -76,7 +76,7 @@ Task execution is managed via `just`.
 | `just saves-archive [extra]` | See Justfile recipe. |
 | `just saves-select [extra]` | See Justfile recipe. |
 | `just saves-seed <credential> [extra]` | See Justfile recipe. |
-| `just fastb` | Fast build with `nix-fast-build` and Attic cache upload. |
+| `just fastb` | Build checks with `nix-fast-build`. |
 | `just hm-build <host>` | Build a standalone Home Manager activation package locally. |
 | `just hm-deploy <host> [remote_nix_bindir]` | Build, copy and activate a Home Manager closure over SSH. |
 | `just iso` | Build an installer ISO. |
@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (141)</summary>
+<summary>Packages exposed by this flake (142)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -204,6 +204,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`life-events`](https://github.com/Multipixelone/infra/blob/main/modules/life-events/default.nix) · `nix run github:Multipixelone/infra#life-events`
 - [`link-argb-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-argb-config`
 - [`link-cooling-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-cooling-config`
+- [`link-prebuild`](https://github.com/Multipixelone/infra/blob/main/modules/ci/prebuild.nix) — Prepare persistent verified Link closures and lease-promote the deploy ref · `nix run github:Multipixelone/infra#link-prebuild`
 - [`listen`](https://github.com/Multipixelone/infra/blob/main/modules/link/listen.nix) · `nix run github:Multipixelone/infra#listen`
 - [`lossywav`](https://github.com/Multipixelone/infra/blob/main/modules/media/lossyflac.nix) — lossy encoder for WAV files · `nix run github:Multipixelone/infra#lossywav`
 - [`moondeck`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/moondeck.nix) — Helper to work with moonlight on a steamdeck · `nix run github:Multipixelone/infra#moondeck`
@@ -270,8 +271,8 @@ This repository follows the [dendritic](https://github.com/mightyiam/dendritic) 
 
 ## Running checks
 
-Checks run on a self-hosted Forgejo Actions runner and push their results
-to an Attic cache. One job builds the whole check set with a single
+Checks run on a self-hosted Forgejo Actions runner, retaining results in
+Link's local Nix store. One job builds the whole check set with a single
 `nix-fast-build`, and reports each check as its own commit status — so
 every check still gets an individual green light on the commit and in the
 pull request, and branch protection can require them by glob.

@@ -31,7 +31,6 @@ let
       stalled-download-timeout = 15
       download-attempts = 100
       accept-flake-config = true
-      netrc-file = /etc/nix/netrc
       access-tokens = github.com=''${{ secrets.GH_TOKEN_FOR_UPDATES }}
       substituters = ${substituters}
       trusted-public-keys = ${trustedKeys}
@@ -104,12 +103,9 @@ let
       uses = "nixbuild/nix-quick-install-action@v35";
       "with".nix_conf = mkNixConf;
     };
-    createAtticNetrc = {
-      name = "Create attic netrc";
+    configureGithubAuth = {
+      name = "Configure private GitHub input authentication";
       run = ''
-        sudo mkdir -p /etc/nix /etc/determinate
-        echo "machine attic-cache.fly.dev login automated password ''${{ secrets.ATTIC_KEY }}" | sudo tee /etc/nix/netrc > /dev/null
-        echo '{"authentication":{"additionalNetrcSources":["/etc/nix/netrc"]}}' | sudo tee /etc/determinate/config.json > /dev/null
         # `x-access-token:<pat>` form, not `<pat>@` — GitHub accepts a bare
         # token as the username only for CLASSIC PATs; a fine-grained PAT must
         # arrive as the PASSWORD or the clone 404s as "Repository not found".
@@ -129,19 +125,6 @@ let
       name = "Install SSH key";
       uses = "webfactory/ssh-agent@v0.9.0";
       "with".ssh-private-key = "\${{ secrets.SSH_PRIVATE_KEY }}";
-    };
-    loginToAttic = {
-      name = "Login to attic";
-      run = ''
-        nix run nixpkgs#attic-client login fly https://attic-cache.fly.dev ''${{ secrets.ATTIC_KEY }}
-      '';
-    };
-    pushToAttic = {
-      name = "Push to attic";
-      continue-on-error = true;
-      run = ''
-        nix run nixpkgs#attic-client push system result -j 3
-      '';
     };
   };
 
@@ -201,8 +184,8 @@ in
     github-actions = ''
       ## Running checks
 
-      Checks run on a self-hosted Forgejo Actions runner and push their results
-      to an Attic cache. One job builds the whole check set with a single
+      Checks run on a self-hosted Forgejo Actions runner, retaining results in
+      Link's local Nix store. One job builds the whole check set with a single
       `nix-fast-build`, and reports each check as its own commit status — so
       every check still gets an individual green light on the commit and in the
       pull request, and branch protection can require them by glob.
@@ -233,21 +216,21 @@ in
             drv = pkgs.writers.writeJSON "gh-actions-workflow-build.yaml" {
               name = buildWorkflowName;
               on = {
-                push = { };
+                push.branches-ignore = [ ci.prebuild.deployBranch ];
                 workflow_dispatch = { };
               };
               jobs = {
                 ${ids.jobs.getCheckNames} = {
+                  "if" = "\${{ github.ref != 'refs/heads/${ci.prebuild.deployBranch}' }}";
                   runs-on = runner.name;
                   outputs.${ids.outputs.jobs.getCheckNamesAarch64} =
                     "\${{ steps.${ids.steps.getCheckNames}.outputs.${ids.outputs.steps.getCheckNamesAarch64} }}";
                   steps = [
                     steps.removeUnusedSoftware
                     steps.checkout
-                    steps.createAtticNetrc
+                    steps.configureGithubAuth
                     steps.nixInstaller
                     steps.installSshKey
-                    steps.loginToAttic
                     {
                       id = ids.steps.getCheckNames;
                       # Naming the aarch64 check set from an x86 runner is fine:
@@ -276,10 +259,9 @@ in
                   steps = [
                     steps.nothingButNix
                     steps.checkout
-                    steps.createAtticNetrc
+                    steps.configureGithubAuth
                     steps.nixInstaller
                     steps.installSshKey
-                    steps.loginToAttic
                     {
                       run = mkNixFastBuild aarch64Runner.system;
                     }
@@ -426,12 +408,10 @@ in
           #           ciSteps.maximizeDiskSpace
           #           ciSteps.chownNix
           #           ciSteps.checkout
-          #           steps.createAtticNetrc
+          #           steps.configureGithubAuth
           #           ciSteps.nixInstaller
           #           steps.installSshKey
-          #           steps.loginToAttic
           #           ciSteps.buildSystem
-          #           steps.pushToAttic
           #         ];
           #       };
           #     };

@@ -20,10 +20,6 @@
         key = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
       }
       {
-        url = "https://attic-cache.fly.dev/system?priority=50";
-        key = "system:qjMAtak3MMVYM2B3EoLvNG9duRTrjdNS65RTagsr+y4=";
-      }
-      {
         url = "https://nix-community.cachix.org";
         key = "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=";
       }

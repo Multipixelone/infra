@@ -226,8 +226,8 @@ in
 
               if [ "$fail" -eq 0 ] && [ "$rc" -ne 0 ] && [ "$nongreen" -eq 0 ]; then
                 # Every single check is green yet nix-fast-build still failed,
-                # so the failure was infrastructural — an attic upload, most
-                # likely. Its exit code cannot distinguish that from a build
+                # so the failure was infrastructural — an interrupted evaluator,
+                # for example. Its exit code cannot distinguish that from a build
                 # failure, which is why the ledger is consulted first and this
                 # is the fallback rather than the primary signal.
                 echo "nix-fast-build exited $rc with no failing check; see the log above." >&2

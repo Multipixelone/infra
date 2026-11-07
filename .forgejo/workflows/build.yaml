@@ -1,6 +1,6 @@
 {
   "concurrency": {
-    "cancel-in-progress": true,
+    "cancel-in-progress": "${{ github.ref != 'refs/heads/main' }}",
     "group": "build-${{ github.ref }}"
   },
   "jobs": {
@@ -12,6 +12,8 @@
         "FORGE_TARGET_URL": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}",
         "FORGE_TOKEN": "${{ secrets.FORGE_TOKEN }}"
       },
+      "if": "${{ github.ref != 'refs/heads/deploy' }}",
+      "outputs": {},
       "runs-on": "nix",
       "steps": [
         {
@@ -32,20 +34,12 @@
           "run": "{\n  echo \"GIT_CONFIG_COUNT=1\"\n  echo \"GIT_CONFIG_KEY_0=url.https://x-access-token:${{ secrets.GH_TOKEN_FOR_UPDATES }}@github.com/.insteadOf\"\n  echo \"GIT_CONFIG_VALUE_0=https://github.com/\"\n} >> \"$GITHUB_ENV\"\n\n# Appended, not assigned: the runner unit already exports NIX_CONFIG\n# with max-jobs and cores, and a plain NIX_CONFIG= here would silently\n# drop those and let CI build at full width. Heredoc form because the\n# value is multi-line.\n{\n  echo \"NIX_CONFIG<<__NIX_CONFIG_EOF__\"\n  printf '%s\\n' \"${NIX_CONFIG:-}\"\n  echo \"access-tokens = github.com=${{ secrets.GH_TOKEN_FOR_UPDATES }}\"\n  echo \"__NIX_CONFIG_EOF__\"\n} >> \"$GITHUB_ENV\"\n"
         },
         {
-          "name": "Configure attic",
-          "run": "set -euo pipefail\n\nif [ -n \"${RUNNER_TEMP:-}\" ]; then\n  atticConfigDir=\"$(mktemp -d \"$RUNNER_TEMP/attic-config.XXXXXX\")\"\nelse\n  atticConfigDir=\"$(mktemp -d)\"\nfi\n\n{\n  echo \"XDG_CONFIG_HOME=$atticConfigDir\"\n} >> \"$GITHUB_ENV\"\necho \"/nix/store/1f0z2gfs9qlsavay5klqkrd85rm437dr-attic/bin\" >> \"$GITHUB_PATH\"\n"
-        },
-        {
-          "name": "Login to attic",
-          "run": "/nix/store/67haqyyywg5mb0fjgqjd4vc543yja1ny-attic-0-unstable-2026-07-06/bin/attic login fly https://attic-cache.fly.dev ${{ secrets.ATTIC_KEY }}\n"
-        },
-        {
           "name": "Seed pending statuses",
           "run": "set -euo pipefail\n\n# Resolved once, into $GITHUB_ENV, so the pipe consumer in the\n# next step is a plain exec rather than a third `nix run`.\nCI_STATUS_BIN=\"$(nix --accept-flake-config build --no-link --print-out-paths .#forgejo-check-status)/bin/forgejo-check-status\"\necho \"CI_STATUS_BIN=$CI_STATUS_BIN\" >> \"$GITHUB_ENV\"\n\n# The seeded list and the evaluator's --select have to agree,\n# or a check is either seeded and never resolved or resolved\n# and never seeded. Both come off dispatchOnlyChecks here.\nif [ \"${{ github.event_name }}\" = workflow_dispatch ]; then\n  skip='[]'\n  echo 'CI_SELECT=cs: cs' >> \"$GITHUB_ENV\"\nelse\n  skip='[\"configurations/nixos/iso\"]'\n  echo 'CI_SELECT=cs: builtins.removeAttrs cs [\"configurations/nixos/iso\"]' >> \"$GITHUB_ENV\"\nfi\n\nnix --accept-flake-config eval --json .#checks.x86_64-linux --apply builtins.attrNames \\\n  | jq -c --argjson skip \"$skip\" 'map(select(IN($skip[]) | not))' \\\n  | \"$CI_STATUS_BIN\" seed\n"
         },
         {
           "name": "nix-fast-build",
-          "run": "set -uo pipefail\n\nrc=0\n# removeSuffix: the shared recipe ends in a newline, which\n# would put the pipe on a line of its own — a syntax error,\n# not a pipeline.\nnix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  --attic-cache system \\\n  --push-build-closure \\\n  -j 2 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 8192 \\\n  --retries 2 \\\n  --stream-json-lines \\\n  --select \"$CI_SELECT\" \\\n  --flake '.#checks.x86_64-linux' | \"$CI_STATUS_BIN\" consume || rc=$?\necho \"NFB_RC=$rc\" >> \"$GITHUB_ENV\"\n"
+          "run": "set -uo pipefail\n\nrc=0\n# removeSuffix: the shared recipe ends in a newline, which\n# would put the pipe on a line of its own — a syntax error,\n# not a pipeline.\nnix run github:Mic92/nix-fast-build -- \\\n  --skip-cached \\\n  --no-nom \\\n  -j 2 \\\n  --eval-workers 1 \\\n  --eval-max-memory-size 8192 \\\n  --retries 2 \\\n  --stream-json-lines \\\n  --select \"$CI_SELECT\" \\\n  --flake '.#checks.x86_64-linux' | \"$CI_STATUS_BIN\" consume || rc=$?\necho \"NFB_RC=$rc\" >> \"$GITHUB_ENV\"\n"
         },
         {
           "if": "always()",
@@ -58,7 +52,11 @@
   },
   "name": "Build",
   "on": {
-    "push": {},
+    "push": {
+      "branches-ignore": [
+        "deploy"
+      ]
+    },
     "workflow_dispatch": {}
   }
 }

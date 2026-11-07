@@ -121,7 +121,7 @@ let
   ];
 
   # One invocation for the whole check set, so the ~50 s of scaffolding a
-  # matrix cell used to pay — checkout, key material, an attic login, fetching
+  # matrix cell used to pay — checkout, key material, fetching
   # nix-fast-build and evaluating the entire flake to resolve ONE attribute —
   # is paid once instead of 86 times.
   #
@@ -145,97 +145,19 @@ let
   };
 
   updateBranch = "update_flake_lock_action";
+  prebuildGuard = "github.repository == '${forge.owner}/${forge.name}' && github.ref == 'refs/heads/${repo.defaultBranch}' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')";
+  prebuildEnv = {
+    GITHUB_REPOSITORY = "\${{ github.repository }}";
+    GITHUB_REF = "\${{ github.ref }}";
+    GITHUB_SHA = "\${{ github.sha }}";
+    GITHUB_EVENT_NAME = "\${{ github.event_name }}";
+    GITHUB_RUN_ID = "\${{ github.run_id }}";
+    GITHUB_RUN_ATTEMPT = "\${{ github.run_attempt }}";
+  };
 in
 {
   perSystem =
     { pkgs, ... }:
-    let
-      # nix-fast-build shells out to `attic push --stdin` after every completed
-      # build. Serialising only that upload bounds the cache's request pressure
-      # without limiting evaluation or Nix's own build parallelism.
-      atticWrapper = pkgs.writeShellApplication {
-        name = "attic";
-        runtimeInputs = [ pkgs.coreutils ];
-        text = ''
-          realAttic="${pkgs.attic-client}/bin/attic"
-
-          stdinPush=false
-          if [[ $# -gt 0 && "$1" == "push" ]]; then
-            for arg in "$@"; do
-              if [[ "$arg" == "--stdin" ]]; then
-                stdinPush=true
-                break
-              fi
-            done
-          fi
-
-          if [[ "$stdinPush" != true ]]; then
-            exec "$realAttic" "$@"
-          fi
-
-          pathsFile="$(mktemp)"
-          trap 'rm -f "$pathsFile"' EXIT
-          cat > "$pathsFile"
-
-          atticArgs=()
-          while [[ $# -gt 0 ]]; do
-            case "$1" in
-              --jobs | -j)
-                if [[ $# -lt 2 ]]; then
-                  printf '%s\n' 'attic push: missing value for jobs flag' >&2
-                  exit 2
-                fi
-                shift 2
-                ;;
-              --jobs=* | -j?*)
-                shift
-                ;;
-              *)
-                atticArgs+=("$1")
-                shift
-                ;;
-            esac
-          done
-
-          for attempt in 1 2 3 4; do
-            if "$realAttic" "''${atticArgs[@]}" --jobs 1 < "$pathsFile"; then
-              exit 0
-            fi
-
-            if [[ "$attempt" -eq 4 ]]; then
-              exit 1
-            fi
-
-            sleep "$((2 ** attempt))"
-          done
-        '';
-      };
-
-      configureAttic = {
-        name = "Configure attic";
-        run = ''
-          set -euo pipefail
-
-          if [ -n "''${RUNNER_TEMP:-}" ]; then
-            atticConfigDir="$(mktemp -d "$RUNNER_TEMP/attic-config.XXXXXX")"
-          else
-            atticConfigDir="$(mktemp -d)"
-          fi
-
-          {
-            echo "XDG_CONFIG_HOME=$atticConfigDir"
-          } >> "$GITHUB_ENV"
-          echo "${atticWrapper}/bin" >> "$GITHUB_PATH"
-        '';
-      };
-
-      loginToAttic = {
-        name = "Login to attic";
-        run = ''
-          ${pkgs.attic-client}/bin/attic login fly https://attic-cache.fly.dev ''${{ secrets.ATTIC_KEY }}
-        '';
-      };
-    in
     {
       files.file = {
         # Note there is no aarch64 job: link is x86_64 and this repo sets no
@@ -244,14 +166,14 @@ in
         ${buildFilePath}.source = pkgs.writers.writeJSON "forgejo-actions-workflow-build.yaml" {
           name = "Build";
           on = {
-            push = { };
+            push.branches-ignore = [ ci.prebuild.deployBranch ];
             workflow_dispatch = { };
           };
-          # One runner, so a superseded push should not sit behind the run it
-          # obsoletes. Supported since Forgejo v14.0.
+          # Do not cancel default-branch publication transactions. Other refs
+          # retain the existing superseded-run cancellation behavior.
           concurrency = {
             group = "build-\${{ github.ref }}";
-            cancel-in-progress = true;
+            cancel-in-progress = "\${{ github.ref != 'refs/heads/${repo.defaultBranch}' }}";
           };
           # One job, not a matrix.
           #
@@ -263,94 +185,139 @@ in
           # that without a runner slot per check — a cached check now gets a
           # green light too, where before it cost a full job to discover
           # there was nothing to do.
-          jobs.${ids.jobs.check} = {
-            runs-on = runner.name;
-            # Under the 480 minutes that both the runner
-            # (settings.runner.timeout in modules/link/forgejo-runner.nix) and
-            # the server (actions.timeout.DEFAULT in modules/impa/forgejo.nix)
-            # allow, so the job's own timeout fires first and Forgejo records a
-            # clean timeout instead of reaping a zombie task ten minutes later.
-            timeout-minutes = 420;
-            env = {
-              FORGE_API = "https://${forge.domain}/api/v1";
-              FORGE_REPO = "\${{ github.repository }}";
-              FORGE_SHA = "\${{ github.sha }}";
-              # The same PAT the update-lock workflow pushes with. The run's
-              # automatic token also carries repo write, but this one is known
-              # to work against this instance's API and needs no experiment.
-              FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
-              # Every status points at this one job. Per-check drill-down comes
-              # from nix-fast-build's `::group::` markers instead, which the
-              # runner rewrites to `##[group]` and Forgejo's log viewer folds.
-              FORGE_TARGET_URL = "\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_number }}";
+          jobs = {
+            ${ids.jobs.check} = {
+              "if" = "\${{ github.ref != 'refs/heads/${ci.prebuild.deployBranch}' }}";
+              outputs = lib.optionalAttrs config.linkCache.enable {
+                prepared-run = "\${{ steps.prebuild.outputs.prepared-run }}";
+              };
+              runs-on = runner.name;
+              # Under the 480 minutes that both the runner
+              # (settings.runner.timeout in modules/link/forgejo-runner.nix) and
+              # the server (actions.timeout.DEFAULT in modules/impa/forgejo.nix)
+              # allow, so the job's own timeout fires first and Forgejo records a
+              # clean timeout instead of reaping a zombie task ten minutes later.
+              timeout-minutes = 420;
+              env = {
+                FORGE_API = "https://${forge.domain}/api/v1";
+                FORGE_REPO = "\${{ github.repository }}";
+                FORGE_SHA = "\${{ github.sha }}";
+                # The same PAT the update-lock workflow pushes with. The run's
+                # automatic token also carries repo write, but this one is known
+                # to work against this instance's API and needs no experiment.
+                FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+                # Every status points at this one job. Per-check drill-down comes
+                # from nix-fast-build's `::group::` markers instead, which the
+                # runner rewrites to `##[group]` and Forgejo's log viewer folds.
+                FORGE_TARGET_URL = "\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_number }}";
+              };
+              steps =
+                sharedPreSteps
+                ++ [
+                  {
+                    name = "Seed pending statuses";
+                    # One extra whole-flake `nix eval`, and worth it twice over: it
+                    # puts a pending dot on every check before the first build
+                    # starts, and it is the ground truth the final sweep needs — a
+                    # failure to evaluate the root emits no per-attribute rows at
+                    # all, only a non-zero exit, so without a seeded list those
+                    # checks would be indistinguishable from checks that passed.
+                    run = ''
+                      set -euo pipefail
+
+                      # Resolved once, into $GITHUB_ENV, so the pipe consumer in the
+                      # next step is a plain exec rather than a third `nix run`.
+                      CI_STATUS_BIN="$(nix ${nixArgs} build --no-link --print-out-paths .#forgejo-check-status)/bin/forgejo-check-status"
+                      echo "CI_STATUS_BIN=$CI_STATUS_BIN" >> "$GITHUB_ENV"
+
+                      # The seeded list and the evaluator's --select have to agree,
+                      # or a check is either seeded and never resolved or resolved
+                      # and never seeded. Both come off dispatchOnlyChecks here.
+                      if [ "''${{ github.event_name }}" = workflow_dispatch ]; then
+                        skip='[]'
+                        echo 'CI_SELECT=${ci.mkSelectExpr [ ]}' >> "$GITHUB_ENV"
+                      else
+                        skip='${builtins.toJSON ci.dispatchOnlyChecks}'
+                        echo 'CI_SELECT=${ci.mkSelectExpr ci.dispatchOnlyChecks}' >> "$GITHUB_ENV"
+                      fi
+
+                      nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames \
+                        | jq -c --argjson skip "$skip" 'map(select(IN($skip[]) | not))' \
+                        | "$CI_STATUS_BIN" seed
+                    '';
+                  }
+                  {
+                    name = "nix-fast-build";
+                    # No `continue-on-error` anywhere any more. It could only ever
+                    # make the WHOLE step advisory, which is why `files:*` and
+                    # `treefmt` could not fail a run — and why `treefmt` sat red on
+                    # main unnoticed. The verdict now comes from the per-check
+                    # ledger in the next step, against lib/ci.nix's
+                    # gatingCheckPatterns.
+                    #
+                    # stdout is JSON Lines and nothing else; the human-readable
+                    # build log is on stderr and still reaches the job log.
+                    run = ''
+                      set -uo pipefail
+
+                      rc=0
+                      # removeSuffix: the shared recipe ends in a newline, which
+                      # would put the pipe on a line of its own — a syntax error,
+                      # not a pipeline.
+                      ${lib.removeSuffix "\n" fastBuild} | "$CI_STATUS_BIN" consume || rc=$?
+                      echo "NFB_RC=$rc" >> "$GITHUB_ENV"
+                    '';
+                  }
+                  {
+                    name = "Report verdict";
+                    # `always()` so a failed build still reconciles its statuses
+                    # rather than leaving them pending. `''${NFB_RC:-1}`: if the
+                    # step above died before writing it, that must not read as
+                    # success.
+                    "if" = "always()";
+                    run = ''"$CI_STATUS_BIN" finish "''${NFB_RC:-1}"'';
+                  }
+                ]
+                ++ lib.optionals config.linkCache.enable [
+                  {
+                    id = "prebuild";
+                    name = "Prepare verified deployment closures";
+                    "if" = "\${{ success() && ${prebuildGuard} }}";
+                    env = prebuildEnv;
+                    run = ''
+                      set -euo pipefail
+                      bin="$(nix ${nixArgs} build --no-update-lock-file --no-write-lock-file --no-link --print-out-paths .#link-prebuild)/bin/link-prebuild"
+                      "$bin" prepare
+                      # Lock-aware maintenance, even with promotion disabled.
+                      "$bin" prune
+                    '';
+                  }
+                ];
             };
-            steps = sharedPreSteps ++ [
-              configureAttic
-              loginToAttic
-              {
-                name = "Seed pending statuses";
-                # One extra whole-flake `nix eval`, and worth it twice over: it
-                # puts a pending dot on every check before the first build
-                # starts, and it is the ground truth the final sweep needs — a
-                # failure to evaluate the root emits no per-attribute rows at
-                # all, only a non-zero exit, so without a seeded list those
-                # checks would be indistinguishable from checks that passed.
-                run = ''
-                  set -euo pipefail
-
-                  # Resolved once, into $GITHUB_ENV, so the pipe consumer in the
-                  # next step is a plain exec rather than a third `nix run`.
-                  CI_STATUS_BIN="$(nix ${nixArgs} build --no-link --print-out-paths .#forgejo-check-status)/bin/forgejo-check-status"
-                  echo "CI_STATUS_BIN=$CI_STATUS_BIN" >> "$GITHUB_ENV"
-
-                  # The seeded list and the evaluator's --select have to agree,
-                  # or a check is either seeded and never resolved or resolved
-                  # and never seeded. Both come off dispatchOnlyChecks here.
-                  if [ "''${{ github.event_name }}" = workflow_dispatch ]; then
-                    skip='[]'
-                    echo 'CI_SELECT=${ci.mkSelectExpr [ ]}' >> "$GITHUB_ENV"
-                  else
-                    skip='${builtins.toJSON ci.dispatchOnlyChecks}'
-                    echo 'CI_SELECT=${ci.mkSelectExpr ci.dispatchOnlyChecks}' >> "$GITHUB_ENV"
-                  fi
-
-                  nix ${nixArgs} eval --json .#checks.${runner.system} --apply builtins.attrNames \
-                    | jq -c --argjson skip "$skip" 'map(select(IN($skip[]) | not))' \
-                    | "$CI_STATUS_BIN" seed
-                '';
-              }
-              {
-                name = "nix-fast-build";
-                # No `continue-on-error` anywhere any more. It could only ever
-                # make the WHOLE step advisory, which is why `files:*` and
-                # `treefmt` could not fail a run — and why `treefmt` sat red on
-                # main unnoticed. The verdict now comes from the per-check
-                # ledger in the next step, against lib/ci.nix's
-                # gatingCheckPatterns.
-                #
-                # stdout is JSON Lines and nothing else; the human-readable
-                # build log is on stderr and still reaches the job log.
-                run = ''
-                  set -uo pipefail
-
-                  rc=0
-                  # removeSuffix: the shared recipe ends in a newline, which
-                  # would put the pipe on a line of its own — a syntax error,
-                  # not a pipeline.
-                  ${lib.removeSuffix "\n" fastBuild} | "$CI_STATUS_BIN" consume || rc=$?
-                  echo "NFB_RC=$rc" >> "$GITHUB_ENV"
-                '';
-              }
-              {
-                name = "Report verdict";
-                # `always()` so a failed build still reconciles its statuses
-                # rather than leaving them pending. `''${NFB_RC:-1}`: if the
-                # step above died before writing it, that must not read as
-                # success.
-                "if" = "always()";
-                run = ''"$CI_STATUS_BIN" finish "''${NFB_RC:-1}"'';
-              }
-            ];
+          }
+          // lib.optionalAttrs config.linkCache.enable {
+            promote = {
+              needs = ids.jobs.check;
+              runs-on = runner.name;
+              timeout-minutes = 30;
+              "if" =
+                "\${{ needs.${ids.jobs.check}.result == 'success' && needs.${ids.jobs.check}.outputs.prepared-run != '' && vars.LINK_PREBUILD_PROMOTION == 'true' && ${prebuildGuard} }}";
+              env = prebuildEnv // {
+                FORGE_TOKEN = "\${{ secrets.FORGE_TOKEN }}";
+                LINK_PREBUILD_PROMOTION = "\${{ vars.LINK_PREBUILD_PROMOTION }}";
+                PREPARED_RUN = "\${{ needs.${ids.jobs.check}.outputs.prepared-run }}";
+              };
+              steps = sharedPreSteps ++ [
+                {
+                  name = "Promote verified revision with explicit lease";
+                  run = ''
+                    set -euo pipefail
+                    bin="$(nix ${nixArgs} build --no-update-lock-file --no-write-lock-file --no-link --print-out-paths .#link-prebuild)/bin/link-prebuild"
+                    "$bin" promote --run "$PREPARED_RUN"
+                  '';
+                }
+              ];
+            };
           };
         };
 

@@ -20,7 +20,7 @@ You are a Nix expert specializing in:
 
 - **Platform**: Linux (`x86_64-linux`)
 - **Repository**: `/home/tunnel/Documents/Git/infra`
-- **Local rebuild**: `nh os switch` (or `just deploy` to also push to Attic cache)
+- **Local rebuild**: `nh os switch` (or `just deploy`; neither uploads to a binary cache)
 - **Remote deploy**: `just colmena-apply` (deploys to all remote hosts)
 - **Package search**: `nix search nixpkgs#<package>` or `nh search <query>`
 
@@ -34,8 +34,8 @@ nh os switch             # Build and activate (PREFERRED — always use this)
 nh os switch --dry       # Dry run, show what would change
 nh os switch --diff      # Show diff of changes
 
-# Deploy + push to Attic cache
-just deploy              # nh os switch + attic push
+# Build and activate locally
+just deploy              # genswitch; no cache upload
 
 # Remote hosts (colmena)
 just colmena-apply                     # Deploy to all hosts
@@ -165,7 +165,7 @@ nh os build -H <hostname> --dry       # Specific host
 # Local machine (ALWAYS use nh os)
 nh os switch                           # Build and activate
 nh os switch --diff                    # Show what changed
-just deploy                            # Build + activate + push to Attic cache
+just deploy                            # Build + activate locally
 
 # Remote hosts (colmena)
 just colmena-apply                     # Deploy to all hosts
@@ -565,4 +565,4 @@ For simple "where is X?" questions, use the `infra-locate` skill instead.
 - **import-tree**: Files in `modules/` are auto-imported; no need to manually add to an imports list
 - **agenix secrets**: Secrets are stored in a separate `nix-secrets` flake input (git+ssh), managed with `agenix`
 - **Flake not recognized**: Ensure `flake.nix` exists and git-tracked (`git add flake.nix`)
-- **Attic cache**: This repo uses Attic for binary caching; `just deploy` auto-pushes
+- **Server prebuild/pull updates**: For Link's private cache, deployment promotion, signing-key provisioning, or pull-only recovery, read `docs/link-prebuild-pull.md`. Fly/Attic is retired; the reverse-trusted SSH builder proposal was never activated. Source implementation does not establish provisioning or live operation.

@@ -4,6 +4,70 @@
 **Status:** Discussion record; architecture and implementation approval pending
 **Purpose:** Preserve the incident evidence, alternatives, recommendations, and open decisions as an internal source for a future technical portfolio writeup.
 
+## Superseding note — 2026-11-07
+
+The owner rejected the root-equivalent reverse trust required by the 6 November
+distributed-build design. **That design was never activated.** Its runnable
+rollout has been withdrawn; the [old page](link-distributed-builds.md) now records
+only its superseded status.
+
+The accepted replacement is **Link CI prebuilds the actual `impa`, `iot`, and
+`marin` system closures, retains their roots, verifies a private signed read-only
+HTTPS cache, then promotes the tested SHA to a guarded `deploy` ref**. Clients
+will pull complete closures; they receive no new trusted Nix access on Link.
+Comin activation is a later, separately authorized step. Existing Forgejo on
+`impa` still controls the native trusted Link runner: this pre-existing trust is
+not removed, and actual runner registration scope must be verified.
+
+The replacement is implemented in source and generated artifacts were reviewed.
+Offline validation passed 17 helper tests, 13 status tests, and 97 scoped
+configuration/workflow predicates, plus source formatting and lint. Nix snapshots
+span concurrent, unrelated CommuteCompass input/configuration edits; they are not
+a single frozen-input validation and do not certify the latest whole tree. This is **not operational proof**. Defaults are `linkCache.enable = false` and
+`linkCache.publicKey = null`, with promotion separately off unless explicitly
+enabled. Real signing-key provisioning, system builds, deployment, production-ref
+changes, and live probes have **not** been authorized by this implementation
+request. Missing credentials are provisioning gates, not values to invent. See
+the canonical [Link prebuild/pull runbook](link-prebuild-pull.md) for source
+ownership, security and confidentiality boundaries, staged verification,
+distinct-release retention, and rollback.
+
+This note supersedes the 6 November direction, including its “no replacement HTTP
+cache” statement. That earlier implementation/check status applies only to the
+withdrawn design, not the replacement. The independent cleanup of the
+owner-reported stopped Fly cache remains; no provider resource or credential
+deletion is authorized here. The October incident evidence below remains a dated
+historical record, not a fresh availability or deployment claim.
+
+## Superseding note — 2026-11-06
+
+**Historical note: superseded by the 2026-11-07 decision above. The former
+runbook is no longer operational guidance.**
+
+The infrastructure owner has since reported stopping Fly. The accepted direction
+is now **native builds and exact store reuse on Link**, with distributed builds
+for the explicit clients `impa`, `iot`, and `marin` over Link's LAN SSH endpoint.
+There is no replacement HTTP cache, CI relocation, or Comin integration in this
+change. Removing dead Fly consumers and publishers is independent of activating
+the builder and does not authorize deletion of external resources or credentials.
+
+Repository implementation and generated-file reconciliation are complete, and
+scoped configuration and CI-workflow checks passed. **Live activation is not
+authorized by implementation approval, and live distributed-build/reuse proofs
+are pending.** Link's trusted Nix endpoint grants root-equivalent access to the
+authorized client identities; explicit security acceptance and staged rollout
+are required before activation. Existing CI coverage/gating, public caches, and
+private-input authentication are to be preserved.
+
+Use the [Link distributed-build runbook](link-distributed-builds.md) for source
+ownership, the exact endpoint/client/security contract, approval gates, cold
+remote-build and native-Link-reuse proofs, and rollback. The dated metadata and
+sections below remain the **11 October 2026 discussion snapshot**, including
+its incident evidence, then-current proposals, and approval boundaries. In
+particular, “current direction” and “Fly, Neon, and R2 remain intact” below are
+historical statements, not present operational status. No new provider diagnosis
+or successful deployment is asserted by this note.
+
 ## 1. Current direction and decision boundaries
 
 The latest request changes the direction of the discussion:
