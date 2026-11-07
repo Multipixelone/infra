@@ -1,5 +1,13 @@
 {
   nixpkgs.overlays = [
+    # nixpkgs' OpenCode 2.2.5 node_modules hash differs from the fetched output.
+    (_final: prev: {
+      opencode = prev.opencode.overrideAttrs (old: {
+        node_modules = old.node_modules.overrideAttrs (_: {
+          outputHash = "sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=";
+        });
+      });
+    })
     (
 
       _final: prev: {
