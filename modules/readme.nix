@@ -103,7 +103,7 @@
 
           commandDescriptions = {
             rebuild = "Local system rebuild (uses `nh os switch`).";
-            deploy = "Rebuild and push closures to the Attic binary cache.";
+            deploy = "Rebuild and activate the local machine.";
             colmena-apply = "Deploy one host via Colmena. Host names are tags, so any node name works.";
             colmena-apply-servers = "Deploy every always-on server (`@server`) in one run.";
             colmena-apply-tag = "Deploy configurations to a specific Colmena tag.";
@@ -113,7 +113,7 @@
             deploy-services = "Fail-closed split-DNS and service publication deployment.";
             services-smoke = "Smoke-test published service routes from a given network context.";
             services-tofu = "Run the service publication OpenTofu workspace.";
-            fastb = "Fast build with `nix-fast-build` and Attic cache upload.";
+            fastb = "Build checks with `nix-fast-build`.";
             hm-build = "Build a standalone Home Manager activation package locally.";
             hm-deploy = "Build, copy and activate a Home Manager closure over SSH.";
             iso = "Build an installer ISO.";

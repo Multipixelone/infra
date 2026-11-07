@@ -102,7 +102,7 @@ in
               HOME = "/var/lib/forgejo-runner/link";
             };
           };
-          # Nix and attic are the cache. The built-in Actions cache would only
+          # The local Nix store is the cache. The built-in Actions cache would only
           # add a listening socket on the LAN.
           cache.enabled = false;
           host.workdir_parent = "/var/lib/forgejo-runner/link/work";
@@ -140,7 +140,6 @@ in
           nodejs
           wget
           config.nix.package
-          attic-client
           jq
           gnutar
           gzip
@@ -191,10 +190,8 @@ in
         # DynamicUser has no home, so systemd resolves $HOME to `/`. Anything
         # a job writes under it then lands in the read-only root: the first
         # symptom was webfactory/ssh-agent doing `mkdir ~/.ssh` and dying with
-        # ENOENT on `//.ssh`, and `attic login` writing ~/.config would have
-        # failed the same way in the build workflow. Point HOME at the unit's
-        # own StateDirectory, which is writable and survives between jobs so
-        # the attic login is not re-done every run.
+        # ENOENT on `//.ssh`. Point HOME at the unit's own StateDirectory,
+        # which is writable and survives between jobs.
         environment.HOME = "/var/lib/forgejo-runner/link";
         serviceConfig = {
           Slice = "batch-ci.slice";
@@ -260,6 +257,10 @@ in
       # A bare `result` symlink in a job workspace is an indirect GC root, so
       # without this every closure CI has ever built stays pinned. Workflows
       # should still use --no-link; this is the backstop.
+      # Exception: /var/lib/forgejo-runner/link/prebuild/runs holds durable
+      # indirect GC roots outside work/. Never move registered root paths or
+      # add age-only tmpfiles cleanup there: link-prebuild prune owns retention
+      # under run/promotion locks, preserving releases and unresolved intent.
       systemd.tmpfiles.rules = [
         "e /var/lib/private/forgejo-runner/link/work - - - 3d"
       ];

@@ -9,6 +9,15 @@
 # stays in the per-forge modules.
 { lib }:
 rec {
+  prebuild = {
+    hosts = [
+      "impa"
+      "iot"
+      "marin"
+    ];
+    deployBranch = "deploy";
+  };
+
   # `configurations/nixos/iso` builds an installer image nothing deploys, so it
   # only earns a runner slot when someone is about to reinstall a host.
   dispatchOnlyChecks = [ "configurations/nixos/iso" ];
@@ -81,18 +90,12 @@ rec {
 
   # Shared nix-fast-build invocation.
   #
-  # `--push-build-closure` pushes every intermediate derivation as soon as its
-  # builder exits, rather than only the outputs of attributes that finished
-  # green. Without it a cell that dies three hours in uploads nothing at all
-  # for the attribute that failed, and the re-run after the fix rebuilds that
-  # attribute's whole dependency tree from source -- the local store on the
-  # self-hosted runner is the only thing that saved us, and only until GC.
+  # The self-hosted runner retains completed outputs in its local store,
+  # including intermediates from failed checks, for reuse until GC removes them.
   #
-  # There is deliberately no `|| retry-without-attic` fallback: it fired on ANY
-  # non-zero exit, so an eval error or a failed NixOS assertion was reported as
-  # "Attic upload failed" and then re-run to produce the identical failure.
-  # `--retries 2` retries build commands/batches, not cache transport; the
-  # Forgejo-only attic wrapper handles bounded upload retries instead.
+  # `--retries 2` retries build commands/batches. Evaluation and assertion
+  # failures retain their original status rather than being retried as transport
+  # failures.
   #
   # `--no-link` is gone: it is a deprecated no-op in nix-fast-build 2.0.2, which
   # does not create out-links by default. `--no-fold` is deliberately NOT
@@ -118,8 +121,6 @@ rec {
       nix run github:Mic92/nix-fast-build -- \
         --skip-cached \
         --no-nom \
-        --attic-cache system \
-        --push-build-closure \
         -j ${toString jobs} \
         --eval-workers ${toString evalWorkers} \
         --eval-max-memory-size ${toString evalMaxMemory} \

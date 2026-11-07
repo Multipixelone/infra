@@ -42,6 +42,7 @@
 {
   configurations.nixos.iot.module =
     let
+      timing = import ../../lib/commute-alarm.nix;
       utcSentinel = "1970-01-01T00:00:00+00:00";
       # Finn's phone (iOS companion app); keeps critical push payloads valid.
       notifyPhone = "notify.mobile_app_nougat";
@@ -51,7 +52,7 @@
         {
           service = "input_text.set_value";
           target.entity_id = "input_text.commute_${textId}";
-          data.value = "{{ (${timestamp}) | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false) }}";
+          data.value = "{{ as_datetime(${timestamp}).isoformat() }}";
         }
         {
           service = "input_datetime.set_datetime";
@@ -106,6 +107,12 @@
         input_text = {
           commute_next_event = {
             name = "Commute — next event";
+            max = 255;
+          };
+          # Bound to the authoritative UTC pair; the daemon owns the budget.
+          # No initial: preserve adopted manual policy across HA restarts.
+          commute_manual_wake_policy = {
+            name = "Commute — manual wake policy";
             max = 255;
           };
           # Restored JSON epoch-second ledger; never set `initial`. Sixteen
@@ -304,6 +311,15 @@
               description = "Optional buffered leave deadline, ISO-8601 with offset; empty or epoch zero clears.";
               selector.text = { };
             };
+            manual_snoozes = {
+              description = "Optional integer 0–12; final minus first must be count × 390 seconds. Omitted/empty clears policy.";
+              selector.number = {
+                min = 0;
+                max = timing.manualSnoozesMax;
+                step = 1;
+                mode = "box";
+              };
+            };
             next_prep_at = {
               description = "ISO-8601 hard nap cap (next prep minus wake lead), or empty to clear.";
               selector.text = { };
@@ -315,14 +331,27 @@
           };
           sequence = [
             {
-              # Reject malformed/naive deadlines BEFORE any helper changes.
-              # Legacy callers omitting the field explicitly clear the anchor.
+              # Validate the WHOLE request before any helper mutation. Do not
+              # coerce booleans, floats or numeric strings into a manual count.
               condition = "template";
               value_template = ''
-                {% set raw = deadline_at | default("", true) | string | trim %}
-                {% set dt = as_datetime(raw, none) if raw else none %}
-                {{ not raw or (dt is not none and dt.tzinfo is not none
-                   and raw | regex_search('T.*(Z|[+-][0-9]{2}:[0-9]{2})$')) }}
+                {% set ns = namespace(valid=true) %}
+                {% for raw in [wake_at | default(none), deadline_at | default(""), next_prep_at | default("")] %}
+                  {% set optional = loop.index > 1 and raw == "" %}
+                  {% set dt = as_datetime(raw, none) if raw is string and raw else none %}
+                  {% set valid = dt is not none and dt.tzinfo is not none and raw is string
+                     and raw | regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$') %}
+                  {% if not optional and (not valid or as_timestamp(dt, -1) < 0) %}
+                    {% set ns.valid = false %}
+                  {% endif %}
+                {% endfor %}
+                {% set count = manual_snoozes | default("") %}
+                {% set clear = count is string and count == "" %}
+                {% set typed = count is integer and 0 <= count <= ${toString timing.manualSnoozesMax} %}
+                {% set w = as_timestamp(wake_at | default(""), -1) %}
+                {% set d = as_timestamp(deadline_at | default(""), -1) %}
+                {{ ns.valid and (clear or (typed and w > 0
+                   and d - w == count * ${toString timing.manualSnoozeCycleSeconds})) }}
               '';
             }
             {
@@ -352,16 +381,40 @@
                       '';
                     }
                   ];
-                  # The same rollover decision protects BOTH parts of the pair.
-                  # These are serialized writes, not an atomic v1 publication.
+                  # One rollover decision protects the pair AND policy. These
+                  # are serialized legacy writes, not an atomic publication.
+                  # Block speculative lighting while either half is changing,
+                  # including an ordinary clear whose intermediate pair might
+                  # accidentally have global geometry. Malformed policy means
+                  # unknown to the daemon (retain adopted session policy).
                   sequence = [
                     {
                       service = "input_text.set_value";
+                      target.entity_id = "input_text.commute_manual_wake_policy";
+                      data.value = "publishing";
+                    }
+                    {
+                      service = "input_text.set_value";
                       target.entity_id = "input_text.commute_alarm_deadline_utc";
-                      data.value = "{{ (deadline | float if incoming | float > 0 else 0) | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false) }}";
+                      data.value = "{{ as_datetime(deadline | float if incoming | float > 0 else 0).isoformat() }}";
                     }
                   ]
-                  ++ writeInstant "wake_utc" "wake_at" "incoming";
+                  ++ writeInstant "wake_utc" "wake_at" "incoming"
+                  ++ [
+                    {
+                      service = "input_text.set_value";
+                      target.entity_id = "input_text.commute_manual_wake_policy";
+                      # Render the OUTER data mapping once. Rendering value alone
+                      # would native-convert JSON into a dict rejected by input_text.
+                      # The nested value stays raw JSON, with exactly three keys.
+                      data = ''
+                        {% set count = manual_snoozes | default("") %}
+                        {% set policy = dict(wake_at=as_datetime(incoming).isoformat(),
+                           deadline_at=as_datetime(deadline).isoformat(), snoozes=count) %}
+                        {{ dict(value=(policy | to_json) if count is integer else "") }}
+                      '';
+                    }
+                  ];
                 }
               ];
             }

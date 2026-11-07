@@ -50,6 +50,57 @@ the actual generated HA ownership boundary at L-70 and one second earlier, then
 check the real 600-second fade. This detects effective lead divergence rather
 than merely checking that both sources import one constants file.
 
+## Explicit manual snooze policy
+
+The deployed path remains `script.commute_publish_alarm` (legacy); this infra
+tree does not install the app's optional v1 schedule relay. The publisher receives
+an already-computed **first** `wake_at`, exact final `deadline_at`, and optional
+integer `manual_snoozes` (0–12). It must not subtract the interval again. For
+three snoozes ending at 10:00, first ring is 09:40:30 and the existing ten-minute
+light fade starts at 09:30:30. The interval is exactly 390 seconds.
+
+`input_text.commute_manual_wake_policy` restores across HA restarts, with no
+`initial`, and stores raw JSON with exactly `wake_at`, `deadline_at`, and
+`snoozes`. Its UTC pair must match the authoritative UTC helpers and satisfy
+`deadline - wake = snoozes × 390 seconds`. Omitted/empty counts clear policy;
+invalid counts or geometry must mutate no helpers. Rollover preservation applies
+to the pair and policy together. A temporary `publishing` marker blocks pending
+acquisition while the serialized pair writes are in flight; interruption leaves
+it unknown until a successful retry commits policy. Unknown/malformed/mismatched
+policy is not permission for a speculative pending light fade. Active daemon sessions remain
+authoritative, including zero-length final windows.
+
+New runtime cases cover native service-data JSON typing, counts 0/1/3/12,
+validation before mutation, policy clearing and rollover, stale policy gates,
+second-precision fade timing with real restore-file restart, and zero-final
+phone/lighting/desktop completion. The full 36-case runtime lane passed against
+HA 2026.10.2 (exit 0, 105.480 seconds) on the reconciled integration based on
+`c40f10c7e`, using local app `0336257` for the separate real-module evaluation.
+The log is `/tmp/opencode/agent-run-long.commute-final-runtime.VnnjaSrJBu/output.log`.
+These offline results do not establish deployment or audibility.
+
+The real iot/link/app scoped evaluation also passed with `--no-write-lock-file`
+and a local input override. Its non-secret result is
+`/tmp/opencode/commute-validator/real-scoped-modules.json`; the exact evaluation
+expression is preserved in `scoped-apply.nix` alongside it. This verifies the
+real app module/package source, daemon and timer, legacy contract, effective
+60-minute default lead and 17-minute calendar/fallback advance, and generated
+policy helper/publisher. The runtime capture itself uses synthetic app settings.
+
+Nix formatting, Ruff lint, Python compilation, Markdown formatting and deadnix
+passed. Two existing lint findings were reproduced against baseline sources:
+Nixf's `builtins.removeAttrs` warning in the copied link edit, and Statix's
+repeated dashboard `services` keys. They were not silently repaired as part of
+this feature. Full infra checks and host builds remain CI work; no live HA
+instance or devices were contacted.
+
+The copied input pin is still `3fa0c8d`, predating app commit `0336257` with this
+feature. Offline integration should use the local app input override; do not
+commit a local filesystem path or treat the existing pin as activation-ready.
+A portable compatible app revision must be published and pinned separately
+before rollout. Existing `prep_advance_minutes = 17` is preserved for calendar
+and fallback only, never subtracted from explicit manual deadlines.
+
 ## Known coverage limitations
 
 - The generated `commute_wake_bootstrap` custom component (HA

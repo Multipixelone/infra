@@ -8,7 +8,6 @@
       # would still be evaluated with the secret gone.
       config = lib.mkIf (!config.infra.installerMedia) {
         age.secrets = {
-          "attic".file = "${inputs.secrets}/attic.age";
           "nix" = {
             file = "${inputs.secrets}/github/nix.age";
             mode = "440";
@@ -17,7 +16,6 @@
           };
         };
         nix = {
-          settings.netrc-file = config.age.secrets."attic".path;
           extraOptions = ''
             !include ${config.age.secrets.nix.path}
           '';

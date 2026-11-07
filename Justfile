@@ -21,7 +21,6 @@ games-dashboard-dev:
 
 deploy:
   genswitch
-  attic push system /run/current-system -j 2
 
 # Every node carries its own name as a tag, so a bare host name is a valid
 # selector. The hive sets `allowApplyAll = false`, so there is deliberately no
@@ -104,7 +103,7 @@ saves-seed credential extra="":
   nix run .#retroarch-save-seed -- --credential-file "{{credential}}" {{extra}}
 
 fastb:
-  nix-fast-build --attic-cache system --no-link
+  nix-fast-build
 
 # Build a standalone home-manager activation package locally
 hm-build host:
