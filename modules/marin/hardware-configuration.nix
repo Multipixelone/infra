@@ -5,7 +5,12 @@ _: {
   nixpkgs.config.permittedInsecurePackages = [ "broadcom-sta" ];
   nixpkgs.config.allowUnfreePackages = [ "broadcom-sta" ];
   configurations.nixos.marin.module =
-    { lib, config, ... }:
+    {
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
     {
       #imports = [
       #  (modulesPath + "/installer/scan/not-detected.nix")
@@ -30,7 +35,16 @@ _: {
           "b43"
           "bcma"
         ];
-        extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
+        extraModulePackages = [
+          (config.boot.kernelPackages.broadcom_sta.overrideAttrs (old: {
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.buildPackages.kmodigest ];
+            # broadcom-sta bypasses modules_install, so supply the real single-module
+            # certificate required by aggregateModules. Sign after fixup strips wl.ko.
+            postFixup = (old.postFixup or "") + ''
+              kmodigest "$out/lib/modules/${config.boot.kernelPackages.kernel.modDirVersion}/kernel/net/wireless/wl.ko"
+            '';
+          }))
+        ];
       };
 
       fileSystems = {

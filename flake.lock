@@ -644,11 +644,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1794032937,
-        "narHash": "sha256-CWiDeITHMjxfbeYoihZAKrpSQCZan6z0+vPZBDorc5c=",
+        "lastModified": 1794035352,
+        "narHash": "sha256-z8tWcLS79+ffw4uos9XpW6828B15ntDv3IDVNGhjkso=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "3fa0c8d1163593a0762468600ddf12da4a6e0640",
+        "rev": "0336257f7b33c978098a1dad168362e2f11be682",
         "type": "github"
       },
       "original": {
@@ -3948,11 +3948,11 @@
     },
     "nixpkgs_9": {
       "locked": {
-        "lastModified": 1793540411,
-        "narHash": "sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE=",
+        "lastModified": 1793726008,
+        "narHash": "sha256-jQp1wKvbwWdLBASTXkSi/VYmDJ5AbBi1WvcMt9HWJC8=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+        "rev": "1d060086d60cb76a40cf37109f979d88a5bd6396",
         "type": "github"
       },
       "original": {
