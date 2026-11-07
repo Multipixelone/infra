@@ -696,10 +696,21 @@ def run_tests(generated, selected=(), excluded=()):
                 "input_boolean.commute_alarm_enabled": "on",
                 "input_text.commute_wake_utc": "2026-11-05T13:00:00+00:00",
                 "input_text.commute_alarm_skipped_utc": "2026-11-04T13:00:00+00:00",
+                "input_text.commute_manual_wake_policy": json.dumps(
+                    {
+                        "wake_at": "2026-11-05T13:00:00+00:00",
+                        "deadline_at": "2026-11-05T13:19:30+00:00",
+                        "snoozes": 3,
+                    }
+                ),
             }
+            self.assertEqual(
+                generated["hass"]["input_text"]["commute_manual_wake_policy"]["max"],
+                255,
+            )
             if "commute_alarm_deadline_utc" in generated["hass"].get("input_text", {}):
                 restored["input_text.commute_alarm_deadline_utc"] = (
-                    "2026-11-05T14:00:00+00:00"
+                    "2026-11-05T13:19:30+00:00"
                 )
             async with Runtime(generated, restored) as runtime:
                 for entity, value in restored.items():
@@ -783,6 +794,191 @@ def run_tests(generated, selected=(), excluded=()):
                     "2026-11-05T13:00:00+00:00",
                 )
 
+        async def test_manual_publish_exact_pair_json_and_count_boundaries(self):
+            """Catch coercion, lost zero, lead subtraction and native JSON dict writes.
+
+            The older publisher tests only exercise ordinary one-hour windows.
+            These literal pairs come from the explicit 390-second snooze contract,
+            not from the captured global lead or the publisher's output.
+            """
+            async with Runtime(generated) as runtime:
+                for count, first, final in (
+                    (0, "2026-11-05T10:00:00-05:00", "2026-11-05T10:00:00-05:00"),
+                    (1, "2026-11-05T09:53:30-05:00", "2026-11-05T10:00:00-05:00"),
+                    (3, "2026-11-05T09:40:30-05:00", "2026-11-05T10:00:00-05:00"),
+                    (12, "2026-11-05T08:42:00-05:00", "2026-11-05T10:00:00-05:00"),
+                    (
+                        3,
+                        "2026-11-05T09:40:30.123456-05:00",
+                        "2026-11-05T10:00:00.123456-05:00",
+                    ),
+                ):
+                    with self.subTest(snoozes=count, first=first):
+                        await runtime.run(
+                            "commute_publish_alarm",
+                            wake_at=first,
+                            deadline_at=final,
+                            manual_snoozes=count,
+                        )
+                        expected_first = datetime.fromisoformat(first).astimezone(UTC)
+                        expected_final = datetime.fromisoformat(final).astimezone(UTC)
+                        self.assertEqual(
+                            runtime.state("input_text.commute_wake_utc"),
+                            expected_first.isoformat(),
+                        )
+                        self.assertEqual(
+                            runtime.state("input_text.commute_alarm_deadline_utc"),
+                            expected_final.isoformat(),
+                            "the requested final must not move or lose precision",
+                        )
+                        raw = runtime.state("input_text.commute_manual_wake_policy")
+                        self.assertIsInstance(raw, str)
+                        self.assertLessEqual(len(raw), 255)
+                        # Real input_text.set_value above must accept a string,
+                        # not HA's native-template conversion to a dict. The
+                        # daemon consumes bare JSON, with no ledger prefix.
+                        policy = json.loads(raw)
+                        self.assertEqual(
+                            set(policy), {"wake_at", "deadline_at", "snoozes"}
+                        )
+                        self.assertIs(type(policy["snoozes"]), int)
+                        self.assertEqual(policy["snoozes"], count)
+                        for key, expected in (
+                            ("wake_at", expected_first),
+                            ("deadline_at", expected_final),
+                        ):
+                            instant = datetime.fromisoformat(policy[key])
+                            self.assertEqual(instant.utcoffset(), timedelta(0))
+                            self.assertEqual(instant, expected)
+
+        async def test_manual_publish_rejects_before_any_helper_mutation(self):
+            """Catch int coercion or validation after pair/cap/display/event writes.
+
+            Existing invalid-deadline coverage checks only two UTC helpers.
+            """
+            async with Runtime(generated) as runtime:
+                await runtime.run(
+                    "commute_publish_alarm",
+                    wake_at="2026-11-05T09:40:30-05:00",
+                    deadline_at="2026-11-05T10:00:00-05:00",
+                    manual_snoozes=3,
+                    next_prep_at="2026-11-05T09:30:00-05:00",
+                    next_event="Original event",
+                )
+
+                def helpers():
+                    return {
+                        s.entity_id: (s.state, dict(s.attributes), s.last_updated)
+                        for s in runtime.hass.states.async_all()
+                        if s.domain.startswith("input_")
+                    }
+
+                before = helpers()
+                # Give coercible inputs the pair their coerced value would
+                # accept, so geometry validation cannot hide a type-check bug.
+                for count, first in (
+                    (True, "09:53:30"),
+                    (False, "10:00:00"),
+                    (1.5, "09:53:30"),
+                    (3.0, "09:40:30"),
+                    (-1, "10:06:30"),
+                    (13, "08:35:30"),
+                    ("3", "09:40:30"),
+                    ("0", "10:00:00"),
+                    (None, "09:40:30"),
+                ):
+                    with self.subTest(invalid_count=count):
+                        await runtime.run(
+                            "commute_publish_alarm",
+                            wake_at=f"2026-11-06T{first}-05:00",
+                            deadline_at="2026-11-06T10:00:00-05:00",
+                            manual_snoozes=count,
+                            next_prep_at="2026-11-06T08:00:00-05:00",
+                            next_event="Must not be written",
+                        )
+                        self.assertEqual(helpers(), before)
+                # Count alone is insufficient: no missing, cleared, reversed or
+                # global-lead-shaped anchor may masquerade as an explicit pair.
+                for extra in (
+                    {},
+                    {"deadline_at": ""},
+                    {"deadline_at": "1970-01-01T00:00:00Z"},
+                    {"deadline_at": "2026-11-06T09:40:29-05:00"},
+                    {"deadline_at": "2026-11-06T10:40:30-05:00"},
+                    {"deadline_at": "2026-11-06T10:00:01-05:00"},
+                ):
+                    with self.subTest(invalid_pair=extra):
+                        await runtime.run(
+                            "commute_publish_alarm",
+                            wake_at="2026-11-06T09:40:30-05:00",
+                            manual_snoozes=3,
+                            next_prep_at="2026-11-06T08:00:00-05:00",
+                            next_event="Must not be written",
+                            **extra,
+                        )
+                        self.assertEqual(helpers(), before)
+
+        async def test_manual_policy_clear_and_rollover_are_paired(self):
+            """Catch stale policy on ordinary publish or mixed-day rollover triples."""
+            async with Runtime(generated) as runtime:
+                for extra in ({}, {"manual_snoozes": ""}):
+                    with self.subTest(clear=extra):
+                        await runtime.run(
+                            "commute_publish_alarm",
+                            wake_at="2026-11-05T09:40:30-05:00",
+                            deadline_at="2026-11-05T10:00:00-05:00",
+                            manual_snoozes=3,
+                        )
+                        await runtime.run(
+                            "commute_publish_alarm",
+                            wake_at="2026-11-05T09:00:00-05:00",
+                            deadline_at="2026-11-05T10:00:00-05:00",
+                            **extra,
+                        )
+                        self.assertEqual(
+                            runtime.state("input_text.commute_manual_wake_policy"), ""
+                        )
+                        self.assertEqual(
+                            runtime.state("input_text.commute_wake_utc"),
+                            "2026-11-05T14:00:00+00:00",
+                        )
+                await runtime.run(
+                    "commute_publish_alarm",
+                    wake_at="2026-11-04T07:00:00-05:00",
+                    deadline_at="2026-11-04T07:19:30-05:00",
+                    manual_snoozes=3,
+                )
+                entities = (
+                    "input_text.commute_wake_utc",
+                    "input_text.commute_alarm_deadline_utc",
+                    "input_text.commute_manual_wake_policy",
+                )
+                original = {e: runtime.state(e) for e in entities}
+                await runtime.set("input_boolean.commute_alarm_enabled", "on")
+                for extra in ({}, {"manual_snoozes": 0}):
+                    await runtime.run(
+                        "commute_publish_alarm",
+                        wake_at="2026-11-05T10:00:00-05:00",
+                        deadline_at="2026-11-05T10:00:00-05:00",
+                        **extra,
+                    )
+                    self.assertEqual({e: runtime.state(e) for e in entities}, original)
+                # After the existing rollover grace expires an ordinary publish
+                # installs tomorrow's pair and clears today's manual policy.
+                runtime.now += timedelta(seconds=181)
+                await runtime.run(
+                    "commute_publish_alarm",
+                    wake_at="2026-11-05T09:00:00-05:00",
+                    deadline_at="2026-11-05T10:00:00-05:00",
+                )
+                self.assertEqual(
+                    runtime.state(entities[0]), "2026-11-05T14:00:00+00:00"
+                )
+                self.assertEqual(
+                    runtime.state(entities[1]), "2026-11-05T15:00:00+00:00"
+                )
+                self.assertEqual(runtime.state(entities[2]), "")
+
         async def test_generated_scripts_validate(self):
             async with Runtime(generated) as runtime:
                 self.assertTrue(runtime.scripts)
@@ -818,6 +1014,8 @@ def run_tests(generated, selected=(), excluded=()):
                 self.assertEqual(calls, [{"minutes": 30}])
 
         async def window(self, runtime, seconds_to_first=600):
+            # This fixture represents an ordinary publisher's legacy pair.
+            await runtime.set("input_text.commute_manual_wake_policy", "")
             await runtime.set("input_text.commute_alarm_light_owner", "v1:{}")
             await runtime.set("input_text.commute_alarm_phone_claim", "v1:{}")
             await runtime.set("input_text.commute_alarm_bedside_claim", "")
@@ -937,6 +1135,267 @@ def run_tests(generated, selected=(), excluded=()):
                     float(lights[0]["transition"]),
                     300,
                     "late catch-up ends at first ring, not ten minutes late",
+                )
+
+        async def test_manual_pending_requires_valid_matching_policy(self):
+            """Catch ignoring corrupt/stale policy and falling back to global lead.
+
+            Use both a manual pair and the otherwise valid ordinary 60-minute
+            pair: invalid policy must never authorize either pending fade.
+            """
+            async with Runtime(generated) as runtime:
+                await self.window(runtime)
+                first = runtime.state("input_text.commute_wake_utc")
+                for deadline in (
+                    "2026-11-04T12:29:30+00:00",
+                    "2026-11-04T13:10:00+00:00",
+                ):
+                    await runtime.set("input_text.commute_alarm_deadline_utc", deadline)
+                    paired = {"wake_at": first, "deadline_at": deadline, "snoozes": 3}
+                    for bad in (
+                        "unknown",
+                        "unavailable",
+                        "{broken",
+                        "[]",
+                        "v1:" + json.dumps(paired),
+                        json.dumps({**paired, "wake_at": "2026-11-03T12:10:00+00:00"}),
+                        json.dumps(
+                            {**paired, "deadline_at": "2026-11-04T12:29:31+00:00"}
+                        ),
+                        json.dumps({**paired, "snoozes": True}),
+                        json.dumps({**paired, "snoozes": "3"}),
+                        json.dumps({**paired, "snoozes": 2}),
+                        json.dumps({**paired, "extra": 1}),
+                        json.dumps({k: v for k, v in paired.items() if k != "snoozes"}),
+                        json.dumps({**paired, "wake_at": "2026-11-04T07:10:00-05:00"}),
+                    ):
+                        with self.subTest(deadline=deadline, policy=bad):
+                            await runtime.set(
+                                "input_text.commute_manual_wake_policy", bad
+                            )
+                            runtime.calls.clear()
+                            await runtime.run("commute_alarm_reconcile")
+                            self.assertFalse(runtime.calls)
+                            self.assertEqual(self.owner(runtime), {})
+                            self.assertEqual(
+                                runtime.state(
+                                    "binary_sensor.commute_alarm_lights_owned"
+                                ),
+                                "off",
+                            )
+                # A raw, valid pair is eligible; failures above must not be a
+                # blanket ban on all pending manual windows.
+                paired = {
+                    "wake_at": first,
+                    "deadline_at": "2026-11-04T12:29:30+00:00",
+                    "snoozes": 3,
+                }
+                await runtime.set(
+                    "input_text.commute_alarm_deadline_utc", paired["deadline_at"]
+                )
+                await runtime.set(
+                    "input_text.commute_manual_wake_policy", json.dumps(paired)
+                )
+                await runtime.run("commute_alarm_reconcile")
+                self.assertEqual(len(self.lights(runtime, "light.fairy_lights")), 1)
+
+        async def test_manual_three_exact_fade_boundary_and_real_restart(self):
+            """Catch lead double-subtraction, minute rounding and lost restored policy.
+
+            Existing boundaries only exercise an ordinary 60-minute pair.
+            """
+            async with Runtime(generated) as runtime:
+                runtime.now = datetime(2026, 11, 5, 14, 30, 29, tzinfo=UTC)
+                await self.window(runtime, 601)
+                await runtime.run(
+                    "commute_publish_alarm",
+                    wake_at="2026-11-05T09:40:30-05:00",
+                    deadline_at="2026-11-05T10:00:00-05:00",
+                    manual_snoozes=3,
+                )
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertFalse(runtime.calls, "09:30:29 is too early")
+                runtime.now += timedelta(seconds=1)
+                await runtime.run("commute_alarm_reconcile")
+                fade = self.lights(runtime, "light.fairy_lights")
+                self.assertEqual(len(fade), 1, "09:30:30 must start the fade")
+                self.assertEqual(float(fade[0]["transition"]), 600)
+                self.assertEqual(int(fade[0]["brightness"]), 255)
+                self.assertEqual(self.owner(runtime)["p"], "held")
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertFalse(runtime.calls, "repeat must not restart fade")
+                saved = runtime.snapshot_store()
+                policy = runtime.state("input_text.commute_manual_wake_policy")
+                owner = runtime.state("input_text.commute_alarm_light_owner")
+
+            async def prestart(runtime):
+                runtime.now = datetime(2026, 11, 5, 14, 30, 40, tzinfo=UTC)
+                await runtime.set(
+                    "select.fairy_lights_live_override",
+                    "2",
+                    {"options": ["0", "1", "2"]},
+                )
+                await runtime.set("switch.fairy_lights_sync_receive", "off")
+                await runtime.set(
+                    "sensor.commute_alarm_status",
+                    "idle",
+                    {
+                        "schema": 1,
+                        "observed_at": runtime.now.isoformat(),
+                        "session": None,
+                        "ring": None,
+                    },
+                )
+
+            async with Runtime(
+                generated,
+                restore_file=saved,
+                prestart=prestart,
+                automations={"commute_alarm_wake_reconcile"},
+            ) as runtime:
+                self.assertEqual(
+                    runtime.state("input_text.commute_manual_wake_policy"), policy
+                )
+                self.assertEqual(
+                    runtime.state("input_text.commute_wake_utc"),
+                    "2026-11-05T14:40:30+00:00",
+                )
+                self.assertEqual(
+                    runtime.state("input_text.commute_alarm_deadline_utc"),
+                    "2026-11-05T15:00:00+00:00",
+                )
+                self.assertEqual(
+                    runtime.state("input_text.commute_alarm_light_owner"), owner
+                )
+                self.assertEqual(runtime.automation_errors, [])
+                self.assertFalse(
+                    runtime.calls, "real HA start must not retake or restart fade"
+                )
+
+        async def test_manual_zero_final_phone_and_desktop_light_release(self):
+            """Catch strict final>first validators dropping zero-snooze final rings.
+
+            Existing final fixtures have original_at an hour before deadline;
+            this schema-valid fixture adds no manual count field to status.
+            """
+            async with Runtime(generated) as runtime:
+                await self.window(runtime)
+                await runtime.run(
+                    "commute_publish_alarm",
+                    wake_at="2026-11-04T07:10:00-05:00",
+                    deadline_at="2026-11-04T07:10:00-05:00",
+                    manual_snoozes=0,
+                )
+                await runtime.run("commute_alarm_reconcile")
+                self.assertEqual(len(self.lights(runtime, "light.fairy_lights")), 1)
+                self.assertEqual(
+                    float(self.lights(runtime, "light.fairy_lights")[0]["transition"]),
+                    600,
+                )
+                runtime.now += timedelta(minutes=10)
+                state, attrs = status(runtime.now, phase="final")
+                attrs["session"]["locked_deadline_at"] = attrs["session"]["original_at"]
+                attrs["session"]["deadline_at"] = attrs["session"]["original_at"]
+                # Equality is a final-only case, not permission to accept an
+                # impossible window phase at its already-reached deadline.
+                attrs["session"]["phase"] = "window"
+                await runtime.set("sensor.commute_alarm_status", state, attrs)
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertFalse(self.pushes(runtime))
+                self.assertFalse(self.lights(runtime, "light.smart_led_bulb"))
+                self.assertEqual(self.owner(runtime)["s"], "")
+                attrs["session"]["phase"] = "final"
+                await runtime.set("sensor.commute_alarm_status", state, attrs)
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertEqual(self.owner(runtime)["s"], "a" * 32)
+                pushes = self.pushes(runtime)
+                self.assertEqual(len(pushes), 1)
+                token = "a" * 32 + ":" + "b" * 32 + ":final"
+                self.assertEqual(
+                    pushes[0]["data"]["actions"],
+                    [{"action": "CC_MEDS:" + token, "title": "Took meds"}],
+                )
+                self.assertEqual(pushes[0]["data"]["push"]["sound"], "none")
+                self.assertEqual(len(self.lights(runtime, "light.smart_led_bulb")), 1)
+                self.assertFalse(
+                    self.lights(runtime, "light.fairy_lights"),
+                    "active ring must not restart fade",
+                )
+                await runtime.attach({"commute_alarm_phone_action"})
+                seen = []
+                runtime.removers.append(
+                    runtime.hass.bus.async_listen(
+                        "state_changed", lambda e: seen.append(e.data["entity_id"])
+                    )
+                )
+                for action in ("CC_SNOOZE:" + token, "CC_MEDS:" + token):
+                    runtime.hass.bus.async_fire(
+                        "mobile_app_notification_action", {"action": action}
+                    )
+                    await runtime.hass.async_block_till_done()
+                self.assertEqual(
+                    runtime.state("input_boolean.morning_meds_taken"), "on"
+                )
+                self.assertNotIn("input_button.commute_alarm_snooze", seen)
+                self.assertNotIn(
+                    "input_button.commute_alarm_stop",
+                    seen,
+                    "meds must not dismiss final audio",
+                )
+                self.assertEqual(
+                    self.owner(runtime)["p"],
+                    "held",
+                    "only desktop activity completes the window",
+                )
+                await runtime.set(
+                    "light.fairy_lights", "on", {"brightness": 205, "effect": "Solid"}
+                )
+                runtime.now += timedelta(seconds=1)
+                await runtime.set(
+                    "input_text.commute_alarm_window_done_utc", runtime.now.isoformat()
+                )
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertEqual(self.owner(runtime)["p"], "released")
+                self.assertEqual(
+                    [
+                        (d, s, c.get("entity_id"))
+                        for d, s, c in runtime.calls
+                        if d != "notify"
+                    ],
+                    [
+                        (
+                            "select",
+                            "select_option",
+                            "select.fairy_lights_live_override",
+                        ),
+                        ("switch", "turn_on", "switch.fairy_lights_sync_receive"),
+                    ],
+                )
+                self.assertEqual(
+                    runtime.state("select.fairy_lights_live_override"), "1"
+                )
+                self.assertEqual(
+                    runtime.state("switch.fairy_lights_sync_receive"), "on"
+                )
+                self.assertEqual(
+                    dict(runtime.hass.states.get("light.fairy_lights").attributes),
+                    {"brightness": 205, "effect": "Solid"},
+                )
+                self.assertTrue(
+                    any(
+                        d == "notify" and c["message"] == "clear_notification"
+                        for d, _, c in runtime.calls
+                    )
+                )
+                runtime.calls.clear()
+                await runtime.run("commute_alarm_reconcile")
+                self.assertFalse(
+                    runtime.calls, "completed zero-final must not reacquire"
                 )
 
         async def test_light_restoration_only_original_two_controls(self):
@@ -1487,6 +1946,7 @@ def run_tests(generated, selected=(), excluded=()):
 
         async def native_window_inputs(self, runtime, seconds_to_first=600):
             """Window inputs WITHOUT touching owner/phone/bedside helpers."""
+            await runtime.set("input_text.commute_manual_wake_policy", "")
             for helper in (
                 "commute_alarm_skipped_utc",
                 "commute_alarm_window_done_utc",

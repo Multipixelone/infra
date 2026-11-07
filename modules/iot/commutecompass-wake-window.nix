@@ -72,9 +72,12 @@
            and 0 < epoch(s.get('original_at')) | float(-1) <= obs
            and ((s.phase == 'legacy' and s.get('locked_deadline_at') is none)
                 or (s.kind == 'wake' and s.phase in ['window', 'final']
-                    and epoch(s.get('locked_deadline_at')) | float(-1) > epoch(s.original_at) | float(-1)
-                    and ((s.phase == 'window' and obs < epoch(s.locked_deadline_at) | float(-1))
-                         or (s.phase == 'final' and mode == 'ringing' and obs >= epoch(s.locked_deadline_at) | float(-1))))) %}
+                    and ((s.phase == 'window'
+                          and epoch(s.get('locked_deadline_at')) | float(-1) > epoch(s.original_at) | float(-1)
+                          and obs < epoch(s.locked_deadline_at) | float(-1))
+                         or (s.phase == 'final' and mode == 'ringing'
+                             and epoch(s.get('locked_deadline_at')) | float(-1) >= epoch(s.original_at) | float(-1)
+                             and obs >= epoch(s.locked_deadline_at) | float(-1))))) %}
         {% set window = session_valid and mode in ['ringing', 'snoozed'] and s.kind == 'wake'
            and s.phase in ['window', 'final'] and epoch(s.get('locked_deadline_at')) | float(-1) > 0 %}
         {% set sw = epoch(s.get('original_at')) | float(-1) if session_valid else -1 %}
@@ -120,8 +123,25 @@
            session binding a deadline clear does invalidate a pending fade. #}
         {% set safety = owned and (is_state('input_boolean.commute_alarm_enabled', 'off')
            or skip == o.w or wake == 0 or (not o.s and deadline == 0)) %}
+        {# Explicit policy is authoritative: malformed/mismatched is NOT a
+           global-window fallback. Only the publisher's explicit empty clear
+           selects ordinary geometry. Active sessions use their locked facts. #}
+        {% set policy_raw = states('input_text.commute_manual_wake_policy') %}
+        {% set policy = policy_raw | from_json(none) %}
+        {% set pw = policy.get('wake_at') if policy is mapping else none %}
+        {% set pd = policy.get('deadline_at') if policy is mapping else none %}
+        {% set count = policy.get('snoozes') if policy is mapping else none %}
+        {% set policy_valid = policy is mapping and policy | count == 3
+           and count is integer and 0 <= count <= ${toString timing.manualSnoozesMax}
+           and pw is string and pd is string
+           and pw | regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+]00:00)$')
+           and pd | regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+]00:00)$')
+           and epoch(pw) | float(-1) == wake and epoch(pd) | float(-1) == deadline
+           and wake > 0 and deadline - wake == count * ${toString timing.manualSnoozeCycleSeconds} %}
+        {% set published_window = policy_valid or (policy_raw == ""
+           and deadline - wake == ${toString (timing.firstAlarmLeadMinutes * 60)}) %}
         {% set pending = fresh and (s is none or (session_valid and s.kind == 'nap'))
-           and enabled and wake > 0 and deadline - wake == ${toString (timing.firstAlarmLeadMinutes * 60)}
+           and enabled and wake > 0 and published_window
            and skip >= 0 and skip != wake
            and not (terminal_valid and ew == wake)
            and done < wake
@@ -410,7 +430,7 @@
                          and '2' in (state_attr('select.fairy_lights_live_override', 'options') or [])
                          and states('switch.fairy_lights_sync_receive') in ['on', 'off']
                          and states('light.fairy_lights') in ['on', 'off']
-                         and (dict(p='take', w=target_w | int, d=target_d | int, s=target_s,
+                         and (dict(p='take', w=target_w, d=target_d, s=target_s,
                               o=states('select.fairy_lights_live_override'), r=states('switch.fairy_lights_sync_receive'),
                               c=done, a=now_ts) | to_json | length) <= 252 }}
                     '')
@@ -418,7 +438,7 @@
                   sequence = [
                     # Snapshot BOTH controls before takeover; p=take survives
                     # interruption between any of the following service calls.
-                    (setOwner "dict(p='take', w=target_w | int, d=target_d | int, s=target_s, o=states('select.fairy_lights_live_override'), r=states('switch.fairy_lights_sync_receive'), c=done, a=now_ts)")
+                    (setOwner "dict(p='take', w=target_w, d=target_d, s=target_s, o=states('select.fairy_lights_live_override'), r=states('switch.fairy_lights_sync_receive'), c=done, a=now_ts)")
                   ];
                 }
               ];
@@ -455,10 +475,7 @@
                         # Absolute endpoint, not a new ten minutes on retry or
                         # restart. Catch-up after first ring is immediate.
                         transition =
-                          facts
-                          + "{{ [0, [${toString (timing.lightFadeMinutes * 60)}, o.w - now_ts, o.d - ${
-                            toString (timing.firstAlarmLeadMinutes * 60)
-                          } - now_ts] | min] | max | int }}";
+                          facts + "{{ [0, [${toString (timing.lightFadeMinutes * 60)}, o.w - now_ts] | min] | max }}";
                       };
                     }
                     (setOwner "dict(o, p='held')")
@@ -497,6 +514,7 @@
                 "input_boolean.morning_meds_taken"
                 "input_text.commute_wake_utc"
                 "input_text.commute_alarm_deadline_utc"
+                "input_text.commute_manual_wake_policy"
                 "input_text.commute_alarm_skipped_utc"
                 "input_text.commute_alarm_window_done_utc"
               ];

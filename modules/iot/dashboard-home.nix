@@ -352,7 +352,8 @@ _: {
           {%- if ok and session.phase == 'legacy' -%}
             {%- set ok = session.get('locked_deadline_at') is none -%}
           {%- elif ok -%}
-            {%- set ok = session.kind == 'wake' and sd > sw -%}
+            {%- set ok = session.kind == 'wake' and (sd > sw
+                 or (sd == sw and session.phase == 'final' and raw == 'ringing' and obs >= sd)) -%}
           {%- endif -%}
           {%- if ok and ended is mapping -%}
             {%- set last = ended.get(session.kind) -%}
