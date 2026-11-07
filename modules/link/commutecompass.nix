@@ -123,6 +123,7 @@
         {
           "commutecompass-morning" = openclawHardening;
           "commutecompass-poll" = openclawHardening;
+          "commutecompass-alarm-publish" = openclawHardening;
 
           # pw-dump calls sched_setscheduler during PipeWire initialization;
           # upstream's ~@resources filter killed it with SIGSYS (x86_64 audit
