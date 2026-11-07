@@ -28,6 +28,10 @@ You are a Nix expert specializing in:
 
 **CRITICAL: ALWAYS use `nh os` for local builds and switches. NEVER use raw `nixos-rebuild` or `nix build .#nixosConfigurations...` unless explicitly asked.**
 
+For agent host builds, read the `agent-run-long` skill for captured raw-output flags
+and timeout headroom (at least `1860000` ms for `30m`). Replace `HOST` with the target
+hostname (for example, `marin`) in the build commands below.
+
 ```bash
 # Local machine (most common)
 nh os switch             # Build and activate (PREFERRED — always use this)
@@ -45,8 +49,8 @@ just colmena-apply-tag <tag>           # Deploy to tagged hosts only
 just debug               # nh os switch with --show-trace --verbose
 
 # Build specific host without switching
-nh os build -H <hostname>             # e.g., nh os build -H marin
-nh os build                           # Current host, no activation
+agent-run-long --label nh-os-build-HOST --timeout 30m -- nh os build -H HOST --no-nom --log-format raw -L
+agent-run-long --label nh-os-build-local --timeout 30m -- nh os build --no-nom --log-format raw -L
 ```
 
 ## Key Paths
@@ -152,10 +156,12 @@ nix flake check --no-build
 # Full check with build
 nix flake check
 
-# Show what would be built for a host (dry run)
-nh os build --dry                     # Current host
-nh os build -H <hostname> --dry       # Specific host
+# Evaluate only (replace <hostname> with the current or target host)
+nix eval .#nixosConfigurations.<hostname>.config.system.build.toplevel.drvPath --raw
 ```
+
+Do not run `nh os build --dry`: NH ignores `--dry` for builds and actually builds.
+Use the scoped evaluation above when no build is intended.
 
 ### 2. Rebuild System
 
@@ -175,8 +181,8 @@ just colmena-apply-tag server          # Deploy only to tagged "server" hosts
 just debug
 
 # Build without activating
-nh os build                            # Current host
-nh os build -H <hostname>             # Specific host
+agent-run-long --label nh-os-build-local --timeout 30m -- nh os build --no-nom --log-format raw -L
+agent-run-long --label nh-os-build-HOST --timeout 30m -- nh os build -H HOST --no-nom --log-format raw -L
 ```
 
 ### 3. Fetch Hashes for Packages
@@ -242,8 +248,8 @@ nh os switch --diff      # Show what changed
 nh os switch --dry       # Dry run
 
 # Build without switching
-nh os build
-nh os build -H <hostname>
+agent-run-long --label nh-os-build-local --timeout 30m -- nh os build --no-nom --log-format raw -L
+agent-run-long --label nh-os-build-HOST --timeout 30m -- nh os build -H HOST --no-nom --log-format raw -L
 
 # Home-manager operations
 nh home switch

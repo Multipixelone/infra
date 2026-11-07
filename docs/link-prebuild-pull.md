@@ -279,9 +279,10 @@ Record failed gates as well as successes; review reports for private contents.
 Live stages are pending authorization; repository checks belong to the validator
 after writers reconcile. Linux Nix validation/long-running commands use the
 approved background validator and inherited `agent-run-long` procedure, with fresh
-`direnv exec .` when a dev shell is needed. Use `nh` for a separately approved
-local system build, not raw `nix build` or `nixos-rebuild`. If execution/delegation
-is unavailable, record the limitation.
+`direnv exec .` when a dev shell is needed. For a separately approved local
+system build, use the `agent-run-long` skill's wrapped, raw-output NH host-build
+form (`--no-nom --log-format raw -L`), not raw `nix build` or `nixos-rebuild`.
+If execution/delegation is unavailable, record the limitation.
 
 ## Future client no-build contract
 

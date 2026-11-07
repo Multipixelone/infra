@@ -38,9 +38,12 @@ also give their outer control at least 60 seconds of headroom.
 Examples:
 
 ```bash
-agent-run-long --label nh-os-build-link --timeout 30m -- nh os build -H link
+agent-run-long --label nh-os-build-link --timeout 30m -- nh os build -H link --no-nom --log-format raw -L
 agent-run-long --label nix-build-example --timeout 30m -- nix build --no-link .#packages.x86_64-linux.example
 ```
+
+For captured NH host builds, use `--no-nom --log-format raw -L` to avoid
+progress redraws and retain builder logs. Human interactive use is unchanged.
 
 Avoid pipelines for validation. If one is unavoidable, pass an explicit shell
 after `--`; its pipeline exit-status behavior is then that shell's behavior and
