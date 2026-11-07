@@ -25,7 +25,8 @@
     { pkgs, ... }:
     {
       home.packages = [
-        pkgs.balatro-mod-manager
+        # 2026-11-07: removed from nixpkgs
+        # pkgs.balatro-mod-manager
         pkgs.prismlauncher
         pkgs.sgdboop
         pkgs.vintagestory
