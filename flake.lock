@@ -644,11 +644,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1793860568,
-        "narHash": "sha256-vAJFoYzT65HRE7RWp7JJODYXB0r73NXpXsP+mF4AJs8=",
+        "lastModified": 1794032937,
+        "narHash": "sha256-CWiDeITHMjxfbeYoihZAKrpSQCZan6z0+vPZBDorc5c=",
         "owner": "Multipixelone",
         "repo": "commutecompass",
-        "rev": "bdec0bfa8abe9950bf5473544cae9cab9489412a",
+        "rev": "3fa0c8d1163593a0762468600ddf12da4a6e0640",
         "type": "github"
       },
       "original": {

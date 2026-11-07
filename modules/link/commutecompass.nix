@@ -52,19 +52,32 @@
         # Enable the wake/nap alarm with a runtime-only personal sound file
         # and a fixed ten-second volume ramp; pass other settings through.
         configFile = (pkgs.formats.toml { }).generate "commutecompass-config.toml" (
-          lib.recursiveUpdate (fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml")) {
-            alarm = {
-              enabled = true;
-              # Keep this a string: the personal audio must not enter the store.
-              sound = "/home/tunnel/Music/alarm.opus";
-              ramp_start_percent = 30;
-              ramp_seconds = 10;
-              # Advisory status is REST-created by the daemon; the schedule
-              # remains on the existing helper contract, not the opt-in v1 relay.
-              schedule_contract = "legacy";
-              status_entity = "sensor.commute_alarm_status";
-              # Share the first-ring lead with iot's ten-minute light fade.
-              window.first_alarm_lead_minutes = alarmTiming.firstAlarmLeadMinutes;
+          let
+            mergedConfig =
+              lib.recursiveUpdate (fromTOML (builtins.readFile "${inputs.secrets}/commutecompass/config.toml"))
+                {
+                  alarm = {
+                    enabled = true;
+                    # Keep this a string: the personal audio must not enter the store.
+                    sound = "/home/tunnel/Music/alarm.opus";
+                    ramp_start_percent = 30;
+                    ramp_seconds = 10;
+                    # Advisory status is REST-created by the daemon; the schedule
+                    # remains on the existing helper contract, not the opt-in v1 relay.
+                    schedule_contract = "legacy";
+                    status_entity = "sensor.commute_alarm_status";
+                    # Advance calendar and fallback deadlines once; preserve window spacing.
+                    window.prep_advance_minutes = 17;
+                    # Share the first-ring lead with iot's ten-minute light fade.
+                    window.first_alarm_lead_minutes = alarmTiming.firstAlarmLeadMinutes;
+                  };
+                };
+          in
+          mergedConfig
+          // {
+            alarm = mergedConfig.alarm // {
+              # The canonical override must not conflict with a private legacy alias.
+              window = removeAttrs mergedConfig.alarm.window [ "calendar_advance_minutes" ];
             };
           }
         );
