@@ -548,19 +548,17 @@ ls $(nix build nixpkgs#<pkg> --print-out-paths --no-link)/bin/
 5. **Pin flake inputs** for reproducibility
 6. **Use overlays** for package modifications, not inline overrides
 7. **Separate concerns**: system config in `modules/`, user config in `home/`
-8. **Never create `result` symlink** — always use `-o /tmp/result` with `nix build`
+8. **Keep build links out of the checkout** — use `--no-link`, or an explicit `-o /tmp/opencode/<name>` when a link is needed
 
 ## Escalation
 
-This skill provides reference patterns for routine Nix work. Escalate to the `nix` **agent** (sonnet) when:
+This skill provides reference patterns for routine Nix work. Return scoped handoffs through the orchestrator:
 
-- Infinite recursion or complex evaluation errors that `--show-trace` doesn't clarify
-- Multi-file module interaction debugging (option set in one module, overridden in another)
-- Overlay conflicts or cross-host dependency resolution
-- Hash mismatches requiring iterative `nix-prefetch` debugging
-- Architecture decisions spanning multiple hosts or domains
+- `diagnostician` for evaluation/build/activation or service failures needing causal investigation, including recursion, module interactions, overlay conflicts, and hash mismatches.
+- `oracle` for difficult synthesis after evidence collection or architecture decisions spanning hosts or domains.
+- `fixer` for approved implementation and `validator` for builds, tests, and long evaluations.
 
-For simple "where is X?" questions, use the `infra-locate` skill instead.
+For simple "where is X?" questions, use the `infra-navigation` skill or delegate read-only discovery to `explorer`.
 
 ## Common Gotchas
 

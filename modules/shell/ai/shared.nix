@@ -41,8 +41,8 @@
       '';
     };
 
-    # Populate programs.mcp.servers so claude-code, codex, and opencode can use
-    # enableMcpIntegration = true without duplicating server definitions.
+    # Share MCP definitions across clients. Claude Code and Codex use their HM
+    # integrations; opencode.nix renders native V2 servers from the same source.
     flake.modules.homeManager.base = hmArgs: {
       imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
       # Holds PARALLEL_API_KEY, consumed by the websearch MCP server below and

@@ -16,7 +16,7 @@ Agent prompts, skills, AGENTS.md, CLAUDE.md, and routing instructions define beh
 
 In `.nix` files, the sole exception is literal documentation text within existing `text.readme` contributions or existing `files.file` strings whose output and use you have verified to be descriptive documentation. An attribute name or explanatory wording is not sufficient: scripts, workflows, runtime/configuration strings, and generated JSON metadata are not documentation targets.
 
-Isolate the permitted text even when its file also contains operational code. Leave Nix expressions, interpolations, delimiters, escaping, attributes, ordering, imports, options, and generation logic unchanged. New Nix contributions, source wiring, or changes that cannot be separated from logic belong to fixer. For mixed requests, complete independent authorized documentation and report the implementation dependency; never describe pending implementation as current behavior.
+Isolate the permitted text even when its file also contains operational code. Establish exclusive file ownership with the orchestrator before editing a mixed prose/implementation file; serialize same-file work with fixer or return proposed prose instead. Leave Nix expressions, interpolations, delimiters, escaping, attributes, ordering, imports, options, and generation logic unchanged. New Nix contributions, source wiring, or changes that cannot be separated from logic belong to fixer. For mixed requests, complete independent authorized documentation and report the implementation dependency; never describe pending implementation as current behavior.
 
 ## Respect generated outputs and execution boundaries
 

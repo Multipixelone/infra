@@ -97,12 +97,13 @@ Read the relevant rules and public-key bindings in
 Rekeying existing ciphertext remains user-only. Give the user:
 
 ```fish
-cd ~/Documents/Git/nix-secrets
-agenix -r -i ~/.ssh/agenix
+cd /home/tunnel/Documents/Git/nix-secrets; and env AGENIX_RULES=/home/tunnel/Documents/Git/nix-secrets/secrets.nix agenix -r -i ~/.ssh/agenix
 ```
 
-Use their actual matching identity. Explain that `-r` re-encrypts entries
-sequentially, requires identities able to decrypt them, and is not transactional:
+After verifying the canonical rules path, pin `AGENIX_RULES` in every agenix
+handoff so inherited `AGENIX_RULES`/`RULES` or discovery cannot select another
+rules file. Use their actual matching identity. Explain that `-r` re-encrypts
+entries sequentially, requires identities able to decrypt them, and is not transactional:
 a failure can leave earlier entries updated and later entries unchanged. Have the
 user preserve a recoverable private revision and verify identity coverage before
 starting; never claim a failed run rolled back. Adding a host to `systems` does
@@ -117,8 +118,7 @@ when necessary.
 Give the exact path and schema without values:
 
 ```fish
-cd ~/Documents/Git/nix-secrets
-agenix -e service/token.age -i ~/.ssh/agenix
+cd /home/tunnel/Documents/Git/nix-secrets; and env AGENIX_RULES=/home/tunnel/Documents/Git/nix-secrets/secrets.nix agenix -e service/token.age -i ~/.ssh/agenix
 ```
 
 Tell the user to enter the value in their local editor, not chat. Do not launch

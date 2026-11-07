@@ -13,9 +13,11 @@
       }:
       let
         aiConfig = config.flake.aiConfig;
-        # OpenCode fetches this npm plugin; update this version and its schema
-        # together here, not with the installer (which writes HM-managed files).
+        # Keep npm plugin and schema versions together, not in installers that
+        # would overwrite Home Manager-managed files.
         omoVersion = "3.0.7";
+        dcpVersion = "3.2.0";
+        visualCacheVersion = "1.7.5";
 
         # ── Composable building blocks ──────────────────────────────────
         #
@@ -41,7 +43,7 @@
           orchestrator = {
             skills = [ "*" ];
             # Keep context7/grep_app off orchestrator so it delegates
-            # doc/code lookups to librarian instead of doing them itself.
+            # doc/code lookups to explorer instead of doing them itself.
             mcps = [
               "*"
               "!context7"
@@ -52,22 +54,19 @@
             skills = [ "simplify" ];
             mcps = [ ];
           };
-          librarian = {
-            skills = [ ];
-            mcps = [
-              "websearch"
-              "context7"
-              "grep_app"
-            ];
-          };
-          # explorer/fixer do most hands-on repo work, so give them Nix
-          # knowledge (nix skill + nixos MCP for option/package lookups).
+          # OMO 3.0.7 aliases librarian to explorer; keep repo and external
+          # research capabilities on the canonical explorer role.
           explorer = {
             skills = [
               "infra-navigation"
               "nix"
             ];
-            mcps = [ "nixos" ];
+            mcps = [
+              "nixos"
+              "websearch"
+              "context7"
+              "grep_app"
+            ];
           };
           designer = {
             skills = [ "agent-browser" ];
@@ -141,7 +140,6 @@
         presetOmniroute = mkPreset {
           orchestrator.model = "kestral";
           oracle.model = "high-effort";
-          librarian.model = "subagent";
           explorer.model = "subagent";
           designer.model = "high-effort";
           fixer.model = "fixer";
@@ -181,7 +179,7 @@
           description = "Runs tests, lint, typechecks, builds, and Nix validation via agent-run-long, returning concise failure evidence while keeping full logs on disk.";
           prompt = builtins.readFile ./prompts/validator.md;
           orchestratorPrompt = ''
-            @validator — runs established builds, tests, lint, typechecks, and Nix validation; owns every `agent-run-long` task and returns PASS/FAIL/BLOCKED with commands, exit codes, excerpts, and log paths. Delegate: each independent long-running build, test, or CI validation lane to a separate background validator with non-overlapping scopes (serialize overlaps); the final required checks after writers are reconciled. Don't: trivial short checks, writing or fixing tests or code, coverage/architecture/visual review.
+            @validator — runs established builds, tests, lint, typechecks, and Nix validation; owns every `agent-run-long` task and returns PASS/FAIL/BLOCKED with commands, exit codes, excerpts, and log paths. Delegate: each independent long-running build, test, or CI validation lane to a separate background validator with non-overlapping scopes (serialize overlaps); the final required checks after writers are reconciled. Don't: trivial short checks that another agent is explicitly permitted to run without agent-run-long, writing or fixing tests or code, coverage/architecture/visual review.
           '';
           # Execution-only: shell + read, no file mutation.
           permission = {
@@ -232,7 +230,7 @@
           description = "Reconciles substantial project documentation, runbooks, and multi-file guides against source, configuration, and tests.";
           prompt = builtins.readFile ./prompts/documenter.md;
           orchestratorPrompt = ''
-            @documenter — delegate substantial source-to-doc reconciliation, operational runbooks, architecture/migration guides, or coordinated documentation updates, including literal prose in existing generated-doc sources. Pass the requested outcome, scope/file constraints, known evidence, and open questions; it can inspect local sources without a complete dossier. Keep short corrections or summaries already supported by your context in the orchestrator. Do not delegate implementation changes, generated-output edits, source comments/docstrings, or agent-policy/routing changes. Route required source wiring and regeneration to fixer, and checks to validator.
+            @documenter — delegate substantial source-to-doc reconciliation, operational runbooks, architecture/migration guides, or coordinated documentation updates, including literal prose in existing generated-doc sources. Pass the requested outcome, scope/file constraints, non-overlapping file ownership, known evidence, and open questions; serialize edits to shared mixed Nix files with other writers. It can inspect local sources without a complete dossier. Keep short corrections or summaries already supported by your context in the orchestrator. Do not delegate implementation changes, generated-output edits, source comments/docstrings, or agent-policy/routing changes. Route required source wiring and regeneration to fixer, and checks to validator.
           '';
           permission = {
             "*" = "deny";
@@ -270,139 +268,37 @@
               "*" = "deny";
               "/home/tunnel/Documents/Git/nix-secrets/secrets.nix" = "allow";
             };
+            ast_grep_replace = "deny";
             bash = "ask";
             webfetch = "deny";
             websearch = "deny";
           };
         };
 
-        lspServers = {
-          nixd = {
-            command = [
-              (lib.getExe pkgs.nixd)
-              "--inlay-hints=true"
-            ];
-            extensions = [ ".nix" ];
-          };
-          basedpyright = {
-            command = [
-              "${pkgs.basedpyright}/bin/basedpyright-langserver"
-              "--stdio"
-            ];
-            extensions = [
-              ".py"
-              ".pyi"
-            ];
-          };
-          ruff = {
-            command = [
-              (lib.getExe pkgs.ruff)
-              "server"
-            ];
-            extensions = [
-              ".py"
-              ".pyi"
-            ];
-          };
-          "typescript-language-server" = {
-            command = [
-              (lib.getExe pkgs.typescript-language-server)
-              "--stdio"
-            ];
-            extensions = [
-              ".ts"
-              ".tsx"
-              ".js"
-              ".jsx"
-              ".mjs"
-              ".cjs"
-            ];
-          };
-          "vscode-css-language-server" = {
-            command = [
-              "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server"
-              "--stdio"
-            ];
-            extensions = [
-              ".css"
-              ".scss"
-              ".less"
-            ];
-          };
-          "vscode-html-language-server" = {
-            command = [
-              "${pkgs.vscode-langservers-extracted}/bin/vscode-html-language-server"
-              "--stdio"
-            ];
-            extensions = [
-              ".html"
-              ".htm"
-            ];
-          };
-          "vscode-json-language-server" = {
-            command = [
-              "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server"
-              "--stdio"
-            ];
-            extensions = [
-              ".json"
-              ".jsonc"
-            ];
-          };
-          yaml = {
-            command = [
-              "${pkgs.yaml-language-server}/bin/yaml-language-server"
-              "--stdio"
-            ];
-            extensions = [
-              ".yaml"
-              ".yml"
-            ];
-          };
-          taplo = {
-            command = [
-              (lib.getExe pkgs.taplo)
-              "lsp"
-              "stdio"
-            ];
-            extensions = [ ".toml" ];
-          };
-          marksman = {
-            command = [
-              (lib.getExe pkgs.marksman)
-              "server"
-            ];
-            extensions = [
-              ".md"
-              ".markdown"
-            ];
-          };
-          texlab = {
-            command = [ (lib.getExe pkgs.texlab) ];
-            extensions = [
-              ".tex"
-              ".bib"
-            ];
-          };
-          tinymist = {
-            command = [ (lib.getExe pkgs.tinymist) ];
-            extensions = [ ".typ" ];
-          };
-          "astro-ls" = {
-            command = [
-              "${pkgs.astro-language-server}/bin/astro-ls"
-              "--stdio"
-            ];
-            extensions = [ ".astro" ];
-          };
-          "fish-lsp" = {
-            command = [
-              (lib.getExe pkgs.fish-lsp)
-              "start"
-            ];
-            extensions = [ ".fish" ];
-          };
-        };
+        # Render shared MCP definitions directly into native OpenCode V2 shape.
+        # Home Manager's built-in integration still emits the old server map.
+        mcpServers = lib.mapAttrs (
+          _: server:
+          let
+            isRemote = (server.url or null) != null;
+            enabled = lib.hm.mcp.resolveEnabled server;
+            environment = lib.hm.mcp.renderEnv (path: "{file:${path}}") (server.env or { });
+          in
+          {
+            type = if isRemote then "remote" else "local";
+          }
+          // (
+            if isRemote then
+              { inherit (server) url; }
+            else
+              { command = [ server.command ] ++ (server.args or [ ]); }
+          )
+          // lib.optionalAttrs (isRemote && (server.headers or { }) != { }) {
+            inherit (server) headers;
+          }
+          // lib.optionalAttrs (!isRemote && environment != { }) { inherit environment; }
+          // lib.optionalAttrs (enabled != null) { disabled = !enabled; }
+        ) hmArgs.config.programs.mcp.servers;
 
         # ── Dynamic context pruning ─────────────────────────────────────
         #
@@ -411,7 +307,7 @@
         # soft and per-model floors stay high while ceilings guard overflow.
         dcpConfig = builtins.toJSON {
           "$schema" =
-            "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json";
+            "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/v${dcpVersion}/dcp.schema.json";
           enabled = true;
           pruneNotification = "detailed";
           pruneNotificationType = "chat";
@@ -463,10 +359,9 @@
             iterationNudgeThreshold = 40;
             nudgeForce = "soft";
             protectedTools = [
-              "task"
+              "subagent"
               "skill"
               "todowrite"
-              "todoread"
             ];
             protectUserMessages = false;
           };
@@ -489,8 +384,8 @@
           council = councilConfig;
           fallback = fallbackConfig;
           agents = customAgents;
-          # v3 lacks todoContinuation's prior threshold/cap controls; configure
-          # backgroundJobs.orchestratorWake only after verifying its v3 schema.
+          # Disable OMO's duplicate code-search MCP; use shared grep_app instead.
+          disabled_mcps = [ "gh_grep" ];
           # Enable observer agent (disabled by default upstream).
           disabled_agents = [ ];
           presets.omniroute.agents = presetOmniroute;
@@ -501,13 +396,10 @@
         programs.fish.interactiveShellInit = lib.concatStringsSep "\n\n" [
           # fish
           ''
-            set -Ux OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS true
-          ''
-          # fish
-          ''
             # The hosted Parallel Search MCP expands PARALLEL_API_KEY from the
             # process environment. Export it session-wide so every opencode launch
             # inherits it (oc, ocd, bare `opencode`), not just ones wrapped by `ocd`.
+            # This does not update an already-running shared server's environment.
             # `set -gx`, never `-Ux`: universal variables persist to
             # fish_variables on disk — don't leak the secret there.
             set -l parallel_env ${hmArgs.config.age.secrets.parallel.path}
@@ -520,48 +412,54 @@
         programs.opencode = {
           enable = true;
           package = pkgs.opencode;
-          enableMcpIntegration = true;
+          enableMcpIntegration = false;
           inherit (aiConfig) context;
           agents = if aiConfig.agentsDir == null then { } else aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
           settings = {
-            # programs.mcp uses Claude-style ${VAR} placeholders, but OpenCode
-            # only expands {env:VAR}. OpenCode settings replace the whole
-            # server entry imported by enableMcpIntegration rather than
-            # merging into it, so restate type/url here -- a headers-only
-            # entry fails OpenCode's mcp schema ("mcp.websearch.enabled
-            # missing key").
-            mcp.websearch = {
-              type = "remote";
-              url = "https://search.parallel.ai/mcp";
-              enabled = true;
-              headers.Authorization = "Bearer {env:PARALLEL_API_KEY}";
+            # Shared programs.mcp headers use Claude-style placeholders;
+            # OpenCode expands {env:VAR} in the server process environment.
+            mcp.servers = mcpServers // {
+              websearch = {
+                type = "remote";
+                url = "https://search.parallel.ai/mcp";
+                disabled = false;
+                headers.Authorization = "Bearer {env:PARALLEL_API_KEY}";
+              };
             };
-            plugin = [
-              # "@simonwjackson/opencode-direnv"
-              "@tarquinen/opencode-dcp"
+            plugins = [
+              "@tarquinen/opencode-dcp@${dcpVersion}"
               "oh-my-opencode-slim@${omoVersion}"
-              # "true-mem"
-              # "opencode-history-search"
             ];
-            enabled_providers = [ "omniroute" ];
+            policies = [
+              {
+                action = "provider.use";
+                resource = "*";
+                effect = "deny";
+              }
+              {
+                action = "provider.use";
+                resource = "omniroute";
+                effect = "allow";
+              }
+            ];
             # Store the gateway API key with OpenCode's /connect flow, outside
             # the Nix store. See OmniRoute's OpenCode integration guide:
             # https://omniroute.hagicode.com/en-US/frameworks/opencode/
-            provider.omniroute = {
-              npm = "@ai-sdk/openai-compatible";
+            providers.omniroute = {
+              package = "aisdk:@ai-sdk/openai-compatible";
               name = "OmniRoute";
               # Every device (link included) goes through the published name so
               # the router is reached the same way everywhere, over TLS.
-              options.baseURL = "https://${config.flake.servicePublicationInventory.applications.ai.canonical}/v1";
+              settings.baseURL = "https://${config.flake.servicePublicationInventory.applications.ai.canonical}/v1";
               models = builtins.listToAttrs (
                 map
                   (name: {
                     inherit name;
                     value = {
                       inherit name;
-                      tool_call = true;
-                      modalities = {
+                      capabilities = {
+                        tools = true;
                         input = [ "text" ] ++ lib.optional (name != "Subagent") "image";
                         output = [ "text" ];
                       };
@@ -581,29 +479,43 @@
               );
             };
             model = models.kestral;
-            small_model = models.subagent;
-            autoupdate = false;
-            # Core OpenCode LSP server configuration, not plugin configuration.
-            lsp = lspServers;
-            agent.build.permission.task = {
-              "*" = "allow";
+            update = "disable";
+            agents = {
+              title.model = models.subagent;
+              build.permissions = [
+                {
+                  action = "subagent";
+                  resource = "*";
+                  effect = "allow";
+                }
+              ];
+              plan.permissions = [
+                {
+                  action = "subagent";
+                  resource = "*";
+                  effect = "allow";
+                }
+              ];
+              orchestrator.permissions = [
+                {
+                  action = "glob";
+                  resource = "*";
+                  effect = "deny";
+                }
+              ];
             };
-            agent.plan.permission.task = {
-              "*" = "allow";
-            };
-            agent.orchestrator.permission.glob = "deny";
           };
-          # OpenCode 2 replaced tui.json with cli.json.
+          # Global terminal client configuration.
           cli = {
             scroll = {
               speed = 1;
               acceleration = true;
             };
             # Cache hit rate + token breakdown in the sidebar. A terminal
-            # plugin, so it loads from cli.json and not settings.plugin — the
+            # plugin, so it loads from cli.json and not settings.plugins — the
             # two lists are separate loaders and a terminal plugin listed in
             # the main one is silently ignored.
-            plugins = [ "opencode-visual-cache" ];
+            plugins = [ "opencode-visual-cache@${visualCacheVersion}" ];
             # Stylix and the catppuccin module are both disabled for opencode
             # above, so pick its built-in theme here.
             theme.name = "catppuccin";
@@ -617,31 +529,16 @@
           set -l root (git rev-parse --show-toplevel 2>/dev/null; or echo $PWD)
           cd $root; or return
 
-          # Forward the agenix env-file via `env` so external MCP credentials
-          # are available to this opencode process.
+          # Inject launch-time MCP credentials into both client and private
+          # server. An already-running shared server keeps its old environment;
+          # setting client variables alone cannot refresh that server's secrets.
           set -l envfile ${hmArgs.config.age.secrets.parallel.path}
-
-          # Pick a free port so the oh-my-opencode-slim multiplexer (zellij)
-          # can reach opencode's HTTP API. Starting at 4096 and scanning
-          # upward lets multiple concurrent / forgotten opencode instances
-          # coexist without port conflicts.
-          set -l port
-          for candidate in (seq 4096 4196)
-            if test (ss -Htln "sport = :$candidate" 2>/dev/null | count) -eq 0
-              set port $candidate
-              break
-            end
-          end
-          if test -z "$port"
-            echo "ocd: no free port in 4096-4196" >&2
-            return 1
-          end
 
           # `command env` bypasses fish-grc's auto-alias on `env`, which
           # would otherwise wrap opencode's stdout in a line-based
           # colorizer and shred the TUI.
           command env (test -r $envfile; and string match -rv '^#|^$' < $envfile) \
-            opencode --port $port $argv
+            opencode --standalone $argv
         '';
 
         xdg.configFile."opencode/oh-my-opencode-slim.json".text = omoConfig;
