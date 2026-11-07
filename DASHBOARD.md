@@ -374,36 +374,43 @@ load.
 
 ### Step 1 — declare the modules (the real fix)
 
-Add every used module to `services.home-assistant.customLovelaceModules` in
-`modules/iot/roomieorder.nix` (or a dedicated `modules/iot/lovelace-modules.nix`).
+Declare frontend card modules in `services.home-assistant.customLovelaceModules`
+in `modules/iot/dashboard-home.nix`. UIX, the successor to card-mod, is instead
+installed through `services.home-assistant.customComponents` in
+`modules/iot/homeassistant.nix` and manages its own frontend resource.
 nixpkgs status of the cards the kiosk actually uses, verified:
 
-| Module                         | nixpkgs `home-assistant-custom-lovelace-modules.*` |
-| ------------------------------ | -------------------------------------------------- |
-| `mushroom`                     | ✅ (already wired)                                 |
-| `card-mod`                     | ✅                                                 |
-| `auto-entities`                | ✅                                                 |
-| `mini-graph-card`              | ✅                                                 |
-| `clock-weather-card`           | ✅                                                 |
-| `atomic-calendar-revive`       | ✅                                                 |
-| `today-card` (`ha-today-card`) | ❌ **not packaged**                                |
+| Module                         | nixpkgs `home-assistant-custom-lovelace-modules.*`  |
+| ------------------------------ | --------------------------------------------------- |
+| `mushroom`                     | ✅ (already wired)                                  |
+| `card-mod`                     | Removed; use `home-assistant-custom-components.uix` |
+| `auto-entities`                | ✅                                                  |
+| `mini-graph-card`              | ✅                                                  |
+| `clock-weather-card`           | ✅                                                  |
+| `atomic-calendar-revive`       | ✅                                                  |
+| `today-card` (`ha-today-card`) | ❌ **not packaged**                                 |
 
-So six are one-liners; **only `today-card` needs work** — either a small
+The five available card modules are one-liners; UIX is a custom component.
+**Only `today-card` needs a custom package** — either a small
 `fetchzip`/`fetchFromGitHub` derivation (mirror the HACS derivation pattern in
 `modules/iot/homeassistant.nix`, which builds the `hacs` component itself), or
 swap those 4 `today-card` instances for a packaged calendar card. Sketch:
 
 ```nix
 services.home-assistant.customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
-  mushroom card-mod auto-entities mini-graph-card clock-weather-card atomic-calendar-revive
+  mushroom auto-entities mini-graph-card clock-weather-card atomic-calendar-revive
   # + today-card  (custom derivation, see above)
 ];
+# Add to the existing customComponents list, alongside HACS and ha_mcp_tools:
+services.home-assistant.customComponents = [ pkgs.home-assistant-custom-components.uix ];
 ```
 
 The existing `customLovelaceModules → lovelace.resources` merge in
-`homeassistant.nix` then emits one YAML resource per module, and the orphaned
-cards render. **`card-mod` must be in the list** or every `card_mod:` style block
-is silently ignored.
+`homeassistant.nix` emits one YAML resource per card module. UIX manages its own
+frontend resource; do not add it to `customLovelaceModules`. Existing `card_mod:`
+style blocks remain compatible. After deploying the component, add **UI eXtension**
+through **Settings → Devices & services → Add integration**, then refresh the
+frontend to load its resource.
 
 ### Step 2 — retire HACS's resource role
 

@@ -1828,13 +1828,12 @@ _: {
       };
     in
     {
-      # Single source of truth for this host's frontend resources. Declaring any
-      # of these emits lovelace.resources (yaml resource_mode), so EVERY custom:
-      # card used by any dashboard on iot must be in this list. card-mod MUST stay
-      # here or all card_mod: styling is silently ignored.
+      # Declaring these emits lovelace.resources (yaml resource_mode), so custom:
+      # cards used by dashboards on iot must be listed here unless their custom
+      # component manages resources itself. The UIX custom component supplies
+      # existing card_mod: styling and manages its own resources.
       services.home-assistant.customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
         mushroom
-        card-mod
         auto-entities
         button-card
         mini-graph-card

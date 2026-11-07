@@ -2679,6 +2679,7 @@
           customComponents = [
             (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.hacs))
             pkgs.home-assistant-custom-components.ha_mcp_tools
+            pkgs.home-assistant-custom-components.uix
           ];
 
           config = {
