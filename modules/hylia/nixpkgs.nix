@@ -12,9 +12,9 @@
         pkg: builtins.elem (lib.getName pkg) config.nixpkgs.config.permittedInsecurePackages;
     };
 
-    # Flake-level `nixpkgs.overlays` (modules/fixes.nix) don't reach this
-    # instance, so darwin-only fixes live here.
-    nixpkgs.overlays = [
+    # Share package fixes with the flake's other nixpkgs instances, including
+    # the FastMCP override that keeps it on the compatible MCP SDK 1.x.
+    nixpkgs.overlays = config.nixpkgs.overlays ++ [
       # Codex's managed-preferences synchronization fails inside Darwin builds.
       # Keep the install-time version check; run the test suite on Linux.
       (_final: prev: {
