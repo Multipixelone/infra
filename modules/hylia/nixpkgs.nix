@@ -19,6 +19,11 @@
       # Keep the install-time version check; run the test suite on Linux.
       (_final: prev: {
         codex-acp = prev.codex-acp.overrideAttrs { doCheck = false; };
+
+        # Darwin cannot copy sockets; keep the rest of xcp's test suite enabled.
+        xcp = prev.xcp.overrideAttrs (old: {
+          cargoCheckFeatures = (old.cargoCheckFeatures or [ ]) ++ [ "test_no_sockets" ];
+        });
       })
     ];
   };
