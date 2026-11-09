@@ -2,6 +2,7 @@
   lib,
   rootPath,
   inputs,
+  withSystem,
   ...
 }:
 {
@@ -16,5 +17,13 @@
       packages.lichii = pkgs.callPackage "${rootPath}/pkgs/lichii" {
         src = inputs.lichii;
       };
+    };
+
+  flake.modules.homeManager.gaming =
+    { pkgs, ... }:
+    {
+      home.packages = [
+        (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.lichii))
+      ];
     };
 }
