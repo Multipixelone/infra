@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (142)</summary>
+<summary>Packages exposed by this flake (143)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -201,6 +201,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`ipod-sync-inner`](https://github.com/Multipixelone/infra/blob/main/modules/media/ipod.nix) · `nix run github:Multipixelone/infra#ipod-sync-inner`
 - [`izotope`](https://github.com/Multipixelone/infra/blob/main/modules/media/yabridge.nix) — iZotope RX audio repair toolkit · `nix run github:Multipixelone/infra#izotope`
 - [`libretro-azahar`](https://github.com/Multipixelone/infra/blob/main/modules/link/retroarch.nix) — Azahar Nintendo 3DS emulator libretro core · `nix run github:Multipixelone/infra#libretro-azahar`
+- [`lichii`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/lichii.nix) — Experimental Nintendo Switch and Switch 2 emulator · `nix run github:Multipixelone/infra#lichii`
 - [`life-events`](https://github.com/Multipixelone/infra/blob/main/modules/life-events/default.nix) · `nix run github:Multipixelone/infra#life-events`
 - [`link-argb-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-argb-config`
 - [`link-cooling-config`](https://github.com/Multipixelone/infra/blob/main/modules/link/cooling-checks.nix) · `nix run github:Multipixelone/infra#link-cooling-config`

@@ -2648,6 +2648,23 @@
         "type": "github"
       }
     },
+    "lichii": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794181270,
+        "narHash": "sha256-kHXFnYkvuNjorCKvfhvMI9x12hfpUx4OeTVtEo1GUqQ=",
+        "owner": "zortos293",
+        "repo": "Lichii",
+        "rev": "cbb512ee7a9de9d9dbe2f865ec2e468888503214",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zortos293",
+        "ref": "nx2",
+        "repo": "Lichii",
+        "type": "github"
+      }
+    },
     "mac-app-util": {
       "inputs": {
         "cl-nix-lite": "cl-nix-lite",
@@ -4337,6 +4354,7 @@
         "import-tree": "import-tree_2",
         "khinsider": "khinsider",
         "lanzaboote": "lanzaboote",
+        "lichii": "lichii",
         "mac-app-util": "mac-app-util",
         "make-shell": "make-shell_2",
         "mcp-servers-nix": "mcp-servers-nix",

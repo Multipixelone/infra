@@ -182,6 +182,10 @@
       url = "github:nix-community/lanzaboote/v1.0.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    lichii = {
+      url = "github:zortos293/Lichii/nx2";
+      flake = false;
+    };
     mac-app-util = {
       url = "github:hraban/mac-app-util";
       inputs.flake-utils.follows = "flake-utils";
