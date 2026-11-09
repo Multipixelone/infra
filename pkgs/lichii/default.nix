@@ -19,6 +19,7 @@
   gamemode,
   httplib,
   kdePackages,
+  libglvnd,
   libusb1,
   lz4,
   nlohmann_json,
@@ -137,6 +138,7 @@ stdenv.mkDerivation {
   preFixup = ''
     qtWrapperArgs+=(--prefix LD_LIBRARY_PATH : ${
       lib.makeLibraryPath [
+        libglvnd
         vulkan-loader
         pipewire
       ]
