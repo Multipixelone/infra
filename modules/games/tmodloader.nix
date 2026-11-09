@@ -129,7 +129,8 @@
         virtualisation.oci-containers.containers = lib.mapAttrs' (
           id: s:
           lib.nameValuePair "games-${id}" {
-            autoStart = true;
+            # Start and stop manually through the dashboard or systemd.
+            autoStart = false;
             # Retain exit/OOM state until the ordered ExecStopPost verification.
             # oci-containers removes the container in its subsequent cleanup hook.
             autoRemoveOnStop = false;

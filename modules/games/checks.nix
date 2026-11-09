@@ -257,6 +257,7 @@
                   assert fixture["units"]["minecraft-server-survival"]["memoryMax"] == "6G"
                   assert fixture["units"]["minecraft-server-survival"]["stopTimeout"] == 180
                   assert fixture["units"]["minecraft-server-velocity"]["memoryMax"] == "1G"
+                  assert fixture["units"]["podman-games-terraria"]["wantedBy"] == []
                   assert fixture["units"]["podman-games-terraria"]["memoryMax"] == "4G"
                   assert fixture["units"]["podman-games-terraria"]["startTimeout"] == "40min"
                   assert fixture["units"]["podman-games-terraria"]["stopTimeout"] == 180
