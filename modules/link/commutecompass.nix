@@ -66,6 +66,9 @@
                     # remains on the existing helper contract, not the opt-in v1 relay.
                     schedule_contract = "legacy";
                     status_entity = "sensor.commute_alarm_status";
+                    # Default morning base: the 17-minute advance below makes the
+                    # final alarm 09:30 when no calendar event needs earlier.
+                    fallback_time = "09:47";
                     # Advance calendar and fallback deadlines once; preserve window spacing.
                     window.prep_advance_minutes = 17;
                     # Share the first-ring lead with iot's ten-minute light fade.
