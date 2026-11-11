@@ -145,6 +145,12 @@ stdenv.mkDerivation {
     })
   '';
 
+  postFixup = ''
+    # Steam loads its overlay before the Qt wrapper can set LD_LIBRARY_PATH.
+    # Make libGL available during the wrapper's own loader startup.
+    patchelf --add-needed "${lib.getLib libglvnd}/lib/libGL.so.1" "$out/bin/lichii"
+  '';
+
   meta = {
     description = "Experimental Nintendo Switch and Switch 2 emulator";
     homepage = "https://github.com/zortos293/Lichii";
