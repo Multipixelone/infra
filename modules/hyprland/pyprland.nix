@@ -24,7 +24,7 @@
 
         [scratchpads.gpt]
         animation = "fromLeft"
-        command = "uwsm app -- foot -a foot-gpt tgpt -m"
+        command = "uwsm app -- footclient -a foot-gpt tgpt -m"
         class = "foot-gpt"
         size = "40% 90%"
         unfocus = "hide"

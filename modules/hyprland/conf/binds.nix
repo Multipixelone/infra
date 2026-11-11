@@ -101,8 +101,8 @@
               [
                 (bind "${mod} + SHIFT + Q" (mkLuaInline "hl.dsp.window.close()"))
                 # app keybinds
-                (bind "${mod} + RETURN" (exec "uwsm app -- foot"))
-                (bind "SUPER + E" (exec "foot -a foot-files -- fish -c yazi"))
+                (bind "${mod} + RETURN" (exec "uwsm app -- footclient"))
+                (bind "SUPER + E" (exec "uwsm app -- footclient -a foot-files -- fish -c yazi"))
                 (bind "${mod} + SHIFT + W" (exec "uwsm app -- firefox"))
                 (bind "${mod} + SHIFT + D" (exec (runOnce "discord")))
                 (bind "${mod} + SHIFT + S" (exec (runOnce "steam")))

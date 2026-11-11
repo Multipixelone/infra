@@ -68,7 +68,7 @@
         "rmpc" = {
           name = "rmpc";
           comment = "rmpc music player";
-          exec = "uwsm app -- foot -a foot-music rmpc";
+          exec = "uwsm app -- footclient -a foot-music rmpc";
           terminal = false;
           type = "Application";
           icon = "apple-music";
