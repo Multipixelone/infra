@@ -10,6 +10,8 @@
       key = "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=";
     }
   ];
+  # Posy's cursors (cc-by-nc-4.0) supply the XCursor half of the cursor theme.
+  nixpkgs.config.allowUnfreePackages = [ "posy-cursors" ];
   flake.modules = {
     nixos.pc =
       { pkgs, ... }:
@@ -36,12 +38,34 @@
       let
         inherit (hmArgs.config.lib.stylix) colors;
         hostname = if osConfig != null then osConfig.networking.hostName else null;
-        cursor-theme = pkgs.fetchzip {
+        cursor = hmArgs.config.home.pointerCursor;
+        hyprcursor-src = pkgs.fetchzip {
           url = "https://blusky.s3.us-west-2.amazonaws.com/Posy_Cursor_Black_h.tar.gz";
           hash = "sha256-EC4bKLo1MAXOABcXb9FneoXlV2Fkb9wOFojewaSejZk=";
         };
+        # One theme dir serving both hyprcursor (manifest.hl + hyprcursors/)
+        # and XCursor (cursors/ + index.theme) consumers.
+        cursor-theme = pkgs.runCommand "posy-cursor-black-h" { } ''
+          dir=$out/share/icons/Posy_Cursor_Black_h
+          mkdir -p $dir
+          cp -r ${hyprcursor-src}/. $dir/
+          ln -s ${pkgs.posy-cursors}/share/icons/Posy_Cursor_Black/cursors $dir/cursors
+          cp ${pkgs.posy-cursors}/share/icons/Posy_Cursor_Black/index.theme $dir/index.theme
+        '';
       in
       {
+        home.pointerCursor = {
+          enable = true;
+          package = cursor-theme;
+          name = "Posy_Cursor_Black_h";
+          size = 32;
+          gtk.enable = true;
+          x11.enable = true;
+          hyprcursor = {
+            enable = true;
+            size = 24;
+          };
+        };
         # imports = [
         #   ./conf
         #   ./modules
@@ -148,7 +172,7 @@
               {
                 _args = [
                   "XCURSOR_SIZE"
-                  "32"
+                  (toString cursor.size)
                 ];
               }
               {
@@ -171,14 +195,20 @@
               }
               {
                 _args = [
+                  "XCURSOR_THEME"
+                  cursor.name
+                ];
+              }
+              {
+                _args = [
                   "HYPRCURSOR_THEME"
-                  "Posy_Cursor_Black_h"
+                  cursor.name
                 ];
               }
               {
                 _args = [
                   "HYPRCURSOR_SIZE"
-                  "24"
+                  (toString cursor.hyprcursor.size)
                 ];
               }
             ];
@@ -406,7 +436,6 @@
             };
           };
         };
-        home.file.".local/share/icons/Posy_Cursor_Black_h".source = cursor-theme;
       };
   };
 }
