@@ -4,7 +4,6 @@
       mergiraf.enableGitIntegration = true;
       git = {
         settings = {
-          merge.conflictstyle = "zdiff3";
           rerere.enabled = true;
         };
       };

@@ -4,14 +4,24 @@
     settings = {
       core = {
         editor = "hx";
-        whitespace = "fix,-indent-with-non-tab,trailing-space,cr-at-eol";
+        whitespace = "cr-at-eol";
       };
       user = {
         email = config.flake.meta.owner.email;
         name = config.flake.meta.accounts.github.username;
       };
       init.defaultBranch = "main";
-      push.default = "current";
+      pull.rebase = true;
+      push = {
+        default = "current";
+        autoSetupRemote = true;
+      };
+      fetch = {
+        prune = true;
+        fsckObjects = true;
+      };
+      receive.fsckObjects = true;
+      transfer.fsckObjects = true;
       commit.verbose = true;
       branch.sort = "-committerdate";
       tag.sort = "taggerdate";

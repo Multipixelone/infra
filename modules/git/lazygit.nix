@@ -51,33 +51,14 @@
           enableGitIntegration = true;
         };
         git = {
-          enable = true;
           lfs.enable = true;
 
           ignores = [
-            "*result*"
+            "result"
+            "result-*"
+            ".slim"
+            ".claude/settings.local.json"
           ];
-          settings = {
-            pull = {
-              ff = "only";
-              rebase = false;
-            };
-            push = {
-              default = "current";
-              autoSetupRemote = true;
-            };
-            mergetool."diffview" = {
-              cmd = "nvim -n -c \"DiffviewOpen\" \"$MERGE\"";
-              prompt = false;
-            };
-            init.defaultBranch = "main";
-            branch.autosetupmerge = "true";
-            repack.usedeltabaseoffset = "true";
-            rebase = {
-              autoSquash = true;
-              autoStash = true;
-            };
-          };
         };
       };
     };
