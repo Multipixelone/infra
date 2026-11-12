@@ -30,31 +30,34 @@
         };
       };
     };
-    nixos.pc = {
-      musnix.enable = true;
-      security.rtkit.enable = true;
-      services.pipewire = {
-        pulse.enable = true;
-        jack.enable = true;
-        raopOpenFirewall = true;
-        extraConfig.pipewire = {
-          "10-airplay" = {
-            "context.modules" = [
-              {
-                name = "libpipewire-module-raop-discover";
-                # increase the buffer size if you get dropouts/glitches
-                # args = {
-                #   "raop.latency.ms" = 500;
-                # };
-              }
-            ];
+    nixos.pc =
+      { config, ... }:
+      {
+        musnix.enable = true;
+        security.rtkit.enable = true;
+        # Opt in with pw-jack instead of setting LD_LIBRARY_PATH globally.
+        environment.systemPackages = [ config.services.pipewire.package.jack ];
+        services.pipewire = {
+          pulse.enable = true;
+          raopOpenFirewall = true;
+          extraConfig.pipewire = {
+            "10-airplay" = {
+              "context.modules" = [
+                {
+                  name = "libpipewire-module-raop-discover";
+                  # increase the buffer size if you get dropouts/glitches
+                  # args = {
+                  #   "raop.latency.ms" = 500;
+                  # };
+                }
+              ];
+            };
           };
         };
+        imports = [
+          inputs.musnix.nixosModules.musnix
+        ];
       };
-      imports = [
-        inputs.musnix.nixosModules.musnix
-      ];
-    };
     homeManager.base =
       { pkgs, lib, ... }:
       {
