@@ -356,12 +356,10 @@
           undo = "${sh} -c \"${lib.getExe kill-script}\"";
         };
       # Self-contained launcher for the gamescope Big Picture app.
-      # Hyprland 0.55 regressed the `fullscreen` window-rule effect: it is a
-      # silent no-op for every window (the `fullscreen` dispatcher still works,
-      # and `match:class ^(gamescope)$, fullscreen on` in windowrules.nix no
-      # longer fires at open). Until the upstream fullscreen refactor lands
-      # (hyprwm/Hyprland#14705), fullscreen the gamescope window ourselves once
-      # it maps. One-shot: polls, fixes, exits — no persistent socket listener.
+      # Retain a one-shot fullscreen fallback for gamescope when neither its
+      # own -f nor the compositor's window rule has taken effect after mapping.
+      # This checks actual state instead of assuming a particular Hyprland
+      # version's rule behavior. Polls, fixes, exits — no socket listener.
       # Idempotent: only acts when fs == 0, so it becomes a no-op the moment the
       # window rule starts working again.
       bigpicture-launch =
@@ -377,10 +375,14 @@
             config.programs.hyprland.package
           ];
           text = ''
-            HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
-            export HYPRLAND_INSTANCE_SIGNATURE
+            ${stream-session-shell}
+            ${stream-mode-shell}
+            stream_resolve_instance || exit 1
 
-            hyprctl dispatch 'hl.dsp.exec_cmd("${steam-gamescope}", { workspace = "name:${stream-ws}" })'
+            # exec_cmd inherits the compositor's environment, not Sunshine's.
+            # Forward only validated numeric client mode fields (including the
+            # intentional 3840x2160@60 fallback), never arbitrary environment.
+            stream_ipc dispatch "hl.dsp.exec_cmd(\"${pkgs.coreutils}/bin/env SUNSHINE_CLIENT_WIDTH=$width SUNSHINE_CLIENT_HEIGHT=$height SUNSHINE_CLIENT_FPS=$refresh_rate ${steam-gamescope}\", { workspace = \"name:${stream-ws}\" })"
 
             # Detach the poll. Sunshine only treats a launcher that exits as a
             # detached command if it exits within 5s ("App exited gracefully
@@ -389,30 +391,28 @@
             # finished, end the session, and fire the steam-kill undo cmd —
             # killing Steam mid-startup before it ever drew a frame.
             (
-              for _ in $(seq 1 80); do
+              deadline=$((SECONDS + 20))
+              while (( SECONDS < deadline )); do
                 # Scope the match to the stream workspace. A bare class match can
                 # pick up a gamescope window stranded by a previous session and
                 # fullscreen that instead of ours. Matched on `.workspace.name`
                 # because named workspaces have negative, unstable ids.
-                addr=$(hyprctl -j clients \
-                  | jq -r --arg ws ${stream-ws} 'first(.[] | select(.class == "gamescope" and .workspace.name == $ws)) // empty | .address')
-                [ -n "$addr" ] || { sleep 0.25; continue; }
+                addr=$(stream_ipc -j clients \
+                  | jq -r --arg ws ${stream-ws} 'first(.[] | select(.class == "gamescope" and .workspace.name == $ws)) // empty | .address') || { sleep 0.25; continue; }
+                [[ "$addr" =~ ^0x[[:xdigit:]]+$ ]] || { sleep 0.25; continue; }
 
                 # gamescope also fullscreens itself via -f. Let that land first so
                 # we only act if it genuinely did not take.
                 sleep 0.5
-                fs=$(hyprctl -j clients \
-                  | jq -r --arg a "$addr" 'first(.[] | select(.address == $a)) // empty | .fullscreen')
+                fs=$(stream_ipc -j clients \
+                  | jq -r --arg a "$addr" 'first(.[] | select(.address == $a)) // empty | .fullscreen') || continue
 
                 if [ "$fs" = "0" ]; then
-                  # One IPC round-trip, and an explicit state rather than a
-                  # toggle. `dispatch fullscreen` toggles whatever is focused, so
-                  # the old focuswindow-then-fullscreen pair could fullscreen an
-                  # unrelated window if focus moved in between, or toggle
-                  # gamescope back *out* of fullscreen if it self-fullscreened in
-                  # the gap. `fullscreenstate 2 -1` sets internal fullscreen and
-                  # leaves the client state alone, so re-running is a no-op.
-                  hyprctl --batch "dispatch hl.dsp.focus({ window = \"address:$addr\" }) ; dispatch hl.dsp.window.fullscreen_state({ internal = 2, client = -1 })"
+                  # Target the mapped window directly without stealing focus;
+                  # explicit internal state is idempotent and client=-1 leaves
+                  # the client's own fullscreen state alone (Hyprland 0.57 API).
+                  stream_ipc dispatch "hl.dsp.window.fullscreen_state({ window = \"address:$addr\", internal = 2, client = -1 })" ||
+                    echo "Warning: could not fullscreen the stream gamescope window" >&2
                 fi
                 break
               done
@@ -550,8 +550,8 @@
             {
               name = "Steam (Big Picture)";
               # args poached from https://gitlab.com/evlaV/jupiter-PKGBUILD/-/blob/master/gamescope/steam-launcher?ref_type=heads
-              # bigpicture-launch wraps the gamescope launch and force-fullscreens
-              # the gamescope window (Hyprland 0.55 `fullscreen` rule regression).
+              # bigpicture-launch forwards the client mode and retains an
+              # idempotent fullscreen fallback for the mapped gamescope window.
               cmd = lib.getExe bigpicture-launch;
               prep-cmd = [
                 prep
