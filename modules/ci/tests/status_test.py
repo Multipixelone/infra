@@ -131,6 +131,22 @@ class StatusTests(unittest.TestCase):
         for result in results.values():
             self.assertEqual(result["description"], "build exited with 1")
 
+    def test_prebuild_contract_failure_or_missing_result_blocks_run(self):
+        # The helper's own check must gate deployment, not become an advisory
+        # warning merely because its name is outside configurations/*.
+        for rows in (
+            [evaluation("link-prebuild"), build("link-prebuild", False)],
+            [evaluation("link-prebuild", success=False, error="broken helper")],
+            [],
+        ):
+            with self.subTest(rows=rows):
+                self.posts.unlink(missing_ok=True)
+                results, finished = self.reconcile(["link-prebuild"], rows, rc=1)
+                self.assertEqual(finished.returncode, 1)
+                self.assertEqual(
+                    results["link-prebuild"]["state"], "failure" if rows else "error"
+                )
+
     def test_late_alias_inherits_success_or_failure(self):
         for success in (True, False):
             with self.subTest(success=success):

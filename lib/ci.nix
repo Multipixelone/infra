@@ -39,10 +39,15 @@ rec {
   # no longer matches its source. Everything else — packages, home-manager
   # profiles, the service-publication contract — reports Forgejo's `warning`
   # state instead: visibly not green, but not a merge blocker.
+  #
+  # `link-prebuild` gates because the closure-preparation/promotion helper's
+  # own offline contract must hold before it may run against this revision;
+  # the helper additionally requires this check's realized output.
   gatingCheckPatterns = [
     "configurations/*"
     "files:*"
     "treefmt"
+    "link-prebuild"
   ];
 
   # Job, step and output identifiers. Shared so `needs.<job>.outputs.<name>`

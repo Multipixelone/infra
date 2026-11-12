@@ -278,8 +278,9 @@ Link's local Nix store. One job builds the whole check set with a single
 every check still gets an individual green light on the commit and in the
 pull request, and branch protection can require them by glob.
 
-`configurations/*`, `files:*` and `treefmt` turn the job red. Everything
-else reports a yellow warning instead: visible, but not a merge blocker.
+`configurations/*`, `files:*`, `treefmt` and `link-prebuild` turn the job
+red. Everything else reports a yellow warning instead: visible, but not a
+merge blocker.
 
 GitHub Actions is kept for one thing the runner cannot do: `aarch64-linux`.
 Every host in this repo is x86_64 and nothing here enables binfmt

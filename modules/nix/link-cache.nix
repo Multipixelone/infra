@@ -50,32 +50,56 @@ in
       default = null;
       description = "Provisioned Link cache public key; never a placeholder or a private key.";
     };
+    pullOnlyHosts = lib.mkOption {
+      type = lib.types.listOf (lib.types.enum clients);
+      default = [ ];
+      description = ''
+        Cache clients switched to strict pull-only operation (max-jobs = 0,
+        fallback = false). Other enabled clients keep the cache substituter
+        and signature trust but retain their local build and fallback defaults.
+      '';
+    };
   };
 
   config.configurations.nixos =
-    lib.genAttrs clients (_: {
+    lib.genAttrs clients (name: {
       module =
         { config, ... }:
-        lib.mkIf cfg.enable {
-          assertions = prerequisites ++ [
-            {
-              assertion = !config.nix.distributedBuilds && config.nix.buildMachines == [ ];
-              message = "Link cache clients must not forward builds.";
-            }
-            {
-              assertion = config.nixpkgs.hostPlatform.system == linkSystem;
-              message = "Link cache clients must match Link's native build platform.";
-            }
-          ];
-          networking.hosts = lib.optionalAttrs validAddress { ${address} = [ fqdn ]; };
-          nix.settings = {
-            substituters = [ "https://${fqdn}:5050" ];
-            trusted-public-keys = lib.optional validKey cfg.publicKey;
-            require-sigs = true;
-            max-jobs = 0;
-            fallback = false;
-          };
-        };
+        lib.mkMerge [
+          {
+            assertions = [
+              {
+                assertion = !(lib.elem name cfg.pullOnlyHosts) || cfg.enable;
+                message = "linkCache.pullOnlyHosts requires linkCache.enable.";
+              }
+            ];
+          }
+          (lib.mkIf cfg.enable {
+            assertions = prerequisites ++ [
+              {
+                assertion = !config.nix.distributedBuilds && config.nix.buildMachines == [ ];
+                message = "Link cache clients must not forward builds.";
+              }
+              {
+                assertion = config.nixpkgs.hostPlatform.system == linkSystem;
+                message = "Link cache clients must match Link's native build platform.";
+              }
+            ];
+            networking.hosts = lib.optionalAttrs validAddress { ${address} = [ fqdn ]; };
+            nix.settings = {
+              substituters = [ "https://${fqdn}:5050" ];
+              trusted-public-keys = lib.optional validKey cfg.publicKey;
+              require-sigs = true;
+            };
+          })
+          (lib.mkIf (cfg.enable && lib.elem name cfg.pullOnlyHosts) {
+            # Opt-in no-local-jobs/no-source-fallback policy; explicit output-copy required.
+            nix.settings = {
+              max-jobs = 0;
+              fallback = false;
+            };
+          })
+        ];
     })
     // {
       link.module =
@@ -151,6 +175,8 @@ in
           security.acme.certs.${fqdn} = {
             domain = fqdn;
             dnsProvider = "cloudflare";
+            # Internal DNS shadows challenge subdomains; check public propagation directly.
+            dnsResolver = "1.1.1.1:53";
             environmentFile = "/run/agenix/cloudflare-acme-dns01";
             group = config.services.nginx.group;
           };

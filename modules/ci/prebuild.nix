@@ -15,7 +15,7 @@ let
   };
 in
 {
-  perSystem = { pkgs, ... }: {
+  perSystem = { pkgs, system, ... }: {
     packages.link-prebuild = pkgs.writeShellApplication {
       name = "link-prebuild";
       meta.description = "Prepare persistent verified Link closures and lease-promote the deploy ref";
@@ -25,9 +25,12 @@ in
         pkgs.nixVersions.latest
         pkgs.cacert
       ];
+      # checkSystem names the controller check prepare requires as evidence.
       text = ''
         export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
-        exec python3 ${../../lib/link-prebuild.py} --config ${pkgs.writeText "link-prebuild-config.json" (builtins.toJSON settings)} "$@"
+        exec python3 ${../../lib/link-prebuild.py} --config ${
+          pkgs.writeText "link-prebuild-config.json" (builtins.toJSON (settings // { checkSystem = system; }))
+        } "$@"
       '';
     };
     checks.link-prebuild =

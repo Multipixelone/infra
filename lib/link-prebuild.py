@@ -25,12 +25,34 @@ class Failure(RuntimeError):
     pass
 
 
-def run(*args, env=None, check=True):
-    result = subprocess.run(args, text=True, capture_output=True, env=env, check=False)
+def run(*args, env=None, check=True, stream=False):
+    """Run a command; stdout is always captured for parsing.
+
+    stream=True passes stderr straight through to the job log so long native
+    Nix builds/verification show live progress. Explicit Git commands keep stderr
+    captured; Nix still inherits private-input auth and may invoke Git internally.
+    """
+    if stream:
+        result = subprocess.run(
+            args, text=True, stdout=subprocess.PIPE, stderr=None, env=env, check=False
+        )
+    else:
+        result = subprocess.run(
+            args, text=True, capture_output=True, env=env, check=False
+        )
     if check and result.returncode:
         # Do not print argv/environment: authentication can be inherited.
-        raise Failure(f"{args[0]} failed ({result.returncode}): {result.stderr}")
+        detail = "see stderr above" if stream else result.stderr
+        raise Failure(f"{args[0]} failed ({result.returncode}): {detail}")
     return result
+
+
+def progress(message):
+    print(f"link-prebuild: {message}", file=sys.stderr, flush=True)
+
+
+STORE_PATH = r"/nix/store/[0-9a-z]{32}-[^/\s]+"
+CHECK = "link-prebuild"
 
 
 def atomic(path, value):
@@ -116,9 +138,66 @@ class Prebuild:
     def lock_digest():
         return hashlib.sha256(Path("flake.lock").read_bytes()).hexdigest()
 
-    def prepare(self, sha):
+    def check_evidence(self, ledger):
+        """Bind preparation to a completed successful controller check.
+
+        The status ledger alone is insufficient: it records `success` for
+        built, substituted, already-present AND evaluation-skipped checks.
+        So also require that the exact check output of this checkout is
+        realized. A cached/local output is valid evidence (it exists only if
+        that derivation's builder succeeded); a skipped check has none.
+        `--max-jobs 0 --builders ''` is intended to only substitute or reuse
+        here, but is not relied on as proof that nothing builds. The
+        eval-vs-build equality below proves only that this checkout's exact
+        check output is realized, not how it was realized.
+        """
+        if not ledger:
+            raise Failure("controller check evidence is required")
+        try:
+            rows = [
+                line.split("\t")
+                for line in Path(ledger).read_text().splitlines()
+                if line.split("\t", 1)[0] == CHECK
+            ]
+        except FileNotFoundError:
+            raise Failure("controller check ledger is missing") from None
+        if len(rows) != 1 or rows[0][1:] != ["success"]:
+            raise Failure("controller check did not complete successfully")
+        installable = f".#checks.{self.cfg['checkSystem']}.{CHECK}"
+        flags = ("--no-update-lock-file", "--no-write-lock-file")
+        expected = run(
+            "nix",
+            "--accept-flake-config",
+            "eval",
+            *flags,
+            "--raw",
+            installable + ".outPath",
+        ).stdout.strip()
+        progress("confirming controller check output")
+        built = run(
+            "nix",
+            "--accept-flake-config",
+            "build",
+            *flags,
+            "--store",
+            "daemon",
+            "--max-jobs",
+            "0",
+            "--builders",
+            "",
+            "--no-link",
+            "--print-out-paths",
+            installable,
+            stream=True,
+        ).stdout.split()
+        if not re.fullmatch(STORE_PATH, expected) or built != [expected]:
+            raise Failure("controller check output is not realized for this checkout")
+        return {"check": CHECK, "ledger": "success", "output": expected}
+
+    def prepare(self, sha, ledger=None):
         if not self.gate(sha):
             return None
+        evidence = self.check_evidence(ledger)
         self.initialize()
         run_id = str(int(time.time())) + "-" + uuid.uuid4().hex
         directory = self.runs / run_id
@@ -139,11 +218,13 @@ class Prebuild:
                 "repository": self.cfg["repository"],
                 "cache": self.cfg["cache"],
                 "publicKey": self.cfg["publicKey"],
+                "checkEvidence": evidence,
             }
             atomic(directory / "manifest.json", manifest)
             for host in self.cfg["hosts"]:
                 root = roots / host
                 # Do not move roots after the daemon registers indirect roots.
+                progress(f"building {host}")
                 run(
                     "nix",
                     "--accept-flake-config",
@@ -157,11 +238,10 @@ class Prebuild:
                     "--out-link",
                     str(root),
                     f".#nixosConfigurations.{host}.config.system.build.toplevel",
+                    stream=True,
                 )
                 output = str(root.resolve(strict=True))
-                if not re.fullmatch(
-                    r"/nix/store/[0-9a-z]{32}-[^/]+", output
-                ) or output.endswith(".drv"):
+                if not re.fullmatch(STORE_PATH, output) or output.endswith(".drv"):
                     raise Failure("build did not produce a concrete system output")
                 manifest["hosts"][host] = output
             self.clean()
@@ -207,8 +287,16 @@ class Prebuild:
                     ]
                 ),
             }
+            progress("verifying remote closure")
             local = run(
-                "nix", "path-info", "--store", "daemon", "--recursive", *paths, env=env
+                "nix",
+                "path-info",
+                "--store",
+                "daemon",
+                "--recursive",
+                *paths,
+                env=env,
+                stream=True,
             )
             remote = run(
                 "nix",
@@ -218,6 +306,7 @@ class Prebuild:
                 "--recursive",
                 *paths,
                 env=env,
+                stream=True,
             )
             if set(local.stdout.splitlines()) != set(remote.stdout.splitlines()):
                 raise Failure("remote runtime closure differs from local closure")
@@ -232,6 +321,7 @@ class Prebuild:
                 "1",
                 *paths,
                 env=env,
+                stream=True,
             )
 
     def manifest(self, run_id, sha=None):
@@ -250,6 +340,13 @@ class Prebuild:
             raise Failure("prepared source/cache configuration differs")
         if set(m["hosts"]) != set(self.cfg["hosts"]) or not valid_sha(m["sha"]):
             raise Failure("invalid prepared host set/SHA")
+        evidence = m.get("checkEvidence") or {}
+        if (
+            evidence.get("check") != CHECK
+            or evidence.get("ledger") != "success"
+            or not re.fullmatch(STORE_PATH, evidence.get("output") or "")
+        ):
+            raise Failure("prepared run lacks controller check evidence")
         for host, output in m["hosts"].items():
             root = directory / "roots" / host
             if not root.is_symlink() or str(root.resolve(strict=True)) != output:
@@ -438,10 +535,11 @@ def main():
     parser.add_argument("command", choices=["prepare", "promote", "prune"])
     parser.add_argument("--sha", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument("--run")
+    parser.add_argument("--ledger")
     args = parser.parse_args()
     helper = Prebuild(load(args.config))
     if args.command == "prepare":
-        prepared = helper.prepare(args.sha)
+        prepared = helper.prepare(args.sha, args.ledger)
         if prepared:
             with Path(os.environ["GITHUB_OUTPUT"]).open("a") as out:
                 out.write("prepared-run=" + prepared + "\n")

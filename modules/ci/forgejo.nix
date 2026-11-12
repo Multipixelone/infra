@@ -287,7 +287,10 @@ in
                     run = ''
                       set -euo pipefail
                       bin="$(nix ${nixArgs} build --no-update-lock-file --no-write-lock-file --no-link --print-out-paths .#link-prebuild)/bin/link-prebuild"
-                      "$bin" prepare
+                      # The status ledger written by forgejo-check-status above;
+                      # prepare refuses to run without a successful,
+                      # realized link-prebuild check for this checkout.
+                      "$bin" prepare --ledger "''${CI_STATUS_DIR:-''${RUNNER_TEMP:-$PWD}/ci-status}/resolved"
                       # Lock-aware maintenance, even with promotion disabled.
                       "$bin" prune
                     '';

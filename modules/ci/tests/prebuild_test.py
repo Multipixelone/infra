@@ -14,6 +14,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+CHECK_OUTPUT = "/nix/store/" + "a" * 32 + "-link-prebuild-offline-tests"
+
 SOURCE = sys.argv.pop(1)
 spec = importlib.util.spec_from_file_location("prebuild", SOURCE)
 p = importlib.util.module_from_spec(spec)
@@ -50,6 +52,7 @@ class PrebuildTests(unittest.TestCase):
             "remote": self.remote,
             "cache": "https://cache.example.invalid:5050",
             "hosts": ["impa", "iot", "marin"],
+            "checkSystem": "x86_64-linux",
         }
         self.helper = p.Prebuild(self.cfg)
         self.helper.initialize()
@@ -100,6 +103,11 @@ class PrebuildTests(unittest.TestCase):
                 "ready": True,
                 "lockDigest": self.helper.lock_digest(),
                 "hosts": hosts,
+                "checkEvidence": {
+                    "check": "link-prebuild",
+                    "ledger": "success",
+                    "output": CHECK_OUTPUT,
+                },
                 **{key: self.cfg[key] for key in ("repository", "cache", "publicKey")},
             },
         )
@@ -138,18 +146,116 @@ class PrebuildTests(unittest.TestCase):
             self.helper.prepare(self.sha)
         self.assertIsNone(self.deploy())
 
-    def test_host_build_failure_leaves_unready_roots_and_no_ref(self):
+    def test_prepare_rejects_missing_or_non_success_check_before_building(self):
+        ledger = self.root / "resolved"
+        for contents in (
+            None,
+            "",
+            "other-check\tsuccess\n",
+            "link-prebuild\twarning\n",
+            "link-prebuild\tfailure\n",
+            "link-prebuild\tpending\n",
+            "link-prebuild\tsuccess\nlink-prebuild\tsuccess\n",
+        ):
+            with self.subTest(contents=contents):
+                if contents is not None:
+                    ledger.write_text(contents)
+                with (
+                    patch.object(p, "run", wraps=p.run) as command,
+                    self.assertRaises(p.Failure),
+                ):
+                    self.helper.prepare(
+                        self.sha, ledger if contents is not None else None
+                    )
+                self.assertFalse(
+                    any(call.args[0] == "nix" for call in command.call_args_list)
+                )
+                self.assertEqual(list(self.helper.runs.iterdir()), [])
+                self.assertIsNone(self.deploy())
+
+    def test_success_ledger_requires_exact_realized_check(self):
+        ledger = self.root / "resolved"
+        ledger.write_text("other-check\tfailure\nlink-prebuild\tsuccess\n")
+        with patch.object(
+            p,
+            "run",
+            return_value=subprocess.CompletedProcess([], 0, CHECK_OUTPUT + "\n", ""),
+        ) as command:
+            evidence = self.helper.check_evidence(ledger)
+        self.assertEqual(evidence["output"], CHECK_OUTPUT)
+        self.assertEqual(evidence["check"], "link-prebuild")
+        args = command.call_args.args
+        self.assertIn("build", args)
+        self.assertIn(".#checks.x86_64-linux.link-prebuild", args)
+        self.assertEqual(args[args.index("--max-jobs") + 1], "0")
+        self.assertEqual(args[args.index("--builders") + 1], "")
+        self.assertIn("--no-link", args)
+        self.assertIn("--print-out-paths", args)
+        # A successful command for a different check output is not proof that
+        # this checkout's tests completed, even if the ledger says success.
+        with (
+            patch.object(
+                p,
+                "run",
+                side_effect=[
+                    subprocess.CompletedProcess([], 0, CHECK_OUTPUT + "\n", ""),
+                    subprocess.CompletedProcess(
+                        [], 0, "/nix/store/" + "b" * 32 + "-other-check\n", ""
+                    ),
+                ],
+            ),
+            self.assertRaises(p.Failure),
+        ):
+            self.helper.check_evidence(ledger)
         real = p.run
 
-        def mocked(*args, **kwargs):
+        def unavailable(*args, **kwargs):
+            if args[0] == "nix":
+                if "eval" in args:
+                    return subprocess.CompletedProcess(args, 0, CHECK_OUTPUT + "\n", "")
+                raise p.Failure("check output unavailable")
+            return real(*args, **kwargs)
+
+        with (
+            patch.object(p, "run", side_effect=unavailable),
+            self.assertRaisesRegex(p.Failure, "check output unavailable"),
+        ):
+            self.helper.prepare(self.sha, ledger)
+        self.assertEqual(list(self.helper.runs.iterdir()), [])
+        self.assertIsNone(self.deploy())
+
+    def test_host_build_failure_leaves_unready_roots_and_no_ref(self):
+        ledger = self.root / "resolved"
+        ledger.write_text("link-prebuild\tsuccess\n")
+        real = subprocess.run
+        builds = []
+
+        def mocked(args, **kwargs):
             if args[0] == "nix":
                 if args[1:] == ("--version",):
                     return subprocess.CompletedProcess(args, 0, "nix (mock)\n", "")
-                raise p.Failure("mock host build failed")
-            return real(*args, **kwargs)
+                if any(
+                    arg.startswith(".#checks.x86_64-linux.link-prebuild")
+                    for arg in args
+                ):
+                    return subprocess.CompletedProcess(args, 0, CHECK_OUTPUT + "\n", "")
+                builds.append(kwargs)
+                return subprocess.CompletedProcess(
+                    args, 1, "", "mock host build failed"
+                )
+            return real(args, **kwargs)
 
-        with patch.object(p, "run", side_effect=mocked), self.assertRaises(p.Failure):
-            self.helper.prepare(self.sha)
+        with (
+            patch.object(p.subprocess, "run", side_effect=mocked),
+            self.assertRaises(p.Failure),
+        ):
+            self.helper.prepare(self.sha, ledger)
+        self.assertEqual(len(builds), 1)
+        # Build progress must reach the job log while machine-readable stdout
+        # stays separate. Capturing both hides long-running native Nix logs.
+        self.assertFalse(builds[0].get("capture_output", False))
+        self.assertIsNone(builds[0].get("stderr"))
+        self.assertEqual(builds[0].get("stdout"), subprocess.PIPE)
         directories = list(self.helper.runs.iterdir())
         self.assertEqual(len(directories), 1)
         self.assertFalse(p.load(directories[0] / "manifest.json")["ready"])
@@ -158,9 +264,11 @@ class PrebuildTests(unittest.TestCase):
 
     def test_verify_remote_key_isolation_contents_and_closure_equality(self):
         calls = []
+        process_options = []
 
-        def mocked(*args, **kwargs):
+        def mocked(args, **kwargs):
             calls.append((args, kwargs["env"]))
+            process_options.append(kwargs)
             return subprocess.CompletedProcess(
                 args, 0, "/nix/store/system\n/nix/store/dep\n", ""
             )
@@ -172,10 +280,16 @@ class PrebuildTests(unittest.TestCase):
                     "NIX_CONFIG": "extra-trusted-public-keys = unwanted\nsecret-key-files = /private"
                 },
             ),
-            patch.object(p, "run", side_effect=mocked),
+            patch.object(p.subprocess, "run", side_effect=mocked),
         ):
             self.helper.verify(["/nix/store/system"], self.root)
         self.assertEqual(len(calls), 3)
+        # Closure comparisons still need captured stdout even when native Nix
+        # progress is streamed. In particular verification must not buffer logs.
+        self.assertFalse(process_options[-1].get("capture_output", False))
+        self.assertIsNone(process_options[-1].get("stderr"))
+        for options in process_options:
+            self.assertEqual(options.get("stdout"), subprocess.PIPE)
         verify, env = calls[-1]
         self.assertEqual(
             verify[:7],
@@ -253,6 +367,15 @@ class PrebuildTests(unittest.TestCase):
         run_id = self.prepared()
         with patch.dict(os.environ, {"LINK_PREBUILD_PROMOTION": "false"}):
             self.assertFalse(self.helper.promote(self.sha, run_id))
+        manifest_path = self.helper.runs / run_id / "manifest.json"
+        manifest = p.load(manifest_path)
+        evidence = manifest.pop("checkEvidence")
+        p.atomic(manifest_path, manifest)
+        with self.assertRaisesRegex(p.Failure, "controller check evidence"):
+            self.helper.promote(self.sha, run_id)
+        self.assertIsNone(self.deploy())
+        manifest["checkEvidence"] = evidence
+        p.atomic(manifest_path, manifest)
         (self.helper.runs / run_id / "roots" / "iot").unlink()
         with self.assertRaises(p.Failure):
             self.helper.promote(self.sha, run_id)
@@ -407,6 +530,20 @@ class PrebuildTests(unittest.TestCase):
             creds = Path(value.split("--file=", 1)[1])
             self.assertEqual(creds.stat().st_mode & 0o777, 0o600)
             self.assertIn("offline-token", creds.read_text())
+            # Streaming safe native Nix progress must not also start streaming
+            # Git's authenticated remote diagnostics into the job log.
+            with patch.object(
+                p.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 1, "", "auth failed"),
+            ) as process:
+                result = self.helper.git("ls-remote", self.remote, check=False)
+            self.assertEqual(result.stderr, "auth failed")
+            options = process.call_args.kwargs
+            self.assertTrue(
+                options.get("capture_output", False)
+                or options.get("stderr") == subprocess.PIPE
+            )
         self.assertFalse(creds.exists())
         self.assertEqual(
             before, {k: v for k, v in os.environ.items() if k.startswith("GIT_CONFIG_")}
