@@ -198,7 +198,14 @@
       url = "github:natsukium/mcp-servers-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+    millennium = {
+      url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+      inputs.millennium-src.follows = "millennium-src";
+    };
+    millennium-src = {
+      url = "github:SteamClientHomebrew/Millennium";
+      flake = false;
+    };
     monocle.url = "github:Multipixelone/monocle/nix-build";
     musnix.url = "github:musnix/musnix";
     nextmeeting = {

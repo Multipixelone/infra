@@ -2766,17 +2766,19 @@
     },
     "millennium": {
       "inputs": {
-        "millennium-src": "millennium-src",
+        "millennium-src": [
+          "millennium-src"
+        ],
         "nixpkgs": "nixpkgs_22",
         "nixpkgs-bun": "nixpkgs-bun"
       },
       "locked": {
         "dir": "packages/nix",
-        "lastModified": 1793036394,
-        "narHash": "sha256-vKNDa2aF7mi8I5SJVlqtePTwel64sYEAiHQR7HbUpwk=",
+        "lastModified": 1794431387,
+        "narHash": "sha256-U6tNAspTTC+6/LwCiddZbeDXydn0a6jssSDDBvVIlFk=",
         "owner": "SteamClientHomebrew",
         "repo": "Millennium",
-        "rev": "d6a7822a43744b6290a0e059bdd032d9b9a2ec94",
+        "rev": "dee8e60f689b4f42b04eea0a4f4f063ecd8609aa",
         "type": "github"
       },
       "original": {
@@ -2789,17 +2791,16 @@
     "millennium-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1792710296,
-        "narHash": "sha256-e79vMkWWeK7Rk3OjbK82yC+EgVgCCtG9wRMxO1ZP+vE=",
+        "lastModified": 1794431387,
+        "narHash": "sha256-U6tNAspTTC+6/LwCiddZbeDXydn0a6jssSDDBvVIlFk=",
         "owner": "SteamClientHomebrew",
         "repo": "Millennium",
-        "rev": "3858d60a2081f612739f07386ceac9b79f68274b",
+        "rev": "dee8e60f689b4f42b04eea0a4f4f063ecd8609aa",
         "type": "github"
       },
       "original": {
         "owner": "SteamClientHomebrew",
         "repo": "Millennium",
-        "rev": "3858d60a2081f612739f07386ceac9b79f68274b",
         "type": "github"
       }
     },
@@ -4356,6 +4357,7 @@
         "make-shell": "make-shell_2",
         "mcp-servers-nix": "mcp-servers-nix",
         "millennium": "millennium",
+        "millennium-src": "millennium-src",
         "monocle": "monocle",
         "musnix": "musnix",
         "nextmeeting": "nextmeeting",

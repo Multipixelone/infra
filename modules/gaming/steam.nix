@@ -1,7 +1,16 @@
 { inputs, ... }:
 {
   flake-file.inputs = {
-    millennium.url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+    millennium = {
+      url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+      # Upstream's packaging can move ahead of its pinned source (e.g. the RT3
+      # MILLENNIUM_LINUX_X64 flag), so keep source and packaging on one revision.
+      inputs.millennium-src.follows = "millennium-src";
+    };
+    millennium-src = {
+      url = "github:SteamClientHomebrew/Millennium";
+      flake = false;
+    };
 
     steam-easygrid = {
       url = "github:luthor112/steam-easygrid";
