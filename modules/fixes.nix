@@ -87,6 +87,19 @@
         ];
       });
     })
+    # codex-acp pulls in source-built codex even though the CLI uses codex-nix.
+    # Remove once nixpkgs includes this upstream build-input fix:
+    # https://github.com/NixOS/nixpkgs/commit/16b463698a5b9f20881b6c5f1150ce37e2456db9
+    (final: prev: {
+      codex = prev.codex.overrideAttrs (old: {
+        buildInputs = old.buildInputs ++ [
+          final.aws-lc
+          final.oniguruma
+          final.sqlite
+          final.zstd
+        ];
+      });
+    })
     # espanso 2.3.0 fails to link on aarch64-darwin: buildRustPackage's default
     # cargo-auditable pass injects an undefined `_AUDITABLE_VERSION_INFO` symbol
     # plus an espanso_audit_data.o, and the cctools `ld` crashes (Trace/BPT trap,
