@@ -1,45 +1,72 @@
 # Link prebuild, signed-cache pull, and promotion runbook
 
-**Status — 2026-11-07:** The cache, preparation/promotion helper, workflow wiring,
-and offline tests are implemented in source. Generated artifacts were reviewed;
-17 helper tests, 13 status tests, and 97 scoped configuration/workflow predicates
-passed, along with source formatting and lint checks. The Nix snapshots span
-concurrent, unrelated CommuteCompass input/configuration edits; they are not a
-single frozen-input validation and do not certify the latest whole tree. **The feature is disabled by default, not an
-operational cache or deployment pipeline.** Signing-key provisioning, real system
-builds, deployment, production-ref changes, and live probes require separate
-authorization and have not been performed. Offline mocks and configuration
-inspection do not establish live cache, signature, or promotion success.
+**Status — 2026-11-12: source fixes committed as `6ab6d34ab`; scoped validation
+passed.** The feature remains disabled by default, not an operational cache.
+Against unchanged lockfile SHA-256 `ade60923c46450fedf5ff0b1e6b41c5e80f0998baa582689041f89f0c52a87f0`,
+19 helper tests, 14 status tests, targeted formatting/lint, generated-artifact
+review, and synthetic configuration/workflow evaluations passed. These cover
+source behavior, not the full suite or live operation. The earlier 7 November
+report covered an older, changing-input snapshot and is historical; no result
+from it is used to certify this revision.
+
+This runbook is for the owner and authorized operator. The next rollout is
+**cache-first, while retaining Colmena**: provision and activate Link, prove real
+preparation and cold explicit-output copies, then stop. Do not enable strict
+client policy, Comin, or promotion in this rollout. No provisioning, deployment,
+real system build, production-ref update, or live probe is authorized by the
+source/documentation work; all such evidence remains pending.
 
 This replaces the [never-activated distributed-build design](link-distributed-builds.md).
 The [decision record](ci-build-cache-decision-record.md) preserves the dated
-changes and October incident. Comin activation remains a later project. Fly
-cleanup remains independent; the owner reported stopping Fly.
+changes and October incident. Fly cleanup remains independent; the owner reported
+stopping Fly. Track **source implemented → provisioned → activated → live-tested**
+separately: none follows automatically from the preceding state or a mock test.
 
 ## Architecture and trust
 
 ```text
-Forgejo checks on native Link runner
-  -> build and root actual impa/iot/marin system closures in Link's /nix/store
-  -> verify complete closures through private signed HTTPS cache
-  -> guarded promotion of the exact tested SHA to refs/heads/deploy
-  -> later: client resolves that SHA, copies complete closure, roots, activates
+Cache-first rollout (separately authorized, not yet demonstrated):
+  verified repository-scoped native Link runner
+    -> checks, then build and root actual impa/iot/marin system closures
+    -> verify complete closures through private signed HTTPS cache
+    -> cold copy of recorded output on impa, then iot and marin; NO activation
+
+Deployment today: Link-side Colmena build -> SSH closure push -> target activation
+
+Later, separate project only:
+  guarded exact-SHA deploy ref -> Comin/pull adapter -> pending root -> activation
 ```
 
 Only **`impa`, `iot`, and `marin`** are prebuild/pull clients. The replacement
-grants no trusted Nix access to Link: no writable SSH store, new trusted user,
-remote builder, or client SSH host-key authentication. Link does not substitute
-from itself; GitHub and unrelated hosts receive no Link cache settings. Public
-caches, private-input authentication, CI checks/status policy, ARM advisory
-coverage, deployment tooling, and resource budgets must remain intact.
+grants them no new trusted Nix access to Link: no writable SSH store, new trusted
+user, remote builder, or client SSH host-key authentication. Link does not
+substitute from itself; GitHub and unrelated hosts receive no Link cache settings.
+Public caches, private-input authentication, existing CI checks/status policy,
+ARM advisory coverage, deployment tooling, and resource budgets remain.
+
+**Keep Colmena today.** [`modules/configurations/nixos.nix`](../modules/configurations/nixos.nix)
+sets `deployment.buildOnTarget = false` by default, passed into the hive by
+[`modules/configurations/colmena.nix`](../modules/configurations/colmena.nix).
+There is no target-build override in the inspected source. The established
+[`Justfile`](../Justfile) recipes build on the invoking machine (Link for this
+workflow) and push closures to targets over SSH. The signed cache does not replace
+that deployment path, and a cache proof must not activate a client.
 
 **Existing trust is not removed.** Forgejo on `impa` already controls the native
-trusted Link runner. Its source still has conflicting registration comments:
-global enrollment versus a repository-scoped trust rationale. Before enabling
-promotion, the owner must verify actual repository-only enrollment and who can
-submit trusted workflows. Native CI is not an untrusted-fork sandbox. Accepting
-Link's signing key also means trusting its signed outputs on clients; a signature
-is not independent proof of safe source or a successful release.
+trusted Link runner. Its source has conflicting registration comments: global
+enrollment versus a repository-scoped trust rationale. **Before any cache CI use,
+not merely before promotion**, verify its actual enrollment is restricted to
+`tunnel/infra`, and identify everyone who can submit trusted workflows. Stop if
+scope is global, broader than intended, or unverified. Native CI is not an
+untrusted-fork sandbox. Accepting Link's signing key also means trusting its
+signed outputs; a signature is not independent proof of safe source or a
+successful release.
+
+Link is the owner's desktop, not an always-on cache service. That uptime tradeoff
+is accepted: when it is off, new uncached updates needing Link cannot complete.
+Already-running systems continue, and local store objects/public caches remain
+usable; this is not a guarantee that every ordinary build succeeds during an
+outage. The future explicit-copy path stops if its Link source is unavailable.
 
 The cache is **private, not a release-only object store**. An authorized reader
 can retrieve any known path in Link's store, including private sources/configs,
@@ -56,8 +83,9 @@ Source ownership:
   correspond to [`modules/hosts.nix`](../modules/hosts.nix).
 - [`modules/ci/prebuild.nix`](../modules/ci/prebuild.nix) packages
   [`lib/link-prebuild.py`](../lib/link-prebuild.py) as `link-prebuild`, supplies its
-  configuration, and declares the offline check. Its `prepare`, `promote --run`,
-  and `prune` entry points are CI/state-management operations, not activation.
+  configuration, and declares the offline check. Its `prepare --ledger`,
+  `promote --run`, and `prune` entry points are CI/state-management operations,
+  not activation.
 - [`lib/ci.nix`](../lib/ci.nix) owns the fixed host list and `deploy` branch;
   [`modules/ci/forgejo.nix`](../modules/ci/forgejo.nix) owns workflow guards;
   [`modules/ci.nix`](../modules/ci.nix) excludes deployment-ref builds on GitHub.
@@ -68,40 +96,57 @@ Source ownership:
   [`modules/ci/tests/prebuild_test.py`](../modules/ci/tests/prebuild_test.py)
   exercises offline control flow with mock Nix and disposable bare Git.
 
-The withdrawn distributed-build module has been removed. Retention now counts
-distinct release SHAs, with a same-SHA retry regression test; the workflow runs
-lock-aware pruning after successful preparation. These are source observations,
-not test results. The validator still needs to check evaluated configuration,
-generated outputs, formatting/links, and focused tests after artifact review.
+The withdrawn distributed-build module has been removed. The committed fixes
+separate strict client policy from cache enablement, gate on the helper's own
+check, and pin the ACME propagation resolver. Scoped validation covered all six
+hosts at disabled defaults, synthetic enabled configurations with empty/one/all
+strict-client selections, rejected disabled/invalid selections, and workflow
+ledger/gating checks. Generation changed only the README gate list; disabled
+workflows stayed unchanged. This does not establish activated configuration,
+production signing material, or live cache behavior.
 
-The module defaults to **`linkCache.enable = false`** and
-**`linkCache.publicKey = null`**. Disabled means no new cache listener/firewall
-rules, signing-secret declaration, client cache/job policy, or generated
-preparation/promotion steps. Ordinary CI retains its checks, authentication, and
-resource budgets; `deploy` trigger exclusions and default-branch cancellation
-protection remain. Enabling asserts a correctly shaped public key and the
-presence of encrypted `nix-cache/link.age`; credential/public-key agreement is a
-separate startup check, not proven by file existence.
+Defaults and independent gates:
 
-Promotion has another interlock: repository variable **`LINK_PREBUILD_PROMOTION`
-must equal `true`**; absent/false leaves promotion off. This does **not** disable
-preparation once enabled workflows are published. Coordinate source enablement,
-workflow publication, and the Link-only activation gate below.
+- **`linkCache.enable = false`**: no new cache listener/firewall rules, signing
+  secret declaration, client cache policy, or generated preparation/promotion
+  steps. Ordinary CI remains, including the gating `link-prebuild` check, `deploy`
+  trigger exclusions, and default-branch cancellation protection.
+- **`linkCache.publicKey = null`**: enabling requires a correctly shaped real public
+  key and encrypted `nix-cache/link.age`. File existence is not proof of usable
+  material; the service checks secret/public-key agreement at startup.
+- **`linkCache.pullOnlyHosts = [ ]`**: cache enablement alone gives the three
+  clients the hostname mapping, substituter, trusted key, and `require-sigs = true`
+  when their configurations are activated. It leaves their local-build and
+  fallback settings unchanged. Only hosts explicitly selected in this list get
+  `max-jobs = 0` and `fallback = false`. Values are restricted to `impa`, `iot`, and
+  `marin`; selecting a host while the cache is disabled fails that host's
+  assertion. **Keep the list empty throughout the cache-first rollout.**
+- Repository variable **`LINK_PREBUILD_PROMOTION` must equal `true`** for promotion.
+  Keep it absent/false until the separately reviewed Comin/pull-adapter pass;
+  there is no current consumer requiring a `deploy` ref. This interlock does
+  **not** disable preparation once enabled workflows are published.
 
-Track these states separately: **source implemented → provisioned → activated →
-live-tested**. None follows automatically from the preceding one or from a green
-mock test. Missing production prerequisites are gates, not evidence of a broken
-running service.
+Publishing an enabled workflow, activating Link, and activating any client are
+separate actions. Require Link readiness before publishing enabled preparation;
+do not combine them into a fleet switch. Missing production prerequisites are
+gates, not evidence of a broken running service.
 
 ## Endpoint and signing contract
 
 - URL: **`https://link-cache.home.finnrut.is:5050`**.
 - nginx binds only **`192.168.6.6:5050`**; nix-serve stays on
   **`127.0.0.1:5051`**, with no broad firewall opening.
-- Link and the three clients get a `networking.hosts` mapping to Link's LAN IP.
-  There is no global flake `nixConfig` cache URL, public DNS record, publication
-  registry entry, or Tunnel route. A dedicated DNS-01 ACME certificate uses the
-  existing ACME credential; an HTTPS certificate is not permission to publish.
+- Enabled configurations give Link and the three clients a `networking.hosts`
+  mapping to Link's LAN IP. The module adds no global flake `nixConfig` cache URL,
+  public A record, publication registry entry, or Tunnel route.
+- A dedicated DNS-01 ACME certificate uses the existing
+  `/run/agenix/cloudflare-acme-dns01` credential. Propagation checks are pinned to
+  **`1.1.1.1:53`**, avoiding the internal split-DNS shadow. DNS-01 needs control of
+  the public challenge TXT record, **not a public A record or inbound port 80**.
+  DNS authority/propagation, private credential availability, certificate-key
+  handling, and successful live issuance/renewal remain unproven. A resolver
+  setting is not issuance evidence; an HTTPS certificate is not permission to
+  publish the cache.
 - Both nginx and the early `nixos-link-cache` firewall chain restrict sources.
   The chain precedes broad `nixos-fw` accepts, including trusted `wg0`; simply
   opening TCP/5050 would not enforce this boundary. nginx ends with `deny all`.
@@ -140,22 +185,50 @@ here.
 ## Preparation, promotion, and retained state
 
 Existing system checks already reference actual NixOS toplevels, but a cached
-check without persistent roots is not enough. Preparation runs only after the
-existing **Report verdict** succeeds, with cache enabled, in the authoritative
-repository on a default-branch push or authorized dispatch. Checkout SHA must
-match the event; tracked content, submodules, and lockfile must match that SHA.
-The configured authority is `https://git.finnrut.is/tunnel/infra.git`, default
-branch `main`, promotion target `refs/heads/deploy`—not the GitHub mirror.
-It explicitly builds all three toplevels through Link's daemon with no remote
-builders, no lockfile mutation, and stable per-host out-links, retaining existing
-`NIX_CONFIG` budgets. Native builds reuse Link's store; there is no upload step.
+system check without persistent roots is not enough. Preparation runs only after
+**Report verdict** succeeds, with cache enabled, in the authoritative repository
+on a default-branch push or authorized dispatch. Checkout SHA must match the
+event; tracked content, submodules, and lockfile must match that SHA. The authority
+is `https://git.finnrut.is/tunnel/infra.git`, default branch `main`, eventual
+promotion target `refs/heads/deploy`—not the GitHub mirror.
 
-Preparation records SHA, lock digest, run/attempt, Nix version, host output paths,
-and verification. It compares complete local and HTTPS runtime-closure path sets
-and invokes native `nix store verify` on **the remote HTTPS store recursively**,
-including NAR contents, with `--sigs-needed 1` and only the expected trusted public
-key. There is no custom signature/OpenSSL verifier. Native Nix can accept
-content-addressed paths by their content identity; that is not signature proof.
+**The controller check is a gate, not advisory.** `lib/ci.nix` includes
+`link-prebuild` in `gatingCheckPatterns`. The workflow passes the status reporter's
+`resolved` ledger to `prepare --ledger`. Before building any host, the helper:
+
+1. Requires exactly one `link-prebuild` ledger row with state `success`.
+2. Evaluates this checkout's `checks.<checkSystem>.link-prebuild.outPath` and
+   requires the check build's output to equal that exact path. The packaged
+   `checkSystem` is the package's system (`x86_64-linux` on the native Link runner).
+   An already-realized or substituted successful output is valid; a success label
+   for an unsupported/skipped check without its realized output is insufficient.
+3. Records `checkEvidence` in the prepared manifest; promotion rejects a manifest
+   without that record. Older prepared manifests are incompatible: prepare again
+   through the gated workflow, never hand-edit evidence into them.
+
+The check confirmation uses `nix build --max-jobs 0 --builders ''` with lockfile
+updates forbidden. **The evidence is the exact evaluated/realized output match,
+not proof that the command never built anything or freshly reran the tests.**
+This is a control-flow safeguard inside the already-trusted runner, not a new
+security boundary against malicious workflows.
+
+Preparation explicitly builds all three system toplevels through Link's daemon
+with no remote builders, no lockfile mutation, and stable per-host out-links,
+retaining existing `NIX_CONFIG` budgets. Native builds reuse Link's store; there
+is no upload step. Native builds, closure queries, and verification stream stderr
+for progress while capturing stdout for parsing; explicit Git commands keep their
+output captured. Nix still inherits private-input authentication and may invoke
+Git internally, so streamed diagnostics are not guaranteed credential-free.
+Review logs before sharing; do not add shell tracing or dump inherited credentials
+to diagnose a quiet job.
+
+Preparation records SHA, lock digest, run/attempt, Nix version, check evidence,
+host output paths, and verification. It compares complete local and HTTPS
+runtime-closure path sets and invokes native `nix store verify` on **the remote
+HTTPS store recursively**, including NAR contents, with `--sigs-needed 1` and
+only the expected trusted public key. There is no custom signature/OpenSSL
+verifier. Native Nix can accept content-addressed paths by their content identity;
+that is not signature proof.
 Unsigned/wrong-key negative tests therefore need input-addressed objects. The
 helper isolates verification configuration, clears extra keys/private signers,
 enforces TLS verification, uses fresh metadata state and zero narinfo TTLs, and
@@ -164,19 +237,26 @@ response, or top-level signature is insufficient. Preparation/verification
 failure leaves `deploy` unchanged; real signing/content verification is still a
 live validation gate.
 
-The separate promotion job also requires successful checks, a nonempty prepared
-run, the same repository/ref guards, and `LINK_PREBUILD_PROMOTION == 'true'`.
-Both forges exclude `deploy` from build triggers and retain defensive job guards;
-lock updates remain on the default branch. Default-branch runs are not cancelled
-in favor of newer runs; correctness must not depend on FIFO scheduling or token
-trigger suppression.
+### Promotion safety, retained but not enabled
+
+**Promotion is not a prerequisite for cache use.** Keep its interlock off for this
+rollout; the following safeguards must survive the later Comin/promotion pass.
+The separate job requires successful checks, a nonempty prepared run with
+controller-check evidence, the same repository/ref guards, and
+`LINK_PREBUILD_PROMOTION == 'true'`. Both forges exclude `deploy` from build
+triggers and retain defensive job guards; lock updates remain on the default
+branch. Default-branch runs are not cancelled in favor of newer runs; correctness
+must not depend on FIFO scheduling or token trigger suppression.
 
 Promotion uses the existing `FORGE_TOKEN` through temporary credentials, not an
 argv token or a new CI secret, and removes checkout's competing authorization
-header. **Verify the token's actual actor**, which may be the human owner, before
-protecting `deploy`: only the intended actor may advance it, no force/delete or
-human merges, and required statuses must already be complete. Do not require the
-promotion job's own pending status for its push.
+header. Before later enabling it, **verify the token's actual actor**, which may
+be the human owner, and protect `deploy`: only the intended actor may advance it,
+no force/delete or human merges, and required statuses—including
+`checks / link-prebuild`—must already be successfully complete for the candidate.
+Do not require the promotion job's own pending status for its push. These are
+branch-protection prerequisites, not a claim that the helper queries Forgejo
+statuses or configures protection itself.
 
 Under the persistent promotion lock, the helper reconciles any unresolved intent,
 validates prepared state/roots, then discovers authoritative default/deploy refs.
@@ -187,6 +267,8 @@ SHA (or absence); no unconditional force or API ref replacement is allowed.
 Default can advance between its check and the one-ref push: the contract is
 **tested, monotonically advancing deploy**, not an atomic update of two refs or
 an assurance that deploy is always the newest default tip.
+
+### Roots, retention, and disk headroom
 
 Persistent state is outside workspace cleanup:
 
@@ -216,81 +298,165 @@ younger than 24 hours**, plus active locks and unresolved intent. Same-SHA retri
 do not consume predecessor slots. Unprotected directories must also be at least
 24 hours old by directory mtime before deletion; unlocked failed/unpromoted runs
 can then be cleaned. The test source covers count/grace/lock/intent retention and
-same-SHA retry behavior, but no passing result is asserted here.
+same-SHA retry behavior; the focused offline suite passed, without proving live
+root visibility, storage capacity, or production promotion.
 
 The workflow calls lock-aware `prune` after successful preparation even when
-promotion is off; promotion also prunes after durable finalization. This is not
-an age-only tmpfiles rule or an independent timer: without a later successful
-run or separately authorized maintenance, eligible runs can remain longer.
-Never move registered roots, discard current roots before replacement, or wipe
-the store. Existing GC thresholds stay unchanged; disk pressure is not permission
-to evict protected releases. `keep-outputs` can retain more than runtime closures,
-so this policy is no disk quota.
+promotion is off; promotion also prunes after durable finalization. **Do not add a
+standalone pruning timer or age-only tmpfiles cleanup.** During cache-only use,
+the last good prepared run is unpromoted, so promotion history does not protect it
+permanently. A later prune may remove it once it is old and unlocked; without a
+later successful prepare or separately authorized maintenance, eligible runs can
+remain longer. A failed prepare does not invoke the workflow's subsequent prune.
+Reconfirm that the chosen run's roots still exist before scheduling client copies.
+
+**Three releases plus 24 hours is a retention rule, not a disk budget.**
+[`modules/nix/settings.nix`](../modules/nix/settings.nix) sets `keep-outputs = true`,
+which can retain more than runtime closures. Existing Link GC thresholds remain
+10–40 GiB; they cannot reclaim rooted data or guarantee space for the next build.
+Before approving recurring preparation, measure closure sizes, actual free space,
+and peak headroom during a representative three-host run, then confirm that
+post-prepare pruning leaves room for another run. No such measurement is supplied.
+Stop new preparation on inadequate headroom; do not evict protected releases,
+move registered roots, discard current roots before replacement, or wipe the
+store to make a build pass.
 
 ## Approval-gated rollout
 
-Stop at any failed gate. The owner authorizes each live stage; Fixer implements
-source changes; the orchestrator reviews artifacts; the background validator
-collects scoped evidence after writers reconcile. Stage new sources before
-Git-backed evaluation/regeneration. For this task, the background validator runs
-regeneration, which rewrites all `files.file` outputs and `flake.nix`; the
-orchestrator reviews the entire generated diff. Preserve external `flake.lock`
-and `modules/marin/hardware-configuration.nix` changes.
+**Stop at any failed gate.** The owner authorizes each live stage. Repository
+work is not permission to provision secrets, build real systems, deploy, alter
+production refs, or probe services. Keep `pullOnlyHosts = [ ]`, promotion off, and
+Colmena as the deployment path throughout this rollout.
 
-1. **Reconcile disabled source.** Validate defaults, missing-prerequisite failure,
-   and an isolated enabled test fixture with synthetic public material only.
-   Check no reverse access, no unintended consumers/publication, CI guards and
-   existing coverage/auth/budgets. Run focused offline tests and formatting/link
-   checks; mocks prove control flow, not TLS/signing or live pushes.
-2. **Provision only with separate approval.** The owner/secrets maintainer creates
-   a real signing identity through the private secrets workflow, encrypts the
-   one new file for Link, and supplies only its real public key to Fixer for
-   `linkCache.publicKey`. Any private-input revision change is separately
-   reviewed. Verify the existing ACME credential is usable without exposing it.
-   Do not read/print private key bytes, track plaintext, or add CI signing secrets.
-3. **Activate Link only after approval.** Prepare reviewed enable/public-key
-   values and regenerate, but coordinate publishing the enabled default-branch
-   workflow: it schedules real preparation builds even with promotion off.
-   Deploy only Link from the approved candidate using existing single-host
-   tooling; leave clients unactivated. Verify actual bindings, untrusted service
-   user/credential handling, public-key match, TLS, exact source ACLs, denied
-   methods/paths, and unauthorized LAN/WireGuard sources. Verify missing-signer
-   isolation without interrupting unrelated nginx sites. Never bypass TLS.
-4. **Prove preparation before promotion.** Separately authorize publishing/running
-   the enabled workflow and real three-host builds. Require remote full-closure
-   signature/content verification, daemon-visible roots across runner restart,
-   and retention/recovery evidence. Record runner scope, trusted contributors,
-   token actor, branch protection, and completed required statuses. Enable
-   promotion last, only after those prerequisites and a production-ref update
-   are approved.
-5. **Activate client policy one host at a time.** `impa`, then `iot`, then `marin`:
-   verify hostname resolution and `ip -4 route get 192.168.6.6`, then observed
-   source/return path to TCP/5050. Require the exact allowlist above, never a
-   guessed NAT source. Test cold whole-closure fetch and fail-closed negatives
-   without activation before proceeding to the next client.
-6. **Comin remains deferred.** Design and validate the activation/rooting adapter
-   separately; neither publication nor a successful fetch activates a system.
+### 1. Reconcile source and verify runner enrollment
 
-Keep the approved SHA/lock digest, provisioned public-key identity, per-host output
-paths, remote closure/signature/content results, stable-root observations,
-old/candidate/observed deploy refs, and each client's route/ACL/cold-fetch results.
-Record failed gates as well as successes; review reports for private contents.
+- Complete the scoped source review and current-lock validation: disabled
+  defaults; enabled cache with no strict clients; one selected client; invalid
+  client/disabled-cache selection; missing-prerequisite failures; no reverse
+  access or unintended consumers; preserved coverage/authentication/budgets;
+  ACME resolver; helper-check gating and realized evidence; focused offline tests.
+  Use synthetic public material only in fixtures. Mocks do not prove TLS,
+  signatures, daemon roots, or live promotion.
+- Before **any cache CI use**, the owner verifies actual `tunnel/infra`-only native
+  runner enrollment and trusted workflow contributors in Forgejo. Resolve the
+  contradictory registration comments against live enrollment, not assumptions.
+  An unknown or global registration scope is a stop condition.
+- Fixer owns source wiring; Validator executes regeneration and final scoped
+  checks, including documentation formatting/links. The orchestrator reviews the
+  entire generated diff. `nix run .#generate-files` rewrites all `files.file`
+  outputs and `flake.nix`, and pre-commit also invokes it. Stage new source files
+  before Git-backed evaluation/regeneration; never hand-edit generated outputs.
+  Repository review and commits do not authorize live rollout.
 
-Live stages are pending authorization; repository checks belong to the validator
-after writers reconcile. Linux Nix validation/long-running commands use the
-approved background validator and inherited `agent-run-long` procedure, with fresh
-`direnv exec .` when a dev shell is needed. For a separately approved local
-system build, use the `agent-run-long` skill's wrapped, raw-output NH host-build
-form (`--no-nom --log-format raw -L`), not raw `nix build` or `nixos-rebuild`.
-If execution/delegation is unavailable, record the limitation.
+### 2. Provision the signing identity, then activate Link only
+
+- With separate approval, the owner/secrets maintainer creates a real signing
+  identity through the private secrets workflow, encrypts `nix-cache/link.age`
+  for Link, and supplies only its public key for `linkCache.publicKey`. Review
+  the private-input revision change separately. Do not print private bytes,
+  track plaintext keys, or put the signer in CI secrets/environment.
+- Verify the existing ACME credential, public DNS challenge authority, and
+  public-resolver reachability without exposing credentials. DNS-01 does not
+  require opening port 80 or publishing a public cache A record.
+- Prepare reviewed `enable = true`, the real public key, and **an empty
+  `pullOnlyHosts` list**. Activate **Link only** with the established single-host
+  deployment procedure from the approved candidate. Leave all three client
+  systems unchanged. Coordinate workflow publication: merging enabled generated
+  workflow steps can start real preparation even with promotion off. Do not
+  publish them before Link and the runner gates are ready and builds authorized.
+- Verify runtime bindings, untrusted service user/credential handling,
+  public-key agreement, valid TLS/hostname/chain, exact nginx and early-firewall
+  ACLs, allowed cache protocol paths, and denied writes/query strings/log paths.
+  Include unauthorized LAN and WireGuard sources. Demonstrate missing/invalid
+  signer isolation under an approved failure test without disrupting unrelated
+  nginx sites. Never bypass TLS or widen the ACL to make a probe pass.
+
+### 3. Prove real three-host preparation and storage headroom
+
+Separately authorize an enabled default-branch CI run for the approved SHA/lock.
+Require completed gating checks, including `link-prebuild` and its exact realized
+output evidence. The run must build/root **all three actual host toplevels**, not
+only a package subset, then verify complete remote closure equality, trusted
+signatures, and NAR contents. Cache-info success, a `Sig` grep, or a warm local
+store is not sufficient.
+
+Prove the indirect roots are visible to the daemon **before and after an
+authorized runner restart**, outside workspace cleanup. Record measured disk
+headroom for the three-host preparation and the next run, considering
+`keep-outputs`; the retention count is not a capacity estimate. Inspect
+lock-aware prune behavior without deleting protected roots. Keep promotion off:
+this stage neither creates nor advances `deploy`.
+
+### 4. Cold-copy one client, then all three, without activation
+
+Start with **`impa`**. Use an approved prepared manifest's immutable SHA, lock
+digest, and exact host output; no deployment ref is needed. Verify that run's
+roots still exist and that the chosen output is initially absent on the client.
+Do not delete current or rollback objects to manufacture a cold test.
+
+Link-only activation does not install the client hostname mapping or signing
+trust. Before a copy, separately approve and establish scoped client resolution
+and trusted-key configuration using the already-installed Nix; do not activate a
+new NixOS generation or select `pullOnlyHosts` merely to set up this proof. If the
+operator cannot establish that prerequisite without a client activation, stop
+and return the missing setup to Fixer. Verify `ip -4 route get 192.168.6.6` and the
+observed source/return path to TCP/5050 against the exact ACL—not a guessed NAT
+address.
+
+Use the [explicit-output payload below](#copy-only-payload-for-an-authorized-proof).
+It writes to the client's store, but must not build, switch profiles, or activate
+a system. Record whole-closure availability and native signature/content evidence,
+not just a successful no-op on an already-warm store. In approved disposable
+negative fixtures, missing dependencies, unsigned input-addressed objects, wrong
+keys, TLS failure, and unavailable Link must fail without build fallback or
+activation; never damage the live cache to create a negative test.
+
+Only after `impa` passes, repeat for **`iot`**, then **`marin`**, using each host's
+recorded output and observed route. A single-host pass is not proof of all three
+network paths. **Keep Colmena for actual deployments.**
+
+### 5. Stop here
+
+Do **not** enable strict clients, Comin, or `LINK_PREBUILD_PROMOTION` after a
+successful cache proof. A later, separately authorized pass must design and test
+the exact-output copy/root/activation adapter and its recovery, review Git actor
+and branch protections, and only then consider per-host strict policy and
+promotion. Cached objects and successful copies are not activation evidence.
+
+For the cache-first rollout, retain the approved SHA/lock digest, real public-key
+identity, runner-scope evidence, ready manifest/check output, per-host paths,
+remote verification, daemon-root/restart observations, disk measurements, and
+per-client route/ACL/cold-copy/negative results. Record failed gates too; review
+reports for private contents. Old/candidate/observed `deploy` refs are evidence
+for the later promotion pass, not a prerequisite here.
+
+For authorized Linux Nix validation or long-running work, the background
+validator follows the inherited `agent-run-long` procedure; use fresh
+`direnv exec .` when a development shell is needed. For a separately approved
+local system build, use the established wrapped, raw-output NH host-build form
+(`--no-nom --log-format raw -L`), not raw `nix build` or `nixos-rebuild`. This does
+not change the helper's explicit CI builds or authorize a target-local rebuild.
+If execution/delegation is unavailable, report that limitation.
 
 ## Future client no-build contract
 
-Enabled clients add the real cache URL/key and require signatures, with
-`max-jobs = 0`, `fallback = false`, and no distributed builders. Public caches
-remain. **`max-jobs = 0` is not an absolute no-build guarantee**: in particular,
-`preferLocalBuild` derivations can still execute. Ordinary evaluation also stays
-local. Disabled defaults leave pre-existing local settings unchanged.
+**A cached NixOS toplevel does not make an ordinary target-side NH rebuild a
+pull-only update.** The pinned-source review supplied for this reconciliation
+identifies `preferLocalBuild = true` and `allowSubstitutes = false` on the upstream
+[NixOS toplevel](https://github.com/NixOS/nixpkgs/blob/f4a03c008967841f2a0b3cb7c436fc6fc31671f6/nixos/modules/system/activation/top-level.nix).
+With the output absent locally, the normal derivation build path is therefore
+not a cache-copy contract. The reviewed **Nix 2.35.3** native local-build path
+rejects local builds at `max-jobs = 0`; do not repeat the generic claim that
+`preferLocalBuild` bypasses that limit. These are pinned-source findings, **not a
+runtime NH/client proof**, nor a blanket guarantee about every Nix execution
+path. Recheck the selected Nix package and upstream behavior when the lock changes.
+
+Cache enablement alone does not set those strict job/fallback values. The optional
+`pullOnlyHosts` policy applies them per host, with no distributed builders and
+public caches retained. Leave it empty until the adapter below is approved and
+tested. The no-build contract comes from **evaluation with IFD disabled followed
+by copying an explicit output**, not from passing a flake installable to a build
+command with different settings.
 
 For a future pull/Comin adapter, the required sequence is:
 
@@ -308,8 +474,15 @@ For a future pull/Comin adapter, the required sequence is:
    wrong keys, TLS failures, or unavailable Link must leave the current system
    active. Already-running services do not depend on the next cache fetch.
 
-For the later authorized fetch proof, using already installed Nix rather than
-loading a dev shell that might itself build, an `impa` evaluation payload is:
+### Copy-only payload for an authorized proof
+
+For rollout stage 4, use the prepared manifest's immutable SHA directly; do not
+create `deploy` just to test the cache. On the approved client, prerequisites are
+an authenticated clean checkout at that SHA/lock, installed Nix, verified hostname
+resolution/route, the real signing public key trusted by the destination daemon,
+and signature/TLS checking enabled. Use installed tools rather than loading a dev
+shell that might itself build. This `impa` evaluation payload must match its
+manifest entry; use the corresponding host attribute on `iot` or `marin`:
 
 ```fish
 nix eval --no-update-lock-file --no-write-lock-file \
@@ -317,36 +490,46 @@ nix eval --no-update-lock-file --no-write-lock-file \
   .#nixosConfigurations.impa.config.system.build.toplevel.outPath
 ```
 
-After checking that result against the release record, a copy-only payload is:
+After checking that result against the ready manifest, the copy-only payload is:
 
 ```fish
 set toplevel /nix/store/REPLACE_WITH_VERIFIED_SYSTEM_OUTPUT
 nix copy --from https://link-cache.home.finnrut.is:5050 --to daemon "$toplevel"
 ```
 
-Replace the placeholder; require the provisioned trusted public key and
-`require-sigs = true`. Do not use `--no-check-sigs`, disable TLS, substitute a
-flake installable, or treat these two commands as a complete activation workflow.
-Use an initially cold client/output for proof; copying into a warm Link store is
-not evidence of publication. Missing-dependency, unsigned-input-addressed-path,
-and wrong-key tests must fail without building or activating. No such live proof
-has been supplied.
+Replace the placeholder with the verified non-`.drv` system output. This copies
+its closure into the target store; it does **not** create a system generation,
+establish the future pending root, or activate anything. Require
+`require-sigs = true` and `ssl-verify = true`. Do not use `--no-check-sigs`, disable
+TLS, substitute a flake installable, or fall back to `nh`/`nix build` if it fails.
+Failure may leave partially copied store objects but must not change the running
+system. A successful copy into an already-warm store proves no transfer; use the
+cold proof and negative cases from stage 4. No such live proof has been supplied.
 
 ## Recovery and rollback
 
-First **disable promotion**, preserve the current ref, manifests, roots, and any
-unresolved intent, and reconcile ambiguous push outcomes before retrying. Do not
-manually delete intent to force progress or prune to recover disk space. Fix the
-cause and use the guarded helper only after review; source comments and a failed
-job alone cannot establish the actual remote ref.
+During cache-only rollout, **leave promotion off and keep using Colmena**. Stop
+new preparation/copy attempts at a failed gate; preserve current and rollback
+roots. Link downtime blocks new Link-dependent uncached work, not running
+services or the existence of public caches. Do not switch a target to local
+rebuilds or weaken signature/TLS checks just to finish a cache proof.
 
-For a planned shutdown, restore client cache/local-build policy one client at a
-time before removing the Link endpoint/key. Do not strand clients at
-`max-jobs = 0` or remove a key still needed for a pending closure. Preserve current
-and rollback roots; endpoint shutdown need not delete store contents. A reviewed
-revert on the default branch followed by fresh preparation/forward promotion is
+If promotion was enabled in a later authorized pass, **disable it first**,
+preserve the current ref, manifests, roots, and unresolved intent, and reconcile
+ambiguous push outcomes before retrying. Do not manually delete intent to force
+progress or prune to recover disk space. Fix the cause and use the guarded helper
+only after review; a red job does not establish the remote ref. A reviewed revert
+on the default branch followed by fresh preparation/forward promotion is
 preferred to rewinding `deploy`. Emergency ref rewind is separate authorized
 break-glass work, not a normal helper operation.
+
+For a planned shutdown, inventory which client settings were actually activated.
+If a later rollout selected strict clients, remove them from `pullOnlyHosts` and
+restore their approved build/fallback policy one host at a time before disabling
+the cache. Remove client endpoint/trust configuration only after pending copies
+are resolved; do not strand clients at `max-jobs = 0` or remove a key still needed
+for a pending closure. Preserve current and rollback roots. Endpoint shutdown
+need not delete store contents or restore the withdrawn reverse-trust design.
 
 Signer compromise requires stopping publication/promotion and revoking affected
 client trust under an incident plan. Removing a key does not repair a compromised

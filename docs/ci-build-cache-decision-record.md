@@ -11,26 +11,60 @@ distributed-build design. **That design was never activated.** Its runnable
 rollout has been withdrawn; the [old page](link-distributed-builds.md) now records
 only its superseded status.
 
-The accepted replacement is **Link CI prebuilds the actual `impa`, `iot`, and
-`marin` system closures, retains their roots, verifies a private signed read-only
-HTTPS cache, then promotes the tested SHA to a guarded `deploy` ref**. Clients
-will pull complete closures; they receive no new trusted Nix access on Link.
-Comin activation is a later, separately authorized step. Existing Forgejo on
-`impa` still controls the native trusted Link runner: this pre-existing trust is
-not removed, and actual runner registration scope must be verified.
+**Reconciled 2026-11-12; source fixes committed as `6ab6d34ab` with scoped validation passing.** The
+accepted replacement is **Link CI prebuilds the actual `impa`, `iot`, and `marin`
+system closures, retains stable roots, and verifies a private signed read-only
+HTTPS cache**. Clients receive no new trusted Nix access on Link. **Keep Link-side
+Colmena build-and-push deployment today (`buildOnTarget = false`).** Guarded
+exact-SHA promotion remains implemented for a later Comin/pull-adapter pass, but
+its interlock stays off: there is no current consumer requiring `deploy`, and
+promotion is not a prerequisite for cache use.
 
-The replacement is implemented in source and generated artifacts were reviewed.
-Offline validation passed 17 helper tests, 13 status tests, and 97 scoped
-configuration/workflow predicates, plus source formatting and lint. Nix snapshots
-span concurrent, unrelated CommuteCompass input/configuration edits; they are not
-a single frozen-input validation and do not certify the latest whole tree. This is **not operational proof**. Defaults are `linkCache.enable = false` and
-`linkCache.publicKey = null`, with promotion separately off unless explicitly
-enabled. Real signing-key provisioning, system builds, deployment, production-ref
-changes, and live probes have **not** been authorized by this implementation
-request. Missing credentials are provisioning gates, not values to invent. See
-the canonical [Link prebuild/pull runbook](link-prebuild-pull.md) for source
-ownership, security and confidentiality boundaries, staged verification,
-distinct-release retention, and rollback.
+The next separately authorized rollout is cache-first: verify the native
+runner's actual `tunnel/infra`-only enrollment **before any cache CI use**; provision
+the signing key and activate Link only; prove real three-host preparation,
+TLS/signatures/ACLs, daemon-visible roots across runner restart, and disk headroom;
+then cold-copy the recorded explicit output on `impa`, followed by `iot` and
+`marin`, **without client activation**. Stop before strict clients, Comin, or
+promotion. Existing Forgejo control of the trusted native runner is not removed;
+its conflicting registration comments do not prove live scope.
+
+Defaults remain `linkCache.enable = false`, `linkCache.publicKey = null`, and
+`linkCache.pullOnlyHosts = [ ]`. Cache enablement adds client cache trust and
+substitution but leaves local-build/fallback settings unchanged. Only explicitly
+selected `impa`/`iot`/`marin` hosts get `max-jobs = 0` and `fallback = false`;
+selection requires the cache to be enabled. Keep the list empty for cache-first
+proof. A cached toplevel does not make normal target-side NH rebuilds pull-only:
+the reviewed upstream toplevel disables substitution, and the pinned Nix 2.35.3
+native local-build path rejects zero local jobs. This is a source finding, not
+runtime proof; the future no-build contract is explicit-output copying plus
+separately designed rooting/activation, not a `preferLocalBuild` exception.
+
+The scoped source fixes also make the helper's `link-prebuild` check gating,
+require its successful ledger entry and exact realized check output before
+preparation, retain check evidence for later promotion, and pin DNS-01 propagation
+to a public resolver. Already-realized/cached successful check outputs are valid;
+the output match does not prove fresh test execution or a never-build command.
+DNS-01 needs no public cache A record or inbound port 80, but credentials, DNS,
+and live issuance remain unproven. Retaining three distinct promoted releases
+plus a 24-hour grace is not a disk budget, especially with `keep-outputs`.
+During cache-only use, an unpromoted last good run is not permanently protected
+by promotion history; keep existing lock-aware prune after successful prepare,
+not a standalone pruning timer. Link desktop uptime is an accepted tradeoff:
+new uncached work needing it can block; running systems and public caches do not
+depend on that cache's uptime.
+
+The **7 November** report is historical and does not certify this revision.
+For `6ab6d34ab`, 19 helper tests, 14 status tests, synthetic six-host policy and
+workflow evaluations, targeted formatting/lint, and generated-artifact review
+passed against unchanged lockfile SHA-256
+`ade60923c46450fedf5ff0b1e6b41c5e80f0998baa582689041f89f0c52a87f0`.
+This is focused source evidence, not a full-suite or live-service result. No real
+signing-key provisioning, system builds, deployment, production-ref changes, or
+live probes are authorized by this source/documentation request. Missing
+credentials are provisioning gates, not values to invent. See the canonical
+[Link prebuild/pull runbook](link-prebuild-pull.md) for the practical gates, trust
+boundaries, retention, future promotion safety, and recovery.
 
 This note supersedes the 6 November direction, including its “no replacement HTTP
 cache” statement. That earlier implementation/check status applies only to the
