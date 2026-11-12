@@ -2,7 +2,7 @@
   lib,
   rootPath,
   inputs,
-  withSystem,
+  # withSystem,
   ...
 }:
 {
@@ -20,10 +20,10 @@
     };
 
   flake.modules.homeManager.gaming =
-    { pkgs, ... }:
+    # { pkgs, ... }:
     {
       home.packages = [
-        (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.lichii))
+        # (withSystem pkgs.stdenv.hostPlatform.system (psArgs: psArgs.config.packages.lichii))
       ];
     };
 }
