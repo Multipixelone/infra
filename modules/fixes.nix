@@ -67,12 +67,26 @@
     #     };
     #   });
     # })
-    # https://github.com/NixOS/nixpkgs/pull/493604
-    # (final: prev: {
-    #   anki = prev.anki.overrideAttrs {
-    #     buildInputs = prev.anki.buildInputs ++ [ prev.qt6.qtwebengine ];
-    #   };
-    # })
+    # Anki 26.09.4's offline wheel list lacks tomlkit, required by hatchling 1.32.0.
+    # Cargo's system-library hook also needs explicit native dependencies.
+    # Remove when nixpkgs fixes Anki's wheel list and native build inputs.
+    (final: prev: {
+      anki = prev.anki.overrideAttrs (old: {
+        env = old.env // {
+          UV_FIND_LINKS = final.runCommand "uv-wheels-with-tomlkit" { } ''
+            mkdir -p $out
+            ln -s ${old.env.UV_FIND_LINKS}/*.whl $out/
+            ln -s ${final.python3.pkgs.tomlkit.dist}/*.whl $out/
+          '';
+        };
+        nativeBuildInputs = old.nativeBuildInputs ++ [ final.pkg-config ];
+        buildInputs = old.buildInputs ++ [
+          final.sqlite
+          final.xz
+          final.zstd
+        ];
+      });
+    })
     # espanso 2.3.0 fails to link on aarch64-darwin: buildRustPackage's default
     # cargo-auditable pass injects an undefined `_AUDITABLE_VERSION_INFO` symbol
     # plus an espanso_audit_data.o, and the cctools `ld` crashes (Trace/BPT trap,
