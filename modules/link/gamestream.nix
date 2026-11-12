@@ -256,21 +256,27 @@
         let
           kill-script = pkgs.writeShellApplication {
             name = "steam-kill";
-            runtimeInputs = [ pkgs.procps ];
+            runtimeInputs = [
+              pkgs.procps
+              pkgs.coreutils
+            ];
             text = ''
-              # `|| true`: pkill exits 1 when nothing matched, which under `set -e`
-              # aborts the script and makes Sunshine log "Return code [1]" on every
-              # teardown where Steam was already gone.
-              pkill steam || true
+              # Exact current-user matching must not kill this steam-kill wrapper
+              # (or another user's Steam). No match is harmless under `set -e`.
+              uid=$(id -u)
+              pkill -x -u "$uid" steam || true
 
               # pkill only sends SIGTERM; Steam takes seconds to actually exit.
               # Without this wait, reconnecting straight away launches a second
               # gamescope+Steam against the still-dying instance, which lands you
               # in "Steam is already running" contention and a black stream.
               for _ in $(seq 1 40); do
-                pgrep -x steam >/dev/null || break
+                pgrep -x -u "$uid" steam >/dev/null || break
                 sleep 0.25
               done
+              if pgrep -x -u "$uid" steam >/dev/null; then
+                echo "Warning: Steam is still running after the 10s SIGTERM wait; reconnect may contend with it" >&2
+              fi
             '';
           };
         in
