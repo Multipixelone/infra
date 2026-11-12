@@ -28,8 +28,96 @@ in
         pkgs.coreutils
         pkgs.curl
         pkgs.libnotify
-        pkgs.mako
       ];
+      noctaliaDnd = pkgs.writeShellApplication {
+        name = "gamemode-noctalia-dnd";
+        runtimeInputs = [
+          config.home-manager.users.${username}.programs.noctalia.package
+          config.programs.hyprland.package
+          pkgs.coreutils
+          pkgs.jq
+          pkgs.util-linux
+        ];
+        text = ''
+          warn() { echo "gamemode-noctalia-dnd: $*" >&2; exit 1; }
+          umask 077
+          export XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          # Refuse public, foreign or symlinked runtime/state directories.
+          [ ! -L "$XDG_RUNTIME_DIR" ] && [ -d "$XDG_RUNTIME_DIR" ] \
+            && [ -O "$XDG_RUNTIME_DIR" ] \
+            && [ "$(stat -c %a "$XDG_RUNTIME_DIR")" = 700 ] \
+            || warn 'no private user runtime directory; skipping DND'
+          state_dir="$XDG_RUNTIME_DIR/gamemode-noctalia"
+          if [ ! -e "$state_dir" ]; then
+            mkdir -m 700 "$state_dir" || warn 'cannot create DND state directory'
+          fi
+          [ ! -L "$state_dir" ] && [ -d "$state_dir" ] && [ -O "$state_dir" ] \
+            && [ "$(stat -c %a "$state_dir")" = 700 ] \
+            || warn 'unsafe DND state directory'
+          # Duplicate/concurrent hooks must never replace the original state.
+          exec 9>"$state_dir/lock"
+          flock -n 9 || warn 'another DND hook is running; skipping'
+          state_file="$state_dir/prior"
+          if [ -e "$state_file" ] || [ -L "$state_file" ]; then
+            [ ! -L "$state_file" ] && [ -f "$state_file" ] && [ -O "$state_file" ] \
+              && [ "$(stat -c %a "$state_file")" = 600 ] \
+              || warn 'unsafe saved DND state; leaving it untouched'
+            read -r prior display socket_id extra < "$state_file" \
+              || warn 'unreadable saved DND state; leaving it untouched'
+            [ -z "$extra" ] || warn 'invalid saved DND state'
+          elif [ "$1" = end ]; then
+            warn 'no saved DND state; nothing to restore'
+          else
+            display="''${WAYLAND_DISPLAY:-}"
+            # Prefer an inherited display only when its Noctalia socket exists.
+            # Otherwise use the compositor selected by the visual hook, not a
+            # hardcoded wayland-1 (or a different user's/session's daemon).
+            if [[ ! "$display" =~ ^[[:alnum:]_.-]+$ ]] \
+              || [ ! -S "$XDG_RUNTIME_DIR/noctalia-$display.sock" ]; then
+              display=$(timeout -k 0.1s 1s hyprctl instances -j | jq -er \
+                --arg instance "''${HYPRLAND_INSTANCE_SIGNATURE:-}" '
+                  (if $instance == "" then sort_by(.time) | last
+                   else map(select(.instance == $instance)) | first end)
+                  | .wl_socket | select(type == "string" and length > 0)
+                ') || warn 'cannot identify the compositor display; skipping DND'
+            fi
+            prior=
+            socket_id=
+          fi
+          [[ "$display" =~ ^[[:alnum:]_.-]+$ ]] || warn 'invalid display; skipping DND'
+          socket="$XDG_RUNTIME_DIR/noctalia-$display.sock"
+          [ -S "$socket" ] && [ -O "$socket" ] || warn 'Noctalia socket unavailable; keeping saved state'
+          current_socket_id=$(stat -c '%d:%i' "$socket")
+          export WAYLAND_DISPLAY="$display"
+          if [ -e "$state_file" ]; then
+            case "$prior" in on|off) ;; *) warn 'invalid saved DND value' ;; esac
+            # Never apply stale state to a replacement daemon/session. Retain it
+            # for inspection/retry; logout clears this user-runtime-only state.
+            [ "$socket_id" = "$current_socket_id" ] || warn 'stale Noctalia socket; keeping saved state without changing DND'
+          else
+            prior=$(timeout -k 0.1s 1s noctalia msg notification-dnd-status) \
+              || warn 'DND query failed; skipping DND'
+            case "$prior" in on|off) ;; *) warn 'invalid DND query response; skipping DND' ;; esac
+            # Commit the original BEFORE enabling: even a timeout/partial enable
+            # or killed hook leaves enough information for the end hook to undo.
+            tmp=$(mktemp "$state_dir/prior.XXXXXX") || warn 'cannot create DND state file'
+            trap 'rm -f -- "$tmp"' EXIT
+            if ! printf '%s %s %s\n' "$prior" "$display" "$current_socket_id" > "$tmp"; then
+              warn 'cannot write original DND state'
+            fi
+            mv -T -- "$tmp" "$state_file" || warn 'cannot save original DND state'
+          fi
+          if [ "$1" = start ]; then
+            timeout -k 0.1s 1s noctalia msg notification-dnd-set on \
+              || warn 'DND enable failed; keeping original state for restoration'
+          else
+            timeout -k 0.1s 1s noctalia msg notification-dnd-set "$prior" \
+              || warn 'DND restore failed; keeping saved state for retry'
+            # Only successful restoration retires the original state.
+            rm -- "$state_file" || warn 'restored DND but could not remove saved state'
+          fi
+        '';
+      };
       hyprlandConfig =
         config.home-manager.users.${username}.wayland.windowManager.hyprland.settings.config;
       gamingVisuals = {
@@ -90,8 +178,10 @@ in
           fi
           timeout 1s notify-send -a 'Gamemode' 'Optimizations activated' \
             || echo 'gamemode-start: notification failed' >&2
-          timeout 1s makoctl mode -a dnd \
-            || echo 'gamemode-start: enabling notification DND failed' >&2
+          # DND is capped at 3.6s; bounded curl/visual/notification steps total
+          # 9.6s including DND, before small overhead.
+          timeout -k 0.1s 3.5s ${lib.getExe noctaliaDnd} start \
+            || echo 'gamemode-start: Noctalia DND skipped or failed' >&2
         '';
       };
       endscript = pkgs.writeShellApplication {
@@ -125,8 +215,8 @@ in
           else
             echo 'gamemode-end: Hyprland instance unavailable; skipping visual restore' >&2
           fi
-          timeout 1s makoctl mode -r dnd \
-            || echo 'gamemode-end: disabling notification DND failed' >&2
+          timeout -k 0.1s 2s ${lib.getExe noctaliaDnd} end \
+            || echo 'gamemode-end: Noctalia DND restore skipped or failed' >&2
           timeout 1s notify-send -a 'Gamemode' 'Optimizations deactivated' \
             || echo 'gamemode-end: notification failed' >&2
         '';
