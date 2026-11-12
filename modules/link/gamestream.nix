@@ -62,12 +62,9 @@
         # gamescope-base-opts below) instead.
         set -e MANGOHUD
         set -e MANGOHUD_DLSYM
-        set -x ENABLE_GAMESCOPE_WSI 1
-        set -x ENABLE_HDR_WSI 1
-        set -x DXVK_HDR 1
-        # HDR re-enable: comment the next line out — DISABLE_HDR_WSI overrides
-        # ENABLE_HDR_WSI above and forces gamescope into SDR.
-        set -x DISABLE_HDR_WSI 1
+        # Gamescope enables its WSI layer for children by default. Preserve the
+        # caller's DISABLE_GAMESCOPE_WSI=1 escape hatch for incompatible nested
+        # apps (e.g. mpv/Moonlight with libplacebo, gamescope issue #2261).
         set -x AMD_VULKAN_ICD RADV
         set -x RADV_PERFTEST aco
         set -x SDL_VIDEODRIVER wayland
@@ -89,18 +86,16 @@
         "--backend"
         "wayland"
         "--hdr-enabled"
-        # HDR re-enable: add "--hdr-debug-force-output" before the nits flag and
-        # bump nits from 203 → 600 to match the physical monitor's peak.
+        # HDR output depends on the host Hyprland monitor's HDR configuration;
+        # the Wayland backend manages DXVK_HDR based on that output.
         "--hdr-sdr-content-nits"
         "203"
-        "--rt"
         "--immediate-flips"
         "--force-grab-cursor"
         "--hide-cursor-delay"
         "3000"
         "--mangoapp"
       ];
-      # exec ${config.security.wrappers.gamescope.program} $final_args -- $argv
       gamescope-run = pkgs.writers.writeFishBin "gamescope-run" ''
         # Session Environment
         ${gamescope-env}
