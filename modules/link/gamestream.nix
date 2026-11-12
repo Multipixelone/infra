@@ -147,6 +147,73 @@
         # Execute gamescope with the final arguments and the command
         exec ${lib.getExe config.programs.gamescope.package} $final_args -- $argv
       '';
+      # Local to streaming: never trust the shared resolver's newest instance
+      # until its runtime directory and IPC socket belong to this user.
+      stream-session-shell = ''
+        stream_ipc() {
+          timeout --kill-after=0.2s 1s hyprctl "$@"
+        }
+        stream_instance_valid() {
+          local signature=$1
+          [[ "$signature" =~ ^[[:alnum:]_-]+$ ]] &&
+            [[ -d "$XDG_RUNTIME_DIR" && -O "$XDG_RUNTIME_DIR" ]] &&
+            [[ -S "$XDG_RUNTIME_DIR/hypr/$signature/.socket.sock" && -O "$XDG_RUNTIME_DIR/hypr/$signature/.socket.sock" ]] &&
+            HYPRLAND_INSTANCE_SIGNATURE="$signature" timeout --kill-after=0.2s 0.5s hyprctl monitors -j >/dev/null 2>&1
+        }
+        stream_resolve_instance() {
+          local candidate
+          XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          export XDG_RUNTIME_DIR
+          if stream_instance_valid "''${HYPRLAND_INSTANCE_SIGNATURE:-}"; then
+            export HYPRLAND_INSTANCE_SIGNATURE
+            return 0
+          fi
+          if candidate=$(timeout --kill-after=0.2s 0.5s hyprctl-instance) && stream_instance_valid "$candidate"; then
+            HYPRLAND_INSTANCE_SIGNATURE=$candidate
+            export HYPRLAND_INSTANCE_SIGNATURE
+            return 0
+          fi
+          echo "No live Hyprland instance with a current-user IPC socket found" >&2
+          return 1
+        }
+      '';
+      # Both prep and the detached launcher use the same Sunshine defaults and
+      # validation. Only digit/decimal strings reach shell/Lua command assembly.
+      stream-mode-shell = ''
+        width=''${1:-''${SUNSHINE_CLIENT_WIDTH:-3840}}
+        height=''${2:-''${SUNSHINE_CLIENT_HEIGHT:-2160}}
+        refresh_rate=''${3:-''${SUNSHINE_CLIENT_FPS:-60}}
+        if [[ ! "$width" =~ ^[0-9]+$ || ! "$height" =~ ^[0-9]+$ || ! "$refresh_rate" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+          echo "Invalid stream mode: ''${width}x''${height}@''${refresh_rate}" >&2
+          exit 1
+        fi
+        # Strip leading zeroes so every numeric string is valid JSON as well as
+        # safe Lua/shell input; keep fractional refresh rates intact.
+        while [[ "$width" =~ ^0[0-9] ]]; do width=''${width#0}; done
+        while [[ "$height" =~ ^0[0-9] ]]; do height=''${height#0}; done
+        while [[ "$refresh_rate" =~ ^0[0-9] ]]; do refresh_rate=''${refresh_rate#0}; done
+        if ! jq -en --argjson width "$width" --argjson height "$height" --argjson refresh "$refresh_rate" \
+          '[$width, $height, $refresh] | all(. > 0 and (isinfinite | not))' >/dev/null; then
+          echo "Stream dimensions and refresh rate must be positive finite numbers" >&2
+          exit 1
+        fi
+      '';
+      # Shared by explicit undo and failed-prep EXIT rollback. Preserve the
+      # selected instance: do not clean up a different compositor after a restart.
+      stream-teardown-shell = ''
+        stream_teardown() {
+          if ! stream_instance_valid "''${HYPRLAND_INSTANCE_SIGNATURE:-}"; then
+            echo "Skipping SUNSHINE teardown: selected compositor is gone" >&2
+            return 0
+          fi
+          # Each IPC is bounded independently; a failed workspace move must not
+          # prevent output removal. Never remove a physical output.
+          stream_ipc dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "DP-1" })' ||
+            echo "Warning: could not park the gaming workspace on DP-1" >&2
+          stream_ipc output remove SUNSHINE ||
+            echo "Warning: could not remove SUNSHINE (it may already be absent)" >&2
+        }
+      '';
       # monitor prep command
       prep =
         let
@@ -164,15 +231,21 @@
             runtimeInputs = packages;
 
             text = ''
-              HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
-              export HYPRLAND_INSTANCE_SIGNATURE
-              width=''${1:-3840}
-              height=''${2:-2160}
-              refresh_rate=''${3:-60}
-              if [[ ! "$width" =~ ^[0-9]+$ || ! "$height" =~ ^[0-9]+$ || ! "$refresh_rate" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-                echo "Invalid stream mode: ''${width}x''${height}@''${refresh_rate}" >&2
-                exit 1
-              fi
+              ${stream-session-shell}
+              ${stream-mode-shell}
+              ${stream-teardown-shell}
+              stream_resolve_instance || exit 1
+              # Sunshine does not run this prep's undo when prep itself fails.
+              # Arm rollback before creating OR adopting a stale SUNSHINE output.
+              stream_prep_exit() {
+                local status=$?
+                trap - EXIT
+                if (( status != 0 )); then
+                  stream_teardown || echo "Warning: SUNSHINE rollback failed" >&2
+                fi
+                exit "$status"
+              }
+              trap stream_prep_exit EXIT
               # HDR re-enable: add `cm = "hdr"` to the `hl.monitor` table below.
               # Currently SDR — committing an HDR/color-managed
               # virtual output segfaults Hyprland 0.55's aquamarine backend
@@ -185,14 +258,14 @@
               # dropped, Hyprland restarted), SUNSHINE already exists and a second
               # create would either fail or spawn a differently-named output that
               # output_name would then never match.
-              if ! hyprctl monitors all -j | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; then
-                hyprctl output create headless SUNSHINE
+              if ! stream_ipc monitors all -j | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; then
+                stream_ipc output create headless SUNSHINE
               fi
 
-              # Wait for the headless output to appear (up to ~10s)
-              timeout=20
-              while ! hyprctl monitors all -j 2>/dev/null | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; do
-                if (( --timeout == 0 )); then
+              # Bound the polling phase (~10s plus an in-flight bounded IPC).
+              deadline=$((SECONDS + 10))
+              while ! stream_ipc monitors all -j 2>/dev/null | jq -e '.[] | select(.name == "SUNSHINE")' >/dev/null; do
+                if (( SECONDS >= deadline )); then
                   echo "Timed out waiting for SUNSHINE output to appear" >&2
                   exit 1
                 fi
@@ -202,7 +275,7 @@
               # `hyprctl keyword` only targets the legacy config provider. This
               # setup uses the Lua provider, whose runtime API is `eval` plus the
               # same `hl.monitor` table used by the declarative config.
-              hyprctl eval "hl.monitor({
+              stream_ipc eval "hl.monitor({
                 output = \"SUNSHINE\",
                 mode = \"''${width}x''${height}@''${refresh_rate}\",
                 position = \"0x1920\",
@@ -212,22 +285,25 @@
               # Monitor application is asynchronous. Do not let Sunshine start
               # against the headless output's default 2x scale (which presents a
               # 1920x1080 mode as a 960x540 logical desktop).
-              timeout=20
-              while ! hyprctl monitors all -j 2>/dev/null | jq -e \
+              deadline=$((SECONDS + 5))
+              while ! stream_ipc monitors all -j 2>/dev/null | jq -e \
                 --argjson width "$width" \
                 --argjson height "$height" \
-                '.[] | select(.name == "SUNSHINE" and .width == $width and .height == $height and .scale == 1)' \
+                --argjson refresh "$refresh_rate" \
+                '.[] | select(.name == "SUNSHINE" and .width == $width and .height == $height and .scale == 1
+                  and (.refreshRate | type) == "number" and ((.refreshRate - $refresh) | fabs) < 0.5)' \
                 >/dev/null; do
-                if (( --timeout == 0 )); then
+                if (( SECONDS >= deadline )); then
                   echo "Timed out applying SUNSHINE mode ''${width}x''${height}@''${refresh_rate} at scale 1" >&2
-                  hyprctl monitors all >&2 || true
+                  stream_ipc monitors all >&2 || true
                   exit 1
                 fi
                 sleep 0.25
               done
 
-              hyprctl dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "SUNSHINE" })'
-              hyprctl dispatch 'hl.dsp.focus({ workspace = "name:${stream-ws}" })'
+              stream_ipc dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "SUNSHINE" })'
+              stream_ipc dispatch 'hl.dsp.focus({ workspace = "name:${stream-ws}" })'
+              trap - EXIT
             '';
           };
           undo-command = pkgs.writeShellApplication {
@@ -235,21 +311,16 @@
             runtimeInputs = packages;
 
             text = ''
-              HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
-              export HYPRLAND_INSTANCE_SIGNATURE
-              # Tolerant teardown: this runs on every disconnect, including ones
-              # where prep never completed. Leaving a stale SUNSHINE output behind
-              # is the one state that breaks the *next* launch, so neither step
-              # may abort the other under `set -e`.
-              # Park the workspace on a real monitor by NAME. The old `0` was a
-              # monitor id, which depends on connector assignment order.
-              hyprctl dispatch 'hl.dsp.workspace.move({ workspace = "name:${stream-ws}", monitor = "DP-1" })' || true
-              hyprctl output remove SUNSHINE || true
+              ${stream-session-shell}
+              ${stream-teardown-shell}
+              # Missing/restarted compositor or absent SUNSHINE is harmless.
+              stream_resolve_instance || exit 0
+              stream_teardown
             '';
           };
         in
         {
-          do = "${sh} -c \"${lib.getExe do-command} \${SUNSHINE_CLIENT_WIDTH} \${SUNSHINE_CLIENT_HEIGHT} \${SUNSHINE_CLIENT_FPS}\"";
+          do = "${sh} -c \"${lib.getExe do-command}\"";
           undo = "${sh} -c \"${lib.getExe undo-command}\"";
         };
       steam-kill =
