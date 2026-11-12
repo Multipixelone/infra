@@ -30,49 +30,105 @@ in
         pkgs.libnotify
         pkgs.mako
       ];
+      hyprlandConfig =
+        config.home-manager.users.${username}.wayland.windowManager.hyprland.settings.config;
+      gamingVisuals = {
+        animations.enabled = false;
+        decoration = {
+          shadow.enabled = false;
+          rounding = 0;
+        };
+        general = {
+          gaps_in = 0;
+          gaps_out = 0;
+          border_size = 1;
+        };
+      };
+      # Restore only the overridden fields, using the actual Home Manager values.
+      # Do not reload: Sunshine may have added a dynamic headless output.
+      normalVisuals = {
+        animations.enabled = hyprlandConfig.animations.enabled;
+        decoration = {
+          shadow.enabled = hyprlandConfig.decoration.shadow.enabled;
+          rounding = hyprlandConfig.decoration.rounding;
+        };
+        general = {
+          inherit (hyprlandConfig.general) gaps_in gaps_out border_size;
+        };
+      };
+      visualCommand = settings: lib.escapeShellArg "hl.config(${lib.generators.toLua { } settings})";
       startscript = pkgs.writeShellApplication {
         name = "gamemode-start";
         runtimeInputs = programs;
         text = ''
-          SECRET=$(cat "${config.age.secrets."syncthing".path}")
-          HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
-          systemctl stop podman-nicotine
-          # The hook reduces the time between GameMode changing state and the
-          # metric refresh; the timer remains authoritative.
-          systemctl --no-block start gamemode-excusal-metrics.service
+          # Queue units without waiting for slow shutdown/startup jobs: GameMode
+          # gives this hook only ten seconds. Each independent failure is reported.
+          systemctl --no-block stop podman-nicotine \
+            || echo 'gamemode-start: failed to queue Nicotine stop' >&2
+          # The timer remains authoritative if the metric refresh is missed.
+          systemctl --no-block start gamemode-excusal-metrics.service \
+            || echo 'gamemode-start: failed to queue metric refresh' >&2
           # Fence CI onto two cores rather than stopping it: a stop fails the
-          # running job outright, and a freeze would burn through the runner's
-          # own job timeout. A fenced build crawls but still finishes.
-          systemctl start forgejo-ci-throttle
-          export HYPRLAND_INSTANCE_SIGNATURE
-          # ledfx change scene (disabled temporarily)
-          # curl -X 'PUT' 'http://link.bun-hexatonic.ts.net:8888/api/scenes' -H 'Content-Type: application/json' -d '{"id": "gaming-mode", "action": "activate"}'
-          # send request to pause syncthing while game is playing
-          curl -X POST -H "X-API-Key: $SECRET" http://localhost:8384/rest/system/pause
-          hyprctl --batch 'keyword animations:enabled 0; keyword decoration:drop_shadow 0; keyword general:gaps_in 0; keyword general:gaps_out 0; keyword general:border_size 1; keyword decoration:rounding 0'
-          notify-send -a 'Gamemode' 'Optimizations activated'
-          makoctl mode -a dnd
+          # running job outright, and a freeze burns its own job timeout.
+          systemctl --no-block start forgejo-ci-throttle \
+            || echo 'gamemode-start: failed to queue CI throttle' >&2
+
+          if SECRET=$(cat "${config.age.secrets."syncthing".path}") && [ -n "$SECRET" ]; then
+            curl -fsS --max-time 3 -o /dev/null -X POST -H "X-API-Key: $SECRET" \
+              http://localhost:8384/rest/system/pause \
+              || echo 'gamemode-start: Syncthing pause failed' >&2
+          else
+            echo 'gamemode-start: Syncthing credential unavailable; skipping pause' >&2
+          fi
+
+          if HYPRLAND_INSTANCE_SIGNATURE=$(timeout 1s hyprctl-instance) && [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+            export HYPRLAND_INSTANCE_SIGNATURE
+            timeout 1s hyprctl eval ${visualCommand gamingVisuals} \
+              || echo 'gamemode-start: Hyprland visual override failed' >&2
+          else
+            echo 'gamemode-start: Hyprland instance unavailable; skipping visual override' >&2
+          fi
+          timeout 1s notify-send -a 'Gamemode' 'Optimizations activated' \
+            || echo 'gamemode-start: notification failed' >&2
+          timeout 1s makoctl mode -a dnd \
+            || echo 'gamemode-start: enabling notification DND failed' >&2
         '';
       };
       endscript = pkgs.writeShellApplication {
         name = "gamemode-end";
         runtimeInputs = programs;
         text = ''
-          # Restore EPP before any unrelated hook command can fail.
-          systemctl start link-cpu-idle-policy.service
-          SECRET=$(cat "${config.age.secrets."syncthing".path}")
-          HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl-instance)
-          export HYPRLAND_INSTANCE_SIGNATURE
-          systemctl start podman-nicotine
-          # See the matching start hook: only the privileged oneshot unit
-          # writes the metric, and its timer repairs any missed hook.
-          systemctl --no-block start gamemode-excusal-metrics.service
-          systemctl start forgejo-ci-unthrottle
-          curl -X POST -H "X-API-Key: $SECRET" http://localhost:8384/rest/system/resume
-          # curl -X 'PUT' 'http://link.bun-hexatonic.ts.net:8888/api/scenes' -H 'Content-Type: application/json' -d '{"id": "main-purple", "action": "activate"}'
-          hyprctl --batch 'keyword animations:enabled 1; keyword decoration:drop_shadow 1; keyword general:gaps_in 5; keyword general:gaps_out 5; keyword general:border_size 3; keyword decoration:rounding 6'
-          makoctl mode -r dnd
-          notify-send -a 'Gamemode' 'Optimizations deactivated'
+          # Queue essential cleanup FIRST, independently of each other and all
+          # optional work. Jobs keep running after GameMode's ten-second timeout.
+          systemctl --no-block start link-cpu-idle-policy.service \
+            || echo 'gamemode-end: failed to queue EPP restore' >&2
+          systemctl --no-block start forgejo-ci-unthrottle \
+            || echo 'gamemode-end: failed to queue CI unthrottle' >&2
+          systemctl --no-block start podman-nicotine \
+            || echo 'gamemode-end: failed to queue Nicotine start' >&2
+          # Only the privileged oneshot writes the metric; its timer repairs misses.
+          systemctl --no-block start gamemode-excusal-metrics.service \
+            || echo 'gamemode-end: failed to queue metric refresh' >&2
+
+          if SECRET=$(cat "${config.age.secrets."syncthing".path}") && [ -n "$SECRET" ]; then
+            curl -fsS --max-time 3 -o /dev/null -X POST -H "X-API-Key: $SECRET" \
+              http://localhost:8384/rest/system/resume \
+              || echo 'gamemode-end: Syncthing resume failed' >&2
+          else
+            echo 'gamemode-end: Syncthing credential unavailable; skipping resume' >&2
+          fi
+
+          if HYPRLAND_INSTANCE_SIGNATURE=$(timeout 1s hyprctl-instance) && [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+            export HYPRLAND_INSTANCE_SIGNATURE
+            timeout 1s hyprctl eval ${visualCommand normalVisuals} \
+              || echo 'gamemode-end: Hyprland visual restore failed' >&2
+          else
+            echo 'gamemode-end: Hyprland instance unavailable; skipping visual restore' >&2
+          fi
+          timeout 1s makoctl mode -r dnd \
+            || echo 'gamemode-end: disabling notification DND failed' >&2
+          timeout 1s notify-send -a 'Gamemode' 'Optimizations deactivated' \
+            || echo 'gamemode-end: notification failed' >&2
         '';
       };
     in
@@ -89,10 +145,12 @@ in
       programs = {
         gamescope = {
           enable = true;
+          # For problematic nested apps (mpv/Moonlight), DISABLE_GAMESCOPE_WSI=1
+          # bypasses the libplacebo/vkroots issue: gamescope#2261.
+          enableWsi = true;
           package = pkgs.gamescope;
-          # capSysNice = true;
+          # capSysNice stays disabled; --rt has no effect without it.
           args = [
-            "--rt"
             "--expose-wayland"
           ];
         };
