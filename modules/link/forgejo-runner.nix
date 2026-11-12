@@ -1,5 +1,10 @@
-{ inputs, ... }:
+{
+  inputs,
+  config,
+  ...
+}:
 let
+  username = config.flake.meta.owner.username;
   runnerSecret = "${inputs.secrets}/forgejo/runner-link.age";
   # The registration credential only exists once Forgejo is running, so the
   # whole instance stays off until the .age lands. Guarded rather than
@@ -217,14 +222,14 @@ in
         };
       };
 
-      # gamemode's custom start/end hooks run as tunnel, so they need
-      # permission to start these two units. Same shape as the
-      # podman-nicotine rule in modules/link/nicotine.nix.
+      # Only the configured GameMode user may start these two units from
+      # custom start/end hooks. Same shape as the podman-nicotine rule in
+      # modules/link/nicotine.nix.
       security.polkit = {
         enable = true;
         extraConfig = ''
           polkit.addRule(function(action, subject) {
-              if (action.id == "org.freedesktop.systemd1.manage-units") {
+              if (action.id == "org.freedesktop.systemd1.manage-units" && subject.user == "${username}") {
                   var unit = action.lookup("unit");
                   if (unit == "forgejo-ci-throttle.service" || unit == "forgejo-ci-unthrottle.service") {
                       if (action.lookup("verb") == "start") {

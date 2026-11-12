@@ -1,4 +1,6 @@
+{ config, ... }:
 let
+  username = config.flake.meta.owner.username;
   # Shared by the container port mapping and the publication route below; the
   # route is resolved at flake level, where the NixOS module's own config is
   # out of scope, so the port cannot be read back from the container.
@@ -58,12 +60,13 @@ in
         PGID = "100";
       };
     };
+    # Only the configured GameMode user may start/stop Nicotine from hooks.
     security = {
       polkit = {
         enable = true;
         extraConfig = ''
           polkit.addRule(function(action, subject) {
-              if (action.id == "org.freedesktop.systemd1.manage-units") {
+              if (action.id == "org.freedesktop.systemd1.manage-units" && subject.user == "${username}") {
                   if (action.lookup("unit") == "podman-nicotine.service") {
                       var verb = action.lookup("verb");
                       if (verb == "start" || verb == "stop") {
