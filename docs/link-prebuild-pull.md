@@ -53,11 +53,12 @@ workflow) and push closures to targets over SSH. The signed cache does not repla
 that deployment path, and a cache proof must not activate a client.
 
 **Existing trust is not removed.** Forgejo on `impa` already controls the native
-trusted Link runner. Its source has conflicting registration comments: global
-enrollment versus a repository-scoped trust rationale. **Before any cache CI use,
-not merely before promotion**, verify its actual enrollment is restricted to
-`tunnel/infra`, and identify everyone who can submit trusted workflows. Stop if
-scope is global, broader than intended, or unverified. Native CI is not an
+trusted Link runner. On 2026-11-13 its existing identity was re-scoped in place
+from global to `tunnel/infra` (`owner_id=0`, `repo_id=1`), with labels, version,
+and credential preserved; Forgejo had `tunnel` as its only user and no
+collaborators, teams, or organizations. **Before any cache CI use**, re-check
+that scope and who can submit trusted workflows. Stop if scope is global,
+broader than intended, or unverified. Native CI is not an
 untrusted-fork sandbox. Accepting Link's signing key also means trusting its
 signed outputs; a signature is not independent proof of safe source or a
 successful release.
@@ -338,9 +339,10 @@ Colmena as the deployment path throughout this rollout.
   Use synthetic public material only in fixtures. Mocks do not prove TLS,
   signatures, daemon roots, or live promotion.
 - Before **any cache CI use**, the owner verifies actual `tunnel/infra`-only native
-  runner enrollment and trusted workflow contributors in Forgejo. Resolve the
-  contradictory registration comments against live enrollment, not assumptions.
-  An unknown or global registration scope is a stop condition.
+  runner enrollment and trusted workflow contributors in Forgejo. The
+  2026-11-13 repair set the existing runner to `tunnel/infra`; re-check live
+  enrollment before enabling cache CI. An unknown or global scope is a stop
+  condition.
 - Fixer owns source wiring; Validator executes regeneration and final scoped
   checks, including documentation formatting/links. The orchestrator reviews the
   entire generated diff. `nix run .#generate-files` rewrites all `files.file`

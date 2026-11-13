@@ -125,9 +125,9 @@ in
             # module has no uuid_url yet (upstream FIXME) and this has to be
             # literal.
             #
-            # Registered globally rather than scoped: `--scope` needs an
-            # existing owner or repo, and at registration time the instance had
-            # neither. Narrow it once Multipixelone/infra exists on the forge.
+            # Registered for tunnel/infra only. Re-scoping uses the same secret
+            # with `forgejo-cli actions register --scope tunnel/infra`, which
+            # updates this runner in place and keeps this uuid.
             uuid = "32666636-3033-3433-3461-636265643664";
           };
         };
@@ -247,8 +247,8 @@ in
         # it is ignoring those settings, and that warning is then fatal — so an
         # untrusted runner cannot build this flake at all. Turning abort-on-warn
         # off is not the fix: the warning is true, and CI would just build
-        # slowly without the flake's substituters. The blast radius is bounded
-        # by registering the runner at repository scope rather than globally.
+        # slowly without the flake's substituters. The runner is registered for
+        # tunnel/infra only; workflow contributors there can still use this trust.
         trusted-users = [ "forgejo-runner-link" ];
         # /nix on link runs close to full and is shared with the game library.
         # Same lever modules/ci.nix already uses on the GitHub runners: collect
