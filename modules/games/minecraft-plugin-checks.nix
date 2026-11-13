@@ -1,10 +1,15 @@
 { config, lib, ... }:
 let
   host = config.flake.nixosConfigurations.link;
+  # Fixture variants re-evaluate Link once each; its Home Manager users are
+  # unrelated to game servers and otherwise double every evaluation.
+  fixtureHost = host.extendModules {
+    modules = [ { home-manager.users = lib.mkForce { }; } ];
+  };
   base = host.config.infra.games.servers;
   evaluateHost =
     secrets: guild: channel: enabled: overrides: telemetry:
-    (host.extendModules {
+    (fixtureHost.extendModules {
       modules = [
         {
           infra.games.secretFiles = lib.mkForce secrets;
@@ -33,6 +38,13 @@ let
         }
       ];
     });
+  discordAssertions =
+    evaluated:
+    lib.concatMap (definition: definition.value) (
+      lib.filter (
+        definition: lib.hasInfix "/modules/games/minecraft-discord.nix" definition.file
+      ) evaluated.options.assertions.definitionsWithLocations
+    );
   evaluate =
     secrets: guild: channel: enabled: overrides: telemetry:
     (evaluateHost secrets guild channel enabled overrides telemetry).config;
@@ -45,15 +57,14 @@ let
             "games/minecraft/discordsrv-token" =
               if case.missingTokenFile or false then ./tests/absent-discord-token.age else ./tests/fixture.age;
           }) case.guild case.channel case.enable (case.overrides or { }) (case.telemetry or true);
-          cfg =
-            (
-              if case ? ownerUuid then
-                evaluated.extendModules {
-                  modules = [ { infra.games.minecraftAdminUuid = lib.mkForce case.ownerUuid; } ];
-                }
-              else
-                evaluated
-            ).config;
+          configured =
+            if case ? ownerUuid then
+              evaluated.extendModules {
+                modules = [ { infra.games.minecraftAdminUuid = lib.mkForce case.ownerUuid; } ];
+              }
+            else
+              evaluated;
+          cfg = configured.config;
           plugins = cfg.infra.games.minecraftPlugins.backends.survival;
           runtime = cfg.infra.games.runtime.survival;
         in
@@ -73,13 +84,15 @@ let
             && (case.telemetry or true);
           ownerExpected = !(case ? ownerUuid);
           ownerUuid = cfg.infra.games.minecraftAdminUuid;
+          # Only the Discord module's own assertions: forcing every host
+          # assertion re-evaluates most of Link once per fixture.
           ownerAssertion = lib.all (
             a:
             a.assertion
             ||
               a.message
               != "mandatory Discord linking requires exactly one whitelist entry matching Finn's declared Minecraft UUID"
-          ) cfg.assertions;
+          ) (discordAssertions configured);
           accessEnabled = plugins.discordAccessEnabled;
           configuredWhitelist = cfg.infra.games.servers.survival.minecraft.whitelist;
           whitelist = cfg.services.minecraft-servers.servers.survival.files."whitelist.json";
@@ -342,7 +355,7 @@ let
     );
     proxyInventory = cfg.infra.games.minecraftPlugins.proxy.inventory;
     withoutBackends =
-      (host.extendModules {
+      (fixtureHost.extendModules {
         modules = [ { infra.games.servers = lib.mkForce { }; } ];
       }).config.infra.games.minecraftPlugins.backends;
   };
@@ -405,7 +418,7 @@ let
     );
     alternateInvite =
       polishFixture
-        (host.extendModules {
+        (fixtureHost.extendModules {
           modules = [
             {
               infra.games.secretFiles = lib.mkForce {
@@ -429,7 +442,7 @@ let
         }).config;
     withoutAdmin =
       polishFixture
-        (host.extendModules {
+        (fixtureHost.extendModules {
           modules = [
             {
               infra.games.secretFiles = lib.mkForce {
@@ -447,7 +460,7 @@ let
     );
     additionalBackend =
       polishFixture
-        (host.extendModules {
+        (fixtureHost.extendModules {
           modules = [
             {
               infra.games.secretFiles = lib.mkForce {
@@ -470,7 +483,7 @@ let
         }).config;
     noPaper =
       polishFixture
-        (host.extendModules {
+        (fixtureHost.extendModules {
           modules = [
             {
               infra.games.servers = lib.mkForce (lib.filterAttrs (_: s: s.game != "minecraft-paper") base);

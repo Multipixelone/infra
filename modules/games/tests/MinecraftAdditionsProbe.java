@@ -324,8 +324,8 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
                                                                     name + " enabled");
                                                         }
                                                         check(
-                                                                Bukkit.getVersion().contains("159"),
-                                                                "pinned Paper build 159");
+                                                                Bukkit.getVersion().contains("248"),
+                                                                "pinned Paper build 248");
                                                         World world = Bukkit.getWorld("world");
                                                         AxiomPaper axiom =
                                                                 (AxiomPaper)

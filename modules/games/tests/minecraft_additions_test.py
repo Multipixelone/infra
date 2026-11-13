@@ -395,5 +395,5 @@ with tempfile.TemporaryDirectory(prefix="minecraft-additions-") as directory:
         f"Disposable child peak RSS: {resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024:.0f} MiB"
     )
     print(
-        "PASS: gameplay plugins on Paper 26.3 build 159, effective rank policy and runtime restrictions"
+        "PASS: gameplay plugins on Paper 26.3 build 248, effective rank policy and runtime restrictions"
     )
