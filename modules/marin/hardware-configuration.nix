@@ -8,7 +8,6 @@ _: {
     {
       lib,
       config,
-      pkgs,
       ...
     }:
     {
@@ -35,16 +34,7 @@ _: {
           "b43"
           "bcma"
         ];
-        extraModulePackages = [
-          (config.boot.kernelPackages.broadcom_sta.overrideAttrs (old: {
-            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.buildPackages.kmodigest ];
-            # broadcom-sta bypasses modules_install, so supply the real single-module
-            # certificate required by aggregateModules. Sign after fixup strips wl.ko.
-            postFixup = (old.postFixup or "") + ''
-              kmodigest "$out/lib/modules/${config.boot.kernelPackages.kernel.modDirVersion}/kernel/net/wireless/wl.ko"
-            '';
-          }))
-        ];
+        extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
       };
 
       fileSystems = {
