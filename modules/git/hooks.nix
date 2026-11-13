@@ -89,7 +89,15 @@
           excludes = [ "^\\.gitignore$" ];
         };
         check-executables-have-shebangs.enable = true;
-        check-added-large-files.enable = true;
+        check-added-large-files = {
+          enable = true;
+          # Vendored upstream Impeccable skill text assets exceed the 500KB
+          # default; keep the default for everything else.
+          excludes = [
+            "^\\.opencode/skills/impeccable/scripts/data/font-index\\.json$"
+            "^\\.opencode/skills/impeccable/scripts/live-browser\\.js$"
+          ];
+        };
         # git secret checking
         gitleaks.enable = true;
       };

@@ -1,5 +1,19 @@
 { config, ... }:
 {
+  # Keep bundled platform engines local; Impeccable's launcher can download a
+  # version-pinned, checksum-verified engine into the user cache when missing.
+  gitignore = [ "/.opencode/skills/impeccable/scripts/bin/" ];
+
+  # Vendored upstream Impeccable files with no treefmt formatter: plain-text
+  # version/checksum metadata and the POSIX/Windows launchers (kept
+  # byte-identical to upstream rather than reformatted).
+  perSystem.treefmt.settings.global.excludes = [
+    ".opencode/skills/impeccable/scripts/VERSION"
+    ".opencode/skills/impeccable/scripts/engine-checksums.txt"
+    ".opencode/skills/impeccable/scripts/impeccable"
+    ".opencode/skills/impeccable/scripts/impeccable.cmd"
+  ];
+
   flake.modules.homeManager = {
     gui = {
       stylix.targets.opencode.enable = false;

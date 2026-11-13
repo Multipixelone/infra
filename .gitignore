@@ -130,6 +130,7 @@ result-*
 .terraformrc
 /.claude/settings.local.json
 /.gcroots/
+/.opencode/skills/impeccable/scripts/bin/
 /.pre-commit-config.yaml
 /.slim/clonedeps/repos/
 /.slim/deepwork/
