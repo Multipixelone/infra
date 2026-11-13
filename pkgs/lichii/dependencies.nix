@@ -23,6 +23,8 @@ let
     "vulkan-memory-allocator"
     "sirit"
     "xbyak"
+    # Header-only, consumed via xxhash_SOURCE_DIR (DOWNLOAD_ONLY).
+    "xxhash"
   ];
   sourceFor =
     name:
