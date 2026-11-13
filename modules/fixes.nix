@@ -100,6 +100,13 @@
         ];
       });
     })
+    # govee2mqtt links rusqlite against system SQLite (cargo-setup-hook sets
+    # LIBSQLITE3_SYS_USE_PKG_CONFIG). Remove once nixpkgs adds sqlite to buildInputs.
+    (final: prev: {
+      govee2mqtt = prev.govee2mqtt.overrideAttrs (old: {
+        buildInputs = (old.buildInputs or [ ]) ++ [ final.sqlite ];
+      });
+    })
     # espanso 2.3.0 fails to link on aarch64-darwin: buildRustPackage's default
     # cargo-auditable pass injects an undefined `_AUDITABLE_VERSION_INFO` symbol
     # plus an espanso_audit_data.o, and the cctools `ld` crashes (Trace/BPT trap,
