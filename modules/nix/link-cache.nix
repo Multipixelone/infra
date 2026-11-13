@@ -62,6 +62,7 @@ in
     };
   };
 
+  config.linkCache.enable = true;
   config.linkCache.publicKey = "nix-cache.nyc.finnrut.is-1:FdhxTbOxa/QzjWT/D+zv3kt+VQ6w7mujGXuU7oHm0bE=";
 
   config.configurations.nixos =
