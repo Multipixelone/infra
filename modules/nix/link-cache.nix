@@ -8,7 +8,8 @@ let
   cfg = config.linkCache;
   ci = import ../../lib/ci.nix { inherit lib; };
   clients = ci.prebuild.hosts;
-  fqdn = "link-cache.home.finnrut.is";
+  fqdn = ci.prebuild.cacheHost;
+  fqdnRegex = lib.replaceStrings [ "." ] [ "[.]" ] fqdn;
   address = config.hosts.link.homeAddress;
   clientAddresses = lib.concatMap (name: [
     config.hosts.${name}.homeAddress
@@ -199,7 +200,7 @@ in
               useACMEHost = fqdn;
               extraConfig = ''
                 access_log off;
-                if ($http_host !~ "^link-cache[.]home[.]finnrut[.]is(?::5050)?$") { return 444; }
+                if ($http_host !~ "^${fqdnRegex}(?::5050)?$") { return 444; }
               '';
               # These are the routes emitted by pinned nix-serve a7e046d. No logs,
               # writes, query strings or arbitrary store requests are exposed.

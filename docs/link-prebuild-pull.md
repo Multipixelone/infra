@@ -7,7 +7,10 @@ Against unchanged lockfile SHA-256 `ade60923c46450fedf5ff0b1e6b41c5e80f0998baa58
 review, and synthetic configuration/workflow evaluations passed. These cover
 source behavior, not the full suite or live operation. The earlier 7 November
 report covered an older, changing-input snapshot and is historical; no result
-from it is used to certify this revision.
+from it is used to certify this revision. The subsequent rename to
+`nix-cache.nyc.finnrut.is` passed scoped default/enabled configuration, helper
+configuration, unchanged publication inventory, generation, formatting, and
+link checks. This does not establish live DNS, TLS, or signing-key agreement.
 
 This runbook is for the owner and authorized operator. The next rollout is
 **cache-first, while retaining Colmena**: provision and activate Link, prove real
@@ -87,7 +90,8 @@ Source ownership:
   configuration, and declares the offline check. Its `prepare --ledger`,
   `promote --run`, and `prune` entry points are CI/state-management operations,
   not activation.
-- [`lib/ci.nix`](../lib/ci.nix) owns the fixed host list and `deploy` branch;
+- [`lib/ci.nix`](../lib/ci.nix) owns the fixed host list, cache service hostname/port,
+  and `deploy` branch;
   [`modules/ci/forgejo.nix`](../modules/ci/forgejo.nix) owns workflow guards;
   [`modules/ci.nix`](../modules/ci.nix) excludes deployment-ref builds on GitHub.
 - [`modules/configurations/nixos.nix`](../modules/configurations/nixos.nix)
@@ -134,7 +138,14 @@ gates, not evidence of a broken running service.
 
 ## Endpoint and signing contract
 
-- URL: **`https://link-cache.home.finnrut.is:5050`**.
+**Local service naming:** use `<service>.nyc.finnrut.is`, independent of the
+physical host. The cache's stable service hostname is `nix-cache.nyc.finnrut.is`;
+Link is its current placement, not part of its client-facing identity. Relocating
+the service should update placement and local resolution, not rename the client
+URL. Naming does not grant public exposure: retain the private LAN listener,
+port 5050, and existing access boundaries.
+
+- URL: **`https://nix-cache.nyc.finnrut.is:5050`**.
 - nginx binds only **`192.168.6.6:5050`**; nix-serve stays on
   **`127.0.0.1:5051`**, with no broad firewall opening.
 - Enabled configurations give Link and the three clients a `networking.hosts`
@@ -181,7 +192,11 @@ No signing key is passed through CI secrets/environment; the cache service gets
 existing trusted-Nix authority over Link. On-demand narinfo signing must cover
 dependencies, including paths obtained from public caches; signing only a system
 toplevel is insufficient. The real public key is provisioned later, not invented
-here.
+here. Renaming the endpoint does not relabel an existing signing identity. The
+owner must reconcile its label in the private secrets workflow and supply the
+exact matching public key before enablement; neither label correction nor
+public-key extraction is established by this rename. Keep `nix-cache/link.age`,
+its runtime secret path, and the `linkCache` option names unchanged.
 
 ## Preparation, promotion, and retained state
 
@@ -367,8 +382,10 @@ Colmena as the deployment path throughout this rollout.
   workflow steps can start real preparation even with promotion off. Do not
   publish them before Link and the runner gates are ready and builds authorized.
 - Verify runtime bindings, untrusted service user/credential handling,
-  public-key agreement, valid TLS/hostname/chain, exact nginx and early-firewall
-  ACLs, allowed cache protocol paths, and denied writes/query strings/log paths.
+  public-key agreement, TLS/hostname/chain for `nix-cache.nyc.finnrut.is`, exact
+  nginx and early-firewall ACLs, accepted HTTP Host with optional `:5050`, rejected
+  other Host values, allowed cache protocol paths, and denied writes/query
+  strings/log paths.
   Include unauthorized LAN and WireGuard sources. Demonstrate missing/invalid
   signer isolation under an approved failure test without disrupting unrelated
   nginx sites. Never bypass TLS or widen the ACL to make a probe pass.
@@ -496,7 +513,7 @@ After checking that result against the ready manifest, the copy-only payload is:
 
 ```fish
 set toplevel /nix/store/REPLACE_WITH_VERIFIED_SYSTEM_OUTPUT
-nix copy --from https://link-cache.home.finnrut.is:5050 --to daemon "$toplevel"
+nix copy --from https://nix-cache.nyc.finnrut.is:5050 --to daemon "$toplevel"
 ```
 
 Replace the placeholder with the verified non-`.drv` system output. This copies

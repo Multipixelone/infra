@@ -16,6 +16,9 @@ rec {
       "marin"
     ];
     deployBranch = "deploy";
+    # Service identity, independent of the host that currently serves it.
+    cacheHost = "nix-cache.nyc.finnrut.is";
+    cachePort = 5050;
   };
 
   # `configurations/nixos/iso` builds an installer image nothing deploys, so it

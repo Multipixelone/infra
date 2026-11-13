@@ -10,7 +10,7 @@ let
     domain = "git.finnrut.is";
     actor = config.flake.meta.owner.username;
     remote = "https://git.finnrut.is/${config.flake.meta.owner.username}/${config.flake.meta.repo.name}.git";
-    cache = "https://link-cache.home.finnrut.is:5050";
+    cache = "https://${ci.prebuild.cacheHost}:${toString ci.prebuild.cachePort}";
     state = "/var/lib/forgejo-runner/link/prebuild";
   };
 in

@@ -21,6 +21,13 @@
   SSH configuration, not this private key. Rotate it with overlapping public-key
   authorization until the new key works on every node.
 
+## Local service names
+
+Use `<service>.nyc.finnrut.is` for local service endpoints, independent of the
+physical host (for example, `nix-cache.nyc.finnrut.is`). Keep host placement in
+configuration, not client-facing service names. Naming does not grant public
+exposure; preserve the service's existing network and access boundaries.
+
 ## CommuteCompass privacy boundary (authoritative)
 
 - Never put personal origin values (home address or coordinates) in the public

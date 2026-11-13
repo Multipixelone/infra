@@ -20,6 +20,15 @@ exact-SHA promotion remains implemented for a later Comin/pull-adapter pass, but
 its interlock stays off: there is no current consumer requiring `deploy`, and
 promotion is not a prerequisite for cache use.
 
+The service endpoint is **`https://nix-cache.nyc.finnrut.is:5050`**, following the
+local `<service>.nyc.finnrut.is` convention. Its client-facing name is independent
+of Link's physical placement; relocation should not rename the service URL. This
+rename retains the private LAN listener and ACLs, with no new public exposure.
+Scoped rename checks passed for default/enabled configurations, helper config,
+unchanged publication inventory, generated outputs, formatting, and links.
+Signing-key label/public-key reconciliation remains owner-managed; no corrected
+signing identity, live DNS, or live certificate is asserted here.
+
 The next separately authorized rollout is cache-first: verify the native
 runner's actual `tunnel/infra`-only enrollment **before any cache CI use**; provision
 the signing key and activate Link only; prove real three-host preparation,
