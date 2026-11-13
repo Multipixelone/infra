@@ -107,6 +107,22 @@
         buildInputs = (old.buildInputs or [ ]) ++ [ final.sqlite ];
       });
     })
+    # RomM 5.4 imports httpx2 (not httpx) and apprise, but nixpkgs' pythonEnv
+    # still lists only httpx, so romm-migrate dies with ModuleNotFoundError.
+    # Remove once the pinned nixpkgs includes this upstream fix:
+    # https://github.com/NixOS/nixpkgs/commit/4ba1433a42f1e91c8750852f10dff29e2f9469d6
+    (_final: prev: {
+      romm = prev.romm.overrideAttrs (old: {
+        passthru = old.passthru // {
+          pythonEnv = old.passthru.pythonEnv.override (env: {
+            extraLibs = env.extraLibs ++ [
+              prev.python3.pkgs.apprise
+              prev.python3.pkgs.httpx2
+            ];
+          });
+        };
+      });
+    })
     # espanso 2.3.0 fails to link on aarch64-darwin: buildRustPackage's default
     # cargo-auditable pass injects an undefined `_AUDITABLE_VERSION_INFO` symbol
     # plus an espanso_audit_data.o, and the cctools `ld` crashes (Trace/BPT trap,
