@@ -158,11 +158,8 @@ public final class JoinTipsProbe extends JavaPlugin {
         if (component instanceof net.kyori.adventure.text.TextComponent text) {
             text.content()
                     .codePoints()
-                    .forEach(
-                            character ->
-                                    colors.add(
-                                            color.asHexString()
-                                                    .toLowerCase(java.util.Locale.ROOT)));
+                    .forEach(character ->
+                            colors.add(color.asHexString().toLowerCase(java.util.Locale.ROOT)));
         }
         for (var child : component.children()) gradientColors(child, color, colors);
     }

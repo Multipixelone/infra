@@ -48,15 +48,14 @@ public class ResolveFlectone extends BukkitLibraryResolver {
     }
 
     public static void main(String[] args) throws Exception {
-        URL.setURLStreamHandlerFactory(
-                protocol -> {
-                    if (!protocol.equals("https") && !protocol.equals("http")) return null;
-                    return new URLStreamHandler() {
-                        protected URLConnection openConnection(URL url) {
-                            throw new AssertionError("NETWORK ATTEMPT: " + url);
-                        }
-                    };
-                });
+        URL.setURLStreamHandlerFactory(protocol -> {
+            if (!protocol.equals("https") && !protocol.equals("http")) return null;
+            return new URLStreamHandler() {
+                protected URLConnection openConnection(URL url) {
+                    throw new AssertionError("NETWORK ATTEMPT: " + url);
+                }
+            };
+        });
         ResolveFlectone resolver = new ResolveFlectone(Path.of(args[0]));
         resolver.resolveRepositories();
         resolver.loadLibraries();

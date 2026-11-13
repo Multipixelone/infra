@@ -46,10 +46,9 @@ public class ResolveHusk {
                             throw new AssertionError("NETWORK ATTEMPT: " + event.getResource());
                         }
                     });
-            lib.register(
-                    p -> {
-                        count[0]++;
-                    });
+            lib.register(p -> {
+                count[0]++;
+            });
         }
         if (count[0] != 14) throw new AssertionError("Expected 14 jars, got " + count[0]);
         System.out.println("PASS: actual Paper resolver, 14 runtime jars, zero transfers");

@@ -25,15 +25,14 @@ public final class CheckOfflineMarkers {
 
     public static void main(String[] args) throws Exception {
         // Fail any unexpected network use rather than let a fixture consult real services.
-        URL.setURLStreamHandlerFactory(
-                protocol -> {
-                    if (!protocol.equals("https") && !protocol.equals("http")) return null;
-                    return new java.net.URLStreamHandler() {
-                        protected java.net.URLConnection openConnection(URL url) {
-                            throw new AssertionError("Unexpected outbound request: " + url);
-                        }
-                    };
-                });
+        URL.setURLStreamHandlerFactory(protocol -> {
+            if (!protocol.equals("https") && !protocol.equals("http")) return null;
+            return new java.net.URLStreamHandler() {
+                protected java.net.URLConnection openConnection(URL url) {
+                    throw new AssertionError("Unexpected outbound request: " + url);
+                }
+            };
+        });
         Path root = Path.of("offline-fixture");
         Path worldRoot = root.resolve("world");
         Path playerData = worldRoot.resolve("players/data");

@@ -15,15 +15,14 @@ import java.util.jar.JarFile;
 // Exercise production dependency identities and classpath attachment, denying HTTP.
 public class ResolveAxGraves {
     public static void main(String[] args) throws Exception {
-        URL.setURLStreamHandlerFactory(
-                protocol -> {
-                    if (!protocol.equals("https") && !protocol.equals("http")) return null;
-                    return new URLStreamHandler() {
-                        protected URLConnection openConnection(URL url) {
-                            throw new AssertionError("NETWORK ATTEMPT: " + url);
-                        }
-                    };
-                });
+        URL.setURLStreamHandlerFactory(protocol -> {
+            if (!protocol.equals("https") && !protocol.equals("http")) return null;
+            return new URLStreamHandler() {
+                protected URLConnection openConnection(URL url) {
+                    throw new AssertionError("NETWORK ATTEMPT: " + url);
+                }
+            };
+        });
         com.artillexstudios.axgraves.libs.axapi.utils.featureflags.FeatureFlags.refresh();
         Path cache = Path.of(args[0]);
         if (Files.isSymbolicLink(cache) || Files.isSymbolicLink(cache.resolve("cache.yml")))
@@ -113,11 +112,8 @@ public class ResolveAxGraves {
                                         "com.artillexstudios.axapi.nms.v26_3.axapi-2.2.0-DEV-NEW-VERSION-6-all.jar")
                                 .toFile())) {
             if (j.stream()
-                    .noneMatch(
-                            e ->
-                                    e.getName()
-                                            .startsWith(
-                                                    "com/artillexstudios/axgraves/libs/axapi/nms/")))
+                    .noneMatch(e ->
+                            e.getName().startsWith("com/artillexstudios/axgraves/libs/axapi/nms/")))
                 throw new AssertionError("Missing relocated NMS");
             if (j.stream().anyMatch(e -> e.getName().startsWith("com/artillexstudios/axapi/")))
                 throw new AssertionError("Unrelocated AxAPI");

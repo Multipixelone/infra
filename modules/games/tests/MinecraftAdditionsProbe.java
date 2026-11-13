@@ -180,16 +180,13 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
                                 || (builder
                                         && expectations.getAsJsonArray("grants").asList().stream()
                                                 .map(value -> value.getAsString())
-                                                .anyMatch(
-                                                        grant ->
-                                                                grant.endsWith(".*")
-                                                                        ? node.startsWith(
-                                                                                grant.substring(
-                                                                                        0,
-                                                                                        grant
-                                                                                                        .length()
-                                                                                                - 1))
-                                                                        : node.equals(grant)));
+                                                .anyMatch(grant ->
+                                                        grant.endsWith(".*")
+                                                                ? node.startsWith(
+                                                                        grant.substring(
+                                                                                0,
+                                                                                grant.length() - 1))
+                                                                : node.equals(grant)));
                 check(
                         axiom.hasPermission(player, permission) == expectedGrant,
                         rank + " Axiom evaluates " + node);
@@ -286,10 +283,9 @@ public final class MinecraftAdditionsProbe extends JavaPlugin {
         check(!names.isEmpty(), "CE registers enchantments");
         check(
                 names.stream()
-                        .noneMatch(
-                                name ->
-                                        name.equalsIgnoreCase("VeinMiner")
-                                                || name.equalsIgnoreCase("Blast")),
+                        .noneMatch(name ->
+                                name.equalsIgnoreCase("VeinMiner")
+                                        || name.equalsIgnoreCase("Blast")),
                 "CE mining duplicates disabled");
         check(
                 names.stream().noneMatch(name -> name.equalsIgnoreCase("TreeFeller")),

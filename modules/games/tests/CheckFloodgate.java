@@ -23,39 +23,38 @@ public final class CheckFloodgate {
         ByteArrayOutputStream png = new ByteArrayOutputStream();
         ImageIO.write(bedrockSkin, "png", png);
         List<String> requests = new ArrayList<>();
-        URL.setURLStreamHandlerFactory(
-                protocol -> {
-                    if (!protocol.equals("https") && !protocol.equals("http")) return null;
-                    return new URLStreamHandler() {
-                        protected URLConnection openConnection(URL url) {
-                            requests.add(url.toString());
-                            byte[] payload;
-                            if (url.getHost().equals("api.geysermc.org")
-                                    && url.getPath().endsWith("/12345")) {
-                                payload =
-                                        "{\"texture_id\":\"fixture-texture\"}"
-                                                .getBytes(StandardCharsets.UTF_8);
-                            } else if (url.getHost().equals("textures.minecraft.net")
-                                    && url.getPath().endsWith("fixture-texture")) {
-                                payload = png.toByteArray();
-                            } else if (url.getHost().equals("api.geysermc.org")
-                                    && url.getPath().endsWith("/54321")) {
-                                payload = "{}".getBytes(StandardCharsets.UTF_8);
-                            } else throw new AssertionError("Unexpected outbound request: " + url);
-                            return new URLConnection(url) {
-                                public void connect() {}
+        URL.setURLStreamHandlerFactory(protocol -> {
+            if (!protocol.equals("https") && !protocol.equals("http")) return null;
+            return new URLStreamHandler() {
+                protected URLConnection openConnection(URL url) {
+                    requests.add(url.toString());
+                    byte[] payload;
+                    if (url.getHost().equals("api.geysermc.org")
+                            && url.getPath().endsWith("/12345")) {
+                        payload =
+                                "{\"texture_id\":\"fixture-texture\"}"
+                                        .getBytes(StandardCharsets.UTF_8);
+                    } else if (url.getHost().equals("textures.minecraft.net")
+                            && url.getPath().endsWith("fixture-texture")) {
+                        payload = png.toByteArray();
+                    } else if (url.getHost().equals("api.geysermc.org")
+                            && url.getPath().endsWith("/54321")) {
+                        payload = "{}".getBytes(StandardCharsets.UTF_8);
+                    } else throw new AssertionError("Unexpected outbound request: " + url);
+                    return new URLConnection(url) {
+                        public void connect() {}
 
-                                public InputStream getInputStream() {
-                                    return new ByteArrayInputStream(payload);
-                                }
+                        public InputStream getInputStream() {
+                            return new ByteArrayInputStream(payload);
+                        }
 
-                                public Object getContent() {
-                                    return getInputStream();
-                                }
-                            };
+                        public Object getContent() {
+                            return getInputStream();
                         }
                     };
-                });
+                }
+            };
+        });
         BlueMapFixture fixture = new BlueMapFixture(Path.of("floodgate-fixture/web"));
         BufferedImage javaSkin = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
         List<UUID> fallbackPlayers = new ArrayList<>();
