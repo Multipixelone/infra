@@ -9,6 +9,7 @@ let
         public
         publicTCPPorts
         publicUDPPorts
+        wakeOnJoin
         worldPaths
         ;
     }) (lib.filterAttrs (_: s: s.game == "minecraft-paper") c.infra.games.runtime);
