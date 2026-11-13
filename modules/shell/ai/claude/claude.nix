@@ -1,5 +1,4 @@
 {
-  rootPath,
   withSystem,
   inputs,
   config,
@@ -19,21 +18,11 @@
       url = "github:ryoppippi/nix-claude-code";
     };
   };
-  perSystem =
-    { pkgs, ... }:
-    {
-      packages.ralph-wiggum-plugin = pkgs.callPackage "${rootPath}/pkgs/ralph-wiggum-plugin" {
-        src = inputs.claude-code-src;
-      };
-    };
   nixpkgs.config.allowUnfreePackages = [ "claude-code" ];
   flake.modules.homeManager.base =
     { pkgs, ... }:
     let
       aiConfig = config.flake.aiConfig;
-      # ralph-wiggum-plugin = withSystem pkgs.stdenv.hostPlatform.system (
-      #   psArgs: psArgs.config.packages.ralph-wiggum-plugin
-      # );
       claude-status-line = withSystem pkgs.stdenv.hostPlatform.system (
         psArgs: psArgs.config.packages.claude-status-line
       );
@@ -75,7 +64,6 @@
         skills = aiConfig.skillsDir;
         enableMcpIntegration = true;
         plugins = {
-          # ralph-wiggum = "${ralph-wiggum-plugin}";
           # caveman = "${inputs.caveman}/plugins/caveman";
           commit-commands = "${inputs.claude-code-src}/plugins/commit-commands";
           # feature-dev = "${inputs.claude-code-src}/plugins/feature-dev";

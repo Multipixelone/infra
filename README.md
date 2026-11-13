@@ -106,7 +106,7 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 ## Packages
 
 <details>
-<summary>Packages exposed by this flake (143)</summary>
+<summary>Packages exposed by this flake (142)</summary>
 
 - [`agent-run-long`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/agent-run-long.nix) — Run one command with a bounded lifetime and durable private log · `nix run github:Multipixelone/infra#agent-run-long`
 - [`anki-tools`](https://github.com/Multipixelone/infra/blob/main/modules/productivity/anki-tools.nix) — Build .apkg decks and push cards to a running Anki from a shared cards.json schema · `nix run github:Multipixelone/infra#anki-tools`
@@ -217,7 +217,6 @@ Portable applications exposed by this flake and runnable on any Nix-enabled syst
 - [`playlist-transcode`](https://github.com/Multipixelone/infra/blob/main/modules/media/playlist-transcode.nix) · `nix run github:Multipixelone/infra#playlist-transcode`
 - [`plexamp-headless`](https://github.com/Multipixelone/infra/blob/main/modules/marin/plexamp-headless.nix) — Headless Plexamp player · `nix run github:Multipixelone/infra#plexamp-headless`
 - [`pragmata`](https://github.com/Multipixelone/infra/blob/main/modules/theme/fonts.nix) — Condensed monospace font with programming ligatures · `nix run github:Multipixelone/infra#pragmata`
-- [`ralph-wiggum-plugin`](https://github.com/Multipixelone/infra/blob/main/modules/shell/ai/claude/claude.nix) — Ralph Wiggum loop plugin for Claude Code — self-referential agentic loops · `nix run github:Multipixelone/infra#ralph-wiggum-plugin`
 - [`rb-albumart`](https://github.com/Multipixelone/infra/blob/main/modules/media/rockbox.nix) · `nix run github:Multipixelone/infra#rb-albumart`
 - [`retroarch-bundle-generate`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/bundles.nix) — Generate one client's RetroArch save-sync bundle from the Core policy · `nix run github:Multipixelone/infra#retroarch-bundle-generate`
 - [`retroarch-config-diff`](https://github.com/Multipixelone/infra/blob/main/modules/gaming/saves/retroarch-config.nix) — Diff the generated RetroArch configuration against the live one, key by key, without printing credential values · `nix run github:Multipixelone/infra#retroarch-config-diff`
