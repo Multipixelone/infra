@@ -99,7 +99,7 @@ in
             envs = {
               # Client-side, so CI builds are bounded without slowing the
               # interactive `just rebuild` path on the same machine.
-              NIX_CONFIG = "max-jobs = 3\ncores = 4";
+              NIX_CONFIG = "max-jobs = 4\ncores = 6";
               # Belt and braces with the unit's own HOME below: act_runner
               # composes a job's environment rather than passing the unit's
               # through wholesale, so the value has to be stated where the
@@ -169,8 +169,8 @@ in
         # Prometheus on a box that is already memory-tight.
         CPUWeight = 20;
         IOWeight = 20;
-        MemoryHigh = "8G";
-        MemoryMax = "12G";
+        MemoryHigh = "14G";
+        MemoryMax = "20G";
         TasksMax = 4096;
       };
 

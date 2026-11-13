@@ -143,8 +143,8 @@ class NightlyUnitsTest(unittest.TestCase):
                     self.assertNotIn("MemoryHigh", case["slices"][sibling])
                     self.assertNotIn("MemoryMax", case["slices"][sibling])
                 ci = case["slices"]["batch-ci"]
-                self.assertEqual(ci["MemoryHigh"], "8G")
-                self.assertEqual(ci["MemoryMax"], "12G")
+                self.assertEqual(ci["MemoryHigh"], "14G")
+                self.assertEqual(ci["MemoryMax"], "20G")
                 for job, quota in zip(
                     ("beets-xtractor-backfill", "beets-embed-backfill"), quotas
                 ):

@@ -125,20 +125,20 @@ let
   # nix-fast-build and evaluating the entire flake to resolve ONE attribute —
   # is paid once instead of 86 times.
   #
-  # One eval worker at 8 GiB: individual attributes exceeded the previous
+  # One eval worker at 12 GiB: individual attributes exceeded the previous
   # 3 GiB worker budget even when evaluated alone, so more workers cannot help.
-  # The aggregate evaluator budget is 1×8192 MiB = 8 GiB, leaving 4 GiB below
-  # batch-ci.slice's MemoryMax=12G for the runner and other CI processes.
-  # MemoryHigh=8G remains the soft reclaim/throttling threshold, not spare
+  # The aggregate evaluator budget is 1×12288 MiB = 12 GiB, leaving 8 GiB below
+  # batch-ci.slice's MemoryMax=20G for the runner and other CI processes.
+  # MemoryHigh=14G remains the soft reclaim/throttling threshold, not spare
   # capacity; the worker budget is not a hard cap on total slice usage.
   #
-  # `-j 2` multiplies with the runner unit's own `NIX_CONFIG = max-jobs = 3`
-  # (modules/link/forgejo-runner.nix), so up to six derivations build at once.
+  # `-j 2` multiplies with the runner unit's own `NIX_CONFIG = max-jobs = 4`
+  # (modules/link/forgejo-runner.nix), so up to eight derivations build at once.
   fastBuild = ci.mkNixFastBuild {
     flakeSystem = runner.system;
     jobs = 2;
     evalWorkers = 1;
-    evalMaxMemory = 8192;
+    evalMaxMemory = 12288;
     streamJsonLines = true;
     # Resolved inside the job: the dispatch-only set depends on the event.
     select = "\"$CI_SELECT\"";
