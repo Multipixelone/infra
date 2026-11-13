@@ -26,8 +26,16 @@ in
       );
       # This is the existing real NixOS module output under evaluation-only
       # secret/backup overrides, not a second handwritten schema or manifest.
+      # The mock fixture exercises the sleeping lifecycle, so survival keeps
+      # wake-on-join enabled here even though production defaults it off.
+      manifest = infra.flake.checks.x86_64-linux.games-contract.fixtureData.enabled.manifest;
       fixture = pkgs.writeText "games-dashboard-mock-manifest.json" (
-        builtins.toJSON infra.flake.checks.x86_64-linux.games-contract.fixtureData.enabled.manifest
+        builtins.toJSON (
+          manifest
+          // {
+            servers = map (s: if s.id == "survival" then s // { wakeOnJoin = true; } else s) manifest.servers;
+          }
+        )
       );
       launcher = pkgs.writeShellApplication {
         name = "games-dashboard-dev";
