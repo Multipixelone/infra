@@ -43,36 +43,42 @@
 
     # Share MCP definitions across clients. Claude Code and Codex use their HM
     # integrations; opencode.nix renders native V2 servers from the same source.
-    flake.modules.homeManager.base = hmArgs: {
-      imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
-      # Holds PARALLEL_API_KEY, consumed by the websearch MCP server below and
-      # by opencode.nix's fish exporter. The ciphertext is still filed under the
-      # old ai/tavily.age name in the secrets repo -- websearch moved from Tavily
-      # to Parallel and the file was reused rather than re-created. Renaming it
-      # there means an agenix re-encrypt plus a lock bump, so the key is named
-      # for its contents here and the stale path is called out rather than left
-      # to be discovered by decrypting it.
-      age.secrets."parallel".file = "${inputs.secrets}/ai/tavily.age";
-      programs.mcp.enable = true;
-      mcp-servers.programs = {
-        context7.enable = true;
-        github = {
-          enable = true;
-          envFile = hmArgs.config.age.secrets."gh".path;
+    flake.modules.homeManager.base =
+      { pkgs, ... }@hmArgs:
+      {
+        imports = [ inputs.mcp-servers-nix.homeManagerModules.default ];
+        home.packages = [
+          pkgs.ast-grep
+          pkgs.fastmod
+        ];
+        # Holds PARALLEL_API_KEY, consumed by the websearch MCP server below and
+        # by opencode.nix's fish exporter. The ciphertext is still filed under the
+        # old ai/tavily.age name in the secrets repo -- websearch moved from Tavily
+        # to Parallel and the file was reused rather than re-created. Renaming it
+        # there means an agenix re-encrypt plus a lock bump, so the key is named
+        # for its contents here and the stale path is called out rather than left
+        # to be discovered by decrypting it.
+        age.secrets."parallel".file = "${inputs.secrets}/ai/tavily.age";
+        programs.mcp.enable = true;
+        mcp-servers.programs = {
+          context7.enable = true;
+          github = {
+            enable = true;
+            envFile = hmArgs.config.age.secrets."gh".path;
+          };
+          nixos.enable = true;
         };
-        nixos.enable = true;
+        mcp-servers.settings.servers = {
+          grep_app = {
+            type = "http";
+            url = "https://mcp.grep.app";
+          };
+          websearch = {
+            type = "http";
+            url = "https://search.parallel.ai/mcp";
+            headers.Authorization = "Bearer \${PARALLEL_API_KEY}";
+          };
+        };
       };
-      mcp-servers.settings.servers = {
-        grep_app = {
-          type = "http";
-          url = "https://mcp.grep.app";
-        };
-        websearch = {
-          type = "http";
-          url = "https://search.parallel.ai/mcp";
-          headers.Authorization = "Bearer \${PARALLEL_API_KEY}";
-        };
-      };
-    };
   };
 }

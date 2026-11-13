@@ -70,11 +70,6 @@
       url = "github:catppuccin/helix";
       flake = false;
     };
-    claude-code-pkg.url = "github:ryoppippi/nix-claude-code";
-    claude-code-src = {
-      url = "github:anthropics/claude-code";
-      flake = false;
-    };
     codex-nix = {
       url = "github:SecBear/codex-nix";
       inputs = {
