@@ -152,12 +152,14 @@ class NightlyUnitsTest(unittest.TestCase):
                         continue
                     service = unit(case, job + ".service")["Service"]
                     if job == "beets-embed-backfill":
+                        # The style backend default follows embedBackfill.rocm.
+                        backend = "torch" if case["embedRocm"] else "onnx"
                         for suffix in (".service", "-now.service"):
                             self.assertEqual(
                                 environment(case, job + suffix)[
                                     "BEETS_EMBED_STYLE_BACKEND"
                                 ],
-                                "torch",
+                                backend,
                             )
                             self.assertEqual(
                                 unit(case, job + suffix)["Service"]["CPUQuota"],

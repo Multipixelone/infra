@@ -39,6 +39,7 @@
           );
           workers = cfg.services.beets.xtractorBackfill.workers;
           threads = cfg.services.beets.embedBackfill.threads;
+          embedRocm = cfg.services.beets.embedBackfill.rocm;
           transcodeService = cfg.home-manager.users.tunnel.systemd.user.services.transcode-music.Service;
           runtimeDirectorySize = cfg.services.logind.settings.Login.RuntimeDirectorySize or "10%";
           kernelVersion = cfg.boot.kernelPackages.kernel.version;
