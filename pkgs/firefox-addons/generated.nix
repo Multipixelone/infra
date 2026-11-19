@@ -41,10 +41,10 @@
     };
     "tree-style-tab" = buildMozillaXpiAddon {
       pname = "tree-style-tab";
-      version = "4.4.9";
+      version = "4.4.10";
       addonId = "treestyletab@piro.sakura.ne.jp";
-      url = "https://addons.mozilla.org/firefox/downloads/file/5072919/tree_style_tab-4.4.9.xpi";
-      sha256 = "6fa89f9228ecd5d61bebb38f38ba6851e24ee521d446525fba0b24a492e96984";
+      url = "https://addons.mozilla.org/firefox/downloads/file/5267735/tree_style_tab-4.4.10.xpi";
+      sha256 = "6e44b6761ef86c4f4ecf8e86d4033e33c5d30f9fbb2a9691d6911b7b7d56c14f";
       meta = with lib;
       {
         homepage = "https://github.com/piroor/treestyletab";
