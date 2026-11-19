@@ -10,7 +10,13 @@ from pathlib import Path
 from time import monotonic
 
 
-def snapshot(source: Path, destination: Path, timeout_seconds: float = 300) -> None:
+def snapshot(
+    source: Path,
+    destination: Path,
+    timeout_seconds: float = 300,
+    *,
+    required_tables: tuple[str, ...] = (),
+) -> None:
     """Keep the previous snapshot until a complete, checked replacement exists.
 
     The destination directory is root-owned and provisioned by NixOS. Never
@@ -40,6 +46,18 @@ def snapshot(source: Path, destination: Path, timeout_seconds: float = 300) -> N
             saved.set_progress_handler(lambda: int(monotonic() >= deadline), 10000)
             if saved.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
                 raise RuntimeError("SQLite snapshot failed its integrity check")
+            if required_tables:
+                tables = {
+                    row[0]
+                    for row in saved.execute(
+                        "SELECT name FROM sqlite_schema WHERE type = 'table'"
+                    )
+                }
+                missing = sorted(set(required_tables) - tables)
+                if missing:
+                    raise RuntimeError(
+                        f"{source.name} snapshot lacks required tables: {', '.join(missing)}"
+                    )
             # The snapshot is one standalone file, even when the source
             # uses WAL. Finish journal changes before publishing it.
             saved.execute("PRAGMA journal_mode=DELETE")

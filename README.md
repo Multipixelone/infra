@@ -67,7 +67,7 @@ Task execution is managed via `just`.
 | `just colmena-build <host>` | Build one host's closure locally without touching the machine. |
 | `just colmena-dry <host>` | Dry-activate on the target: report what would start, stop or restart. |
 | `just colmena-diff <host>` | Diff the target's running closure against a freshly built one via `nvd`. |
-| `just deploy-services [mode] [routes]` | Fail-closed split-DNS and service publication deployment. |
+| `just deploy-services [mode]` | Fail-closed split-DNS and service publication deployment. |
 | `just services-smoke [context] [routes]` | Smoke-test published service routes from a given network context. |
 | `just services-tofu [action]` | Run the service publication OpenTofu workspace. |
 | `just saves-bundle <client> <core_dir> [extra]` | See Justfile recipe. |

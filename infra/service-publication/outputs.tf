@@ -7,3 +7,11 @@ output "managed_inventory" {
     registry_schema     = local.registry.metadata.schemaVersion
   }
 }
+
+output "edge_only_access_audiences" {
+  description = "Non-secret Access application audience tags for origin JWT validation."
+  value = {
+    for key, application in cloudflare_zero_trust_access_application.managed :
+    key => application.aud if try(local.registry.applications[key].edgeOnly, false)
+  }
+}

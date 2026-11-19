@@ -812,6 +812,27 @@
         "type": "github"
       }
     },
+    "dvp": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795125900,
+        "narHash": "sha256-nJS9bvyt183lxEpxm67ikggFNZnHemcR7sQre2pgWyg=",
+        "ref": "feat/nixos-service",
+        "rev": "c4bc473f9c34c307978017e2a425ca1f8641f0f9",
+        "revCount": 61,
+        "type": "git",
+        "url": "https://github.com/Multipixelone/dvp.git"
+      },
+      "original": {
+        "ref": "feat/nixos-service",
+        "type": "git",
+        "url": "https://github.com/Multipixelone/dvp.git"
+      }
+    },
     "editorconfig": {
       "flake": false,
       "locked": {
@@ -4280,6 +4301,7 @@
         "copyparty": "copyparty",
         "determinate": "determinate",
         "disko": "disko",
+        "dvp": "dvp",
         "euphony": "euphony",
         "files": "files",
         "flake-compat": "flake-compat_4",

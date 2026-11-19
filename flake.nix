@@ -91,6 +91,10 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    dvp = {
+      url = "git+https://github.com/Multipixelone/dvp.git?ref=feat/nixos-service";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     euphony = {
       url = "github:Multipixelone/euphony/nix-build";
       inputs.nixpkgs.follows = "nixpkgs";

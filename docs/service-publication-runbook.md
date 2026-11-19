@@ -299,13 +299,19 @@ so the ordering cannot be ambiguous.
 Runtime probe inputs are:
 
 - `SERVICE_PUBLICATION_BLOCKY_ADDRESS` optionally overrides the declarative
-  internal-DNS host address for diagnostic LAN probes;
+  internal-DNS host address for standalone diagnostic LAN probes; deployment
+  always tests the generated resolver addresses;
 - `SERVICE_PUBLICATION_VPN_PROBE_COMMAND`, optional, executed on a genuine VPN
   client and expected to run the generated inventory's VPN checks. No VPN client
   is guaranteed to be up, so leaving it unset is allowed: the deploy prints that
   the VPN view stays unproven and continues on the LAN proof alone. Set it (for
   example an `ssh <client>` wrapper around `service-publication-smoke vpn`) for
-  any change where the VPN path has to be verified before publication;
+  any change where the VPN path has to be verified before publication. For
+  edge-only additions, forward `SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS`
+  and `SERVICE_PUBLICATION_WAIT_FOR_EDGE_DNS` from the wrapper's environment
+  to the remote smoke command. The first allows an absent record before
+  Cloudflare apply; the second allows a bounded wait for public DNS afterward.
+  Do not hardcode either in the wrapper;
 - `SERVICE_PUBLICATION_EXTERNAL_RESOLVER` optionally overrides the public
   resolver (default `1.1.1.1`) that the external probe resolves published
   hostnames through and asserts private names against; and
@@ -321,6 +327,46 @@ Runtime probe inputs are:
   foreign client path. External verification runs only when the registry
   publishes at least one public route, or when this deployment withdraws one; a
   registry with no public routes skips it and says so.
+
+### DVP: first publication
+
+DVP runs only on Link at `127.0.0.1:8790`. `dvp.finnrut.is` uses public
+DNS even on LAN and VPN; there is no private alias. The `finn-only` Access
+policy is enforced at the edge, and DVP validates the signed Access assertion
+itself. LAN and VPN smoke probes check that DNS returns no private origin
+address and that direct HTTPS to Link returns 403. Before the first Cloudflare
+apply, an absent DNS record is expected; final smoke requires a public answer.
+These checks prove anonymous denial, not availability to Finn or that all
+traffic transits the tunnel. A valid Finn assertion is a bearer credential.
+Access protects new requests, not copies the authorized browser already saved
+for offline use. Use Finn's own device/profile and clear the site's data before
+handing it to someone else. For both deployments, configure the VPN probe on a
+real VPN client as described above.
+
+1. With `services.dvp.cloudflareAccess` enabled and its issuer and audience
+   unset, review and run `just deploy-services`. This creates the Access app
+   and DNS while the DVP origin denies every application request, including
+   requests from authenticated users.
+2. Read the `dvp` value under `edge_only_access_audiences` with
+   `nix run .#service-publication-tofu -- output`. Set that value as
+   `services.dvp.cloudflareAccess.audience` in `modules/link/dvp.nix`. Set
+   `issuer` to the exact `https://<team>.cloudflareaccess.com` URL from the
+   Zero Trust account settings. These are not credentials. Do not derive them
+   from a browser token or disable the origin gate to get a successful probe.
+3. Commit, review, and run `just deploy-services` again. Verify a fresh
+   Finn session loads the UI, a different identity is denied, and direct
+   LAN/VPN requests without a valid assertion still return 403. In Finn's
+   Access session, verify that `/api/bundle` returns 401 without a DVP bearer
+   token and 200 for an enrolled device with a saved bundle. Do not log either
+   credential. If the Access application is ever replaced, repeat the audience
+   check before enabling the new application at the origin.
+
+For recovery, stop DVP before replacing any database. Restic holds the SQLite
+snapshots under `/var/backup/dvp`, not the live files under `/srv/dvp`.
+Recover the desired snapshots together, set them to `dvp:dvp` and mode `0600`
+in `/srv/dvp`, and keep old SQLite sidecars out of the restored directory.
+Review whether the restore would resurrect any revoked devices or enrollment
+codes before restarting. The other `/srv/dvp` files are backed up as-is.
 
 Useful diagnostic forms are:
 

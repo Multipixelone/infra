@@ -27,25 +27,31 @@ writeShellApplication {
     servicePublicationValidate
   ];
   text = ''
+    mode=''${1:-apply}
+    case "$mode" in
+    apply | plan-only) ;;
+    *)
+      echo "usage: $0 {apply|plan-only}" >&2
+      exit 2
+      ;;
+    esac
+    if [[ -n ''${2:-} || $# -gt 2 ]]; then
+      echo "deployment does not accept a route filter; use service-publication-smoke for individual routes" >&2
+      exit 2
+    fi
+
+    # Do not let ambient diagnostic settings leak into either deploy gate.
+    unset SERVICE_PUBLICATION_ROUTE_FILTER SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS SERVICE_PUBLICATION_WAIT_FOR_EDGE_DNS
+
     repo_root=$(git rev-parse --show-toplevel)
     cd "$repo_root"
 
-    mode=''${1:-apply}
-    route_filter=''${2:-}
     registry=infra/service-publication/registry.json
     state_dir=${builtins.toJSON stateDir}
     privilege_command=${builtins.toJSON privilegeCommand}
     ssh_command=${builtins.toJSON sshCommand}
     revision_file="$state_dir/last-successful-revision"
     applied_revision_file=/etc/service-publication/revision
-
-    case "$mode" in
-    apply | plan-only) ;;
-    *)
-      echo "usage: $0 {apply|plan-only} [application/route]" >&2
-      exit 2
-      ;;
-    esac
 
     stage() { printf '\n==> %s\n' "$1"; }
 
@@ -212,16 +218,11 @@ writeShellApplication {
     # them, so a probe run inside that window fails on a certificate that is
     # merely not issued yet. Wait on the certificate here rather than giving the
     # probes retries, which would also mask a genuinely broken origin.
-    tls_select='.'
-    if [[ -n $route_filter ]]; then
-      # shellcheck disable=SC2016 # $route is a jq variable, not a shell variable.
-      tls_select='select(.key == $route)'
-    fi
-    tls_targets_tsv=$(jq -r --arg route "$route_filter" "
-      .internalProbes[] | $tls_select |
-      ([.hostname, .proxyAddress], (select(.alias != null) | [.alias, .proxyAddress]))
+    tls_targets_tsv=$(jq -r '
+      .internalProbes[]
+      | ([.hostname, .proxyAddress], (select(.alias != null) | [.alias, .proxyAddress]))
       | @tsv
-    " "$registry" | sort -u)
+    ' "$registry" | sort -u)
     tls_targets=()
     if [[ -n $tls_targets_tsv ]]; then
       mapfile -t tls_targets <<<"$tls_targets_tsv"
@@ -259,15 +260,27 @@ writeShellApplication {
       done
     }
 
-    run_internal_smoke() {
+    run_local_smoke() {
+      env -u SERVICE_PUBLICATION_BLOCKY_ADDRESS \
+        SERVICE_PUBLICATION_REGISTRY="$repo_root/$registry" service-publication-smoke "$@"
+    }
+
+    # The subshell scopes the phase flags to this LAN probe and the trusted VPN
+    # runner. An SSH-based runner must forward them to its VPN client itself.
+    run_internal_smoke() (
+      case "$1" in
+      pre-publication) export SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS=1 ;;
+      final) export SERVICE_PUBLICATION_WAIT_FOR_EDGE_DNS=1 ;;
+      *) return 2 ;;
+      esac
       wait_for_certificates
-      service-publication-smoke lan "$route_filter"
+      run_local_smoke lan
       if [[ -z ''${SERVICE_PUBLICATION_VPN_PROBE_COMMAND:-} ]]; then
         echo "no SERVICE_PUBLICATION_VPN_PROBE_COMMAND set; the VPN view stays unproven for this run" >&2
         return 0
       fi
-      SERVICE_PUBLICATION_ROUTE_FILTER="$route_filter" bash -c "$SERVICE_PUBLICATION_VPN_PROBE_COMMAND"
-    }
+      bash -c "$SERVICE_PUBLICATION_VPN_PROBE_COMMAND"
+    )
 
     run_external_smoke() {
       if [[ -z ''${SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND:-} ]]; then
@@ -276,10 +289,10 @@ writeShellApplication {
         # the source address stays local; set the variable to a runner outside the
         # network for changes that have to prove a foreign client path too.
         echo "no SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND set; verifying the edge from here against the public resolver" >&2
-        service-publication-smoke external "$route_filter"
+        run_local_smoke external
         return
       fi
-      SERVICE_PUBLICATION_ROUTE_FILTER="$route_filter" bash -c "$SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND"
+      bash -c "$SERVICE_PUBLICATION_EXTERNAL_PROBE_COMMAND"
     }
 
     # Colmena builds every selected node before it pushes any of them, so a node
@@ -301,13 +314,13 @@ writeShellApplication {
       stage "deploy generated NixOS service configuration"
       colmena apply --on @service-publication
       stage "prove LAN origin readiness (and the VPN view when a probe is configured) before publication"
-      run_internal_smoke
+      run_internal_smoke pre-publication
       stage "apply Access-protected Cloudflare publication"
       service-publication-tofu apply
     fi
 
     stage "run complete internal and external smoke verification"
-    run_internal_smoke
+    run_internal_smoke final
     public_count=$(jq -n --argjson routes "$current_public" '$routes | length')
     if ((public_count > 0 || removed > 0)); then
       run_external_smoke

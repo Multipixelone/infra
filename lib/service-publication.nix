@@ -20,6 +20,8 @@ let
   validPath = value: match "/.*" value != null;
   pathContains = parent: child: parent == "/" || lib.hasPrefix parent child;
   routeKey = application: route: "${application}/${route}";
+  edgeOnly = application: application.edgeOnly or false;
+  edgeOnlyMetadata = application: lib.optionalAttrs (edgeOnly application) { edgeOnly = true; };
 
   # The single Cloudflare zone this pipeline manages. Public DNS records, the
   # Tunnel ingress and the proxy's shared ACME SAN certificate all live inside
@@ -53,6 +55,15 @@ let
         hostName:
         ((hosts.${hostName} or { capabilities.reverseProxy = false; }).capabilities.reverseProxy or false);
       internalDnsHosts = siteName: (sites.${siteName} or { internalDnsHosts = [ ]; }).internalDnsHosts;
+      inInternalZone =
+        hostname:
+        lib.any (
+          site:
+          let
+            zone = lib.toLower (lib.removeSuffix "." site.internalZone);
+          in
+          hostname == zone || lib.hasSuffix ".${zone}" hostname
+        ) (attrValues sites);
 
       canonicalFor =
         applicationName: application:
@@ -66,7 +77,7 @@ let
 
       aliasFor =
         applicationName: application:
-        if application.public then
+        if application.public && !edgeOnly application then
           "${applicationName}.${(sites.${application.site} or { internalZone = "invalid"; }).internalZone}"
         else
           null;
@@ -147,7 +158,8 @@ let
             lanAddress = if proxyHost == null then null else hostLan proxyHost;
           };
           inherit (route) health;
-        };
+        }
+        // edgeOnlyMetadata application;
 
       routes = lib.concatMapAttrs (
         applicationName: application:
@@ -163,6 +175,7 @@ let
       applicationList = lib.mapAttrsToList (applicationName: application: {
         name = applicationName;
         inherit (application) site public access;
+        edgeOnly = edgeOnly application;
         canonical = canonicalFor applicationName application;
         alias = aliasFor applicationName application;
         routes = filter (route: route.application == applicationName) routeList;
@@ -187,7 +200,7 @@ let
         // lib.optionalAttrs (application.alias != null) {
           ${application.alias} = address;
         }
-      ) { } applicationList;
+      ) { } (filter (application: !application.edgeOnly) applicationList);
 
       blockyRecords = hostAdminRecords // applicationRecords;
 
@@ -328,42 +341,42 @@ let
 
       internalProbes = concatMap (
         route:
-        map (resolverHost: {
-          key = "${route.key}@${resolverHost}";
-          routeKey = route.key;
-          scope = "internal";
-          hostname = route.canonical;
-          inherit (route) canonical alias;
-          inherit resolverHost;
-          resolverAddress = hostLan resolverHost;
-          proxyAddress = route.proxy.lanAddress;
-          path = route.health.path;
-          expectedStatuses = route.health.expectedStatuses;
-          timeoutSeconds = route.health.timeoutSeconds;
-        }) (internalDnsHosts route.site)
+        map (
+          resolverHost:
+          {
+            key = "${route.key}@${resolverHost}";
+            routeKey = route.key;
+            scope = "internal";
+            hostname = route.canonical;
+            inherit (route) canonical alias;
+            inherit resolverHost;
+            resolverAddress = hostLan resolverHost;
+            proxyAddress = route.proxy.lanAddress;
+            path = route.health.path;
+            expectedStatuses = route.health.expectedStatuses;
+            timeoutSeconds = route.health.timeoutSeconds;
+          }
+          // edgeOnlyMetadata route
+        ) (internalDnsHosts route.site)
       ) routeList;
 
-      externalProbes = map (route: {
-        inherit (route) key;
-        scope = "external";
-        hostname = route.canonical;
-        path = route.health.path;
-        expectedStatuses = route.health.expectedStatuses;
-        timeoutSeconds = route.health.timeoutSeconds;
-        inherit (route) access;
-        denied = false;
-      }) (filter (route: route.public) routeList);
+      mkExternalProbe =
+        denied: route:
+        {
+          inherit (route) key access;
+          inherit denied;
+          scope = "external";
+          hostname = route.canonical;
+          path = route.health.path;
+          expectedStatuses = if denied then [ 404 ] else route.health.expectedStatuses;
+          timeoutSeconds = route.health.timeoutSeconds;
+        }
+        // edgeOnlyMetadata route;
 
-      externalDeniedProbes = map (route: {
-        inherit (route) key;
-        scope = "external";
-        hostname = route.canonical;
-        path = route.health.path;
-        expectedStatuses = [ 404 ];
-        timeoutSeconds = route.health.timeoutSeconds;
-        inherit (route) access;
-        denied = true;
-      }) (filter (route: applications.${route.application}.public && !route.public) routeList);
+      externalProbes = map (mkExternalProbe false) (filter (route: route.public) routeList);
+      externalDeniedProbes = map (mkExternalProbe true) (
+        filter (route: applications.${route.application}.public && !route.public) routeList
+      );
 
       errorsForApplication =
         application:
@@ -371,6 +384,20 @@ let
           original = applications.${application.name};
           applicationBypassRequested = original.access.bypassAccess;
           wholeBypass = wholeApplicationBypass original;
+          edgePolicy =
+            if original.access.policy == null then null else accessPolicies.${original.access.policy} or null;
+          humanIdentitySelector =
+            rule:
+            let
+              selector =
+                if attrNames rule == [ "email" ] then
+                  rule.email.email or null
+                else if attrNames rule == [ "email_domain" ] then
+                  rule.email_domain.domain or null
+                else
+                  null;
+            in
+            builtins.isString selector && isNonEmpty selector;
           appRoutes = application.routes;
           publicRoutes = filter (route: route.public) appRoutes;
           routeAccessOverrides = filter (
@@ -415,6 +442,32 @@ let
         ++ optional (
           original.publicHostname != null && !original.public
         ) "application ${application.name}: publicHostname requires public = true"
+        ++ lib.optionals application.edgeOnly (
+          optional (!original.public) "application ${application.name}: edgeOnly requires public = true"
+          ++ optional (inInternalZone application.canonical) "application ${application.name}: edgeOnly canonical hostname ${application.canonical} is inside an internal static zone"
+          ++ optional (
+            original.access.bypassAccess
+            || original.access.serviceTokens != [ ]
+            || original.access.bypassJustification != null
+          ) "application ${application.name}: edgeOnly cannot declare Access bypass or service tokens"
+          # Only positive human identity selectors may grant access. Other
+          # selectors (e.g. geo) may constrain but not grant it.
+          ++
+            optional
+              (
+                edgePolicy == null
+                || edgePolicy.decision != "allow"
+                || edgePolicy.include == [ ]
+                || !(lib.all humanIdentitySelector edgePolicy.include)
+                || lib.any (rule: rule ? service_token || rule ? any_valid_service_token) (
+                  edgePolicy.exclude ++ edgePolicy.require
+                )
+              )
+              "application ${application.name}: edgeOnly requires an allow Access policy for human email identities without service tokens"
+          ++ optional (
+            routeAccessOverrides != [ ]
+          ) "application ${application.name}: edgeOnly cannot declare route Access overrides"
+        )
         ++ optional (
           original.public && publicRoutes == [ ]
         ) "application ${application.name}: public application has no effective public route"
@@ -461,6 +514,9 @@ let
           ++ optional (
             route.health.expectedStatuses == [ ]
           ) "route ${route.key}: expectedStatuses must not be empty"
+          ++ optional (
+            edgeOnly route && route.health.expectedStatuses != [ 403 ]
+          ) "route ${route.key}: edgeOnly origin health must expect only anonymous HTTP 403"
           ++ optional (lib.any (
             status: status < 100 || status > 599
           ) route.health.expectedStatuses) "route ${route.key}: expected status is outside 100..599"
@@ -585,7 +641,10 @@ let
         ++ concatMap (
           route:
           optional (
-            (blockyRecords.${route.canonical} or null) != route.proxy.lanAddress
+            edgeOnly route && builtins.hasAttr route.canonical blockyRecords
+          ) "route ${route.key}: edgeOnly canonical must not have a Blocky record"
+          ++ optional (
+            !edgeOnly route && (blockyRecords.${route.canonical} or null) != route.proxy.lanAddress
           ) "route ${route.key}: Blocky canonical does not resolve to the selected proxy"
           ++ optional (
             route.alias != null && (blockyRecords.${route.alias} or null) != route.proxy.lanAddress
@@ -671,11 +730,15 @@ let
       };
       inherit (registry) sites;
       inherit (registry) hosts;
-      applications = lib.mapAttrs (applicationName: application: {
-        inherit (application) site public latencyObjectiveSeconds;
-        canonical = canonicalFor applicationName application;
-        alias = aliasFor applicationName application;
-      }) applications;
+      applications = lib.mapAttrs (
+        applicationName: application:
+        {
+          inherit (application) site public latencyObjectiveSeconds;
+          canonical = canonicalFor applicationName application;
+          alias = aliasFor applicationName application;
+        }
+        // edgeOnlyMetadata application
+      ) applications;
     };
 in
 {

@@ -117,6 +117,11 @@ let
           type = types.nullOr types.str;
           default = null;
         };
+        edgeOnly = mkOption {
+          type = types.bool;
+          default = false;
+          description = "Publish through Cloudflare Access for human identities only, without split DNS or an internal alias. The origin must independently reject anonymous requests with HTTP 403.";
+        };
         latencyObjectiveSeconds = mkOption {
           type = types.nullOr types.numbers.positive;
           default = null;

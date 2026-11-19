@@ -4,6 +4,7 @@
   curl,
   gitMinimal,
   jq,
+  python3,
   writeShellApplication,
 }:
 writeShellApplication {
@@ -14,6 +15,7 @@ writeShellApplication {
     curl
     gitMinimal
     jq
+    python3
   ];
   text = ''
     registry_file=''${SERVICE_PUBLICATION_REGISTRY:-}
@@ -45,7 +47,7 @@ writeShellApplication {
     select_filter='.'
     if [[ -n $route_filter ]]; then
       # shellcheck disable=SC2016 # $route is a jq variable, not a shell variable.
-      select_filter='select(.key == $route)'
+      select_filter='select((.routeKey // .key) == $route or .key == $route)'
     fi
 
     if [[ $context == external ]]; then
@@ -73,11 +75,106 @@ writeShellApplication {
       fi
     fi
 
+    check_edge_only_dns_once() {
+      local key=$1 resolver=$2 hostname=$3 proxy=$4 record_type answer
+      local answers=()
+      for record_type in A AAAA; do
+        if ! answer=$(dig -r "@$resolver" +time=3 +tries=1 +noall +comments +answer "$hostname." "$record_type"); then
+          echo "$key: failed to query $hostname $record_type on $resolver" >&2
+          return 1
+        fi
+        answers+=("$answer")
+      done
+      python3 - "$key" "$resolver" "$proxy" "''${SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS:-}" "''${answers[@]}" <<'PY'
+    import ipaddress
+    import re
+    import sys
+
+    key, resolver, proxy, allow_unpublished, *answers = sys.argv[1:]
+
+    def unmap(address):
+        return getattr(address, "ipv4_mapped", None) or address
+
+    origin = unmap(ipaddress.ip_address(proxy))
+    public_answer = False
+    nxdomain = False
+    for record_type, answer in zip(("A", "AAAA"), answers):
+        status = re.search(r"^;; ->>HEADER<<- .*\bstatus: ([A-Z]+),", answer, re.MULTILINE)
+        if not status or status[1] not in ("NXDOMAIN", "NOERROR"):
+            sys.exit(f"{key}: unexpected {record_type} DNS status on {resolver}: {status[1] if status else 'missing'}")
+        nxdomain |= status[1] == "NXDOMAIN"
+        for line in answer.splitlines():
+            fields = line.split()
+            if len(fields) < 4 or fields[2] != "IN" or fields[3] not in ("A", "AAAA"):
+                continue
+            rr_type = fields[3]
+            try:
+                address = ipaddress.ip_address(fields[4])
+            except (IndexError, ValueError):
+                sys.exit(f"{key}: malformed {rr_type} DNS answer on {resolver}")
+            if len(fields) != 5 or address.version != (4 if rr_type == "A" else 6):
+                sys.exit(f"{key}: malformed {rr_type} DNS answer on {resolver}")
+            # Mapped IPv4 must not let a private or origin address through as IPv6.
+            address = unmap(address)
+            if (address == origin or not address.is_global or address.is_multicast
+                    or address.is_reserved or getattr(address, "is_site_local", False)):
+                sys.exit(f"{key}: {resolver} returned a non-public or origin {rr_type} answer: {address}")
+            if status[1] != "NOERROR":
+                sys.exit(f"{key}: {resolver} returned an address with {status[1]} for {record_type}")
+            public_answer |= rr_type == record_type
+
+    # Only a valid negative or empty result is retryable; all other failures
+    # (including a private answer in either family) abort immediately.
+    if allow_unpublished != "1" and (nxdomain or not public_answer):
+        sys.exit(75)
+    PY
+    }
+
+    edge_dns_deadline=0
+    check_edge_only_dns() {
+      local key=$1 resolver=$2 hostname=$3 proxy=$4 result announced=0
+      while :; do
+        if check_edge_only_dns_once "$key" "$resolver" "$hostname" "$proxy"; then
+          return 0
+        else
+          result=$?
+        fi
+        if ((result != 75)); then
+          return "$result"
+        fi
+        if [[ ''${SERVICE_PUBLICATION_WAIT_FOR_EDGE_DNS:-} != 1 ]]; then
+          echo "$key: $hostname on $resolver needs NOERROR for both A and AAAA and at least one public address" >&2
+          return 1
+        fi
+        if ((edge_dns_deadline == 0)); then
+          # Blocky caches negative replies for 30 minutes by default. Use one
+          # shared retry window per smoke run with some room for upstream DNS.
+          edge_dns_deadline=$((SECONDS + 2100))
+        fi
+        if ((SECONDS >= edge_dns_deadline)); then
+          echo "$key: timed out waiting for published DNS for $hostname on $resolver (need NOERROR for both A and AAAA and at least one public address)" >&2
+          return 1
+        fi
+        if ((announced == 0)); then
+          echo "$key: waiting for negative DNS cache/propagation for $hostname on $resolver" >&2
+          announced=1
+        fi
+        sleep 15
+      done
+    }
+
     for route in "''${routes[@]}"; do
       key=$(jq -r .key <<<"$route")
       hostname=$(jq -r .hostname <<<"$route")
       path=$(jq -r .path <<<"$route")
       timeout=$(jq -r .timeoutSeconds <<<"$route")
+      edge_only=$(jq -r '.edgeOnly // false' <<<"$route")
+      curl_options=()
+      if [[ $edge_only == true ]]; then
+        # Do not let ~/.curlrc add credentials or redirects, or let an HTTPS
+        # proxy bypass --resolve. These probes must be anonymous and pinned.
+        curl_options=(--disable --noproxy '*')
+      fi
 
       if [[ $context == external ]]; then
         # Resolve through the public resolver and pin curl to that address. Run from
@@ -109,8 +206,8 @@ writeShellApplication {
             echo "$key: bypassed external health returned $status" >&2
             exit 1
           }
-        elif [[ -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
-          challenge=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
+        elif [[ $edge_only == true || -z ''${CF_ACCESS_CLIENT_ID:-} || -z ''${CF_ACCESS_CLIENT_SECRET:-} ]]; then
+          challenge=$(curl "''${curl_options[@]}" --silent --show-error --output /dev/null --max-time "$timeout" \
             --resolve "$hostname:443:$edge" \
             --write-out '%{http_code} %{redirect_url}' "https://$hostname$path")
           read -r status redirect_url <<<"$challenge"
@@ -154,12 +251,16 @@ writeShellApplication {
           echo "$key: generated internal probe has no Blocky resolver address" >&2
           exit 1
         fi
-        answer=$(dig "@$blocky_address" +short "$hostname" A | tail -n 1)
-        [[ $answer == "$proxy" ]] || {
-          echo "$key: $context DNS returned '$answer', expected '$proxy'" >&2
-          exit 1
-        }
-        status=$(curl --silent --show-error --output /dev/null --max-time "$timeout" \
+        if [[ $edge_only == true ]]; then
+          check_edge_only_dns "$key" "$blocky_address" "$hostname" "$proxy"
+        else
+          answer=$(dig "@$blocky_address" +short "$hostname" A | tail -n 1)
+          [[ $answer == "$proxy" ]] || {
+            echo "$key: $context DNS returned '$answer', expected '$proxy'" >&2
+            exit 1
+          }
+        fi
+        status=$(curl "''${curl_options[@]}" --silent --show-error --output /dev/null --max-time "$timeout" \
           --resolve "$hostname:443:$proxy" --write-out '%{http_code}' "https://$hostname$path")
         jq -e --argjson status "$status" '.expectedStatuses | index($status) != null' <<<"$route" >/dev/null || {
           echo "$key: $context health returned $status" >&2

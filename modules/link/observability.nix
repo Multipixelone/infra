@@ -129,6 +129,12 @@ let
   # Derive one module per distinct contract actually present in the registry
   # and let each target name its own. Nothing here knows about a particular
   # service: a new contract mints a new module on its own.
+  # Edge-only origins intentionally deny direct requests. Deploy smoke pins
+  # those probes to the origin; a recurring DNS-based request hits Access
+  # instead and cannot measure authenticated application availability.
+  splitDnsProbes = builtins.filter (
+    probe: !(probe.edgeOnly or false)
+  ) serviceInventory.internalProbes;
   internalProbeContract = probe: {
     statuses = lib.sort (a: b: a < b) (lib.unique probe.expectedStatuses);
     inherit (probe) timeoutSeconds;
@@ -151,7 +157,7 @@ let
           valid_status_codes = contract.statuses;
         };
       }
-    ) (lib.unique (map internalProbeContract serviceInventory.internalProbes))
+    ) (lib.unique (map internalProbeContract splitDnsProbes))
   );
   # These are deliberately diagnostic-only public-positive modules.  The
   # canonical `dns` module below checks a generated private publication record
@@ -262,7 +268,7 @@ let
           slo_class = sloClassFor serviceInventory.routes.${probe.routeKey}.application;
           resolver = probe.resolverHost;
         };
-      }) serviceInventory.internalProbes
+      }) splitDnsProbes
     else
       map (endpoint: {
         targets = [
@@ -460,7 +466,7 @@ let
   # SLO probe. Only generate excusal series for applications that really
   # contribute an endpoint SLI, so unused metadata cannot mint an orphan rule.
   probedSloApplicationNames = lib.unique (
-    map (probe: serviceInventory.routes.${probe.routeKey}.application) serviceInventory.internalProbes
+    map (probe: serviceInventory.routes.${probe.routeKey}.application) splitDnsProbes
   );
   # Keep each registry reference and emitted signal distinct until the ordered
   # endpoint-level max below. That prevents two signals for one application

@@ -57,8 +57,8 @@ colmena-diff host:
   nvd diff "$(ssh colmena.{{host}} readlink -f /run/current-system)" ./.gcroots/node-{{host}}
 
 # Fail-closed split-DNS/service publication deployment. Modes: apply, plan-only.
-deploy-services mode="apply" routes="":
-  nix run .#service-publication-deploy -- "{{mode}}" "{{routes}}"
+deploy-services mode="apply":
+  nix run .#service-publication-deploy -- "{{mode}}"
 
 services-smoke context="lan" routes="":
   nix run .#service-publication-smoke -- "{{context}}" "{{routes}}"

@@ -164,6 +164,13 @@ args@{
             : "''${SERVICE_PUBLICATION_TEST_COMMAND_LOG:?test command log is required}"
             printf '%s %s\n' ${lib.escapeShellArg name} "$*" >> "$SERVICE_PUBLICATION_TEST_COMMAND_LOG"
             ${lib.optionalString (name == "service-publication-smoke") ''
+              if [[ ''${1:-} == lan ]]; then
+                if [[ ''${SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS:-} == 1 ]]; then
+                  echo 'LAN edge DNS: allow unpublished' >> "$SERVICE_PUBLICATION_TEST_COMMAND_LOG"
+                else
+                  echo 'LAN edge DNS: require public' >> "$SERVICE_PUBLICATION_TEST_COMMAND_LOG"
+                fi
+              fi
               : "''${SERVICE_PUBLICATION_TEST_SMOKE_COUNT:?test smoke count is required}"
               count=0
               if [[ -e $SERVICE_PUBLICATION_TEST_SMOKE_COUNT ]]; then
@@ -528,6 +535,28 @@ args@{
                 "$deploy/bin/service-publication-deploy" "$@"
             }
 
+            assert_lan_dns_phases() {
+              local actual expected
+              expected=$(printf '%s\n' 'LAN edge DNS: allow unpublished' \
+                'service-publication-tofu apply' 'LAN edge DNS: require public')
+              if ! actual=$(grep -E '^(LAN edge DNS:|service-publication-tofu apply)' "$command_log") \
+                || [[ $actual != "$expected" ]]; then
+                echo "only the LAN smoke before Cloudflare apply may allow unpublished DNS" >&2
+                cat "$command_log" >&2
+                exit 1
+              fi
+            }
+
+            if SERVICE_PUBLICATION_BOOTSTRAP=1 run_deploy apply fixture/root 2> filter.log; then
+              echo "a route-filtered apply unexpectedly succeeded" >&2
+              exit 1
+            fi
+            grep -Fq 'does not accept a route filter' filter.log
+            if [[ -e $state_dir ]] || grep -Eq '^(colmena |service-publication-tofu apply)' "$command_log" 2>/dev/null; then
+              echo "a route-filtered apply reached a host or Cloudflare operation or touched revision state" >&2
+              exit 1
+            fi
+
             if run_deploy apply; then
               echo "first apply succeeded without bootstrap authorization" >&2
               exit 1
@@ -539,11 +568,13 @@ args@{
             [[ $(<"$revision_file") == "$expected_revision" ]]
             grep -Fq "install -d -m 0750 $state_arg" "$privilege_log"
             grep -Fq "tee $state_arg/last-successful-revision" "$privilege_log"
+            assert_lan_dns_phases
 
             rm -f "$command_log" "$privilege_log" "$smoke_count"
-            run_deploy apply
+            SERVICE_PUBLICATION_ALLOW_UNPUBLISHED_DNS=1 run_deploy apply
             grep -Fqx "cat $state_arg/last-successful-revision" "$privilege_log"
             [[ $(<"$revision_file") == "$expected_revision" ]]
+            assert_lan_dns_phases
 
             rm -f "$command_log" "$privilege_log" "$smoke_count"
             if SERVICE_PUBLICATION_TEST_FAIL_FINAL_SMOKE=1 run_deploy apply; then

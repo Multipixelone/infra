@@ -28,6 +28,29 @@ let
     "192.168.7.0/24"
     "192.168.8.0/24"
   ];
+  dvp = registry.applications.dvp;
+  dvpHostname = "dvp.finnrut.is";
+  dvpInternalAlias = "dvp.nyc.finnrut.is";
+  dvpRoute = inventory.routes."dvp/root";
+  dvpAccessIsFinnOnly =
+    access: access.policy == "finn-only" && access.serviceTokens == [ ] && !access.bypassAccess;
+  resolveWithDvp =
+    overrides:
+    publicationLib.resolve (
+      registry
+      // {
+        applications = registry.applications // {
+          dvp = dvp // overrides;
+        };
+      }
+    );
+  edgeOnlyWithBypass = resolveWithDvp { access = wholeBypassAccess; };
+  edgeOnlyWithServiceToken = resolveWithDvp {
+    access = dvp.access // {
+      serviceTokens = [ "00000000-0000-0000-0000-000000000000" ];
+    };
+  };
+  edgeOnlyWithInternalHostname = resolveWithDvp { publicHostname = dvpInternalAlias; };
   iotFirewallCommands = config.flake.nixosConfigurations.iot.config.networking.firewall.extraCommands;
   hasIotFirewallAccept =
     port: cidr:
@@ -431,6 +454,12 @@ let
       "legacy hostname projection validation regressed";
     assert lib.assertMsg (hasError "outside the managed finnrut.is zone" outOfZoneHostname)
       "managed-zone canonical hostname validation regressed";
+    assert lib.assertMsg (hasError "Access bypass or service tokens" edgeOnlyWithBypass)
+      "edge-only applications must explicitly reject otherwise valid whole-application bypasses";
+    assert lib.assertMsg (hasError "Access bypass or service tokens" edgeOnlyWithServiceToken)
+      "edge-only applications must reject application-level machine tokens";
+    assert lib.assertMsg (hasError "is inside an internal static zone" edgeOnlyWithInternalHostname)
+      "edge-only canonical hostnames must not sit under a private DNS zone";
     assert lib.assertMsg (hasError "narrow the bypass route pathPrefix" wideningBypass)
       "outer-route bypass widening validation regressed";
     # Asserted by property rather than by a full attrNames list: the fixture
@@ -504,6 +533,7 @@ let
           "copyparty"
           "copyparty/assets"
           "copyparty/share"
+          "dvp"
           "forgejo"
           "grafana"
           "grimoire"
@@ -533,6 +563,7 @@ let
           "copyparty"
           "copyparty/assets"
           "copyparty/share"
+          "dvp"
           "forgejo"
           "grafana"
           "grafana/api"
@@ -578,6 +609,96 @@ let
           "198.51.100.0/24"
         ]
     ) "backend allowed-source CIDRs must project as a stable unique list";
+    assert lib.assertMsg
+      (
+        inventory.applications.dvp.edgeOnly
+        && inventory.applications.dvp.site == "nyc"
+        && inventory.applications.dvp.public
+        && inventory.applications.dvp.canonical == dvpHostname
+        && inventory.applications.dvp.alias == null
+        && dvpRoute.public
+        && dvpRoute.pathPrefix == "/"
+        && dvpRoute.proxy.host == "link"
+        && dvpRoute.backend.host == "link"
+        && dvpRoute.backendAddress == "127.0.0.1"
+        && dvpRoute.backend.scheme == "http"
+        && dvpRoute.backend.port == 8790
+        && dvpAccessIsFinnOnly dvpRoute.access
+        && !(builtins.hasAttr dvpHostname inventory.blockyRecords)
+        && !(builtins.hasAttr dvpInternalAlias inventory.blockyRecords)
+        && lib.elem dvpHostname inventory.nginxByHost.link.certificateNames
+        && lib.any (
+          vhost:
+          vhost.name == dvpHostname
+          && vhost.kind == "proxy"
+          && map (route: route.key) vhost.routes == [ "dvp/root" ]
+        ) inventory.nginxByHost.link.vhosts
+        && lib.all (
+          proxy:
+          !(lib.elem dvpInternalAlias proxy.certificateNames)
+          && !(lib.any (vhost: vhost.name == dvpInternalAlias) proxy.vhosts)
+        ) (builtins.attrValues inventory.nginxByHost)
+      )
+      "DVP must have only its canonical Link vhost and certificate name, no Blocky override, and a Link loopback origin on port 8790";
+    assert lib.assertMsg
+      (
+        let
+          access = inventory.cloudflare.accessApplications.dvp;
+          dns = inventory.cloudflare.dnsRecords.dvp;
+          tunnel = lib.findFirst (
+            application: application.key == "dvp"
+          ) null inventory.cloudflare.tunnel.applications;
+        in
+        access.domain == dvpHostname
+        && dvpAccessIsFinnOnly access.access
+        && dns.hostname == dvpHostname
+        && dns.accessDependency == "dvp"
+        && tunnel != null
+        && tunnel.hostname == dvpHostname
+        && tunnel.accessDependency == "dvp"
+        && builtins.length tunnel.ingress == 1
+        && lib.all (
+          ingress:
+          ingress.key == "dvp/root"
+          && ingress.pathPrefix == "/"
+          && ingress.service == "https://${registry.hosts.link.addresses.lan}:443"
+          && ingress.originServerName == dvpHostname
+          && ingress.httpHostHeader == dvpHostname
+          && !ingress.noTlsVerify
+          && ingress.accessDependency == "dvp"
+        ) tunnel.ingress
+      )
+      "DVP must remain protected by finn-only Access and tunnel directly to Link with canonical, verified HTTPS";
+    assert lib.assertMsg
+      (
+        let
+          internal = lib.filter (probe: probe.routeKey == "dvp/root") inventory.internalProbes;
+          external = lib.filter (probe: probe.key == "dvp/root") inventory.externalProbes;
+        in
+        lib.sort (a: b: a < b) (map (probe: probe.resolverHost) internal) == [
+          "impa"
+          "link"
+        ]
+        && lib.all (
+          probe:
+          probe.edgeOnly
+          && probe.hostname == dvpHostname
+          && probe.alias == null
+          && probe.proxyAddress == registry.hosts.link.addresses.lan
+          && probe.path == "/"
+          && probe.expectedStatuses == [ 403 ]
+        ) internal
+        && builtins.length external == 1
+        && lib.all (
+          probe:
+          probe.edgeOnly
+          && probe.hostname == dvpHostname
+          && probe.path == "/"
+          && !probe.denied
+          && dvpAccessIsFinnOnly probe.access
+        ) external
+      )
+      "DVP probe intent must require direct unauthenticated 403 for Link and Impa and retain tokenless Access at the edge";
     assert lib.assertMsg
       (
         inventory.routes."map/root".backend.allowedSourceCidrs == [ ]
@@ -717,7 +838,7 @@ in
               (.hosts.alexandria.deployedByColmena == false) and
               (([.internalProbes[].resolverAddress] | unique | sort) == ["192.168.6.50", "192.168.6.6"]) and
               ([.internalProbes[] | select(.routeKey == "grafana/root")] | length == 2) and
-              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "forgejo", "grimoire", "homeassistant", "map", "minecraft-map", "romm", "saves", "seerr"]) and
+              (.cloudflare.dnsRecords | keys == ["albums", "copyparty", "dvp", "forgejo", "grimoire", "homeassistant", "map", "minecraft-map", "romm", "saves", "seerr"]) and
               (.cloudflare.dnsRecords.map.hostname == "dawarich.finnrut.is") and
               (.cloudflare.dnsRecords["minecraft-map"].hostname == "map.finnrut.is") and
               (.cloudflare.dnsRecords.seerr.hostname == "requests.finnrut.is") and
