@@ -1,7 +1,7 @@
 { inputs, ... }:
 {
   flake-file.inputs.dvp = {
-    url = "git+https://github.com/Multipixelone/dvp.git?ref=feat/nixos-service";
+    url = "git+https://github.com/Multipixelone/dvp.git";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -112,10 +112,10 @@
         trustProxy = true;
         cloudflareAccess = {
           enable = true;
-          email = "finn@cnwr.net";
-          # Fail closed until the first deployment provisions the Access app.
-          issuer = null;
-          audience = null;
+          domain = "saltandstraw.com";
+          emails = [ "finn@cnwr.net" ];
+          issuer = "https://frutis.cloudflareaccess.com";
+          audience = "0053c1f3b2eea1bf8a606a2507833fa3af0b607d0d09896f1a93a43c16b77762";
         };
       };
       systemd.services.dvp.unitConfig.RequiresMountsFor = [ stateDir ];

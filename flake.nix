@@ -92,7 +92,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     dvp = {
-      url = "git+https://github.com/Multipixelone/dvp.git?ref=feat/nixos-service";
+      url = "git+https://github.com/Multipixelone/dvp.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     euphony = {

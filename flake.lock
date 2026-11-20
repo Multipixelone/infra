@@ -819,16 +819,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1795125900,
-        "narHash": "sha256-nJS9bvyt183lxEpxm67ikggFNZnHemcR7sQre2pgWyg=",
-        "ref": "feat/nixos-service",
-        "rev": "c4bc473f9c34c307978017e2a425ca1f8641f0f9",
-        "revCount": 61,
+        "lastModified": 1795200367,
+        "narHash": "sha256-G06/nczfS86NBaXD9Fe9WRso31eSadlYtKrHW8hBV9Y=",
+        "ref": "refs/heads/main",
+        "rev": "73e14e80ad7f62c0ded103aa33dcf75b79d37393",
+        "revCount": 94,
         "type": "git",
         "url": "https://github.com/Multipixelone/dvp.git"
       },
       "original": {
-        "ref": "feat/nixos-service",
         "type": "git",
         "url": "https://github.com/Multipixelone/dvp.git"
       }
