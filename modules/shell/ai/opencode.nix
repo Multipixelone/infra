@@ -32,6 +32,7 @@
         omoVersion = "3.0.7";
         dcpVersion = "3.2.0";
         visualCacheVersion = "1.7.5";
+        debtmap = pkgs.callPackage ../../../pkgs/debtmap { };
 
         # ── Composable building blocks ──────────────────────────────────
         #
@@ -96,6 +97,10 @@
             ];
             mcps = [ "nixos" ];
           };
+          janitor = {
+            skills = [ ];
+            mcps = [ ];
+          };
           # Custom agent forked from marketplace alvin/validator@1.0.1;
           # owns agent-run-long validation lanes.
           validator = {
@@ -157,6 +162,7 @@
           explorer.model = "subagent";
           designer.model = "high-effort";
           fixer.model = "fixer";
+          janitor.model = "fixer";
           validator.model = "fixer";
           tester.model = "fixer";
           diagnostician.model = "subagent";
@@ -185,6 +191,19 @@
 
         # Each combo already retries and falls back inside OmniRoute.
         fallbackConfig.enabled = false;
+
+        customAgents.janitor = {
+          description = "Runs a scoped Debtmap cleanup loop and verifies its edits.";
+          prompt = builtins.readFile ./prompts/janitor.md;
+          orchestratorPrompt = ''
+            @janitor — delegate only when the user explicitly asks to use Janitor or expressly requests the Debtmap cleanup loop. Pass the user's scope and constraints. Do not delegate routine refactoring, code review, or general technical-debt requests to Janitor.
+          '';
+          # Direct edit worker: disable nested delegation and code-mode execution.
+          permission = {
+            task = "deny";
+            execute = "deny";
+          };
+        };
 
         # Locally maintained fork of marketplace package alvin/validator@1.0.1
         # (MIT, by Alvin). Top-level `agents` keys that aren't built-ins are
@@ -406,6 +425,7 @@
         };
       in
       {
+        home.packages = lib.optional (lib.meta.availableOn pkgs.stdenv.hostPlatform debtmap) debtmap;
 
         programs.fish.interactiveShellInit = lib.concatStringsSep "\n\n" [
           # fish
@@ -431,6 +451,16 @@
           agents = if aiConfig.agentsDir == null then { } else aiConfig.agentsDir;
           skills = aiConfig.skillsDir;
           settings = {
+            commands.janitor = {
+              agent = "janitor";
+              subagent = true;
+              description = "Run a scoped Debtmap cleanup loop";
+              template = ''
+                Run the Janitor Debtmap cleanup loop within the following user scope and constraints:
+
+                $ARGUMENTS
+              '';
+            };
             # Shared programs.mcp headers use Claude-style placeholders;
             # OpenCode expands {env:VAR} in the server process environment.
             mcp.servers = mcpServers // {
