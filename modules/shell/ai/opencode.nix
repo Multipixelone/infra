@@ -29,8 +29,8 @@
         aiConfig = config.flake.aiConfig;
         # Keep npm plugin and schema versions together, not in installers that
         # would overwrite Home Manager-managed files.
-        omoVersion = "3.0.7";
-        dcpVersion = "3.2.0";
+        omoVersion = "3.0.8";
+        dcpVersion = "3.2.1";
         visualCacheVersion = "1.7.5";
         debtmap = pkgs.callPackage ../../../pkgs/debtmap { };
 
