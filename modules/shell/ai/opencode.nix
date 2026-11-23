@@ -412,7 +412,7 @@
         omoConfig = builtins.toJSON {
           "$schema" = "https://unpkg.com/oh-my-opencode-slim@${omoVersion}/oh-my-opencode-slim.schema.json";
           autoUpdate = false;
-          multiplexer.type = "zellij";
+          multiplexer.type = "none";
           preset = "omniroute";
           council = councilConfig;
           fallback = fallbackConfig;
