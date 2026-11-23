@@ -819,11 +819,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795200367,
-        "narHash": "sha256-G06/nczfS86NBaXD9Fe9WRso31eSadlYtKrHW8hBV9Y=",
+        "lastModified": 1795470490,
+        "narHash": "sha256-e5jsru4ARwciVmyzd3O5mYBgP6ZPL35HktB7BaEYgfU=",
         "ref": "refs/heads/main",
-        "rev": "73e14e80ad7f62c0ded103aa33dcf75b79d37393",
-        "revCount": 94,
+        "rev": "b03c32373c01b62c9974240e46cbe6f2d8fe700f",
+        "revCount": 125,
         "type": "git",
         "url": "https://github.com/Multipixelone/dvp.git"
       },
