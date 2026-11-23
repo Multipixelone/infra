@@ -1,7 +1,7 @@
 { inputs, ... }:
 {
   flake-file.inputs.dvp = {
-    url = "git+https://github.com/Multipixelone/dvp.git";
+    url = "github:Multipixelone/dvp";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
