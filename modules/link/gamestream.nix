@@ -364,7 +364,12 @@
       # window rule starts working again.
       bigpicture-launch =
         let
-          steam-gamescope = "${lib.getExe gamescope-run} -x -e ${lib.getExe config.programs.steam.package} -steamos3 -steampal -steamdeck -gamepadui";
+          # No -steamdeck/-steampal: they opt Steam into the steamdeck_stable
+          # client beta, a separate install from the desktop client. Switching
+          # between this app and the regular Steam apps then forced a full
+          # client reinstall on every launch, which steam-kill interrupted when
+          # the session ended, so Big Picture never finished starting.
+          steam-gamescope = "${lib.getExe gamescope-run} -x -e ${lib.getExe config.programs.steam.package} -steamos3 -gamepadui";
         in
         pkgs.writeShellApplication {
           name = "bigpicture-launch";
